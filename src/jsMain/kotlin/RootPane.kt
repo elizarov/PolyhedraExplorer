@@ -3,6 +3,7 @@ package polyhedra.js
 import kotlinx.html.InputType
 import kotlinx.html.js.onChangeFunction
 import org.w3c.dom.HTMLInputElement
+import polyhedra.common.*
 import react.RBuilder
 import react.RComponent
 import react.RProps
@@ -37,6 +38,8 @@ class RootPane(props: RootPaneProps) : RComponent<RootPaneProps, RootPaneState>(
         child(Canvas::class) {
             attrs {
                 text = state.text
+                poly = icosahedron
+                style = PolyStyle()
             }
         }
     }

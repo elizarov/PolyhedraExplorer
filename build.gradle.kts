@@ -40,9 +40,6 @@ kotlin {
                 }
             }
         }
-        compilations.all {
-            kotlinOptions.freeCompilerArgs += listOf("-Xopt-in=kotlin.js.ExperimentalJsExport")
-        }
     }
     sourceSets {
         val commonMain by getting
@@ -70,6 +67,10 @@ kotlin {
                 implementation(kotlin("test-js"))
             }
         }
+    }
+    sourceSets.all {
+        languageSettings.useExperimentalAnnotation("kotlin.ExperimentalStdlibApi")
+        languageSettings.useExperimentalAnnotation("kotlin.js.ExperimentalJsExport")
     }
 }
 

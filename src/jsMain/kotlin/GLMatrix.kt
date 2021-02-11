@@ -9,6 +9,8 @@ external object mat4 {
     fun create(): Float32Array
 
     fun identity(out: Float32Array): Float32Array
+    fun invert(out: Float32Array, a: Float32Array): Float32Array
+    fun transpose(out: Float32Array, a: Float32Array): Float32Array
     fun translate(out: Float32Array, a: Float32Array, v: Float32Array): Float32Array
     fun rotate(out: Float32Array, a: Float32Array, rad: Number, axis: Float32Array): Float32Array
     fun rotateX(out: Float32Array, a: Float32Array, rad: Number)

@@ -3,11 +3,14 @@ package polyhedra.js
 import kotlinx.browser.*
 import org.khronos.webgl.*
 import org.w3c.dom.*
+import polyhedra.common.*
 import react.*
 import react.dom.*
 
 external interface CanvasProps : RProps {
     var text: String
+    var poly: Polyhedron
+    var style: PolyStyle
 }
 
 external interface CanvasState : RState {
@@ -62,5 +65,5 @@ class Canvas(props: CanvasProps) : RComponent<CanvasProps, CanvasState>(props) {
         draw()
 
     private fun draw() =
-        drawContext.drawScene(state)
+        drawContext.drawScene(props.poly, props.style, state)
 }

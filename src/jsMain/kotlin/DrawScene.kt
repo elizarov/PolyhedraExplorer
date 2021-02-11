@@ -1,6 +1,7 @@
 package polyhedra.js
 
 import org.khronos.webgl.*
+import polyhedra.common.*
 import kotlin.math.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
@@ -11,80 +12,15 @@ class DrawContext(
     
     val projectionMatrix = mat4.create()
     val modelViewMatrix = mat4.create()
+    val normalMatrix = mat4.create()
 
     val modelViewTranslation = float32Of(-0.0f, 0.0f, -6.0f)
 
-    val positions = float32Of(
-        // Front face
-        -1.0, -1.0,  1.0,
-        1.0, -1.0,  1.0,
-        1.0,  1.0,  1.0,
-        -1.0,  1.0,  1.0,
-
-        // Back face
-        -1.0, -1.0, -1.0,
-        -1.0,  1.0, -1.0,
-        1.0,  1.0, -1.0,
-        1.0, -1.0, -1.0,
-
-        // Top face
-        -1.0,  1.0, -1.0,
-        -1.0,  1.0,  1.0,
-        1.0,  1.0,  1.0,
-        1.0,  1.0, -1.0,
-
-        // Bottom face
-        -1.0, -1.0, -1.0,
-        1.0, -1.0, -1.0,
-        1.0, -1.0,  1.0,
-        -1.0, -1.0,  1.0,
-
-        // Right face
-        1.0, -1.0, -1.0,
-        1.0,  1.0, -1.0,
-        1.0,  1.0,  1.0,
-        1.0, -1.0,  1.0,
-
-        // Left face
-        -1.0, -1.0, -1.0,
-        -1.0, -1.0,  1.0,
-        -1.0,  1.0,  1.0,
-        -1.0,  1.0, -1.0,
-    )
-
     val positionBuffer = gl.createBuffer()!!
-
-    val nVertices = positions.length / 3
-
-    val faceColors = float32Of(
-        1.0,  1.0,  1.0,  1.0,    // Front face: white
-        1.0,  0.0,  0.0,  1.0,    // Back face: red
-        0.0,  1.0,  0.0,  1.0,    // Top face: green
-        0.0,  0.0,  1.0,  1.0,    // Bottom face: blue
-        1.0,  1.0,  0.0,  1.0,    // Right face: yellow
-        1.0,  0.0,  1.0,  1.0,    // Left face: purple
-    )
-
-    val colors = Float32Array(nVertices * 4).apply {
-        for (i in 0 until nVertices) {
-            val j = i / 4
-            for (k in 0 until 4)
-                this[i * 4 + k] = faceColors[j * 4 + k]
-        }
-    }
-
-    val colorBuffer = gl.createBuffer()
-
-    val indices = uint16Of(
-        0,  1,  2,      0,  2,  3,    // front
-        4,  5,  6,      4,  6,  7,    // back
-        8,  9,  10,     8,  10, 11,   // top
-        12, 13, 14,     12, 14, 15,   // bottom
-        16, 17, 18,     16, 18, 19,   // right
-        20, 21, 22,     20, 22, 23,   // left
-    )
-
+    val normalBuffer = gl.createBuffer()!!
+    val colorBuffer = gl.createBuffer()!!
     val indexBuffer = gl.createBuffer()
+    var nIndices = 0
 }
 
 private fun DrawContext.initProjectionMatrix(gl: GL, fieldOfViewDegrees: Double) {
@@ -94,13 +30,16 @@ private fun DrawContext.initProjectionMatrix(gl: GL, fieldOfViewDegrees: Double)
     )
 }
 
-private fun DrawContext.initModelViewMatrix(state: CanvasState) {
+private fun DrawContext.initModelAndNormalMatrices(state: CanvasState) {
     mat4.fromTranslation(modelViewMatrix, modelViewTranslation)
     mat4.rotateX(modelViewMatrix, modelViewMatrix, state.rotation * 0.6)
     mat4.rotateZ(modelViewMatrix, modelViewMatrix, state.rotation)
+
+    mat4.invert(normalMatrix, modelViewMatrix)
+    mat4.transpose(normalMatrix, normalMatrix)
 }
 
-fun DrawContext.drawScene(state: CanvasState) {
+fun DrawContext.drawScene(poly: Polyhedron, style: PolyStyle, state: CanvasState) {
     gl.clearColor(0.0f, 0.0f, 0.0f, 1.0f)
     gl.clearDepth(1.0f)
     gl.enable(GL.DEPTH_TEST)
@@ -109,25 +48,92 @@ fun DrawContext.drawScene(state: CanvasState) {
     
     gl.useProgram(shader.program)
 
+    initPolyhedra(poly, style)
     initProjectionMatrix(gl, 45.0)
-    initModelViewMatrix(state)
+    initModelAndNormalMatrices(state)
 
     gl.uniformMatrix4fv(shader.projectionMatrixLocation, false, projectionMatrix)
     gl.uniformMatrix4fv(shader.modelViewMatrixLocation, false, modelViewMatrix)
+    gl.uniformMatrix4fv(shader.normalMatrixLocation, false, normalMatrix)
 
-    gl.bindBuffer(GL.ARRAY_BUFFER, positionBuffer)
-    gl.bufferData(GL.ARRAY_BUFFER, positions, GL.STATIC_DRAW)
-    gl.vertexAttribPointer(shader.aVertexPositionLocation, 3, GL.FLOAT, false, 0, 0)
-    gl.enableVertexAttribArray(shader.aVertexPositionLocation)
-
-    gl.bindBuffer(GL.ARRAY_BUFFER, colorBuffer)
-    gl.bufferData(GL.ARRAY_BUFFER, colors, GL.STATIC_DRAW)
-    gl.vertexAttribPointer(shader.aVertexColorLocation, 4, GL.FLOAT, false, 0, 0)
-    gl.enableVertexAttribArray(shader.aVertexColorLocation)
-
-    gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, indexBuffer);
-    gl.bufferData(GL.ELEMENT_ARRAY_BUFFER, indices, GL.STATIC_DRAW);
-
-    gl.drawElements(GL.TRIANGLES, indices.length, GL.UNSIGNED_SHORT, 0)
+    gl.drawElements(GL.TRIANGLES, nIndices, GL.UNSIGNED_SHORT, 0)
 }
 
+fun DrawContext.initPolyhedra(poly: Polyhedron, style: PolyStyle) {
+    gl.vertexAttribArray(poly, positionBuffer, shader.aVertexPositionLocation, 3) { _, v, a, i ->
+        a[i] = v.pt
+    }
+    gl.vertexAttribArray(poly, normalBuffer, shader.aVertexNormalLocation, 3) { f, _, a, i ->
+        a[i] = f.plane.n
+    }
+    gl.vertexAttribArray(poly, colorBuffer, shader.aVertexColorLocation, 4) { f, _, a, i ->
+        a[i] = style.faceKindColor(f.kind)
+    }
+    // indices
+    nIndices = poly.fs.sumOf { 3 * (it.size - 2) }
+    val indices = Uint16Array(nIndices)
+    var i = 0
+    var j = 0
+    for (f in poly.fs) {
+        for (k in 2 until f.size) {
+            indices[j++] = i
+            indices[j++] = i + k - 1
+            indices[j++] = i + k
+        }
+        i += f.size
+    }
+    gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, indexBuffer)
+    gl.bufferData(GL.ELEMENT_ARRAY_BUFFER, indices, GL.STATIC_DRAW)
+}
+
+fun GL.vertexAttribArray(
+    poly: Polyhedron,
+    buffer: WebGLBuffer,
+    location: Int,
+    size: Int,
+    transform: (f: Face, v: Vertex, a: Float32Array, i: Int) -> Unit)
+{
+    val data = poly.vertexArray(size, ::Float32Array, transform)
+    bindBuffer(GL.ARRAY_BUFFER, buffer)
+    bufferData(GL.ARRAY_BUFFER, data, GL.STATIC_DRAW)
+    vertexAttribPointer(location, size, GL.FLOAT, false, 0, 0)
+    enableVertexAttribArray(location)
+}
+
+fun <A> Polyhedron.vertexArray(
+    size: Int,
+    factory: (Int) -> A,
+    transform: (f: Face, v: Vertex, a: A, i: Int) -> Unit
+): A {
+    val m = fs.sumOf { it.size }
+    val a = factory(size * m)
+    var i = 0
+    for (f in fs) {
+        for (v in f) {
+            transform(f, v, a, i)
+            i += size
+        }
+    }
+    return a
+}
+
+inline operator fun Float32Array.set(i: Int, x: Double) {
+    set(i, x.toFloat())
+}
+
+operator fun Float32Array.set(i: Int, v: Vec3) {
+    set(i, v.x)
+    set(i + 1, v.y)
+    set(i + 2, v.z)
+}
+
+operator fun Float32Array.set(i: Int, c: Color) {
+    set(i, c.r)
+    set(i + 1, c.g)
+    set(i + 2, c.b)
+    set(i + 3, c.a)
+}
+
+inline operator fun Uint16Array.set(i: Int, x: Int) {
+    set(i, x.toShort())
+}
