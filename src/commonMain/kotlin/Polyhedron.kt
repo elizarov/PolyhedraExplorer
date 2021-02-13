@@ -16,18 +16,23 @@ class Polyhedron(
         }
     }
 
-    val vsByKind by lazy { vs.groupByToList { it.kind } }
-    val fsByKind by lazy { fs.groupByToList { it.kind } }
+    val vsByKind by lazy { vs.groupByToList { it.kind.id } }
+    val fsByKind by lazy { fs.groupByToList { it.kind.id } }
     val esByKind by lazy { es.groupBy { it.kind } }
 
     override fun toString(): String =
         "Polyhedron(vs=${vs.size}, es=${es.size}, fs=${fs.size})"
 }
 
+inline class Kind(val id: Int) : Comparable<Kind> {
+    override fun compareTo(other: Kind): Int = id.compareTo(other.id)
+    override fun toString(): String = "$id"
+}
+
 class Vertex(
     val id: Int,
     val pt: Vec3,
-    val kind: Int,
+    val kind: Kind,
 ) {
     
 }
@@ -42,14 +47,14 @@ class Edge(
         EdgeKind(v.kind, u.kind)
 }
 
-data class EdgeKind(val u: Int, val v: Int) {
+data class EdgeKind(val u: Kind, val v: Kind) {
     override fun toString(): String = "$u-$v"
 }
 
 class Face(
     val id: Int,
     val vs: List<Vertex>,
-    val kind: Int,
+    val kind: Kind,
 ) {
     val plane = plane3(vs[0].pt, vs[1].pt, vs[2].pt)
 
@@ -78,21 +83,22 @@ class PolyhedronBuilder {
     private val vs = ArrayList<Vertex>()
     private val fs = ArrayList<Face>()
 
-    fun vertex(p: Vec3, kind: Int = 0) {
+    fun vertex(p: Vec3, kind: Kind = Kind(0)) {
         vs.add(Vertex(vs.size, p, kind))
     }
 
-    fun vertex(x: Double, y: Double, z: Double, kind: Int = 0) {
+    fun vertex(x: Double, y: Double, z: Double, kind: Kind = Kind(0)) {
         vertex(Vec3(x, y, z), kind)
     }
 
-    fun face(a: List<Vertex>, kind: Int = 0) {
+    fun face(v: List<Int>, kind: Kind = Kind(0)) {
+        val a = List(v.size) { vs[v[it]] }
         fs.add(Face(fs.size, a, kind))
     }
 
-    fun face(vararg v: Int) {
+    fun face(vararg v: Int, kind: Kind = Kind(0)) {
         val a = List(v.size) { vs[v[it]] }
-        face(a)
+        fs.add(Face(fs.size, a, kind))
     }
 
     fun build() = Polyhedron(vs, fs)

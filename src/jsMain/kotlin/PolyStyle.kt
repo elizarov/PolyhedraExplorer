@@ -1,6 +1,7 @@
 package polyhedra.js
 
-class PolyStyle {
-    fun faceKindColor(kind: Int): Color = Color(1.0, 1.0, 0.0, 1.0)
+import polyhedra.common.*
 
+class PolyStyle {
+    fun faceColor(f: Face): Color = Color(1.0, 1.0, 0.0, 1.0)
 }

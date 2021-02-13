@@ -1,44 +1,45 @@
 package polyhedra.js
 
-import kotlinx.html.InputType
+import kotlinx.html.*
 import kotlinx.html.js.onChangeFunction
-import org.w3c.dom.HTMLInputElement
+import org.w3c.dom.*
 import polyhedra.common.*
-import react.RBuilder
-import react.RComponent
-import react.RProps
-import react.RState
+import react.*
 import react.dom.*
 
-external interface RootPaneProps : RProps {
+external interface RootPaneState : RState {
+    var seed: Seed
 }
-
-data class RootPaneState(
-    val text: String = "Hello"
-) : RState
 
 @Suppress("NON_EXPORTABLE_TYPE")
 @JsExport
-class RootPane(props: RootPaneProps) : RComponent<RootPaneProps, RootPaneState>(props) {
-    init {
-        state = RootPaneState()
+class RootPane() : RComponent<RProps, RootPaneState>() {
+    override fun RootPaneState.init() {
+        seed = Seed.Tetrahedron
     }
 
     override fun RBuilder.render() {
-        input {
+        select {
             attrs {
-                type = InputType.text
-                value = state.text
+                this["value"] = state.seed.name
                 onChangeFunction = { event ->
-                    setState(RootPaneState(text = (event.target as HTMLInputElement).value))
+                    val value = (event.target as HTMLSelectElement).value
+                    setState { seed = Seed.valueOf(value) }
+                }
+            }
+            for (seed in Seed.values()) {
+                option {
+                    attrs {
+                        value = seed.name
+                    }
+                    +seed.name
                 }
             }
         }
         br {}
         child(Canvas::class) {
             attrs {
-                text = state.text
-                poly = icosahedron
+                poly = state.seed.poly
                 style = PolyStyle()
             }
         }

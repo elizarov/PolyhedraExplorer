@@ -67,10 +67,11 @@ kotlin {
                 implementation(kotlin("test-js"))
             }
         }
-    }
-    sourceSets.all {
-        languageSettings.useExperimentalAnnotation("kotlin.ExperimentalStdlibApi")
-        languageSettings.useExperimentalAnnotation("kotlin.js.ExperimentalJsExport")
+        all {
+            languageSettings.enableLanguageFeature("InlineClasses")
+            languageSettings.useExperimentalAnnotation("kotlin.ExperimentalStdlibApi")
+            languageSettings.useExperimentalAnnotation("kotlin.js.ExperimentalJsExport")
+        }
     }
 }
 

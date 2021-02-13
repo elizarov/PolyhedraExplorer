@@ -8,7 +8,6 @@ import react.*
 import react.dom.*
 
 external interface CanvasProps : RProps {
-    var text: String
     var poly: Polyhedron
     var style: PolyStyle
 }

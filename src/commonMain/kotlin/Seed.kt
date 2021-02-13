@@ -2,6 +2,24 @@ package polyhedra.common
 
 import kotlin.math.*
 
+enum class Seed(val poly: Polyhedron) {
+    Tetrahedron(tetrahedron),
+    Cube(cube),
+    Icosahedron(icosahedron)
+}
+
+val tetrahedron = polyhedron {
+    val t = 1 / sqrt(2.0)
+    vertex(-1.0, 0.0, -t) // 0
+    vertex(1.0, 0.0, -t) // 1
+    vertex(0.0, -1.0, t) // 2
+    vertex(0.0, 1.0, t) // 3
+    face(0, 1, 3)
+    face(0, 2, 1)
+    face(0, 3, 2)
+    face(1, 2, 3)
+}
+
 val cube = polyhedron {
     vertex(1.0, 1.0, -1.0) // 0
     vertex(-1.0, 1.0, -1.0) // 1
@@ -19,9 +37,8 @@ val cube = polyhedron {
     face(4, 7, 6, 5)
 }
 
-private val phi = (sqrt(5.0) + 1) / 2
-
 val icosahedron = polyhedron {
+    val phi = (sqrt(5.0) + 1) / 2
     vertex(0.0, -1.0, -phi) // 0
     vertex(0.0, 1.0, -phi) // 1
     vertex(-phi, 0.0, -1.0) // 2

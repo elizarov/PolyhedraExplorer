@@ -67,7 +67,7 @@ fun DrawContext.initPolyhedra(poly: Polyhedron, style: PolyStyle) {
         a[i] = f.plane.n
     }
     gl.vertexAttribArray(poly, colorBuffer, shader.aVertexColorLocation, 4) { f, _, a, i ->
-        a[i] = style.faceKindColor(f.kind)
+        a[i] = style.faceColor(f)
     }
     // indices
     nIndices = poly.fs.sumOf { 3 * (it.size - 2) }
