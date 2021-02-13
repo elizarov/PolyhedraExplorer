@@ -5,6 +5,8 @@ import kotlin.math.*
 enum class Seed(val poly: Polyhedron) {
     Tetrahedron(tetrahedron),
     Cube(cube),
+    Octahedron(octahedron),
+    Dodecahedron(dodecahedron),
     Icosahedron(icosahedron)
 }
 
@@ -36,6 +38,8 @@ val cube = polyhedron {
     face(3, 7, 4, 0)
     face(4, 7, 6, 5)
 }
+
+val octahedron = cube.dual()
 
 val icosahedron = polyhedron {
     val phi = (sqrt(5.0) + 1) / 2
@@ -72,3 +76,5 @@ val icosahedron = polyhedron {
     face(8, 11, 10)
     face(9, 10, 11)
 }
+
+val dodecahedron= icosahedron.dual()

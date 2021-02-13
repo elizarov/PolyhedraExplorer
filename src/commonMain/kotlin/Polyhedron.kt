@@ -8,10 +8,10 @@ class Polyhedron(
         var id = 0
         for (f in fs) {
             for (i in 0 until f.size) {
-                val u = f[i]
-                val v = f[(i + 1) % f.size]
-                if (u.id < v.id)
-                    add(Edge(id++, u, v))
+                val a = f[i]
+                val b = f[(i + 1) % f.size]
+                if (a.id < b.id)
+                    add(Edge(id++, a, b))
             }
         }
     }
@@ -20,6 +20,18 @@ class Polyhedron(
     val fsByKind by lazy { fs.groupByToList { it.kind.id } }
     val esByKind by lazy { es.groupBy { it.kind } }
 
+    val inradius: Double by lazy {
+        fs.minOf { f -> f.plane.d }
+    }
+
+    val midradius: Double by lazy {
+        es.avgOf { e -> e.tangentPoint.norm }
+    }
+
+    val circumradius: Double by lazy {
+        vs.maxOf { v -> v.pt.norm }
+    }
+    
     override fun toString(): String =
         "Polyhedron(vs=${vs.size}, es=${es.size}, fs=${fs.size})"
 }
@@ -34,22 +46,32 @@ class Vertex(
     val pt: Vec3,
     val kind: Kind,
 ) {
-    
+    override fun equals(other: Any?): Boolean = other is Vertex && id == other.id
+    override fun hashCode(): Int = id
+    override fun toString(): String = "Vertex(id=$id, $pt)"
+}
+
+data class EdgeKind(val a: Kind, val b: Kind) {
+    override fun toString(): String = "$a-$b"
 }
 
 class Edge(
     val id: Int,
-    val u: Vertex,
-    val v: Vertex,
+    val a: Vertex,
+    val b: Vertex,
 ) {
-    val kind = if (u.kind <= v.kind)
-        EdgeKind(u.kind, v.kind) else
-        EdgeKind(v.kind, u.kind)
+    val kind = if (a.kind <= b.kind)
+        EdgeKind(a.kind, b.kind) else
+        EdgeKind(b.kind, a.kind)
+
+    val vec = b.pt - a.pt
 }
 
-data class EdgeKind(val u: Kind, val v: Kind) {
-    override fun toString(): String = "$u-$v"
-}
+val Edge.tangentFraction: Double
+    get() = -(a.pt * vec) / (vec * vec)
+
+val Edge.tangentPoint: Vec3
+    get() = a.pt + tangentFraction * vec
 
 class Face(
     val id: Int,
@@ -62,6 +84,11 @@ class Face(
         get() = vs.size
     operator fun get(index: Int): Vertex = vs[index]
     operator fun iterator(): Iterator<Vertex> = vs.iterator()
+
+    override fun equals(other: Any?): Boolean = other is Vertex && id == other.id
+    override fun hashCode(): Int = id
+    override fun toString(): String =
+        "Face(id=$id, [${vs.map { it.id }.joinToString(", ")}])"
 }
 
 fun Polyhedron.validate() {
@@ -70,10 +97,10 @@ fun Polyhedron.validate() {
         for (v in f.vs)
             check(v.pt in f.plane)
         for (i in 0 until f.size) {
-            val u = f[i].pt
-            val v = f[(i + 1) % f.size].pt
-            val w = f[(i + 2) % f.size].pt
-            val rot = (w - u) cross (v - u)
+            val a = f[i].pt
+            val b = f[(i + 1) % f.size].pt
+            val c = f[(i + 2) % f.size].pt
+            val rot = (c - a) cross (b - a)
             check(rot * f.plane.n > -EPS)
         }
     }
@@ -91,14 +118,20 @@ class PolyhedronBuilder {
         vertex(Vec3(x, y, z), kind)
     }
 
-    fun face(v: List<Int>, kind: Kind = Kind(0)) {
-        val a = List(v.size) { vs[v[it]] }
+    fun face(v: List<Int>, kind: Kind = Kind(0), sort: Boolean = false) {
+        val a = MutableList(v.size) { vs[v[it]] }
+        if (sort) a.sortFace()
         fs.add(Face(fs.size, a, kind))
     }
 
     fun face(vararg v: Int, kind: Kind = Kind(0)) {
         val a = List(v.size) { vs[v[it]] }
         fs.add(Face(fs.size, a, kind))
+    }
+
+    fun face(f: Face) {
+        val a = List(f.size) { vs[f[it].id] }
+        fs.add(Face(fs.size, a, f.kind))
     }
 
     fun build() = Polyhedron(vs, fs)
@@ -110,7 +143,32 @@ fun polyhedron(block: PolyhedronBuilder.() -> Unit): Polyhedron =
         build()
     }
 
-fun List<Vertex>.sortedFace(): List<Vertex> {
-    TODO()
+private fun MutableList<Vertex>.sortFace() {
+    check(size >= 3)
+    // start with vertex #0
+    val v0 = this[0]
+    val n = plane3(v0.pt, this[1].pt, this[2].pt).normalFromOrigin().n
+    // find proper vertex #1
+    val i1 = (1 until size).first { i1 ->
+        // the rest of vertices must to be the right
+        val v1 = this[i1]
+        all { v2 -> ((v2.pt - v0.pt) cross (v1.pt - v0.pt)) * n > -EPS }
+    }
+    swap(1, i1)
+    // select #2 and others
+    for (i in 2 until size) {
+        val prev = this[i - 1].pt
+        val u = (prev - this[i - 2].pt).unit
+        val j = (i until size).maxByOrNull { j ->
+            (this[j].pt - prev).unit * u
+        }!!
+        swap(i, j)
+    }
+}
+
+private fun <T> MutableList<T>.swap(i: Int, j: Int) {
+    val t = this[i]
+    this[i] = this[j]
+    this[j] = t
 }
 

@@ -30,7 +30,7 @@ private fun DrawContext.initProjectionMatrix(gl: GL, fieldOfViewDegrees: Double)
     )
 }
 
-private fun DrawContext.initModelAndNormalMatrices(state: CanvasState) {
+private fun DrawContext.initModelAndNormalMatrices(state: GLCanvasState) {
     mat4.fromTranslation(modelViewMatrix, modelViewTranslation)
     mat4.rotateX(modelViewMatrix, modelViewMatrix, state.rotation * 0.6)
     mat4.rotateZ(modelViewMatrix, modelViewMatrix, state.rotation)
@@ -39,7 +39,7 @@ private fun DrawContext.initModelAndNormalMatrices(state: CanvasState) {
     mat4.transpose(normalMatrix, normalMatrix)
 }
 
-fun DrawContext.drawScene(poly: Polyhedron, style: PolyStyle, state: CanvasState) {
+fun DrawContext.drawScene(poly: Polyhedron, style: PolyStyle, state: GLCanvasState) {
     gl.clearColor(0.0f, 0.0f, 0.0f, 1.0f)
     gl.clearDepth(1.0f)
     gl.enable(GL.DEPTH_TEST)

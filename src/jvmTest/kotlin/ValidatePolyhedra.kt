@@ -6,7 +6,9 @@ import org.junit.*
 
 class ValidatePolyhedra {
     @Test
-    fun validateAll() {
-        cube.validate()
+    fun validateSeeds() {
+        for (seed in Seed.values()) {
+            seed.poly.validate()
+        }
     }
 }

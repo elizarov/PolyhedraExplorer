@@ -6,7 +6,9 @@ data class Vec3(
     val x: Double,
     val y: Double,
     val z: Double
-)
+) {
+    override fun toString(): String = "($x, $y, $z)"
+}
 
 val Vec3.norm: Double
     get() = sqrt(sqr(x) + sqr(y) + sqr(z))
@@ -20,7 +22,9 @@ val Vec3.unit: Vec3
 operator fun Vec3.plus(u: Vec3): Vec3 = Vec3(x + u.x, y + u.y, z + u.z)
 operator fun Vec3.minus(u: Vec3): Vec3 = Vec3(x - u.x, y - u.y, z - u.z)
 operator fun Vec3.times(u: Vec3): Double = x * u.x + y * u.y + z * u.z
+operator fun Double.times(u: Vec3): Vec3 = Vec3(this * u.x, this * u.y, this * u.z)
 operator fun Vec3.div(d: Double): Vec3 = Vec3(x / d, y / d, z / d)
+operator fun Vec3.unaryMinus(): Vec3 = Vec3(-x, -y, -z)
 
 infix fun Vec3.cross(u: Vec3) = Vec3(
     y * u.z - z * u.y,

@@ -11,3 +11,6 @@ fun plane3(a: Vec3, b: Vec3, c: Vec3): Plane {
 }
 
 operator fun Plane.contains(v: Vec3): Boolean = n * v approx d
+
+fun Plane.normalFromOrigin(): Plane =
+    if (d >= 0) this else Plane(-n, -d)
