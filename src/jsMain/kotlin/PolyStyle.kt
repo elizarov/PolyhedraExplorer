@@ -1,7 +1,15 @@
 package polyhedra.js
 
 import polyhedra.common.*
+import kotlin.math.*
+
+private val hue0 = 57.0 / 360
+private val ratio = (sqrt(5.0) - 1) / 2
+
+private fun paletteColor(id: Int) =
+    hsvColor(hue0 + ratio * id, 0.9, 0.9)
 
 class PolyStyle {
-    fun faceColor(f: Face): Color = Color(1.0, 1.0, 0.0, 1.0)
+    fun faceColor(f: Face): Color = paletteColor(f.id)
 }
+
