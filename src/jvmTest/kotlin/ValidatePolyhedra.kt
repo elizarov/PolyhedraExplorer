@@ -11,4 +11,11 @@ class ValidatePolyhedra {
             seed.poly.validate()
         }
     }
+
+    @Test
+    fun validateRectifiedSeeds() {
+        for (seed in Seed.values()) {
+            seed.poly.rectified().validate()
+        }
+    }
 }

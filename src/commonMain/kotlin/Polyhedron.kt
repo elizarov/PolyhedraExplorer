@@ -4,7 +4,7 @@ class Polyhedron(
     val vs: List<Vertex>,
     val fs: List<Face>
 ) {
-    val es = buildList {
+    val es: List<Edge> = buildList {
         var id = 0
         for (f in fs) {
             for (i in 0 until f.size) {
@@ -16,50 +16,67 @@ class Polyhedron(
         }
     }
 
-    val vsByKind by lazy { vs.groupByToList { it.kind.id } }
-    val fsByKind by lazy { fs.groupByToList { it.kind.id } }
-    val esByKind by lazy { es.groupBy { it.kind } }
+    val kindVertices: IdMap<Kind, List<Vertex>> by lazy { vs.groupById { it.kind } }
+    val kindFaces: IdMap<Kind, List<Face>> by lazy { fs.groupById { it.kind } }
+    val kindEdges: Map<EdgeKind, List<Edge>> by lazy { es.groupBy { it.kind } }
 
-    val inradius: Double by lazy {
-        fs.minOf { f -> f.plane.d }
+    val vertexFaces: IdMap<Vertex, List<Face>> by lazy {
+        fs
+            .flatMap { f -> f.vs.map { v -> v to f } }
+            .groupById({ it.first }, { it.second })
     }
 
-    val midradius: Double by lazy {
-        es.avgOf { e -> e.tangentPoint.norm }
+    val vertexEdges: IdMap<Vertex, Map<Vertex, Edge>> by lazy {
+        es
+            .flatMap { e -> listOf(Triple(e.a, e.b, e), Triple(e.b, e.a, e)) }
+            .groupById { it.first }
+            .mapValues { entry -> entry.value.associateBy({ it.second }, { it.third }) }
     }
 
-    val circumradius: Double by lazy {
-        vs.maxOf { v -> v.pt.norm }
+    val edgeKinds: Map<EdgeKind, Kind> by lazy {
+        es.asSequence()
+            .map { it.kind }
+            .distinct().sorted()
+            .withIndex().associateBy({ it.value }, { Kind(it.index) })
     }
+
+    val inradius: Double by lazy { fs.minOf { f -> f.plane.d } }
+    val midradius: Double by lazy { es.avgOf { e -> e.tangentPoint.norm } }
+    val circumradius: Double by lazy { vs.maxOf { v -> v.pt.norm } }
     
     override fun toString(): String =
         "Polyhedron(vs=${vs.size}, es=${es.size}, fs=${fs.size})"
 }
 
-inline class Kind(val id: Int) : Comparable<Kind> {
+inline class Kind(override val id: Int) : Id, Comparable<Kind> {
     override fun compareTo(other: Kind): Int = id.compareTo(other.id)
     override fun toString(): String = "$id"
 }
 
 class Vertex(
-    val id: Int,
+    override val id: Int,
     val pt: Vec3,
     val kind: Kind,
-) {
+) : Id {
     override fun equals(other: Any?): Boolean = other is Vertex && id == other.id
     override fun hashCode(): Int = id
     override fun toString(): String = "Vertex(id=$id, $pt)"
 }
 
-data class EdgeKind(val a: Kind, val b: Kind) {
+data class EdgeKind(val a: Kind, val b: Kind) : Comparable<EdgeKind> {
+    override fun compareTo(other: EdgeKind): Int {
+        if (a != other.a) return a.compareTo(other.a)
+        return b.compareTo(other.b)
+    }
+
     override fun toString(): String = "$a-$b"
 }
 
 class Edge(
-    val id: Int,
+    override val id: Int,
     val a: Vertex,
     val b: Vertex,
-) {
+) : Id {
     val kind = if (a.kind <= b.kind)
         EdgeKind(a.kind, b.kind) else
         EdgeKind(b.kind, a.kind)
@@ -74,10 +91,10 @@ val Edge.tangentPoint: Vec3
     get() = a.pt + tangentFraction * vec
 
 class Face(
-    val id: Int,
+    override val id: Int,
     val vs: List<Vertex>,
     val kind: Kind,
-) {
+) : Id {
     val plane = plane3(vs[0].pt, vs[1].pt, vs[2].pt)
 
     val size: Int

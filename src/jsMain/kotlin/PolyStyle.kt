@@ -10,6 +10,6 @@ private fun paletteColor(id: Int) =
     hsvColor(hue0 + ratio * id, 0.9, 0.9)
 
 class PolyStyle {
-    fun faceColor(f: Face): Color = paletteColor(f.id)
+    fun faceColor(f: Face): Color = paletteColor(f.kind.id)
 }
 
