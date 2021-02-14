@@ -8,8 +8,14 @@ import react.dom.*
 
 external interface RootPaneState : RState {
     var seed: Seed
-    var transform: Transform
+    var transforms: List<Transform>
     var scale: Scale
+}
+
+fun RootPaneState.poly(): Polyhedron {
+    var poly = seed.poly
+    for (transform in transforms) poly = poly.transformed(transform)
+    return poly.scaled(scale)
 }
 
 @Suppress("NON_EXPORTABLE_TYPE")
@@ -17,36 +23,64 @@ external interface RootPaneState : RState {
 class RootPane() : RComponent<RProps, RootPaneState>() {
     override fun RootPaneState.init() {
         seed = Seed.Tetrahedron
-        transform = Transform.None
+        transforms = emptyList()
         scale = Scale.Midradius
 
     }
 
     override fun RBuilder.render() {
-        dropdown<Seed> {
-            value = state.seed
-            options = Seed.values().toList()
-            onChange = { value ->
-                setState { seed = value }
+        label {
+            +"Seed"
+            dropdown<Seed> {
+                value = state.seed
+                options = Seed.values().toList()
+                onChange = { value ->
+                    setState { seed = value }
+                }
             }
         }
-        dropdown<Transform> {
-            value = state.transform
-            options = Transform.values().toList()
-            onChange = { value ->
-                setState { transform = value }
+        label {
+            +"Transform"
+            for ((i, transform) in state.transforms.withIndex()) {
+                dropdown<Transform> {
+                    value = transform
+                    options = Transform.values().toList()
+                    onChange = { value ->
+                        setState {
+                            if (value != Transform.None) {
+                                transforms = state.transforms.updatedAt(i, value)
+                            } else {
+                                transforms = state.transforms.removedAt(i)
+                            }
+                        }
+                    }
+                }
+            }
+            dropdown<Transform> {
+                value = Transform.None
+                options = Transform.values().toList()
+                onChange = { value ->
+                    setState {
+                        if (value != Transform.None) {
+                            transforms = state.transforms + value
+                        }
+                    }
+                }
             }
         }
-        dropdown<Scale> {
-            value = state.scale
-            options = Scale.values().toList()
-            onChange = { value ->
-                setState { scale = value }
+        label {
+            +"Scaled by"
+            dropdown<Scale> {
+                value = state.scale
+                options = Scale.values().toList()
+                onChange = { value ->
+                    setState { scale = value }
+                }
             }
         }
         br {}
         glCanvas {
-            poly = state.seed.poly.transformed(state.transform).scaled(state.scale)
+            poly = state.poly()
             style = PolyStyle()
         }
     }
