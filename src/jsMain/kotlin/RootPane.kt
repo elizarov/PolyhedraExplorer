@@ -1,7 +1,5 @@
 package polyhedra.js
 
-import kotlinx.html.js.onChangeFunction
-import org.w3c.dom.*
 import polyhedra.common.*
 import react.*
 import react.dom.*
@@ -12,10 +10,29 @@ external interface RootPaneState : RState {
     var scale: Scale
 }
 
-fun RootPaneState.poly(): Polyhedron {
-    var poly = seed.poly
-    for (transform in transforms) poly = poly.transformed(transform)
-    return poly.scaled(scale)
+fun RootPaneState.poly(): Polyhedron =
+    seed.poly.transformed(transforms).scaled(scale)
+
+private inline fun ifValidSeedTransforms(seed: Seed, transforms: List<Transform>, block: () -> Unit) {
+    try {
+        seed.poly.transformed(transforms).validate()
+        block()
+    } catch (e: IllegalArgumentException) {
+        println("$seed $transforms is not valid: $e")
+    }
+}
+
+private fun RootPaneState.safeSeedUpdate(newSeed: Seed) {
+    ifValidSeedTransforms(newSeed, transforms) {
+        seed = newSeed
+    }
+}
+
+private fun RootPaneState.safeTransformsUpdate(update: (List<Transform>) -> List<Transform>) {
+    val newTransforms = update(transforms)
+    ifValidSeedTransforms(seed, newTransforms) {
+        transforms = newTransforms
+    }
 }
 
 @Suppress("NON_EXPORTABLE_TYPE")
@@ -33,9 +50,9 @@ class RootPane() : RComponent<RProps, RootPaneState>() {
             +"Seed"
             dropdown<Seed> {
                 value = state.seed
-                options = Seed.values().toList()
+                options = Seeds
                 onChange = { value ->
-                    setState { seed = value }
+                    setState { safeSeedUpdate(value) }
                 }
             }
         }
@@ -44,13 +61,13 @@ class RootPane() : RComponent<RProps, RootPaneState>() {
             for ((i, transform) in state.transforms.withIndex()) {
                 dropdown<Transform> {
                     value = transform
-                    options = Transform.values().toList()
+                    options = Transforms
                     onChange = { value ->
                         setState {
                             if (value != Transform.None) {
-                                transforms = state.transforms.updatedAt(i, value)
+                                safeTransformsUpdate { it.updatedAt(i, value) }
                             } else {
-                                transforms = state.transforms.removedAt(i)
+                                safeTransformsUpdate { it.removedAt(i) }
                             }
                         }
                     }
@@ -58,11 +75,11 @@ class RootPane() : RComponent<RProps, RootPaneState>() {
             }
             dropdown<Transform> {
                 value = Transform.None
-                options = Transform.values().toList()
+                options = Transforms
                 onChange = { value ->
                     setState {
                         if (value != Transform.None) {
-                            transforms = state.transforms + value
+                            safeTransformsUpdate { it + value }
                         }
                     }
                 }
@@ -72,7 +89,7 @@ class RootPane() : RComponent<RProps, RootPaneState>() {
             +"Scaled by"
             dropdown<Scale> {
                 value = state.scale
-                options = Scale.values().toList()
+                options = Scales
                 onChange = { value ->
                     setState { scale = value }
                 }

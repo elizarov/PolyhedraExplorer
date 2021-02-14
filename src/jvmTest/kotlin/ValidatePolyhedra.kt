@@ -7,15 +7,19 @@ import org.junit.*
 class ValidatePolyhedra {
     @Test
     fun validateSeeds() {
-        for (seed in Seed.values()) {
+        testParameter("seed", Seeds) { seed ->
             seed.poly.validate()
         }
     }
 
     @Test
-    fun validateRectifiedSeeds() {
-        for (seed in Seed.values()) {
-            seed.poly.rectified().validate()
+    fun validateMultipleRectifiedSeeds() {
+        testParameter("seed", Seeds) { seed ->
+            var poly = seed.poly
+            testParameter("n", 1..4) { n ->
+                poly = poly.rectified()
+                poly.validate()
+            }
         }
     }
 }

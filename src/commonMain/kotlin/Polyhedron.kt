@@ -109,16 +109,29 @@ class Face(
 }
 
 fun Polyhedron.validate() {
+    // Validate edges
+    for (e in es) {
+        require(e.vec.norm > EPS) {
+            "$e non-degenerate"
+        }
+    }
     // Validate faces
     for (f in fs) {
+        require(f.plane.d > 0) {
+            "$f ${f.plane} normal points outwards"
+        }
         for (v in f.vs)
-            check(v.pt in f.plane)
+            require(v.pt in f.plane) {
+                "$v in $f ${f.plane}"
+            }
         for (i in 0 until f.size) {
             val a = f[i].pt
             val b = f[(i + 1) % f.size].pt
             val c = f[(i + 2) % f.size].pt
             val rot = (c - a) cross (b - a)
-            check(rot * f.plane.n > -EPS)
+            require(rot * f.plane.n > -EPS) {
+                "$f vertices $a $b $c in clock-wise order"
+            }
         }
     }
 }

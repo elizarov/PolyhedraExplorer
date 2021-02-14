@@ -10,6 +10,8 @@ enum class Seed(val poly: Polyhedron) {
     Icosahedron(icosahedron)
 }
 
+val Seeds: List<Seed> by lazy { Seed.values().toList() }
+
 val tetrahedron = polyhedron {
     val t = 1 / sqrt(2.0)
     vertex(-1.0, 0.0, -t) // 0

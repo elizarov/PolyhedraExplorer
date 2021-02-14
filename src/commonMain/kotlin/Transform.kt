@@ -6,14 +6,19 @@ enum class Transform(val transform: (Polyhedron) -> Polyhedron) {
     Rectified(Polyhedron::rectified)
 }
 
+val Transforms: List<Transform> by lazy { Transform.values().toList() }
+
 fun Polyhedron.transformed(transform: Transform) =
     transform.transform(this)
+
+fun Polyhedron.transformed(transforms: List<Transform>) =
+    transforms.fold(this) { poly, transform -> poly.transformed(transform) }
 
 fun Polyhedron.dual() = polyhedron {
     // vertices from faces
     val r = midradius
     for (f in fs) {
-        vertex(f.plane.dualPoint(r))
+        vertex(f.plane.dualPoint(r), f.kind)
     }
     // faces from vertices
     for ((v, fl) in vertexFaces) {
