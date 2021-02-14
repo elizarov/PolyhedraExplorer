@@ -18,7 +18,13 @@ inline fun <T> Iterable<T>.avgOf(selector: (T) -> Double): Double {
     return sum / n
 }
 
-inline fun <T, R> List<T>.zipWithNextCycle(transform: (T, T) -> R): List<R> = List(size) { i ->
+inline fun <T> List<T>.forEachCycle(block: (T, T) -> Unit) {
+    for (i in indices) {
+        block(this[i], this[(i + 1) % size])
+    }
+}
+
+inline fun <T, R> List<T>.zipWithCycle(transform: (T, T) -> R): List<R> = List(size) { i ->
     transform(this[i], this[(i + 1) % size])
 }
 
@@ -31,5 +37,14 @@ fun <T> List<T>.updatedAt(index: Int, value: T): List<T> {
 fun <T> List<T>.removedAt(index: Int): List<T> {
     val result = toMutableList()
     result.removeAt(index)
+    return result
+}
+
+fun <T, R> Sequence<T>.distinctIndexed(transform: (Int) -> R): Map<T, R> {
+    val result = mutableMapOf<T, R>()
+    var index = 0
+    for (e in this) {
+        if (e !in result) result[e] = transform(index++)
+    }
     return result
 }

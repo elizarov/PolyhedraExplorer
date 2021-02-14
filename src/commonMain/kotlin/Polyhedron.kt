@@ -22,7 +22,7 @@ class Polyhedron(
 
     val vertexFaces: IdMap<Vertex, List<Face>> by lazy {
         fs
-            .flatMap { f -> f.vs.map { v -> v to f } }
+            .flatMap { f -> f.fvs.map { v -> v to f } }
             .groupById({ it.first }, { it.second })
     }
 
@@ -36,8 +36,13 @@ class Polyhedron(
     val edgeKinds: Map<EdgeKind, Kind> by lazy {
         es.asSequence()
             .map { it.kind }
-            .distinct().sorted()
-            .withIndex().associateBy({ it.value }, { Kind(it.index) })
+            .distinctIndexed { Kind(it) }
+    }
+
+    val directedEdgeKinds: Map<EdgeKind, Kind> by lazy {
+        es.asSequence()
+            .flatMap { listOf(it.kind, EdgeKind(it.b.kind, it.a.kind)) }
+            .distinctIndexed { Kind(it) }
     }
 
     val inradius: Double by lazy { fs.minOf { f -> f.plane.d } }
@@ -84,28 +89,31 @@ class Edge(
     val vec = b.pt - a.pt
 }
 
+fun tangentFraction(a: Vec3, vec: Vec3): Double =
+    -(a * vec) / (vec * vec)
+
 val Edge.tangentFraction: Double
-    get() = -(a.pt * vec) / (vec * vec)
+    get() = tangentFraction(a.pt, vec)
 
 val Edge.tangentPoint: Vec3
     get() = a.pt + tangentFraction * vec
 
 class Face(
     override val id: Int,
-    val vs: List<Vertex>,
+    val fvs: List<Vertex>,
     val kind: Kind,
 ) : Id {
-    val plane = plane3(vs[0].pt, vs[1].pt, vs[2].pt)
+    val plane = plane3(fvs[0].pt, fvs[1].pt, fvs[2].pt)
 
     val size: Int
-        get() = vs.size
-    operator fun get(index: Int): Vertex = vs[index]
-    operator fun iterator(): Iterator<Vertex> = vs.iterator()
+        get() = fvs.size
+    operator fun get(index: Int): Vertex = fvs[index]
+    operator fun iterator(): Iterator<Vertex> = fvs.iterator()
 
     override fun equals(other: Any?): Boolean = other is Vertex && id == other.id
     override fun hashCode(): Int = id
     override fun toString(): String =
-        "Face(id=$id, [${vs.map { it.id }.joinToString(", ")}])"
+        "Face(id=$id, [${fvs.map { it.id }.joinToString(", ")}])"
 }
 
 fun Polyhedron.validate() {
@@ -120,7 +128,7 @@ fun Polyhedron.validate() {
         require(f.plane.d > 0) {
             "$f ${f.plane} normal points outwards"
         }
-        for (v in f.vs)
+        for (v in f.fvs)
             require(v.pt in f.plane) {
                 "$v in $f ${f.plane}"
             }
@@ -140,22 +148,20 @@ class PolyhedronBuilder {
     private val vs = ArrayList<Vertex>()
     private val fs = ArrayList<Face>()
 
-    fun vertex(p: Vec3, kind: Kind = Kind(0)) {
-        vs.add(Vertex(vs.size, p, kind))
-    }
+    fun vertex(p: Vec3, kind: Kind = Kind(0)): Vertex =
+        Vertex(vs.size, p, kind).also { vs.add(it) }
 
-    fun vertex(x: Double, y: Double, z: Double, kind: Kind = Kind(0)) {
+    fun vertex(x: Double, y: Double, z: Double, kind: Kind = Kind(0)): Vertex =
         vertex(Vec3(x, y, z), kind)
-    }
 
-    fun face(v: List<Int>, kind: Kind = Kind(0), sort: Boolean = false) {
-        val a = MutableList(v.size) { vs[v[it]] }
-        if (sort) a.sortFace()
+    fun face(vararg fvIds: Int, kind: Kind = Kind(0)) {
+        val a = List(fvIds.size) { vs[fvIds[it]] }
         fs.add(Face(fs.size, a, kind))
     }
 
-    fun face(vararg v: Int, kind: Kind = Kind(0)) {
-        val a = List(v.size) { vs[v[it]] }
+    fun face(fvIds: List<Int>, kind: Kind, sort: Boolean = false) {
+        val a = MutableList(fvIds.size) { vs[fvIds[it]] }
+        if (sort) a.sortFace()
         fs.add(Face(fs.size, a, kind))
     }
 
