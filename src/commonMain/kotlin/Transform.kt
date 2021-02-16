@@ -40,7 +40,7 @@ fun Polyhedron.rectified() = polyhedron {
     }
     // faces from the original vertices
     for (v in vs) {
-        face(vertexEdges[v]!!.map { it.value.id }, FaceKind(kindFaces.size + v.kind.id), sort = true)
+        face(vertexEdges[v]!!.map { it.value.id }, FaceKind(faceKinds.size + v.kind.id), sort = true)
     }
 }
 
@@ -54,11 +54,12 @@ fun Polyhedron.truncated(ratio: Double = regularTruncationRatio) = when {
     ratio <= EPS -> this
     ratio >= 1 - EPS -> rectified()
     else -> polyhedron {
-        // vertices from vertex pairs
-        val edgeIds = directedEdges.map { e ->
+        // vertices from directed edges
+        val edgeIds = directedEdges.associate { e ->
             val t = ratio * e.midPointFraction(edgesMidPointDefault)
-            Pair(e, vertex(t.atSegment(e.a.pt, e.b.pt), VertexKind(directedEdgeKindsIndex[e.kind]!!)))
-        }.associateBy({ (e, _) -> e.a to e.b }, { (_, c) -> c.id })
+            val c = vertex(t.atSegment(e.a.pt, e.b.pt), VertexKind(directedEdgeKindsIndex[e.kind]!!))
+            (e.a to e.b) to c.id
+        }
         // faces from the original faces
         for (f in fs) {
             val fvIds = f.fvs.zipWithCycle { a, b ->
@@ -69,7 +70,7 @@ fun Polyhedron.truncated(ratio: Double = regularTruncationRatio) = when {
         // faces from the original vertices
         for (v in vs) {
             val fvIds = vertexEdges[v]!!.map { edgeIds[v to it.key]!! }
-            face(fvIds, FaceKind(kindFaces.size + v.kind.id), sort = true)
+            face(fvIds, FaceKind(faceKinds.size + v.kind.id), sort = true)
         }
     }
 }

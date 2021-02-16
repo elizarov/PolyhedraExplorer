@@ -25,9 +25,9 @@ class Polyhedron(
         }
     }
 
-    val kindVertices: IdMap<VertexKind, List<Vertex>> by lazy { vs.groupById { it.kind } }
-    val kindFaces: IdMap<FaceKind, List<Face>> by lazy { fs.groupById { it.kind } }
-    val kindEdges: Map<EdgeKind, List<Edge>> by lazy { es.groupBy { it.kind } }
+    val vertexKinds: IdMap<VertexKind, List<Vertex>> by lazy { vs.groupById { it.kind } }
+    val faceKinds: IdMap<FaceKind, List<Face>> by lazy { fs.groupById { it.kind } }
+    val edgeKinds: Map<EdgeKind, List<Edge>> by lazy { es.groupBy { it.kind } }
 
     val vertexFaces: IdMap<Vertex, List<Face>> by lazy {
         fs
@@ -44,14 +44,6 @@ class Polyhedron(
 
     val directedEdges: List<Edge> by lazy { es.flatMap { listOf(it, it.reversed()) } }
 
-    val directedFaceEdges =
-        directedEdges
-            .groupBy { it.r }
-            .mapValues { (f, fes) -> // reorder to natural vertex order on a face
-                val m = fes.associateBy { it.a }
-                f.fvs.map { m[it]!! }
-            }
-
     val edgeKindsIndex: Map<EdgeKind, Int> by lazy {
         es.asSequence()
             .map { it.kind }
@@ -59,8 +51,8 @@ class Polyhedron(
     }
 
     val directedEdgeKindsIndex: Map<EdgeKind, Int> by lazy {
-        es.asSequence()
-            .flatMap { listOf(it.kind, it.kind.reversed()) }
+        directedEdges.asSequence()
+            .map { it.kind }
             .distinctIndexed { it }
     }
 

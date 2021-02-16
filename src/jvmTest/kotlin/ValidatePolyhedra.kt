@@ -13,12 +13,14 @@ class ValidatePolyhedra {
     }
 
     @Test
-    fun validateMultipleRectifiedSeeds() {
+    fun validateMultipleTransforms() {
         testParameter("seed", Seeds) { seed ->
-            var poly = seed.poly
-            testParameter("n", 1..4) { n ->
-                poly = poly.rectified()
-                poly.validate()
+            testParameter("transform", Transforms.filter { it != Transform.None }) {
+                var poly = seed.poly
+                testParameter("n", 1..4) { n ->
+                    poly = poly.rectified()
+                    poly.validate()
+                }
             }
         }
     }

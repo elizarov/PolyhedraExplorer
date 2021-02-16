@@ -18,12 +18,6 @@ inline fun <T> Iterable<T>.avgOf(selector: (T) -> Double): Double {
     return sum / n
 }
 
-inline fun <T> List<T>.forEachCycle(block: (T, T) -> Unit) {
-    for (i in indices) {
-        block(this[i], this[(i + 1) % size])
-    }
-}
-
 inline fun <T, R> List<T>.zipWithCycle(transform: (T, T) -> R): List<R> = List(size) { i ->
     transform(this[i], this[(i + 1) % size])
 }
