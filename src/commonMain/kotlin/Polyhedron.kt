@@ -46,8 +46,12 @@ class Polyhedron(
     }
 
     val inradius: Double by lazy { fs.minOf { f -> f.plane.d } }
-    val midradius: Double by lazy { es.avgOf { e -> e.tangentPoint.norm } }
+    val midradius: Double by lazy { es.avgOf { e -> e.midPoint(MidPoint.Closest).norm } }
     val circumradius: Double by lazy { vs.maxOf { v -> v.pt.norm } }
+
+    val edgesMidPointDefault: MidPoint by lazy {
+        if (es.all { e -> e.isTangentInSegment() }) MidPoint.Tangent else MidPoint.Center
+    }
     
     override fun toString(): String =
         "Polyhedron(vs=${vs.size}, es=${es.size}, fs=${fs.size})"
@@ -85,18 +89,7 @@ class Edge(
     val kind = if (a.kind <= b.kind)
         EdgeKind(a.kind, b.kind) else
         EdgeKind(b.kind, a.kind)
-
-    val vec = b.pt - a.pt
 }
-
-fun tangentFraction(a: Vec3, vec: Vec3): Double =
-    -(a * vec) / (vec * vec)
-
-val Edge.tangentFraction: Double
-    get() = tangentFraction(a.pt, vec)
-
-val Edge.tangentPoint: Vec3
-    get() = a.pt + tangentFraction * vec
 
 class Face(
     override val id: Int,
@@ -119,18 +112,18 @@ class Face(
 fun Polyhedron.validate() {
     // Validate edges
     for (e in es) {
-        require(e.vec.norm > EPS) {
+        require((e.a.pt - e.b.pt).norm > EPS) {
             "$e non-degenerate"
         }
     }
     // Validate faces
     for (f in fs) {
         require(f.plane.d > 0) {
-            "$f ${f.plane} normal points outwards"
+            "Face normal does not point outwards: $f ${f.plane} "
         }
         for (v in f.fvs)
             require(v.pt in f.plane) {
-                "$v in $f ${f.plane}"
+                "Face is not planar: $f, $v !in ${f.plane}"
             }
         for (i in 0 until f.size) {
             val a = f[i].pt
@@ -138,7 +131,7 @@ fun Polyhedron.validate() {
             val c = f[(i + 2) % f.size].pt
             val rot = (c - a) cross (b - a)
             require(rot * f.plane.n > -EPS) {
-                "$f vertices $a $b $c in clock-wise order"
+                "Face is not clockwise: $f, vertices $a $b $c"
             }
         }
     }

@@ -32,7 +32,7 @@ fun Polyhedron.dual() = polyhedron {
 fun Polyhedron.rectified() = polyhedron {
     // vertices from edges
     for (e in es) {
-        vertex(e.tangentPoint, edgeKinds[e.kind]!!)
+        vertex(e.midPoint(edgesMidPointDefault), edgeKinds[e.kind]!!)
     }
     // faces from the original faces
     for (f in fs) {
@@ -50,17 +50,16 @@ val Polyhedron.regularTruncationRatio: Double
         return 1 / (1 + cos(PI / n))
     }
 
-fun Polyhedron.truncated(ratio: Double = regularTruncationRatio) =
-    if (ratio <= EPS) this else
-    if (ratio >= 1 - EPS) rectified() else
-    polyhedron {
+fun Polyhedron.truncated(ratio: Double = regularTruncationRatio) = when {
+    ratio <= EPS -> this
+    ratio >= 1 - EPS -> rectified()
+    else -> polyhedron {
         // vertices from vertex pairs
         val vertexPairIds = fs.flatMap { f ->
             f.fvs.zipWithCycle { a, b ->
-                val vec = b.pt - a.pt
-                val t = ratio * tangentFraction(a.pt, vec)
+                val t = ratio * midPointFraction(a.pt, b.pt, edgesMidPointDefault)
                 val kind = directedEdgeKinds[EdgeKind(a.kind, b.kind)]!!
-                Triple(a, b, vertex(a.pt + t * vec, kind))
+                Triple(a, b, vertex(t.atSegment(a.pt, b.pt), kind))
             }
         }.associateBy({ (a, b, _) -> a to b }, { (_, _, c) -> c.id })
         // faces from the original faces
@@ -74,5 +73,6 @@ fun Polyhedron.truncated(ratio: Double = regularTruncationRatio) =
         for (v in vs) {
             val fvIds = vertexEdges[v]!!.map { vertexPairIds[v to it.key]!! }
             face(fvIds, Kind(kindFaces.size + v.kind.id), sort = true)
+        }
     }
 }
