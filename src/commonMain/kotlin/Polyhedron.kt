@@ -49,7 +49,16 @@ class Polyhedron(
             .mapValues { entry -> entry.value.associateBy({ it.second }, { it.third }) }
     }
 
-    val directedEdges: List<Edge> by lazy { es.flatMap { listOf(it, it.reversed()) } }
+    val directedEdges: List<Edge> by lazy {
+        es.flatMap {
+            with(it) {
+                listOf(
+                    Edge(id, a, b, l, r, EdgeKind(a.kind, b.kind, l.kind, r.kind)),
+                    Edge(id, b, a, r, l, EdgeKind(b.kind, a.kind, r.kind, l.kind))
+                )
+            }
+        }
+    }
 
     val edgeKindsIndex: Map<EdgeKind, Int> by lazy {
         es.asSequence()
@@ -143,8 +152,6 @@ fun uniqueEdgeKind(a: Vertex, b: Vertex, l: Face, r: Face): EdgeKind {
     val k = EdgeKind(a.kind, b.kind, l.kind, r.kind)
     return minOf(k, k.reversed())
 }
-
-fun Edge.reversed(): Edge = Edge(-id - 1, b, a, r, l, kind.reversed())
 
 fun Polyhedron.validate() {
     validateGeometry()
