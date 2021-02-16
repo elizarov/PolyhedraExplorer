@@ -6,18 +6,27 @@ class Polyhedron(
 ) {
     val es: List<Edge> = buildList {
         var id = 0
+        val lFaces = ArrayIdMap<Vertex, HashMap<Vertex, Face>>()
+        for (f in fs) {
+            for (i in 0 until f.size) {
+                val a = f[i]
+                val b = f[(i + 1) % f.size]
+                if (a.id > b.id)
+                    lFaces.getOrPut(b) { HashMap() }[a] = f
+            }
+        }
         for (f in fs) {
             for (i in 0 until f.size) {
                 val a = f[i]
                 val b = f[(i + 1) % f.size]
                 if (a.id < b.id)
-                    add(Edge(id++, a, b))
+                    add(Edge(id++, a, b, lFaces[a]!![b]!!, f))
             }
         }
     }
 
-    val kindVertices: IdMap<Kind, List<Vertex>> by lazy { vs.groupById { it.kind } }
-    val kindFaces: IdMap<Kind, List<Face>> by lazy { fs.groupById { it.kind } }
+    val kindVertices: IdMap<VertexKind, List<Vertex>> by lazy { vs.groupById { it.kind } }
+    val kindFaces: IdMap<FaceKind, List<Face>> by lazy { fs.groupById { it.kind } }
     val kindEdges: Map<EdgeKind, List<Edge>> by lazy { es.groupBy { it.kind } }
 
     val vertexFaces: IdMap<Vertex, List<Face>> by lazy {
@@ -33,16 +42,26 @@ class Polyhedron(
             .mapValues { entry -> entry.value.associateBy({ it.second }, { it.third }) }
     }
 
-    val edgeKinds: Map<EdgeKind, Kind> by lazy {
+    val directedEdges: List<Edge> by lazy { es.flatMap { listOf(it, it.reversed()) } }
+
+    val directedFaceEdges =
+        directedEdges
+            .groupBy { it.r }
+            .mapValues { (f, fes) -> // reorder to natural vertex order on a face
+                val m = fes.associateBy { it.a }
+                f.fvs.map { m[it]!! }
+            }
+
+    val edgeKindsIndex: Map<EdgeKind, Int> by lazy {
         es.asSequence()
             .map { it.kind }
-            .distinctIndexed { Kind(it) }
+            .distinctIndexed { it }
     }
 
-    val directedEdgeKinds: Map<EdgeKind, Kind> by lazy {
+    val directedEdgeKindsIndex: Map<EdgeKind, Int> by lazy {
         es.asSequence()
-            .flatMap { listOf(it.kind, EdgeKind(it.b.kind, it.a.kind)) }
-            .distinctIndexed { Kind(it) }
+            .flatMap { listOf(it.kind, it.kind.reversed()) }
+            .distinctIndexed { it }
     }
 
     val inradius: Double by lazy { fs.minOf { f -> f.plane.d } }
@@ -57,44 +76,30 @@ class Polyhedron(
         "Polyhedron(vs=${vs.size}, es=${es.size}, fs=${fs.size})"
 }
 
-inline class Kind(override val id: Int) : Id, Comparable<Kind> {
-    override fun compareTo(other: Kind): Int = id.compareTo(other.id)
-    override fun toString(): String = "$id"
+inline class VertexKind(override val id: Int) : Id, Comparable<VertexKind> {
+    override fun compareTo(other: VertexKind): Int = id.compareTo(other.id)
+    override fun toString(): String = "${'A' + id}"
 }
 
 class Vertex(
     override val id: Int,
     val pt: Vec3,
-    val kind: Kind,
+    val kind: VertexKind,
 ) : Id {
     override fun equals(other: Any?): Boolean = other is Vertex && id == other.id
     override fun hashCode(): Int = id
-    override fun toString(): String = "Vertex(id=$id, $pt)"
+    override fun toString(): String = "$kind-vertex(id=$id, $pt)"
 }
 
-data class EdgeKind(val a: Kind, val b: Kind) : Comparable<EdgeKind> {
-    override fun compareTo(other: EdgeKind): Int {
-        if (a != other.a) return a.compareTo(other.a)
-        return b.compareTo(other.b)
-    }
-
-    override fun toString(): String = "$a-$b"
-}
-
-class Edge(
-    override val id: Int,
-    val a: Vertex,
-    val b: Vertex,
-) : Id {
-    val kind = if (a.kind <= b.kind)
-        EdgeKind(a.kind, b.kind) else
-        EdgeKind(b.kind, a.kind)
+inline class FaceKind(override val id: Int) : Id, Comparable<FaceKind> {
+    override fun compareTo(other: FaceKind): Int = id.compareTo(other.id)
+    override fun toString(): String = "${'α' + id}"
 }
 
 class Face(
     override val id: Int,
     val fvs: List<Vertex>,
-    val kind: Kind,
+    val kind: FaceKind,
 ) : Id {
     val plane = plane3(fvs[0].pt, fvs[1].pt, fvs[2].pt)
 
@@ -106,8 +111,35 @@ class Face(
     override fun equals(other: Any?): Boolean = other is Vertex && id == other.id
     override fun hashCode(): Int = id
     override fun toString(): String =
-        "Face(id=$id, [${fvs.map { it.id }.joinToString(", ")}])"
+        "$kind-face(id=$id, [${fvs.map { it.id }.joinToString(", ")}])"
 }
+
+data class EdgeKind(val a: VertexKind, val b: VertexKind, val l: FaceKind, val r: FaceKind) : Comparable<EdgeKind> {
+    override fun compareTo(other: EdgeKind): Int {
+        if (a != other.a) return a.compareTo(other.a)
+        if (b != other.b) return b.compareTo(other.b)
+        if (l != other.l) return l.compareTo(other.l)
+        return r.compareTo(other.r)
+    }
+
+    override fun toString(): String = "$a-$l/$r-$b"
+}
+
+fun EdgeKind.reversed(): EdgeKind = EdgeKind(b, a, r, l)
+
+class Edge(
+    override val id: Int,
+    val a: Vertex,
+    val b: Vertex,
+    val l: Face,
+    var r: Face,
+) : Id {
+    val kind = if (a.kind <= b.kind || a.kind == b.kind && l.kind <= r.kind)
+        EdgeKind(a.kind, b.kind, l.kind, r.kind) else
+        EdgeKind(b.kind, a.kind, r.kind, l.kind)
+}
+
+fun Edge.reversed(): Edge = Edge(-id - 1, b, a, r, l)
 
 fun Polyhedron.validate() {
     // Validate edges
@@ -141,18 +173,18 @@ class PolyhedronBuilder {
     private val vs = ArrayList<Vertex>()
     private val fs = ArrayList<Face>()
 
-    fun vertex(p: Vec3, kind: Kind = Kind(0)): Vertex =
+    fun vertex(p: Vec3, kind: VertexKind = VertexKind(0)): Vertex =
         Vertex(vs.size, p, kind).also { vs.add(it) }
 
-    fun vertex(x: Double, y: Double, z: Double, kind: Kind = Kind(0)): Vertex =
+    fun vertex(x: Double, y: Double, z: Double, kind: VertexKind = VertexKind(0)): Vertex =
         vertex(Vec3(x, y, z), kind)
 
-    fun face(vararg fvIds: Int, kind: Kind = Kind(0)) {
+    fun face(vararg fvIds: Int, kind: FaceKind = FaceKind(0)) {
         val a = List(fvIds.size) { vs[fvIds[it]] }
         fs.add(Face(fs.size, a, kind))
     }
 
-    fun face(fvIds: List<Int>, kind: Kind, sort: Boolean = false) {
+    fun face(fvIds: List<Int>, kind: FaceKind, sort: Boolean = false) {
         val a = MutableList(fvIds.size) { vs[fvIds[it]] }
         if (sort) a.sortFace()
         fs.add(Face(fs.size, a, kind))

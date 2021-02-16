@@ -40,7 +40,7 @@ fun <T> List<T>.removedAt(index: Int): List<T> {
     return result
 }
 
-fun <T, R> Sequence<T>.distinctIndexed(transform: (Int) -> R): Map<T, R> {
+inline fun <T, R> Sequence<T>.distinctIndexed(transform: (Int) -> R): Map<T, R> {
     val result = mutableMapOf<T, R>()
     var index = 0
     for (e in this) {

@@ -21,18 +21,18 @@ fun Polyhedron.dual() = polyhedron {
     // vertices from faces
     val r = midradius
     for (f in fs) {
-        vertex(f.plane.dualPoint(r), f.kind)
+        vertex(f.plane.dualPoint(r), VertexKind(f.kind.id))
     }
     // faces from vertices
     for ((v, fl) in vertexFaces) {
-        face(fl.map { it.id }, v.kind, sort = true)
+        face(fl.map { it.id }, FaceKind(v.kind.id), sort = true)
     }
 }
 
 fun Polyhedron.rectified() = polyhedron {
     // vertices from edges
     for (e in es) {
-        vertex(e.midPoint(edgesMidPointDefault), edgeKinds[e.kind]!!)
+        vertex(e.midPoint(edgesMidPointDefault), VertexKind(edgeKindsIndex[e.kind]!!))
     }
     // faces from the original faces
     for (f in fs) {
@@ -40,7 +40,7 @@ fun Polyhedron.rectified() = polyhedron {
     }
     // faces from the original vertices
     for (v in vs) {
-        face(vertexEdges[v]!!.map { it.value.id }, Kind(kindFaces.size + v.kind.id), sort = true)
+        face(vertexEdges[v]!!.map { it.value.id }, FaceKind(kindFaces.size + v.kind.id), sort = true)
     }
 }
 
@@ -55,24 +55,21 @@ fun Polyhedron.truncated(ratio: Double = regularTruncationRatio) = when {
     ratio >= 1 - EPS -> rectified()
     else -> polyhedron {
         // vertices from vertex pairs
-        val vertexPairIds = fs.flatMap { f ->
-            f.fvs.zipWithCycle { a, b ->
-                val t = ratio * midPointFraction(a.pt, b.pt, edgesMidPointDefault)
-                val kind = directedEdgeKinds[EdgeKind(a.kind, b.kind)]!!
-                Triple(a, b, vertex(t.atSegment(a.pt, b.pt), kind))
-            }
-        }.associateBy({ (a, b, _) -> a to b }, { (_, _, c) -> c.id })
+        val edgeIds = directedEdges.map { e ->
+            val t = ratio * e.midPointFraction(edgesMidPointDefault)
+            Pair(e, vertex(t.atSegment(e.a.pt, e.b.pt), VertexKind(directedEdgeKindsIndex[e.kind]!!)))
+        }.associateBy({ (e, _) -> e.a to e.b }, { (_, c) -> c.id })
         // faces from the original faces
         for (f in fs) {
             val fvIds = f.fvs.zipWithCycle { a, b ->
-                listOf(vertexPairIds[a to b]!!, vertexPairIds[b to a]!!)
+                listOf(edgeIds[a to b]!!, edgeIds[b to a]!!)
             }.flatten()
             face(fvIds, f.kind)
         }
         // faces from the original vertices
         for (v in vs) {
-            val fvIds = vertexEdges[v]!!.map { vertexPairIds[v to it.key]!! }
-            face(fvIds, Kind(kindFaces.size + v.kind.id), sort = true)
+            val fvIds = vertexEdges[v]!!.map { edgeIds[v to it.key]!! }
+            face(fvIds, FaceKind(kindFaces.size + v.kind.id), sort = true)
         }
     }
 }
