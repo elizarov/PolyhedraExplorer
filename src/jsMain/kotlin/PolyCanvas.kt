@@ -7,30 +7,30 @@ import polyhedra.common.*
 import react.*
 import react.dom.*
 
-external interface GLCanvasProps : RProps {
+external interface PolyCanvasProps : RProps {
     var poly: Polyhedron
     var style: PolyStyle
 }
 
-external interface GLCanvasState : RState {
+external interface PolyCanvasState : RState {
     var rotation: Double
 }
 
-fun RBuilder.glCanvas(handler: GLCanvasProps.() -> Unit) {
-    child<GLCanvasProps, GLCanvas> {
+fun RBuilder.polyCanvas(handler: PolyCanvasProps.() -> Unit) {
+    child<PolyCanvasProps, PolyCanvas> {
         attrs(handler)
     }
 }
 
 @Suppress("NON_EXPORTABLE_TYPE")
 @JsExport
-class GLCanvas(props: GLCanvasProps) : RComponent<GLCanvasProps, GLCanvasState>(props) {
+class PolyCanvas(props: PolyCanvasProps) : RComponent<PolyCanvasProps, PolyCanvasState>(props) {
     private val canvasRef = createRef<HTMLCanvasElement>()
     private lateinit var drawContext: DrawContext
     private var animationHandle = 0
     private var prevTime = Double.NaN
 
-    override fun GLCanvasState.init(props: GLCanvasProps) {
+    override fun PolyCanvasState.init(props: PolyCanvasProps) {
         rotation = 0.0
     }
 
@@ -66,7 +66,7 @@ class GLCanvas(props: GLCanvasProps) : RComponent<GLCanvasProps, GLCanvasState>(
         window.cancelAnimationFrame(animationHandle)
     }
 
-    override fun componentDidUpdate(prevProps: GLCanvasProps, prevState: GLCanvasState, snapshot: Any) =
+    override fun componentDidUpdate(prevProps: PolyCanvasProps, prevState: PolyCanvasState, snapshot: Any) =
         draw()
 
     private fun draw() =

@@ -42,3 +42,10 @@ inline fun <T, R> Sequence<T>.distinctIndexed(transform: (Int) -> R): Map<T, R> 
     }
     return result
 }
+
+fun Collection<Double>.span(): Double = maxOrNull()!! - minOrNull()!!
+
+private const val fmtPrecision = 1e4
+
+val Double.fmt: String
+    get() = ((this * fmtPrecision).roundToLong() / fmtPrecision).toString()

@@ -5,7 +5,10 @@ fun <T> testParameter(name: String, list: Iterable<T>, block: (T) -> Unit) {
         try {
             block(value)
         } catch (e: Throwable) {
-            throw TestParameterException("$name = $value: $e", e)
+            val msg = e.message
+            val cause = if (e is TestParameterException) e.cause!! else e
+            val sep = if (e is TestParameterException) "," else ":"
+            throw TestParameterException("$name = $value$sep $msg", cause)
         }
     }
 }

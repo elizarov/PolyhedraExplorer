@@ -11,16 +11,23 @@ class Polyhedron(
             for (i in 0 until f.size) {
                 val a = f[i]
                 val b = f[(i + 1) % f.size]
-                if (a.id > b.id)
+                require(a.id != b.id)
+                if (a.id > b.id) {
                     lFaces.getOrPut(b) { HashMap() }[a] = f
+                }
             }
         }
         for (f in fs) {
             for (i in 0 until f.size) {
                 val a = f[i]
                 val b = f[(i + 1) % f.size]
-                if (a.id < b.id)
-                    add(Edge(id++, a, b, lFaces[a]!![b]!!, f))
+                if (a.id < b.id) {
+                    val lf = lFaces[a]?.get(b)
+                    require(lf != null) {
+                        "Edge $a to $b on face $f does not have an adjacent face"
+                    }
+                    add(Edge(id++, a, b, lf, f))
+                }
             }
         }
     }
@@ -124,16 +131,27 @@ class Edge(
     val a: Vertex,
     val b: Vertex,
     val l: Face,
-    var r: Face,
+    val r: Face,
+    val kind: EdgeKind = uniqueEdgeKind(a, b, l, r)
 ) : Id {
-    val kind = if (a.kind <= b.kind || a.kind == b.kind && l.kind <= r.kind)
-        EdgeKind(a.kind, b.kind, l.kind, r.kind) else
-        EdgeKind(b.kind, a.kind, r.kind, l.kind)
+    override fun equals(other: Any?): Boolean = other is Edge && id == other.id
+    override fun hashCode(): Int = id
+    override fun toString(): String = "$kind edge(${a.id}-${l.id}/${r.id}-${b.id})"
+}                                            
+
+fun uniqueEdgeKind(a: Vertex, b: Vertex, l: Face, r: Face): EdgeKind {
+    val k = EdgeKind(a.kind, b.kind, l.kind, r.kind)
+    return minOf(k, k.reversed())
 }
 
-fun Edge.reversed(): Edge = Edge(-id - 1, b, a, r, l)
+fun Edge.reversed(): Edge = Edge(-id - 1, b, a, r, l, kind.reversed())
 
 fun Polyhedron.validate() {
+    validateGeometry()
+    validateKinds()
+}
+
+fun Polyhedron.validateGeometry() {
     // Validate edges
     for (e in es) {
         require((e.a.pt - e.b.pt).norm > EPS) {
@@ -158,6 +176,29 @@ fun Polyhedron.validate() {
                 "Face is not clockwise: $f, vertices $a $b $c"
             }
         }
+    }
+}
+
+fun Polyhedron.validateKinds() {
+    // Validate face kinds
+    for ((fk, fs) in faceKinds) {
+        fs.validateUnique("$fk-face distances") { it.plane.d }
+    }
+    // Validate vertex kinds
+    for ((vk, vs) in vertexKinds) {
+        vs.validateUnique("$vk-vertex distances") { it.pt.norm }
+    }
+    // Validate edge kinds
+    for ((ek, es) in edgeKinds) {
+        es.validateUnique("$ek edge distances") { it.midPoint(MidPoint.Closest).norm }
+        es.validateUnique("$ek edge lengths") { (it.a.pt - it.b.pt).norm }
+    }
+}
+
+private fun <T> Collection<T>.validateUnique(msg: String, selector: (T) -> Double) {
+    val d = associateWith(selector)
+    require(d.values.span() < EPS) {
+        "$msg are different: ${d.entries.minByOrNull { it.value }} -- ${d.entries.maxByOrNull { it.value }}"
     }
 }
 

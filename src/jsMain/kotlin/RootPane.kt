@@ -15,7 +15,7 @@ fun RootPaneState.poly(): Polyhedron =
 
 private inline fun ifValidSeedTransforms(seed: Seed, transforms: List<Transform>, block: () -> Unit) {
     try {
-        seed.poly.transformed(transforms).validate()
+        seed.poly.transformed(transforms).validateGeometry()
         block()
     } catch (e: IllegalArgumentException) {
         println("$seed $transforms is not valid: $e")
@@ -46,59 +46,66 @@ class RootPane() : RComponent<RProps, RootPaneState>() {
     }
 
     override fun RBuilder.render() {
-        label {
-            +"Seed"
-            dropdown<Seed> {
-                value = state.seed
-                options = Seeds
-                onChange = { value ->
-                    setState { safeSeedUpdate(value) }
+        // State
+        div {
+            label {
+                +"Seed"
+                dropdown<Seed> {
+                    value = state.seed
+                    options = Seeds
+                    onChange = { value ->
+                        setState { safeSeedUpdate(value) }
+                    }
                 }
             }
-        }
-        label {
-            +"Transform"
-            for ((i, transform) in state.transforms.withIndex()) {
+            label {
+                +"Transform"
+                for ((i, transform) in state.transforms.withIndex()) {
+                    dropdown<Transform> {
+                        value = transform
+                        options = Transforms
+                        onChange = { value ->
+                            setState {
+                                if (value != Transform.None) {
+                                    safeTransformsUpdate { it.updatedAt(i, value) }
+                                } else {
+                                    safeTransformsUpdate { it.removedAt(i) }
+                                }
+                            }
+                        }
+                    }
+                }
                 dropdown<Transform> {
-                    value = transform
+                    value = Transform.None
                     options = Transforms
                     onChange = { value ->
                         setState {
                             if (value != Transform.None) {
-                                safeTransformsUpdate { it.updatedAt(i, value) }
-                            } else {
-                                safeTransformsUpdate { it.removedAt(i) }
+                                safeTransformsUpdate { it + value }
                             }
                         }
                     }
                 }
             }
-            dropdown<Transform> {
-                value = Transform.None
-                options = Transforms
-                onChange = { value ->
-                    setState {
-                        if (value != Transform.None) {
-                            safeTransformsUpdate { it + value }
-                        }
+            label {
+                +"Scaled by"
+                dropdown<Scale> {
+                    value = state.scale
+                    options = Scales
+                    onChange = { value ->
+                        setState { scale = value }
                     }
                 }
             }
         }
-        label {
-            +"Scaled by"
-            dropdown<Scale> {
-                value = state.scale
-                options = Scales
-                onChange = { value ->
-                    setState { scale = value }
-                }
-            }
-        }
-        br {}
-        glCanvas {
-            poly = state.poly()
+        // Canvas & Info
+        val curPoly = state.poly()
+        polyCanvas {
+            poly = curPoly
             style = PolyStyle()
+        }
+        polyInfoPane {
+            poly = curPoly
         }
     }
 }
