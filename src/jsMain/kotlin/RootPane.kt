@@ -1,6 +1,7 @@
 package polyhedra.js
 
 import polyhedra.common.*
+import polyhedra.js.components.*
 import react.*
 import react.dom.*
 
@@ -8,6 +9,7 @@ external interface RootPaneState : RState {
     var seed: Seed
     var transforms: List<Transform>
     var scale: Scale
+    var rotate: Boolean
 }
 
 fun RootPaneState.poly(): Polyhedron =
@@ -42,7 +44,7 @@ class RootPane() : RComponent<RProps, RootPaneState>() {
         seed = Seed.Tetrahedron
         transforms = emptyList()
         scale = Scale.Midradius
-
+        rotate = true
     }
 
     override fun RBuilder.render() {
@@ -53,9 +55,7 @@ class RootPane() : RComponent<RProps, RootPaneState>() {
                 dropdown<Seed> {
                     value = state.seed
                     options = Seeds
-                    onChange = { value ->
-                        setState { safeSeedUpdate(value) }
-                    }
+                    onChange = { setState { safeSeedUpdate(it) } }
                 }
             }
             label {
@@ -92,9 +92,14 @@ class RootPane() : RComponent<RProps, RootPaneState>() {
                 dropdown<Scale> {
                     value = state.scale
                     options = Scales
-                    onChange = { value ->
-                        setState { scale = value }
-                    }
+                    onChange = { setState { scale = it } }
+                }
+            }
+            label {
+                +"Rotate"
+                checkbox {
+                    checked = state.rotate
+                    onChange = { setState { rotate = it } }
                 }
             }
         }
@@ -103,6 +108,7 @@ class RootPane() : RComponent<RProps, RootPaneState>() {
         polyCanvas {
             poly = curPoly
             style = PolyStyle()
+            rotate = state.rotate
         }
         polyInfoPane {
             poly = curPoly

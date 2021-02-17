@@ -26,7 +26,7 @@ class Polyhedron(
                     require(lf != null) {
                         "Edge $a to $b on face $f does not have an adjacent face"
                     }
-                    add(Edge(id++, a, b, lf, f))
+                    add(Edge(id++, a, b, lf, f).normalizedDirection())
                 }
             }
         }
@@ -50,14 +50,7 @@ class Polyhedron(
     }
 
     val directedEdges: List<Edge> by lazy {
-        es.flatMap {
-            with(it) {
-                listOf(
-                    Edge(id, a, b, l, r, EdgeKind(a.kind, b.kind, l.kind, r.kind)),
-                    Edge(id, b, a, r, l, EdgeKind(b.kind, a.kind, r.kind, l.kind))
-                )
-            }
-        }
+        es.flatMap { listOf(it, it.reversed()) }
     }
 
     val edgeKindsIndex: Map<EdgeKind, Int> by lazy {
@@ -141,17 +134,17 @@ class Edge(
     val b: Vertex,
     val l: Face,
     val r: Face,
-    val kind: EdgeKind = uniqueEdgeKind(a, b, l, r)
 ) : Id {
+    val kind: EdgeKind = EdgeKind(a.kind, b.kind, l.kind, r.kind)
     override fun equals(other: Any?): Boolean = other is Edge && id == other.id
     override fun hashCode(): Int = id
     override fun toString(): String = "$kind edge(${a.id}-${l.id}/${r.id}-${b.id})"
-}                                            
-
-fun uniqueEdgeKind(a: Vertex, b: Vertex, l: Face, r: Face): EdgeKind {
-    val k = EdgeKind(a.kind, b.kind, l.kind, r.kind)
-    return minOf(k, k.reversed())
 }
+
+fun Edge.reversed(): Edge = Edge(id, b, a, r, l)
+
+fun Edge.normalizedDirection(): Edge =
+    if (kind.reversed() < kind) reversed() else this
 
 fun Polyhedron.validate() {
     validateGeometry()

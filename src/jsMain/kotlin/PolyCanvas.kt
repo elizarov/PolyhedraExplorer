@@ -10,6 +10,7 @@ import react.dom.*
 external interface PolyCanvasProps : RProps {
     var poly: Polyhedron
     var style: PolyStyle
+    var rotate: Boolean
 }
 
 external interface PolyCanvasState : RState {
@@ -51,7 +52,13 @@ class PolyCanvas(props: PolyCanvasProps) : RComponent<PolyCanvasProps, PolyCanva
     }
 
     private fun requestAnimation() {
+        if (!props.rotate) {
+            prevTime = Double.NaN
+            return
+        }
+        if (animationHandle != 0) return
         animationHandle = window.requestAnimationFrame { nowTime ->
+            animationHandle = 0
             if (prevTime.isNaN()) prevTime = nowTime
             val dt = (nowTime - prevTime) / 1000 // in seconds
             setState {
@@ -63,11 +70,13 @@ class PolyCanvas(props: PolyCanvasProps) : RComponent<PolyCanvasProps, PolyCanva
     }
 
     override fun componentWillUnmount() {
-        window.cancelAnimationFrame(animationHandle)
+        if (animationHandle != 0) window.cancelAnimationFrame(animationHandle)
     }
 
-    override fun componentDidUpdate(prevProps: PolyCanvasProps, prevState: PolyCanvasState, snapshot: Any) =
+    override fun componentDidUpdate(prevProps: PolyCanvasProps, prevState: PolyCanvasState, snapshot: Any) {
         draw()
+        requestAnimation()
+    }
 
     private fun draw() =
         drawContext.drawScene(props.poly, props.style, state)

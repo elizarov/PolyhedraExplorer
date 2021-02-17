@@ -1,4 +1,4 @@
-package polyhedra.js
+package polyhedra.js.components
 
 import kotlinx.html.js.*
 import org.w3c.dom.*

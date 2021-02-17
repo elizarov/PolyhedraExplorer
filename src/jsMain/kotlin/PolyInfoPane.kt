@@ -14,7 +14,7 @@ fun RBuilder.polyInfoPane(builder: PolyInfoPaneProps.() -> Unit) {
     }
 }
 
-class PolyInfoPane : RComponent<PolyInfoPaneProps, RState>() {
+class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
     override fun RBuilder.render() {
         val poly = props.poly
         div {
