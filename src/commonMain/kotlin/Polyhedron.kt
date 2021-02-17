@@ -72,6 +72,8 @@ class Polyhedron(
     val edgesMidPointDefault: MidPoint by lazy {
         if (es.all { e -> e.isTangentInSegment() }) MidPoint.Tangent else MidPoint.Center
     }
+
+    val truncationConstraints by lazy { computeTruncationConstraints() }
     
     override fun toString(): String =
         "Polyhedron(vs=${vs.size}, es=${es.size}, fs=${fs.size})"
@@ -146,6 +148,12 @@ fun Edge.reversed(): Edge = Edge(id, b, a, r, l)
 fun Edge.normalizedDirection(): Edge =
     if (kind.reversed() < kind) reversed() else this
 
+val Edge.vec: Vec3
+    get() = b.pt - a.pt
+
+val Edge.len: Double
+    get() = vec.norm
+
 fun Polyhedron.validate() {
     validateGeometry()
     validateKinds()
@@ -191,7 +199,7 @@ fun Polyhedron.validateKinds() {
     // Validate edge kinds
     for ((ek, es) in edgeKinds) {
         es.validateUnique("$ek edge distances") { it.midPoint(MidPoint.Closest).norm }
-        es.validateUnique("$ek edge lengths") { (it.a.pt - it.b.pt).norm }
+        es.validateUnique("$ek edge lengths") { it.len }
     }
 }
 
