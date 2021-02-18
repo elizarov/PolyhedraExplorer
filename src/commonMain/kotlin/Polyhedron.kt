@@ -5,7 +5,6 @@ class Polyhedron(
     val fs: List<Face>
 ) {
     val es: List<Edge> = buildList {
-        var id = 0
         val lFaces = ArrayIdMap<Vertex, HashMap<Vertex, Face>>()
         for (f in fs) {
             for (i in 0 until f.size) {
@@ -26,7 +25,7 @@ class Polyhedron(
                     require(lf != null) {
                         "Edge $a to $b on face $f does not have an adjacent face"
                     }
-                    add(Edge(id++, a, b, lf, f).normalizedDirection())
+                    add(Edge(a, b, lf, f).normalizedDirection())
                 }
             }
         }
@@ -166,23 +165,27 @@ data class EdgeKind(val a: VertexKind, val b: VertexKind, val l: FaceKind, val r
 
 fun EdgeKind.reversed(): EdgeKind = EdgeKind(b, a, r, l)
 
-class Edge(
-    override val id: Int,
+data class Edge(
     val a: Vertex,
     val b: Vertex,
     val l: Face,
     val r: Face,
-) : Id {
+) {
     val kind: EdgeKind = EdgeKind(a.kind, b.kind, l.kind, r.kind)
-    override fun equals(other: Any?): Boolean = other is Edge && id == other.id
-    override fun hashCode(): Int = id
     override fun toString(): String = "$kind edge(${a.id}-${l.id}/${r.id}-${b.id})"
 }
 
-fun Edge.reversed(): Edge = Edge(id, b, a, r, l)
+fun Edge.reversed(): Edge = Edge(b, a, r, l)
 
-fun Edge.normalizedDirection(): Edge =
-    if (kind.reversed() < kind) reversed() else this
+fun Edge.normalizedDirection(): Edge {
+    val rk = kind.reversed().compareTo(kind)
+    return when {
+        rk < 0 -> reversed()
+        rk > 0 -> this
+        b.id < a.id -> reversed()
+        else -> this
+    }
+}
 
 val Edge.vec: Vec3
     get() = b.pt - a.pt
@@ -205,13 +208,12 @@ class PolyhedronBuilder {
         fs.add(Face(fs.size, a, kind))
     }
 
-    fun face(fvIds: List<Int>, kind: FaceKind) {
-        fs.add(Face(fs.size, fvIds.map { vs[it] }, kind))
+    fun face(fvs: List<Vertex>, kind: FaceKind) {
+        fs.add(Face(fs.size, fvs.map { vs[it.id] }, kind))
     }
 
     fun face(f: Face) {
-        val a = List(f.size) { vs[f[it].id] }
-        fs.add(Face(fs.size, a, f.kind))
+        face(f.fvs, f.kind)
     }
 
     fun build() = Polyhedron(vs, fs)
