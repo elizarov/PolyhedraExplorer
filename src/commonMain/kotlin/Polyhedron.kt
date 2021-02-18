@@ -45,7 +45,7 @@ class Polyhedron(
         directedEdges
             .groupById { it.a }
             .mapValues { entry ->
-                entry.value.sortedAdjacentEdges(entry.key)
+                entry.value.sortedVertexAdjacentEdges(entry.key)
             }
     }
 
@@ -61,6 +61,12 @@ class Polyhedron(
     val vertexFaces: IdMap<Vertex, List<Face>> by lazy {
         vertexDirectedEdges
             .mapValues { e -> e.value.map { it.r } }
+    }
+
+    val faceDirectedEdges: IdMap<Face, List<Edge>> by lazy {
+        directedEdges
+            .groupById { it.r }
+            .mapValues { it.value.sortedFaceAdjacentEdges(it.key) }
     }
 
     val edgeKindsIndex: Map<EdgeKind, Int> by lazy {
@@ -87,12 +93,23 @@ class Polyhedron(
         "Polyhedron(vs=${vs.size}, es=${es.size}, fs=${fs.size})"
 }
 
-fun List<Edge>.sortedAdjacentEdges(a: Vertex): List<Edge> {
+fun List<Edge>.sortedVertexAdjacentEdges(a: Vertex): List<Edge> {
     require(all { it.a == a })
     val result = toMutableList()
     for (i in 1 until size) {
         val prev = result[i - 1].r
         val j = (i until size).first { result[it].l == prev }
+        result.swap(i, j)
+    }
+    return result
+}
+
+fun List<Edge>.sortedFaceAdjacentEdges(f: Face): List<Edge> {
+    require(all { it.r == f })
+    val result = toMutableList()
+    for (i in 1 until size) {
+        val prev = result[i - 1].b
+        val j = (i until size).first { result[it].a == prev }
         result.swap(i, j)
     }
     return result
@@ -110,7 +127,7 @@ class Vertex(
 ) : Id {
     override fun equals(other: Any?): Boolean = other is Vertex && id == other.id
     override fun hashCode(): Int = id
-    override fun toString(): String = "$kind-vertex(id=$id, $pt)"
+    override fun toString(): String = "$kind vertex(id=$id, $pt)"
 }
 
 inline class FaceKind(override val id: Int) : Id, Comparable<FaceKind> {
@@ -133,7 +150,7 @@ class Face(
     override fun equals(other: Any?): Boolean = other is Face && id == other.id
     override fun hashCode(): Int = id
     override fun toString(): String =
-        "$kind-face(id=$id, [${fvs.map { it.id }.joinToString(", ")}])"
+        "$kind face(id=$id, [${fvs.map { it.id }.joinToString(", ")}])"
 }
 
 data class EdgeKind(val a: VertexKind, val b: VertexKind, val l: FaceKind, val r: FaceKind) : Comparable<EdgeKind> {
@@ -172,62 +189,6 @@ val Edge.vec: Vec3
 
 val Edge.len: Double
     get() = vec.norm
-
-fun Polyhedron.validate() {
-    validateGeometry()
-    validateKinds()
-}
-
-fun Polyhedron.validateGeometry() {
-    // Validate edges
-    for (e in es) {
-        require((e.a.pt - e.b.pt).norm > EPS) {
-            "$e non-degenerate"
-        }
-    }
-    // Validate faces
-    for (f in fs) {
-        require(f.plane.d > 0) {
-            "Face normal does not point outwards: $f ${f.plane} "
-        }
-        for (v in f.fvs)
-            require(v.pt in f.plane) {
-                "Face is not planar: $f, $v !in ${f.plane}"
-            }
-        for (i in 0 until f.size) {
-            val a = f[i].pt
-            val b = f[(i + 1) % f.size].pt
-            val c = f[(i + 2) % f.size].pt
-            val rot = (c - a) cross (b - a)
-            require(rot * f.plane.n > -EPS) {
-                "Face is not clockwise: $f, vertices $a $b $c"
-            }
-        }
-    }
-}
-
-fun Polyhedron.validateKinds() {
-    // Validate face kinds
-    for ((fk, fs) in faceKinds) {
-        fs.validateUnique("$fk-face distances") { it.plane.d }
-    }
-    // Validate vertex kinds
-    for ((vk, vs) in vertexKinds) {
-        vs.validateUnique("$vk-vertex distances") { it.pt.norm }
-    }
-    // Validate edge kinds
-    for ((ek, es) in edgeKinds) {
-        es.validateUnique("$ek edge distances") { it.midPoint(MidPoint.Closest).norm }
-        es.validateUnique("$ek edge lengths") { it.len }
-    }
-}
-
-private fun <T> Collection<T>.validateUnique(msg: String, selector: (T) -> Double) {
-    val d = associateWith(selector)
-    require(d.values.span() < EPS) {
-        "$msg are different: ${d.entries.minByOrNull { it.value }} -- ${d.entries.maxByOrNull { it.value }}"
-    }
-}
 
 class PolyhedronBuilder {
     private val vs = ArrayList<Vertex>()

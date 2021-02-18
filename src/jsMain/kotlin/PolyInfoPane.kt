@@ -25,12 +25,9 @@ class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
             }
             div {
                 for ((fk, fs) in poly.faceKinds) {
-                    val f = fs[0]
-                    val vKinds = f.fvs.map { it.kind }
+                    val fe = poly.faceEssence(fs[0])
                     div {
-                        +"$fk-faces: ${fs.size}"
-                        +", distance ${f.plane.d.fmt}"
-                        +", vertices ${vKinds.size} [${vKinds.joinToString("")}]"
+                        +"$fk faces: ${fs.size}, $fe"
                     }
                 }
             }
@@ -41,12 +38,9 @@ class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
             }
             div {
                 for ((vk, vs) in poly.vertexKinds) {
-                    val v = vs[0]
-                    val fKinds = poly.vertexFaces[v]!!.map { it.kind }
+                    val ve = poly.vertexEssence(vs[0])
                     div {
-                        +"$vk-vertices: ${vs.size}"
-                        +", distance ${v.pt.norm.fmt}"
-                        +", faces ${fKinds.size} [${fKinds.joinToString("")}]"
+                        +"$vk vertices: ${vs.size}, $ve"
                     }
                 }
             }
@@ -59,9 +53,9 @@ class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
                 for ((ek, es) in poly.edgeKinds) {
                     val e = es[0]
                     div {
-                        +"$ek edges: ${es.size}"
-                        +", distance ${e.midPoint(MidPoint.Closest).norm.fmt}"
-                        +", length ${(e.a.pt - e.b.pt).norm.fmt}"
+                        +"$ek edges: ${es.size}, "
+                        +"distance ${e.midPoint(MidPoint.Closest).norm.fmt}, "
+                        +"length ${(e.a.pt - e.b.pt).norm.fmt}"
                     }
                 }
             }
