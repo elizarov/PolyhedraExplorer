@@ -25,7 +25,7 @@ fun Polyhedron.dual() = polyhedron {
     }
     // faces from vertices
     for ((v, fl) in vertexFaces) {
-        face(fl.map { it.id }, FaceKind(v.kind.id), sort = true)
+        face(fl.map { it.id }, FaceKind(v.kind.id))
     }
 }
 
@@ -36,11 +36,11 @@ fun Polyhedron.rectified() = polyhedron {
     }
     // faces from the original faces
     for (f in fs) {
-        face(f.fvs.zipWithCycle { a, b -> vertexEdges[a]!![b]!!.id }, f.kind)
+        face(f.fvs.zipWithCycle { a, b -> vertexVertexDirectedEdge[a]!![b]!!.id }, f.kind)
     }
     // faces from the original vertices
     for (v in vs) {
-        face(vertexEdges[v]!!.map { it.value.id }, FaceKind(faceKinds.size + v.kind.id), sort = true)
+        face(vertexDirectedEdges[v]!!.map { it.id }, FaceKind(faceKinds.size + v.kind.id))
     }
 }
 
@@ -69,8 +69,8 @@ fun Polyhedron.truncated(ratio: Double = regularTruncationRatio) = when {
         }
         // faces from the original vertices
         for (v in vs) {
-            val fvIds = vertexEdges[v]!!.map { edgeIds[v to it.key]!! }
-            face(fvIds, FaceKind(faceKinds.size + v.kind.id), sort = true)
+            val fvIds = vertexVertexDirectedEdge[v]!!.map { edgeIds[v to it.key]!! }
+            face(fvIds, FaceKind(faceKinds.size + v.kind.id))
         }
     }
 }

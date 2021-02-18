@@ -36,21 +36,31 @@ class Polyhedron(
     val faceKinds: IdMap<FaceKind, List<Face>> by lazy { fs.groupById { it.kind } }
     val edgeKinds: Map<EdgeKind, List<Edge>> by lazy { es.groupBy { it.kind } }
 
-    val vertexFaces: IdMap<Vertex, List<Face>> by lazy {
-        fs
-            .flatMap { f -> f.fvs.map { v -> v to f } }
-            .groupById({ it.first }, { it.second })
-    }
-
-    val vertexEdges: IdMap<Vertex, Map<Vertex, Edge>> by lazy {
-        es
-            .flatMap { e -> listOf(Triple(e.a, e.b, e), Triple(e.b, e.a, e)) }
-            .groupById { it.first }
-            .mapValues { entry -> entry.value.associateBy({ it.second }, { it.third }) }
-    }
-
     val directedEdges: List<Edge> by lazy {
         es.flatMap { listOf(it, it.reversed()) }
+    }
+
+    // adjacent edges are properly ordered
+    val vertexDirectedEdges: IdMap<Vertex, List<Edge>> by lazy {
+        directedEdges
+            .groupById { it.a }
+            .mapValues { entry ->
+                entry.value.sortedAdjacentEdges(entry.key)
+            }
+    }
+
+    // adjacent vertex-edges are properly ordered
+    val vertexVertexDirectedEdge: IdMap<Vertex, Map<Vertex, Edge>> by lazy {
+        vertexDirectedEdges
+            .mapValues { entry ->
+                entry.value.associateBy { it.b }
+            }
+    }
+
+    // adjacent faces are properly ordered
+    val vertexFaces: IdMap<Vertex, List<Face>> by lazy {
+        vertexDirectedEdges
+            .mapValues { e -> e.value.map { it.r } }
     }
 
     val edgeKindsIndex: Map<EdgeKind, Int> by lazy {
@@ -75,6 +85,17 @@ class Polyhedron(
 
     override fun toString(): String =
         "Polyhedron(vs=${vs.size}, es=${es.size}, fs=${fs.size})"
+}
+
+fun List<Edge>.sortedAdjacentEdges(a: Vertex): List<Edge> {
+    require(all { it.a == a })
+    val result = toMutableList()
+    for (i in 1 until size) {
+        val prev = result[i - 1].r
+        val j = (i until size).first { result[it].l == prev }
+        result.swap(i, j)
+    }
+    return result
 }
 
 inline class VertexKind(override val id: Int) : Id, Comparable<VertexKind> {
@@ -109,7 +130,7 @@ class Face(
     operator fun get(index: Int): Vertex = fvs[index]
     operator fun iterator(): Iterator<Vertex> = fvs.iterator()
 
-    override fun equals(other: Any?): Boolean = other is Vertex && id == other.id
+    override fun equals(other: Any?): Boolean = other is Face && id == other.id
     override fun hashCode(): Int = id
     override fun toString(): String =
         "$kind-face(id=$id, [${fvs.map { it.id }.joinToString(", ")}])"
@@ -223,10 +244,8 @@ class PolyhedronBuilder {
         fs.add(Face(fs.size, a, kind))
     }
 
-    fun face(fvIds: List<Int>, kind: FaceKind, sort: Boolean = false) {
-        val a = MutableList(fvIds.size) { vs[fvIds[it]] }
-        if (sort) a.sortFace()
-        fs.add(Face(fs.size, a, kind))
+    fun face(fvIds: List<Int>, kind: FaceKind) {
+        fs.add(Face(fs.size, fvIds.map { vs[it] }, kind))
     }
 
     fun face(f: Face) {
@@ -242,32 +261,6 @@ fun polyhedron(block: PolyhedronBuilder.() -> Unit): Polyhedron =
         block()
         build()
     }
-
-private fun MutableList<Vertex>.sortFace() {
-    check(size >= 3)
-    // start with vertex #0
-    val v0 = this[0]
-    val n = plane3(v0.pt, this[1].pt, this[2].pt).normalFromOrigin().n
-    // find proper vertex #1
-    val i1 = (1 until size).firstOrNull { i1 ->
-        // the rest of vertices must to be the right
-        val v1 = this[i1]
-        all { v2 -> ((v2.pt - v0.pt) cross (v1.pt - v0.pt)) * n > -EPS }
-    }
-    require(i1 != null) {
-        "Face is not convex and cannot be sorted: $this"
-    }
-    swap(1, i1)
-    // select #2 and others
-    for (i in 2 until size) {
-        val prev = this[i - 1].pt
-        val u = (prev - this[i - 2].pt).unit
-        val j = (i until size).maxByOrNull { j ->
-            (this[j].pt - prev).unit * u
-        }!!
-        swap(i, j)
-    }
-}
 
 private fun <T> MutableList<T>.swap(i: Int, j: Int) {
     val t = this[i]
