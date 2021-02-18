@@ -65,17 +65,6 @@ class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
                     }
                 }
             }
-            div {
-                +"[TruncationConstraints]"
-                for (tcc in poly.truncationConstraints.cs) {
-                    div {
-                        +tcc.toString()
-                    }
-                }
-                +"Rectification: ${poly.truncationConstraints
-                    .solveRectification()
-                    ?.mapValues { it.value.fmt } }"
-            }
         }
     }
 }

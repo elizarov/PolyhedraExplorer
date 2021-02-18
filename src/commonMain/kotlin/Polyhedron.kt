@@ -73,8 +73,6 @@ class Polyhedron(
         if (es.all { e -> e.isTangentInSegment() }) MidPoint.Tangent else MidPoint.Center
     }
 
-    val truncationConstraints by lazy { computeTruncationConstraints() }
-    
     override fun toString(): String =
         "Polyhedron(vs=${vs.size}, es=${es.size}, fs=${fs.size})"
 }
