@@ -19,8 +19,9 @@ private inline fun ifValidSeedTransforms(seed: Seed, transforms: List<Transform>
     try {
         seed.poly.transformed(transforms).validateGeometry()
         block()
-    } catch (e: IllegalArgumentException) {
+    } catch (e: Exception) {
         println("$seed $transforms is not valid: $e")
+        e.printStackTrace()
     }
 }
 

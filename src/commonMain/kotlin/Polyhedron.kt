@@ -249,10 +249,13 @@ private fun MutableList<Vertex>.sortFace() {
     val v0 = this[0]
     val n = plane3(v0.pt, this[1].pt, this[2].pt).normalFromOrigin().n
     // find proper vertex #1
-    val i1 = (1 until size).first { i1 ->
+    val i1 = (1 until size).firstOrNull { i1 ->
         // the rest of vertices must to be the right
         val v1 = this[i1]
         all { v2 -> ((v2.pt - v0.pt) cross (v1.pt - v0.pt)) * n > -EPS }
+    }
+    require(i1 != null) {
+        "Face is not convex and cannot be sorted: $this"
     }
     swap(1, i1)
     // select #2 and others
