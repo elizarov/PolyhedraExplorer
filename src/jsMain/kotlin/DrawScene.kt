@@ -1,13 +1,17 @@
 package polyhedra.js
 
 import org.khronos.webgl.*
+import org.w3c.dom.*
 import polyhedra.common.*
 import kotlin.math.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
 class DrawContext(
-    val gl: GL,
+    val canvas: HTMLCanvasElement
 ) {
+    val gl: GL = canvas.getContext("webgl") as GL
+    val backgroundColor = canvas.computedStyle().backgroundColor.parseCSSColor() ?: Color(0.0f, 0.0f, 0.0f)
+
     val shader = Shader(gl)
     
     val projectionMatrix = mat4.create()
@@ -23,10 +27,10 @@ class DrawContext(
     var nIndices = 0
 }
 
-private fun DrawContext.initProjectionMatrix(gl: GL, fieldOfViewDegrees: Double) {
+private fun DrawContext.initProjectionMatrix(fieldOfViewDegrees: Double) {
     mat4.perspective(
         projectionMatrix, fieldOfViewDegrees * PI / 180,
-        gl.canvas.clientWidth.toDouble() / gl.canvas.clientHeight, 0.1, 100.0
+        canvas.clientWidth.toDouble() / canvas.clientHeight, 0.1, 100.0
     )
 }
 
@@ -40,7 +44,7 @@ private fun DrawContext.initModelAndNormalMatrices(state: PolyCanvasState) {
 }
 
 fun DrawContext.drawScene(poly: Polyhedron, style: PolyStyle, state: PolyCanvasState) {
-    gl.clearColor(0.0f, 0.0f, 0.0f, 1.0f)
+    gl.clearColor(backgroundColor.r, backgroundColor.g, backgroundColor.b, backgroundColor.a)
     gl.clearDepth(1.0f)
     gl.enable(GL.DEPTH_TEST)
     gl.depthFunc(GL.LEQUAL)
@@ -49,7 +53,7 @@ fun DrawContext.drawScene(poly: Polyhedron, style: PolyStyle, state: PolyCanvasS
     gl.useProgram(shader.program)
 
     initPolyhedra(poly, style)
-    initProjectionMatrix(gl, 45.0)
+    initProjectionMatrix(45.0)
     initModelAndNormalMatrices(state)
 
     gl.uniformMatrix4fv(shader.projectionMatrixLocation, false, projectionMatrix)

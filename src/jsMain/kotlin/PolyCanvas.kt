@@ -46,7 +46,7 @@ class PolyCanvas(props: PolyCanvasProps) : RComponent<PolyCanvasProps, PolyCanva
     }
 
     override fun componentDidMount() {
-        drawContext = DrawContext(canvasRef.current!!.getContext("webgl") as WebGLRenderingContext)
+        drawContext = DrawContext(canvasRef.current!!)
         draw()
         requestAnimation()
     }

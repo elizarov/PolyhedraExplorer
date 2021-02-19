@@ -27,16 +27,12 @@ kotlin {
     js(IR) {
         browser {
             binaries.executable()
-            webpackTask {
-                cssSupport.enabled = true
-            }
-            runTask {
+            commonWebpackConfig {
                 cssSupport.enabled = true
             }
             testTask {
                 useKarma {
                     useChromeHeadless()
-                    webpackConfig.cssSupport.enabled = true
                 }
             }
         }
