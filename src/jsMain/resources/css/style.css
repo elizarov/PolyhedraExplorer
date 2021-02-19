@@ -19,12 +19,32 @@ body {
 }
 
 .row {
-    padding-left: 0.5em;
+    padding-left: 1ch;
+    margin-bottom: 0.3em;
 }
 
 .header {
+    padding-left: 1ch;
+    margin-bottom: 0.3em;
     background-color: hsl(0, 0%, 85%);
     font-weight: 500;
+    height: 1.8em;
+    vertical-align: middle;
+}
+
+div.header-container {
+    display: table;
+    width: 100%;
+    margin-bottom: 0.3em;
+}
+
+div.header-cell {
+    display: table-cell;
+    padding-left: 1ch;
+    background-color: hsl(0, 0%, 85%);
+    font-weight: 500;
+    height: 1.8em;
+    vertical-align: middle;
 }
 
 .card {
@@ -48,6 +68,10 @@ body {
     width: 250px;
 }
 
+.control {
+    height: 1.5em;
+}
+
 canvas.poly {
     width: 100%;
 }
@@ -55,7 +79,7 @@ canvas.poly {
 /* --------- controls --------- */
 
 label {
-    margin-right: 0.5em;
+    margin-right: 1ch;
 }
 
 /* --------- table --------- */
@@ -75,11 +99,11 @@ table td:not(:last-child) {
 }
 
 td {
-    padding-left: 0.5em;
+    padding-left: 1ch;
 }
 
 td.rt {
     text-align: right;
-    padding-left: 1em;
+    padding-left: 1ch;
 }
 

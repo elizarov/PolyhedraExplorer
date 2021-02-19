@@ -63,7 +63,7 @@ class RootPane : RComponent<RProps, RootPaneState>() {
             div("canvas-column card") {
                 // Canvas & Info
                 val curPoly = state.poly()
-                div("row header") { +state.polyName() }
+                header(state.polyName())
                 polyCanvas("poly") {
                     poly = curPoly
                     style = PolyStyle()
@@ -79,9 +79,15 @@ class RootPane : RComponent<RProps, RootPaneState>() {
         }
     }
 
+    private fun RBuilder.header(text: String) {
+        div("header-container") {
+            div("header-cell") { +text }
+        }
+    }
+
     private fun RBuilder.renderControls() {
-        div("row header") { +"Polyhedron" }
-        div("row") {
+        header("Polyhedron")
+        div("row control") {
             label { +"Seed" }
             dropdown<Seed> {
                 value = state.seed
@@ -89,12 +95,12 @@ class RootPane : RComponent<RProps, RootPaneState>() {
                 onChange = { setState { safeSeedUpdate(it) } }
             }
         }
-        
-        div("row header") { +"Transforms" }
+
+        header("Transforms")
         table {
             tbody {
                 for ((i, transform) in state.transforms.withIndex()) {
-                    tr {
+                    tr("control") {
                         td { +"${i + 1}:" }
                         td {
                             dropdown<Transform> {
@@ -113,7 +119,7 @@ class RootPane : RComponent<RProps, RootPaneState>() {
                         }
                     }
                 }
-                tr {
+                tr("control") {
                     td { +"${state.transforms.size + 1}:" }
                     td {
                         dropdown<Transform> {
@@ -127,6 +133,12 @@ class RootPane : RComponent<RProps, RootPaneState>() {
                                 }
                             }
                         }
+                    }
+                }
+                for (i in state.transforms.size + 1..8) {
+                    tr("control") {
+                        td { +"${i + 1}:" }
+                        td {}
                     }
                 }
                 tr {
@@ -143,8 +155,8 @@ class RootPane : RComponent<RProps, RootPaneState>() {
             }
         }
 
-        div("row header") { +"View" }
-        div("row") {
+        header("View")
+        div("row control") {
             label { +"Base scale" }
             dropdown<Scale> {
                 value = state.scale
@@ -152,14 +164,14 @@ class RootPane : RComponent<RProps, RootPaneState>() {
                 onChange = { setState { scale = it } }
             }
         }
-        div("row") {
+        div("row control") {
             label { +"Rotate" }
             checkbox {
                 checked = state.rotate
                 onChange = { setState { rotate = it } }
             }
         }
-        div("row") {
+        div("row control") {
             label { +"View scale" }
             slider {
                 min = -2.0
