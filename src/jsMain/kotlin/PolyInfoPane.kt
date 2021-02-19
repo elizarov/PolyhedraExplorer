@@ -15,47 +15,60 @@ fun RBuilder.polyInfoPane(builder: PolyInfoPaneProps.() -> Unit) {
 }
 
 class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
+    private fun RBuilder.infoHeader(name: String, cnt: Int, distName: String, distValue: Double) {
+        tr("info-header") {
+            td { +name }
+            td { +cnt.toString() }
+            td("rt") { +distName }
+            td { +distValue.fmtFix }
+            repeat(3) { td {} }
+        }
+    }
+
     override fun RBuilder.render() {
         val poly = props.poly
-        div {
-            // Faces
-            div {
-                +"Faces: ${poly.fs.size}"
-                +", inradius: ${poly.inradius.fmt}"
-            }
-            div {
+        table {
+            tbody {
+                // Faces
+                infoHeader("Faces", poly.fs.size, "inradius", poly.inradius)
                 for ((fk, fs) in poly.faceKinds) {
                     val fe = poly.faceEssence(fs[0])
-                    div {
-                        +"$fk faces: ${fs.size}, $fe"
+                    tr {
+                        td("rt") { +"$fk faces" }
+                        td { +fs.size.toString() }
+                        td("rt") { +"distance" }
+                        td { +fe.dist.fmtFix }
+                        td("rt") { +"adj" }
+                        td { +fe.vfs.size.toString() }
+                        td { +fe.vfs.joinToString(" ", "[", "]") }
                     }
                 }
-            }
-            // Vertices
-            div {
-                +"Vertices: ${poly.vs.size}"
-                +", circumradius: ${poly.circumradius.fmt}"
-            }
-            div {
+                // Vertices
+                infoHeader("Vertices", poly.vs.size, "circumradius", poly.circumradius)
                 for ((vk, vs) in poly.vertexKinds) {
                     val ve = poly.vertexEssence(vs[0])
-                    div {
-                        +"$vk vertices: ${vs.size}, $ve"
+                    tr {
+                        td("rt") { +"$vk vertices" }
+                        td { +vs.size.toString() }
+                        td("rt") { +"distance" }
+                        td { +ve.dist.fmtFix }
+                        td("rt") { +"adj" }
+                        td { +ve.vfs.size.toString() }
+                        td { +ve.vfs.joinToString(" ", "[", "]") }
                     }
                 }
-            }
-            // Edges
-            div {
-                +"Edges: ${poly.es.size}"
-                +", midradius: ${poly.midradius.fmt}"
-            }
-            div {
+                // Edges
+                infoHeader("Edges", poly.es.size, "midradius", poly.midradius)
                 for ((ek, es) in poly.edgeKinds) {
                     val e = es[0]
-                    div {
-                        +"$ek edges: ${es.size}, "
-                        +"distance ${e.midPoint(MidPoint.Closest).norm.fmt}, "
-                        +"length ${(e.a.pt - e.b.pt).norm.fmt}"
+                    tr {
+                        td("rt") { +"$ek edges" }
+                        td { +es.size.toString() }
+                        td("rt") { +"distance" }
+                        td { +e.midPoint(MidPoint.Closest).norm.fmtFix }
+                        td {}
+                        td {}
+                        td { +"len ${e.len.fmtFix}" }
                     }
                 }
             }

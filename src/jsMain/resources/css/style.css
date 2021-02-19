@@ -1,8 +1,10 @@
+/* --------- reset --------- */
+
 *, *::before, *::after {
     box-sizing: border-box;
 }
 
-body, p {
+body, p, table, tbody, tr, td, label {
     padding: 0;
     margin: 0;
 }
@@ -11,13 +13,44 @@ input, button, select {
     font: inherit;
 }
 
+/* --------- core style --------- */
+
 body {
     background-color: hsl(0, 0%, 95%);
     color: hsl(0, 0%, 5%);
-    font-family: 'Quicksand', sans-serif;
+    font-family: 'Roboto', sans-serif;
     font-weight: 300;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1, h2, h3 {
     font-weight: 500;
 }
+
+/* --------- controls --------- */
+
+label {
+    margin-left: 0.5em;
+    margin-right: 0.5em;
+}
+
+/* --------- table --------- */
+
+table {
+    border: none;
+    border-spacing: 0;
+}
+
+td {
+    padding-left: 0.5em;
+}
+
+tr.info-header {
+    background-color: hsl(0, 0%, 85%);
+    font-weight: 500;
+}
+
+td.rt {
+    text-align: right;
+    padding-left: 1em;
+}
+

@@ -13,3 +13,14 @@ fun Float.fmt(precision: Int): String = toDouble().fmt(precision)
 
 val Double.fmt: String
     get() = fmt(defaultPrecision)
+
+fun Double.fmtFix(precision: Int): String {
+    val p = 10.0.pow(precision)
+    val m = (this * p).roundToLong().toString().padStart(precision + 1, '0')
+    val i = m.length - precision
+    return m.substring(0, i) + "." + m.substring(i)
+}
+
+val Double.fmtFix: String
+    get() = fmtFix(defaultPrecision)
+

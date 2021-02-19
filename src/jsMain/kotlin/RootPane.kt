@@ -51,57 +51,49 @@ class RootPane() : RComponent<RProps, RootPaneState>() {
     override fun RBuilder.render() {
         // State
         div {
-            label {
-                +"Seed"
-                dropdown<Seed> {
-                    value = state.seed
-                    options = Seeds
-                    onChange = { setState { safeSeedUpdate(it) } }
-                }
+            label { +"Seed" }
+            dropdown<Seed> {
+                value = state.seed
+                options = Seeds
+                onChange = { setState { safeSeedUpdate(it) } }
             }
-            label {
-                +"Transform"
-                for ((i, transform) in state.transforms.withIndex()) {
-                    dropdown<Transform> {
-                        value = transform
-                        options = Transforms
-                        onChange = { value ->
-                            setState {
-                                if (value != Transform.None) {
-                                    safeTransformsUpdate { it.updatedAt(i, value) }
-                                } else {
-                                    safeTransformsUpdate { it.removedAt(i) }
-                                }
-                            }
-                        }
-                    }
-                }
+            label { +"Transform" }
+            for ((i, transform) in state.transforms.withIndex()) {
                 dropdown<Transform> {
-                    value = Transform.None
+                    value = transform
                     options = Transforms
                     onChange = { value ->
                         setState {
                             if (value != Transform.None) {
-                                safeTransformsUpdate { it + value }
+                                safeTransformsUpdate { it.updatedAt(i, value) }
+                            } else {
+                                safeTransformsUpdate { it.removedAt(i) }
                             }
                         }
                     }
                 }
             }
-            label {
-                +"Scaled by"
-                dropdown<Scale> {
-                    value = state.scale
-                    options = Scales
-                    onChange = { setState { scale = it } }
+            dropdown<Transform> {
+                value = Transform.None
+                options = Transforms
+                onChange = { value ->
+                    setState {
+                        if (value != Transform.None) {
+                            safeTransformsUpdate { it + value }
+                        }
+                    }
                 }
             }
-            label {
-                +"Rotate"
-                checkbox {
-                    checked = state.rotate
-                    onChange = { setState { rotate = it } }
-                }
+            label { +"Scaled by" }
+            dropdown<Scale> {
+                value = state.scale
+                options = Scales
+                onChange = { setState { scale = it } }
+            }
+            label { +"Rotate" }
+            checkbox {
+                checked = state.rotate
+                onChange = { setState { rotate = it } }
             }
         }
         // Canvas & Info
