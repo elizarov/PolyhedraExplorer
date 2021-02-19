@@ -13,8 +13,12 @@ external class quat {
     }
 }
 
-external object vec3 {
+external object mat3 {
     fun create(): Float32Array
+
+    fun fromQuat(out: Float32Array, q: quat): Float32Array
+    fun invert(out: Float32Array, a: Float32Array): Float32Array
+    fun transpose(out: Float32Array, a: Float32Array): Float32Array
 }
 
 external object mat4 {

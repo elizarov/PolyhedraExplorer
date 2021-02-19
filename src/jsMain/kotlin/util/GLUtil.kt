@@ -36,6 +36,12 @@ operator fun Float32Array.set(i: Int, c: Color) {
     set(i + 3, c.a)
 }
 
+fun Vec3.toFloat32Array(): Float32Array = Float32Array(3).apply {
+    set(0, x)
+    set(1, y)
+    set(2, z)
+}
+
 inline operator fun Uint16Array.set(i: Int, x: Int) {
     set(i, x.toShort())
 }

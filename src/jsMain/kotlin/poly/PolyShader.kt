@@ -10,6 +10,10 @@ private const val uProjectionMatrix = "uProjectionMatrix"
 private const val uModelViewMatrix = "uModelViewMatrix"
 private const val uNormalMatrix = "uNormalMatrix"
 
+private const val uAmbientLightColor = "uAmbientLightColor"
+private const val uDirectionalLightColor = "uDirectionalLightColor"
+private const val uDirectionalLightVector = "uDirectionalLightVector"
+
 private const val aVertexPosition = "aVertexPosition"
 private const val aVertexNormal = "aVertexNormal"
 private const val aVertexColor = "aVertexColor"
@@ -20,27 +24,25 @@ private const val vLighting = "vLighting"
 private val vsSource = """
     uniform mat4 $uProjectionMatrix;
     uniform mat4 $uModelViewMatrix;
-    uniform mat4 $uNormalMatrix;
+    uniform mat3 $uNormalMatrix;
+    
+    uniform vec3 $uAmbientLightColor;
+    uniform vec3 $uDirectionalLightColor;
+    uniform vec3 $uDirectionalLightVector;
 
     attribute vec4 $aVertexPosition;
     attribute vec3 $aVertexNormal;
     attribute vec4 $aVertexColor;
     
-    varying lowp vec4 $vColor;
-    varying highp vec3 $vLighting;
+    varying vec4 $vColor;
+    varying vec3 $vLighting;
 
     void main() {
       gl_Position = $uProjectionMatrix * $uModelViewMatrix * $aVertexPosition;
-      
-      highp vec3 ambientLight = vec3(0.3, 0.3, 0.3);
-      highp vec3 directionalLightColor = vec3(1, 1, 1);
-      highp vec3 directionalVector = normalize(vec3(0.85, 0.8, 0.75));
-      
-      highp vec4 transformedNormal = $uNormalMatrix * vec4($aVertexNormal, 1.0);
-      highp float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
-      
+      vec3 transformedNormal = $uNormalMatrix * $aVertexNormal;
+      float directional = max(dot(transformedNormal, $uDirectionalLightVector), 0.0);
       $vColor = $aVertexColor;
-      $vLighting = ambientLight + (directionalLightColor * directional);
+      $vLighting = $uAmbientLightColor + ($uDirectionalLightColor * directional);
     }
 """.trimIndent()
 
@@ -55,12 +57,18 @@ private val fsSource = """
 
 class PolyShader(gl: GL) {
     val program: WebGLProgram = initShaderProgram(gl, vsSource, fsSource)
-    val projectionMatrixLocation = gl.getUniformLocation(program, uProjectionMatrix)!!
-    val modelViewMatrixLocation = gl.getUniformLocation(program, uModelViewMatrix)!!
-    val normalMatrixLocation = gl.getUniformLocation(program, uNormalMatrix)!!
-    val aVertexPositionLocation = gl.getAttribLocation(program, aVertexPosition)
-    val aVertexNormalLocation = gl.getAttribLocation(program, aVertexNormal)
-    val aVertexColorLocation = gl.getAttribLocation(program, aVertexColor)
+
+    val uProjectionMatrixLoc = gl.getUniformLocation(program, uProjectionMatrix)!!
+    val uModelViewMatrixLoc = gl.getUniformLocation(program, uModelViewMatrix)!!
+    val uNormalMatrixLoc = gl.getUniformLocation(program, uNormalMatrix)!!
+
+    val uAmbientLightColorLoc = gl.getUniformLocation(program, uAmbientLightColor)!!
+    val uDirectionalLightColorLoc = gl.getUniformLocation(program, uDirectionalLightColor)!!
+    val uDirectionalLightVectorLoc = gl.getUniformLocation(program, uDirectionalLightVector)!!
+    
+    val aVertexPositionLoc = gl.getAttribLocation(program, aVertexPosition)
+    val aVertexNormalLoc = gl.getAttribLocation(program, aVertexNormal)
+    val aVertexColorLoc = gl.getAttribLocation(program, aVertexColor)
 }
 
 class PolyBuffers(val gl: GL) {
@@ -72,15 +80,19 @@ class PolyBuffers(val gl: GL) {
     var nIndices = 0
 }
 
-fun PolyBuffers.draw(viewMatrices: ViewMatrices) {
+fun PolyBuffers.draw(viewMatrices: ViewMatrices, lightning: Lightning) {
     gl.useProgram(shader.program)
-    gl.uniformMatrix4fv(shader.projectionMatrixLocation, false, viewMatrices.projectionMatrix)
-    gl.uniformMatrix4fv(shader.modelViewMatrixLocation, false, viewMatrices.modelViewMatrix)
-    gl.uniformMatrix4fv(shader.normalMatrixLocation, false, viewMatrices.normalMatrix)
+    gl.uniformMatrix4fv(shader.uProjectionMatrixLoc, false, viewMatrices.projectionMatrix)
+    gl.uniformMatrix4fv(shader.uModelViewMatrixLoc, false, viewMatrices.modelViewMatrix)
+    gl.uniformMatrix3fv(shader.uNormalMatrixLoc, false, viewMatrices.normalMatrix)
 
-    gl.enableVertexAttribBuffer(shader.aVertexPositionLocation, positionBuffer, 3)
-    gl.enableVertexAttribBuffer(shader.aVertexNormalLocation, normalBuffer, 3)
-    gl.enableVertexAttribBuffer(shader.aVertexColorLocation, colorBuffer, 4)
+    gl.uniform3fv(shader.uAmbientLightColorLoc, lightning.ambientLightColor)
+    gl.uniform3fv(shader.uDirectionalLightColorLoc, lightning.directionalLightColor)
+    gl.uniform3fv(shader.uDirectionalLightVectorLoc, lightning.directionalLightVector)
+
+    gl.enableVertexAttribBuffer(shader.aVertexPositionLoc, positionBuffer, 3)
+    gl.enableVertexAttribBuffer(shader.aVertexNormalLoc, normalBuffer, 3)
+    gl.enableVertexAttribBuffer(shader.aVertexColorLoc, colorBuffer, 4)
     
     gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, indexBuffer)
     gl.drawElements(GL.TRIANGLES, nIndices, GL.UNSIGNED_SHORT, 0)
