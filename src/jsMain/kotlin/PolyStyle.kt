@@ -1,6 +1,7 @@
 package polyhedra.js
 
 import polyhedra.common.*
+import polyhedra.js.util.*
 import kotlin.math.*
 
 private val hue0 = 57.0 / 360

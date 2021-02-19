@@ -2,6 +2,7 @@ package polyhedra.js
 
 import polyhedra.common.*
 import polyhedra.js.components.*
+import polyhedra.js.poly.*
 import react.*
 import react.dom.*
 

@@ -1,4 +1,4 @@
-package polyhedra.js
+package polyhedra.js.util
 
 import polyhedra.common.*
 import kotlin.math.*

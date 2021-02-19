@@ -1,9 +1,9 @@
-package polyhedra.js
+package polyhedra.js.poly
 
 import kotlinx.browser.*
-import org.khronos.webgl.*
 import org.w3c.dom.*
 import polyhedra.common.*
+import polyhedra.js.*
 import react.*
 import react.dom.*
 
@@ -14,7 +14,8 @@ external interface PolyCanvasProps : RProps {
 }
 
 external interface PolyCanvasState : RState {
-    var rotation: Double
+    var rotateX: Double
+    var rotateY: Double
 }
 
 fun RBuilder.polyCanvas(handler: PolyCanvasProps.() -> Unit) {
@@ -32,7 +33,8 @@ class PolyCanvas(props: PolyCanvasProps) : RComponent<PolyCanvasProps, PolyCanva
     private var prevTime = Double.NaN
 
     override fun PolyCanvasState.init(props: PolyCanvasProps) {
-        rotation = 0.0
+        rotateX = 0.0
+        rotateY = 0.0
     }
 
     override fun RBuilder.render() {
@@ -47,6 +49,10 @@ class PolyCanvas(props: PolyCanvasProps) : RComponent<PolyCanvasProps, PolyCanva
 
     override fun componentDidMount() {
         drawContext = DrawContext(canvasRef.current!!)
+        with(drawContext) {
+            viewParameters.rotateX = state.rotateX
+            viewParameters.rotateX = state.rotateY
+        }
         draw()
         requestAnimation()
     }
@@ -61,16 +67,26 @@ class PolyCanvas(props: PolyCanvasProps) : RComponent<PolyCanvasProps, PolyCanva
             animationHandle = 0
             if (prevTime.isNaN()) prevTime = nowTime
             val dt = (nowTime - prevTime) / 1000 // in seconds
-            setState {
-                rotation = state.rotation + dt
+            with(drawContext) {
+                viewParameters.rotateX += dt * 0.9
+                viewParameters.rotateY += dt * 0.6
             }
+            draw()
             prevTime = nowTime
             requestAnimation()
         }
     }
 
     override fun componentWillUnmount() {
-        if (animationHandle != 0) window.cancelAnimationFrame(animationHandle)
+        if (animationHandle != 0) {
+            window.cancelAnimationFrame(animationHandle)
+            setState {
+                with(drawContext) {
+                    rotateX = viewParameters.rotateX
+                    rotateY = viewParameters.rotateY
+                }
+            }
+        }
     }
 
     override fun componentDidUpdate(prevProps: PolyCanvasProps, prevState: PolyCanvasState, snapshot: Any) {
@@ -79,5 +95,5 @@ class PolyCanvas(props: PolyCanvasProps) : RComponent<PolyCanvasProps, PolyCanva
     }
 
     private fun draw() =
-        drawContext.drawScene(props.poly, props.style, state)
+        drawContext.drawScene(props.poly, props.style)
 }

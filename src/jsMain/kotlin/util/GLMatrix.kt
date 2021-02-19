@@ -1,6 +1,6 @@
 @file:JsModule("gl-matrix")
 @file:JsNonModule
-package polyhedra.js
+package polyhedra.js.util
 
 import kotlin.js.*
 import org.khronos.webgl.*
