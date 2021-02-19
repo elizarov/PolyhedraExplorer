@@ -1,7 +1,5 @@
 package polyhedra.js
 
-import kotlinx.html.*
-import kotlinx.html.js.*
 import polyhedra.common.*
 import polyhedra.js.components.*
 import polyhedra.js.poly.*
@@ -18,6 +16,9 @@ external interface RootPaneState : RState {
 
 fun RootPaneState.poly(): Polyhedron =
     seed.poly.transformed(transforms).scaled(scale)
+
+fun RootPaneState.polyName(): String =
+    transforms.reversed().joinToString("") { "$it " } + seed
 
 private inline fun ifValidSeedTransforms(seed: Seed, transforms: List<Transform>, block: () -> Unit) {
     try {
@@ -54,16 +55,43 @@ class RootPane : RComponent<RProps, RootPaneState>() {
     }
 
     override fun RBuilder.render() {
-        // State
-        div {
+        div("main-layout") {
+            div("canvas-column card") {
+                // Canvas & Info
+                val curPoly = state.poly()
+                div("row header") { +state.polyName() }
+                polyCanvas("poly") {
+                    poly = curPoly
+                    style = PolyStyle()
+                    rotate = state.rotate
+                    viewScale = state.viewScale
+                    onRotateChange = { setState { rotate = it } }
+                    onScaleChange = { setState { viewScale = it } }
+                }
+                polyInfoPane {
+                    poly = curPoly
+                }
+            }
+            div("control-column card") {
+                renderControls()
+            }
+        }
+    }
+
+    private fun RBuilder.renderControls() {
+        div("row header") { +"Polyhedron" }
+        div("row") {
             label { +"Seed" }
             dropdown<Seed> {
                 value = state.seed
                 options = Seeds
                 onChange = { setState { safeSeedUpdate(it) } }
             }
-            label { +"Transform" }
-            for ((i, transform) in state.transforms.withIndex()) {
+        }
+        div("row header") { +"Transforms" }
+        for ((i, transform) in state.transforms.withIndex()) {
+            div("row") {
+                label { +"${i + 1}:" }
                 dropdown<Transform> {
                     value = transform
                     options = Transforms
@@ -78,6 +106,9 @@ class RootPane : RComponent<RProps, RootPaneState>() {
                     }
                 }
             }
+        }
+        div("row") {
+            label { +"${state.transforms.size + 1}:" }
             dropdown<Transform> {
                 value = Transform.None
                 options = Transforms
@@ -89,17 +120,24 @@ class RootPane : RComponent<RProps, RootPaneState>() {
                     }
                 }
             }
-            label { +"Scaled by" }
+        }
+        div("row header") { +"View" }
+        div("row") {
+            label { +"Base scale" }
             dropdown<Scale> {
                 value = state.scale
                 options = Scales
                 onChange = { setState { scale = it } }
             }
+        }
+        div("row") {
             label { +"Rotate" }
             checkbox {
                 checked = state.rotate
                 onChange = { setState { rotate = it } }
             }
+        }
+        div("row") {
             label { +"View scale" }
             slider {
                 min = -2.0
@@ -108,19 +146,6 @@ class RootPane : RComponent<RProps, RootPaneState>() {
                 value = state.viewScale
                 onChange = { setState { viewScale = it } }
             }
-        }
-        // Canvas & Info
-        val curPoly = state.poly()
-        polyCanvas {
-            poly = curPoly
-            style = PolyStyle()
-            rotate = state.rotate
-            viewScale = state.viewScale
-            onRotateChange = { setState { rotate = it } }
-            onScaleChange = { setState { viewScale = it } }
-        }
-        polyInfoPane {
-            poly = curPoly
         }
     }
 }

@@ -1,9 +1,5 @@
 /* --------- reset --------- */
 
-*, *::before, *::after {
-    box-sizing: border-box;
-}
-
 body, p, table, tbody, tr, td, label {
     padding: 0;
     margin: 0;
@@ -22,14 +18,43 @@ body {
     font-weight: 300;
 }
 
-h1, h2, h3 {
+.row {
+    padding-left: 0.5em;
+}
+
+.header {
+    background-color: hsl(0, 0%, 85%);
     font-weight: 500;
+}
+
+.card {
+    border: 1px solid hsl(0, 0%, 5%);
+    margin-top: 10px;
+    margin-left: 10px;
+}
+
+/* --------- layout --------- */
+
+.main-layout {
+    display: flex;
+    flex-flow: row wrap;
+}
+
+.canvas-column {
+    width: 800px;
+}
+
+.control-column {
+    width: 300px;
+}
+
+canvas.poly {
+    width: 100%;
 }
 
 /* --------- controls --------- */
 
 label {
-    margin-left: 0.5em;
     margin-right: 0.5em;
 }
 
@@ -38,15 +63,19 @@ label {
 table {
     border: none;
     border-spacing: 0;
+    width: 100%;
+}
+
+table td:last-child {
+    width: 100%;
+}
+
+table td:not(:last-child) {
+    white-space: nowrap;
 }
 
 td {
     padding-left: 0.5em;
-}
-
-tr.info-header {
-    background-color: hsl(0, 0%, 85%);
-    font-weight: 500;
 }
 
 td.rt {

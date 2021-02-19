@@ -11,6 +11,7 @@ import react.dom.*
 import kotlin.math.*
 
 external interface PolyCanvasProps : RProps {
+    var classes: String?
     var poly: Polyhedron
     var style: PolyStyle
     var rotate: Boolean
@@ -19,8 +20,9 @@ external interface PolyCanvasProps : RProps {
     var onScaleChange: (Double) -> Unit
 }
 
-fun RBuilder.polyCanvas(handler: PolyCanvasProps.() -> Unit) {
+fun RBuilder.polyCanvas(classes: String? = null, handler: PolyCanvasProps.() -> Unit) {
     child<PolyCanvasProps, PolyCanvas> {
+        attrs { this.classes = classes }
         attrs(handler)
     }
 }
@@ -37,10 +39,10 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
     private var prevY = 0.0
 
     override fun RBuilder.render() {
-        canvas {
+        canvas(props.classes) {
             attrs {
-                width = "640"
-                height = "480"
+                width = "800"
+                height = "600"
                 ref = canvasRef
             }
         }

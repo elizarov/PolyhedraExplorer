@@ -16,7 +16,7 @@ fun RBuilder.polyInfoPane(builder: PolyInfoPaneProps.() -> Unit) {
 
 class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
     private fun RBuilder.infoHeader(name: String, cnt: Int, distName: String, distValue: Double) {
-        tr("info-header") {
+        tr("header") {
             td { +name }
             td { +cnt.toString() }
             td("rt") { +distName }
