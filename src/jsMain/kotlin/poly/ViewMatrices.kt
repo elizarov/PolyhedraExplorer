@@ -28,7 +28,7 @@ class ViewMatrices(canvas: HTMLCanvasElement) {
     val normalMatrix = mat3.create()
 
     private val fieldOfViewDegrees = 45
-    private val modelViewTranslation = float32Of(-0.0f, 0.0f, -6.0f)
+    private val modelViewTranslation = float32Of(-0.0, 0.0, -3.0)
     private val modelViewScale = Float32Array(3)
 
     init {

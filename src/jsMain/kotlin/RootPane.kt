@@ -1,5 +1,6 @@
 package polyhedra.js
 
+import kotlinx.html.js.*
 import polyhedra.common.*
 import polyhedra.js.components.*
 import polyhedra.js.poly.*
@@ -49,13 +50,16 @@ class RootPane : RComponent<RProps, RootPaneState>() {
     override fun RootPaneState.init() {
         seed = Seed.Tetrahedron
         transforms = emptyList()
-        scale = Scale.Midradius
+        scale = Scale.Circumradius
         rotate = true
         viewScale = 0.0
     }
 
     override fun RBuilder.render() {
         div("main-layout") {
+            div("control-column card") {
+                renderControls()
+            }
             div("canvas-column card") {
                 // Canvas & Info
                 val curPoly = state.poly()
@@ -72,9 +76,6 @@ class RootPane : RComponent<RProps, RootPaneState>() {
                     poly = curPoly
                 }
             }
-            div("control-column card") {
-                renderControls()
-            }
         }
     }
 
@@ -88,39 +89,60 @@ class RootPane : RComponent<RProps, RootPaneState>() {
                 onChange = { setState { safeSeedUpdate(it) } }
             }
         }
+        
         div("row header") { +"Transforms" }
-        for ((i, transform) in state.transforms.withIndex()) {
-            div("row") {
-                label { +"${i + 1}:" }
-                dropdown<Transform> {
-                    value = transform
-                    options = Transforms
-                    onChange = { value ->
-                        setState {
-                            if (value != Transform.None) {
-                                safeTransformsUpdate { it.updatedAt(i, value) }
-                            } else {
-                                safeTransformsUpdate { it.removedAt(i) }
+        table {
+            tbody {
+                for ((i, transform) in state.transforms.withIndex()) {
+                    tr {
+                        td { +"${i + 1}:" }
+                        td {
+                            dropdown<Transform> {
+                                value = transform
+                                options = Transforms
+                                onChange = { value ->
+                                    setState {
+                                        if (value != Transform.None) {
+                                            safeTransformsUpdate { it.updatedAt(i, value) }
+                                        } else {
+                                            safeTransformsUpdate { it.removedAt(i) }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
                 }
-            }
-        }
-        div("row") {
-            label { +"${state.transforms.size + 1}:" }
-            dropdown<Transform> {
-                value = Transform.None
-                options = Transforms
-                onChange = { value ->
-                    setState {
-                        if (value != Transform.None) {
-                            safeTransformsUpdate { it + value }
+                tr {
+                    td { +"${state.transforms.size + 1}:" }
+                    td {
+                        dropdown<Transform> {
+                            value = Transform.None
+                            options = Transforms
+                            onChange = { value ->
+                                setState {
+                                    if (value != Transform.None) {
+                                        safeTransformsUpdate { it + value }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                tr {
+                    td {}
+                    td {
+                        button {
+                            attrs {
+                                onClickFunction = { setState { transforms = emptyList() } }
+                            }
+                            +"Clear"
                         }
                     }
                 }
             }
         }
+
         div("row header") { +"View" }
         div("row") {
             label { +"Base scale" }
