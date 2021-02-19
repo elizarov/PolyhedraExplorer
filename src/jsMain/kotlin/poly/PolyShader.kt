@@ -78,15 +78,15 @@ fun PolyBuffers.draw(viewMatrices: ViewMatrices) {
     gl.uniformMatrix4fv(shader.modelViewMatrixLocation, false, viewMatrices.modelViewMatrix)
     gl.uniformMatrix4fv(shader.normalMatrixLocation, false, viewMatrices.normalMatrix)
 
-    gl.enableVertexAttribBuffer(positionBuffer, shader.aVertexPositionLocation, 3)
-    gl.enableVertexAttribBuffer(normalBuffer, shader.aVertexNormalLocation, 3)
-    gl.enableVertexAttribBuffer(colorBuffer, shader.aVertexColorLocation, 4)
+    gl.enableVertexAttribBuffer(shader.aVertexPositionLocation, positionBuffer, 3)
+    gl.enableVertexAttribBuffer(shader.aVertexNormalLocation, normalBuffer, 3)
+    gl.enableVertexAttribBuffer(shader.aVertexColorLocation, colorBuffer, 4)
     
     gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, indexBuffer)
     gl.drawElements(GL.TRIANGLES, nIndices, GL.UNSIGNED_SHORT, 0)
 }
 
-fun GL.enableVertexAttribBuffer(buffer: WebGLBuffer, location: Int, size: Int) {
+fun GL.enableVertexAttribBuffer(location: Int, buffer: WebGLBuffer, size: Int) {
     bindBuffer(GL.ARRAY_BUFFER, buffer)
     vertexAttribPointer(location, size, GL.FLOAT, false, 0, 0)
     enableVertexAttribArray(location)
