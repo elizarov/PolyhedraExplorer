@@ -2,7 +2,6 @@ package polyhedra.js.util
 
 import org.khronos.webgl.*
 import polyhedra.common.*
-import polyhedra.js.*
 
 fun float32Of(vararg a: Float) = Float32Array(a.size).apply {
     for (i in a.indices) this[i] = a[i]
@@ -18,6 +17,10 @@ fun uint16Of(vararg a: Int) = Uint16Array(a.size).apply {
 
 inline operator fun Float32Array.set(i: Int, x: Double) {
     set(i, x.toFloat())
+}
+
+fun Float32Array.fill(x: Double) {
+    for (i in 0 until length) set(i, x.toFloat())
 }
 
 operator fun Float32Array.set(i: Int, v: Vec3) {

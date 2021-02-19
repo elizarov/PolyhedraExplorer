@@ -1,5 +1,7 @@
 package polyhedra.js
 
+import kotlinx.html.*
+import kotlinx.html.js.*
 import polyhedra.common.*
 import polyhedra.js.components.*
 import polyhedra.js.poly.*
@@ -11,6 +13,7 @@ external interface RootPaneState : RState {
     var transforms: List<Transform>
     var scale: Scale
     var rotate: Boolean
+    var viewScale: Double
 }
 
 fun RootPaneState.poly(): Polyhedron =
@@ -41,12 +44,13 @@ private fun RootPaneState.safeTransformsUpdate(update: (List<Transform>) -> List
 
 @Suppress("NON_EXPORTABLE_TYPE")
 @JsExport
-class RootPane() : RComponent<RProps, RootPaneState>() {
+class RootPane : RComponent<RProps, RootPaneState>() {
     override fun RootPaneState.init() {
         seed = Seed.Tetrahedron
         transforms = emptyList()
         scale = Scale.Midradius
         rotate = true
+        viewScale = 0.0
     }
 
     override fun RBuilder.render() {
@@ -96,6 +100,14 @@ class RootPane() : RComponent<RProps, RootPaneState>() {
                 checked = state.rotate
                 onChange = { setState { rotate = it } }
             }
+            label { +"View scale" }
+            slider {
+                min = -2.0
+                max = 2.0
+                step = 0.05
+                value = state.viewScale
+                onChange = { setState { viewScale = it } }
+            }
         }
         // Canvas & Info
         val curPoly = state.poly()
@@ -103,6 +115,9 @@ class RootPane() : RComponent<RProps, RootPaneState>() {
             poly = curPoly
             style = PolyStyle()
             rotate = state.rotate
+            viewScale = state.viewScale
+            onRotateChange = { setState { rotate = it } }
+            onScaleChange = { setState { viewScale = it } }
         }
         polyInfoPane {
             poly = curPoly

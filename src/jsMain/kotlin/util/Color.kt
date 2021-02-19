@@ -31,13 +31,6 @@ fun hsvColor(h: Double, s: Double, v: Double, a: Double = 1.0): Color {
     }
 }
 
-private infix fun Double.mod(m: Double): Double {
-    val x = this / m
-    return frac(x) * m
-}
-
-private fun frac(x: Double) = x - floor(x)
-
 fun String.parseCSSColor(): Color? {
     val match = Regex("rgba?\\((\\d+), (\\d+), (\\d+)(?:, (\\d+))?\\)").matchEntire(this)
         ?: return null
