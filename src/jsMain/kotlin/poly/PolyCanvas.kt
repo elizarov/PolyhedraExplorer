@@ -49,7 +49,7 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
     }
 
     override fun componentDidMount() {
-        canvas = canvasRef.current!!
+        canvas = canvasRef.current
         drawContext = DrawContext(canvas)
         canvas.onmousedown = this::handleMouseDown
         canvas.onmousemove = this::handleMouseMove

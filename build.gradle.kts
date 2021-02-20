@@ -1,5 +1,3 @@
-import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpack
-
 plugins {
     kotlin("multiplatform") version "1.4.30"
     application
@@ -13,6 +11,9 @@ repositories {
     mavenCentral()
     maven { url = uri("https://dl.bintray.com/kotlin/kotlin-js-wrappers") }
 }
+
+val `kotlin-react-version`: String by project
+val `gl-matrix-version`: String by project
 
 kotlin {
     jvm {
@@ -53,9 +54,9 @@ kotlin {
         }
         val jsMain by getting {
             dependencies {
-                implementation("org.jetbrains:kotlin-react:16.13.1-pre.113-kotlin-1.4.0")
-                implementation("org.jetbrains:kotlin-react-dom:16.13.1-pre.113-kotlin-1.4.0")
-                implementation(npm("gl-matrix", "3.3.0"))
+                implementation("org.jetbrains:kotlin-react:${`kotlin-react-version`}")
+                implementation("org.jetbrains:kotlin-react-dom:${`kotlin-react-version`}")
+                implementation(npm("gl-matrix", `gl-matrix-version`))
             }
         }
         val jsTest by getting {
