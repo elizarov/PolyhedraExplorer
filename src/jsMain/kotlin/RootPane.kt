@@ -11,13 +11,13 @@ import react.dom.*
 external interface RootPaneState : RState {
     var seed: Seed
     var transforms: List<Transform>
-    var scale: Scale
+    var baseScale: Scale
     var rotate: Boolean
     var viewScale: Double
 }
 
 fun RootPaneState.poly(): Polyhedron =
-    seed.poly.transformed(transforms).scaled(scale)
+    seed.poly.transformed(transforms).scaled(baseScale)
 
 fun RootPaneState.polyName(): String =
     transforms.reversed().joinToString("") { "$it " } + seed
@@ -49,11 +49,14 @@ private fun RootPaneState.safeTransformsUpdate(update: (List<Transform>) -> List
 @JsExport
 class RootPane : RComponent<RProps, RootPaneState>() {
     override fun RootPaneState.init() {
-        seed = Seed.Tetrahedron
-        transforms = emptyList()
-        scale = Scale.Circumradius
-        rotate = true
-        viewScale = 0.0
+        assign(loadRootState())
+    }
+
+    private fun setState(transformState: RootPaneState.() -> Unit) {
+        (this as RComponent<RProps, RootPaneState>).setState {
+            transformState()
+            pushRootState(this)
+        }
     }
 
     override fun RBuilder.render() {
@@ -160,9 +163,9 @@ class RootPane : RComponent<RProps, RootPaneState>() {
         div("row control") {
             label { +"Base scale" }
             dropdown<Scale> {
-                value = state.scale
+                value = state.baseScale
                 options = Scales
-                onChange = { setState { scale = it } }
+                onChange = { setState { baseScale = it } }
             }
         }
         div("row control") {
@@ -177,7 +180,7 @@ class RootPane : RComponent<RProps, RootPaneState>() {
             slider {
                 min = -2.0
                 max = 2.0
-                step = 0.05
+                step = 0.01
                 value = state.viewScale
                 onChange = { setState { viewScale = it } }
             }
