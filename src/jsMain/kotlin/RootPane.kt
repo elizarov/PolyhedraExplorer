@@ -17,6 +17,7 @@ external interface RootPaneState : RState {
     var rotate: Boolean
     var viewScale: Double
     var expand: Double
+    var transparent: Double
     var display: Display
 }
 
@@ -79,6 +80,7 @@ class RootPane : RComponent<RProps, RootPaneState>() {
                     rotate = state.rotate
                     viewScale = state.viewScale
                     expand = state.expand
+                    transparent = if (state.display.hasFaces()) state.transparent else 0.0
                     onRotateChange = { setState { rotate = it } }
                     onScaleChange = { setState { viewScale = it } }
                 }
@@ -219,12 +221,29 @@ class RootPane : RComponent<RProps, RootPaneState>() {
         }
 
         header("Style")
-        div("row control") {
-            label { +"Display" }
-            dropdown<Display> {
-                value = state.display
-                options = Displays
-                onChange = { setState { display = it } }
+        tableBody {
+            tr("control") {
+                td { +"Display" }
+                td {
+                    dropdown<Display> {
+                        value = state.display
+                        options = Displays
+                        onChange = { setState { display = it } }
+                    }
+                }
+            }
+            tr("control") {
+                td { +"Transparent" }
+                td {
+                    slider {
+                        disabled = !state.display.hasFaces()
+                        min = 0.0
+                        max = 1.0
+                        step = 0.01
+                        value = state.transparent
+                        onChange = { setState { transparent = it } }
+                    }
+                }
             }
         }
     }

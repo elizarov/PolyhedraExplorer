@@ -9,6 +9,7 @@ abstract class SharedPolyProgram(gl: GL) : GLProgram(gl) {
     val uModelViewMatrix by uniform(GLType.mat4)
     val uNormalMatrix by uniform(GLType.mat3)
     val uExpand by uniform(GLType.float)
+    val uColorAlpha by uniform(GLType.float, GLPrecision.lowp)
 
     val aVertexPosition by attribute(GLType.vec3)
     val aVertexNormal by attribute(GLType.vec3)
@@ -18,7 +19,10 @@ abstract class SharedPolyProgram(gl: GL) : GLProgram(gl) {
             uProjectionMatrix.assign(projectionMatrix)
             uModelViewMatrix.assign(modelViewMatrix)
             uNormalMatrix.assign(normalMatrix)
-            uExpand.assign(expand)
+            with(viewParameters) {
+                uExpand.assign(expand)
+                uColorAlpha.assign(1.0 - transparent)
+            }
         }
     }
 }

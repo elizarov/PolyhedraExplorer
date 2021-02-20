@@ -29,11 +29,10 @@ operator fun Float32Array.set(i: Int, v: Vec3) {
     set(i + 2, v.z)
 }
 
-operator fun Float32Array.set(i: Int, c: Color) {
+fun Float32Array.setRGB(i: Int, c: Color) {
     set(i, c.r)
     set(i + 1, c.g)
     set(i + 2, c.b)
-    set(i + 3, c.a)
 }
 
 fun Vec3.toFloat32Array(): Float32Array = Float32Array(3).apply {

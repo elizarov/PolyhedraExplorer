@@ -8,9 +8,9 @@ class FaceProgram(gl: GL) : SharedPolyProgram(gl) {
     val uDirectionalLightColor by uniform(GLType.vec3)
     val uDirectionalLightVector by uniform(GLType.vec3)
 
-    val aVertexColor by attribute(GLType.vec4)
+    val aVertexColor by attribute(GLType.vec3)
 
-    val vColor by varying(GLType.vec4, GLPrecision.lowp)
+    val vColor by varying(GLType.vec3, GLPrecision.lowp)
     val vLighting by varying(GLType.vec3, GLPrecision.highp)
 
     override val vertexShader = shader(ShaderType.Vertex) {
@@ -26,7 +26,7 @@ class FaceProgram(gl: GL) : SharedPolyProgram(gl) {
 
     override val fragmentShader = shader(ShaderType.Fragment) {
         main {
-            gl_FragColor.assign(vec4(vColor.rgb * vLighting, vColor.a))
+            gl_FragColor.assign(vec4(vColor * vLighting, uColorAlpha))
         }
     }
 }

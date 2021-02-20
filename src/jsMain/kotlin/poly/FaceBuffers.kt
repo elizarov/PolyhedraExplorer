@@ -31,7 +31,7 @@ fun FaceBuffers.draw(viewMatrices: ViewMatrices, lightning: Lightning) {
 
 fun FaceBuffers.initBuffers(poly: Polyhedron, style: PolyStyle) {
     poly.faceVerticesData(colorBuffer) { f, _, a, i ->
-        a[i] = style.faceColor(f)
+        a.setRGB(i, style.faceColor(f))
     }
     colorBuffer.bindBufferData(gl)
     // indices

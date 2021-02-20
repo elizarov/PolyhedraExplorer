@@ -8,6 +8,7 @@ class ViewParameters {
     var rotationQuat = quat.create()
     var viewScale = 0.0
     var expand = 0.0
+    var transparent = 0.0
 
     private val axis = Float32Array(3)
     private val deltaQuat = quat.create()
@@ -22,11 +23,10 @@ class ViewParameters {
     }
 }
 
-class ViewMatrices {
+class ViewMatrices(val viewParameters: ViewParameters) {
     val projectionMatrix = mat4.create()
     val modelViewMatrix = mat4.create()
     val normalMatrix = mat3.create()
-    var expand = 0.0
 
     private val fieldOfViewDegrees = 45
     private val modelViewTranslation = float32Of(-0.0, 0.0, -3.0)
@@ -40,7 +40,6 @@ class ViewMatrices {
     }
 
     fun initView(params: ViewParameters) {
-        expand = params.expand
         modelViewScale.fill(2.0.pow(params.viewScale))
         mat4.fromRotationTranslationScale(modelViewMatrix, params.rotationQuat, modelViewTranslation, modelViewScale)
 
