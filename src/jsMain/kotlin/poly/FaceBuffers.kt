@@ -6,10 +6,8 @@ import polyhedra.js.*
 import polyhedra.js.util.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
-class FaceBuffers(val gl: GL) {
+class FaceBuffers(val gl: GL, val sharedPolyBuffers: SharedPolyBuffers)  {
     val program = FaceProgram(gl)
-    val positionBuffer = program.aVertexPosition.createBuffer()
-    val normalBuffer = program.aVertexNormal.createBuffer()
     val colorBuffer = program.aVertexColor.createBuffer()
     val indexBuffer = program.createUint16Buffer()
     var nIndices = 0
@@ -18,13 +16,12 @@ class FaceBuffers(val gl: GL) {
 fun FaceBuffers.draw(viewMatrices: ViewMatrices, lightning: Lightning) {
     program.use {
         assignView(viewMatrices)
-        
+
         uAmbientLightColor.assign(lightning.ambientLightColor)
         uDirectionalLightColor.assign(lightning.directionalLightColor)
         uDirectionalLightVector.assign(lightning.directionalLightVector)
 
-        aVertexPosition.assign(positionBuffer)
-        aVertexNormal.assign(normalBuffer)
+        assignSharedPolyBuffers(sharedPolyBuffers)
         aVertexColor.assign(colorBuffer)
     }
     
@@ -33,15 +30,10 @@ fun FaceBuffers.draw(viewMatrices: ViewMatrices, lightning: Lightning) {
 }
 
 fun FaceBuffers.initBuffers(poly: Polyhedron, style: PolyStyle) {
-    poly.faceVerticesData(gl, positionBuffer) { _, v, a, i ->
-        a[i] = v.pt
-    }
-    poly.faceVerticesData(gl, normalBuffer) { f, _, a, i ->
-        a[i] = f.plane.n
-    }
-    poly.faceVerticesData(gl, colorBuffer) { f, _, a, i ->
+    poly.faceVerticesData(colorBuffer) { f, _, a, i ->
         a[i] = style.faceColor(f)
     }
+    colorBuffer.bindBufferData(gl)
     // indices
     nIndices = poly.fs.sumOf { 3 * (it.size - 2) }
     val indices = indexBuffer.takeData(nIndices)
@@ -58,3 +50,4 @@ fun FaceBuffers.initBuffers(poly: Polyhedron, style: PolyStyle) {
     gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, indexBuffer.glBuffer)
     gl.bufferData(GL.ELEMENT_ARRAY_BUFFER, indices, GL.STATIC_DRAW)
 }
+

@@ -3,13 +3,11 @@ package polyhedra.js.poly
 import polyhedra.js.util.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
-class FaceProgram(gl: GL) : ViewProgram(gl) {
+class FaceProgram(gl: GL) : SharedPolyProgram(gl) {
     val uAmbientLightColor by uniform(GLType.vec3)
     val uDirectionalLightColor by uniform(GLType.vec3)
     val uDirectionalLightVector by uniform(GLType.vec3)
 
-    val aVertexPosition by attribute(GLType.vec3)
-    val aVertexNormal by attribute(GLType.vec3)
     val aVertexColor by attribute(GLType.vec4)
 
     val vColor by varying(GLType.vec4, GLPrecision.lowp)

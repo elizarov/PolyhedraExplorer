@@ -5,7 +5,6 @@ import polyhedra.common.*
 import polyhedra.js.util.*
 
 fun <T : GLType<T, *>> Polyhedron.faceVerticesData(
-    gl: WebGLRenderingContext,
     buffer: Float32Buffer<T>,
     transform: (f: Face, v: Vertex, a: Float32Array, i: Int) -> Unit)
 {
@@ -18,6 +17,4 @@ fun <T : GLType<T, *>> Polyhedron.faceVerticesData(
             i += buffer.type.bufferSize
         }
     }
-    gl.bindBuffer(WebGLRenderingContext.ARRAY_BUFFER, buffer.glBuffer)
-    gl.bufferData(WebGLRenderingContext.ARRAY_BUFFER, a, WebGLRenderingContext.STATIC_DRAW)
 }

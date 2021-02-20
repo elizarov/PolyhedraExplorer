@@ -119,6 +119,10 @@ abstract class GLProgram(val gl: GL) {
 
         fun assign(buffer: Float32Buffer<T>) {
             gl.bindBuffer(GL.ARRAY_BUFFER, buffer.glBuffer)
+            enable()
+        }
+
+        fun enable() {
             gl.vertexAttribPointer(location, type.bufferSize, GL.FLOAT, false, 0, 0)
             gl.enableVertexAttribArray(location)
         }
