@@ -81,7 +81,7 @@ class RootPane : RComponent<RProps, RootPaneState>() {
 
     private fun RBuilder.header(text: String) {
         div("header-container") {
-            div("header-cell") { +text }
+            div("header") { +text }
         }
     }
 

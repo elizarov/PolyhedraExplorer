@@ -18,35 +18,6 @@ body {
     font-weight: 300;
 }
 
-.row {
-    padding-left: 1ch;
-    margin-bottom: 0.3em;
-}
-
-.header {
-    padding-left: 1ch;
-    margin-bottom: 0.3em;
-    background-color: hsl(0, 0%, 85%);
-    font-weight: 500;
-    height: 1.8em;
-    vertical-align: middle;
-}
-
-div.header-container {
-    display: table;
-    width: 100%;
-    margin-bottom: 0.3em;
-}
-
-div.header-cell {
-    display: table-cell;
-    padding-left: 1ch;
-    background-color: hsl(0, 0%, 85%);
-    font-weight: 500;
-    height: 1.8em;
-    vertical-align: middle;
-}
-
 .card {
     border: 1px solid hsl(0, 0%, 5%);
     margin-top: 10px;
@@ -60,26 +31,57 @@ div.header-cell {
     flex-flow: row wrap;
 }
 
-.canvas-column {
-    width: 800px;
-}
-
 .control-column {
     width: 250px;
 }
 
-.control {
-    height: 1.5em;
+.canvas-column {
+    width: 800px;
 }
 
 canvas.poly {
     width: 100%;
 }
 
+/* --------- headers --------- */
+
+.header {
+    padding-left: 1ch;
+    background-color: hsl(0, 0%, 85%);
+    font-weight: 500;
+    height: 1.8em;
+    vertical-align: middle;
+}
+
+div.header-container {
+    display: table;
+    width: 100%;
+}
+
+div.header {
+    display: table-cell;
+}
+
 /* --------- controls --------- */
+
+div.row {
+    padding-left: 1ch;
+}
 
 label {
     margin-right: 1ch;
+}
+
+div.control {
+    height: 1.5em;
+    margin-top: 0.3em;
+    margin-bottom: 0.3em;
+}
+
+tr.control {
+    height: 1.8em;
+    border-top: 0.3em solid transparent;
+    border-bottom: 0.3em solid transparent;
 }
 
 /* --------- table --------- */
@@ -87,6 +89,7 @@ label {
 table {
     border: none;
     border-spacing: 0;
+    border-collapse: collapse;
     width: 100%;
 }
 
