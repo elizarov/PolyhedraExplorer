@@ -21,6 +21,7 @@ class Checkbox : RComponent<CheckboxProps, RState>() {
     override fun RBuilder.render() {
         input(InputType.checkBox) {
             attrs {
+                // See https://github.com/JetBrains/kotlin-wrappers/issues/35
                 this["checked"] = props.checked
                 onChangeFunction = { 
                     props.onChange(!props.checked)
