@@ -5,7 +5,6 @@ import org.w3c.dom.*
 import polyhedra.common.*
 import polyhedra.js.*
 import polyhedra.js.util.*
-import kotlin.math.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
 class DrawContext(canvas: HTMLCanvasElement) {
@@ -15,7 +14,7 @@ class DrawContext(canvas: HTMLCanvasElement) {
     val viewParameters = ViewParameters()
     val viewMatrices = ViewMatrices(canvas)
     val lightning = Lightning()
-    val polyBuffers = PolyBuffers(gl)
+    val polyBuffers = FaceBuffers(gl)
 
     var prevPoly: Polyhedron? = null
     var prevStyle: PolyStyle? = null

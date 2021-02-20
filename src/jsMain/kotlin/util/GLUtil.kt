@@ -50,14 +50,18 @@ fun loadShader(gl: WebGLRenderingContext, type: Int, source: String): WebGLShade
     val shader = gl.createShader(type)!!
     gl.shaderSource(shader, source)
     gl.compileShader(shader)
-    if (gl.getShaderParameter(shader, WebGLRenderingContext.COMPILE_STATUS) != true)
-        error("Shader compilation error: ${gl.getShaderInfoLog(shader)}")
+    if (gl.getShaderParameter(shader, WebGLRenderingContext.COMPILE_STATUS) != true) {
+        val error = gl.getShaderInfoLog(shader)
+        println("Error while compiling shader: $error")
+        println("// --- begin source ---")
+        println(source)
+        println("// --- end source ---")
+        error("Shader compilation error: $error")
+    }
     return shader
 }
 
-fun initShaderProgram(gl: WebGLRenderingContext, vsSource: String, fsSource: String): WebGLProgram {
-    val vs = loadShader(gl, WebGLRenderingContext.VERTEX_SHADER, vsSource)
-    val fs = loadShader(gl, WebGLRenderingContext.FRAGMENT_SHADER, fsSource)
+fun initShaderProgram(gl: WebGLRenderingContext, vs: WebGLShader, fs: WebGLShader): WebGLProgram {
     val shaderProgram = gl.createProgram()!!
     gl.attachShader(shaderProgram, vs)
     gl.attachShader(shaderProgram, fs)
