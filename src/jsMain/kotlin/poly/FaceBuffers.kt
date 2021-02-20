@@ -8,10 +8,10 @@ import org.khronos.webgl.WebGLRenderingContext as GL
 
 class FaceBuffers(val gl: GL) {
     val program = FaceProgram(gl)
-    val positionBuffer = gl.createBuffer()!!
-    val normalBuffer = gl.createBuffer()!!
-    val colorBuffer = gl.createBuffer()!!
-    val indexBuffer = gl.createBuffer()
+    val positionBuffer = program.aVertexPosition.createBuffer()
+    val normalBuffer = program.aVertexNormal.createBuffer()
+    val colorBuffer = program.aVertexColor.createBuffer()
+    val indexBuffer = gl.createBuffer()!!
     var nIndices = 0
 }
 
@@ -42,13 +42,13 @@ fun GL.enableVertexAttribBuffer(location: Int, buffer: WebGLBuffer, size: Int) {
 
 fun FaceBuffers.initBuffers(poly: Polyhedron, style: PolyStyle) {
     program.use()
-    poly.vertexAttribData(gl, positionBuffer, 3) { _, v, a, i ->
+    poly.vertexAttribData(gl, positionBuffer) { _, v, a, i ->
         a[i] = v.pt
     }
-    poly.vertexAttribData(gl, normalBuffer,3) { f, _, a, i ->
+    poly.vertexAttribData(gl, normalBuffer) { f, _, a, i ->
         a[i] = f.plane.n
     }
-    poly.vertexAttribData(gl, colorBuffer, 4) { f, _, a, i ->
+    poly.vertexAttribData(gl, colorBuffer) { f, _, a, i ->
         a[i] = style.faceColor(f)
     }
     // indices
@@ -68,30 +68,3 @@ fun FaceBuffers.initBuffers(poly: Polyhedron, style: PolyStyle) {
     gl.bufferData(GL.ELEMENT_ARRAY_BUFFER, indices, GL.STATIC_DRAW)
 }
 
-fun Polyhedron.vertexAttribData(
-    gl: GL,
-    buffer: WebGLBuffer,
-    size: Int,
-    transform: (f: Face, v: Vertex, a: Float32Array, i: Int) -> Unit)
-{
-    val data = vertexArray(size, ::Float32Array, transform)
-    gl.bindBuffer(GL.ARRAY_BUFFER, buffer)
-    gl.bufferData(GL.ARRAY_BUFFER, data, GL.STATIC_DRAW)
-}
-
-fun <A> Polyhedron.vertexArray(
-    size: Int,
-    factory: (Int) -> A,
-    transform: (f: Face, v: Vertex, a: A, i: Int) -> Unit
-): A {
-    val m = fs.sumOf { it.size }
-    val a = factory(size * m)
-    var i = 0
-    for (f in fs) {
-        for (v in f) {
-            transform(f, v, a, i)
-            i += size
-        }
-    }
-    return a
-}

@@ -77,7 +77,7 @@ abstract class GLProgram(val gl: GL) {
 
     open inner class Decl<T : GLType<T, U>, U, SELF: Decl<T, U, SELF>>(
         val kind: String,
-        val type: GLType<T, U>,
+        val type: T,
         prop: KProperty<*>
     ) : Expr<T> {
         val name: String = prop.name
@@ -90,8 +90,8 @@ abstract class GLProgram(val gl: GL) {
         open fun declaration(): String = "$kind $type $name"
     }
 
-    inner class Uniform<T : GLType<T, U>, U>
-        (type: GLType<T, U>, prop: KProperty<*>
+    inner class Uniform<T : GLType<T, U>, U>(
+        type: T, prop: KProperty<*>
     ) : Decl<T, U, Uniform<T, U>>("uniform", type, prop) {
         val location by lazy { gl.getUniformLocation(program, name)!! }
 
@@ -101,27 +101,35 @@ abstract class GLProgram(val gl: GL) {
     }
 
     inner class Attribute<T : GLType<T, U>, U>(
-        type: GLType<T, U>, prop: KProperty<*>
+        type: T, prop: KProperty<*>
     ) : Decl<T, U, Attribute<T, U>>("attribute", type, prop) {
         val location by lazy { gl.getAttribLocation(program, name) }
 
-        fun assign(buffer: WebGLBuffer) {
-            gl.enableVertexAttribBuffer(location, buffer, type.bufferSize)
+        fun createBuffer(): Buffer<T> =
+            Buffer(type, gl.createBuffer()!!)
+
+        fun assign(buffer: Buffer<T>) {
+            gl.enableVertexAttribBuffer(location, buffer.glBuffer, type.bufferSize)
         }
     }
 
     inner class Varying<T : GLType<T, U>, U>(
-        val precision: GLPrecision?, type: GLType<T, U>, prop: KProperty<*>
+        val precision: GLPrecision?, type: T, prop: KProperty<*>
     ) : Decl<T, U, Varying<T, U>>("varying", type, prop) {
         override fun declaration(): String =
             if (precision == null) super.declaration() else "$kind $precision $type $name"
     }
 
     inner class Builtin<T : GLType<T, U>, U>(
-        type: GLType<T, U>, prop: KProperty<*>
+        type: T, prop: KProperty<*>
     ) : Decl<T, U, Builtin<T, U>>("builtin", type, prop) {
         override fun dependencies(): Set<Decl<*, *, *>> = emptySet()
     }
+
+    inner class Buffer<T : GLType<T, *>>(
+        val type: T,
+        val glBuffer: WebGLBuffer
+    )
 
     inner class Shader<T : ShaderType>(
         val glShader: WebGLShader
@@ -163,11 +171,11 @@ abstract class GLProgram(val gl: GL) {
         }
     }
 
-    fun <T : GLType<T, U>, U> uniform(type: GLType<T, U>): Provider<Uniform<T, U>> = Provider { Uniform(type, it) }
-    fun <T : GLType<T, U>, U> attribute(type: GLType<T, U>): Provider<Attribute<T, U>> = Provider { Attribute(type, it) }
-    fun <T : GLType<T, U>, U> varying(type: GLType<T, U>, precision: GLPrecision? = null): Provider<Varying<T, U>> = Provider { Varying(precision, type, it) }
+    fun <T : GLType<T, U>, U> uniform(type: T): Provider<Uniform<T, U>> = Provider { Uniform(type, it) }
+    fun <T : GLType<T, U>, U> attribute(type: T): Provider<Attribute<T, U>> = Provider { Attribute(type, it) }
+    fun <T : GLType<T, U>, U> varying(type: T, precision: GLPrecision? = null): Provider<Varying<T, U>> = Provider { Varying(precision, type, it) }
     
-    private fun <T : GLType<T, *>> builtin(type: GLType<T, *>): Provider<Builtin<T, *>> = Provider { Builtin(type, it) }
+    private fun <T : GLType<T, U>, U> builtin(type: T): Provider<Builtin<T, *>> = Provider { Builtin(type, it) }
 }
 
 enum class GLPrecision { lowp, mediump, highp }
