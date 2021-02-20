@@ -12,8 +12,7 @@ enum class Transform(val transform: (Polyhedron) -> Polyhedron) {
 
 val Transforms: List<Transform> by lazy { Transform.values().toList() }
 
-fun Polyhedron.transformed(transform: Transform) =
-    transform.transform(this)
+fun Polyhedron.transformed(transform: Transform) = memoTransform(transform.transform)
 
 fun Polyhedron.transformed(transforms: List<Transform>) =
     transforms.fold(this) { poly, transform -> poly.transformed(transform) }
