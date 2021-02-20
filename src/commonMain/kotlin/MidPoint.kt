@@ -1,5 +1,7 @@
 package polyhedra.common
 
+import polyhedra.common.util.*
+
 enum class MidPoint { Tangent, Center, Closest }
 
 fun tangentFraction(a: Vec3, b: Vec3): Double {

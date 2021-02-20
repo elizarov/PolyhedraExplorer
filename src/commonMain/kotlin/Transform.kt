@@ -1,5 +1,6 @@
 package polyhedra.common
 
+import polyhedra.common.util.*
 import kotlin.math.*
 
 enum class Transform(val transform: (Polyhedron) -> Polyhedron) {

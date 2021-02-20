@@ -1,6 +1,7 @@
 package polyhedra.js.util
 
 import polyhedra.common.*
+import polyhedra.common.util.*
 import kotlin.math.*
 
 data class Color(

@@ -1,5 +1,7 @@
 package polyhedra.common
 
+import polyhedra.common.util.*
+
 class Polyhedron(
     val vs: List<Vertex>,
     val fs: List<Face>
@@ -114,9 +116,17 @@ fun List<Edge>.sortedFaceAdjacentEdges(f: Face): List<Edge> {
     return result
 }
 
+private fun idString(id: Int, first: Char, last: Char): String {
+    val n = last - first + 1
+    val ch = first + (id % n)
+    val rem = id / n
+    if (rem == 0) return ch.toString()
+    return idString(rem - 1, first, last) + ch
+}
+
 inline class VertexKind(override val id: Int) : Id, Comparable<VertexKind> {
     override fun compareTo(other: VertexKind): Int = id.compareTo(other.id)
-    override fun toString(): String = "${'A' + id}"
+    override fun toString(): String = idString(id, 'A', 'Z')
 }
 
 class Vertex(
@@ -131,7 +141,7 @@ class Vertex(
 
 inline class FaceKind(override val id: Int) : Id, Comparable<FaceKind> {
     override fun compareTo(other: FaceKind): Int = id.compareTo(other.id)
-    override fun toString(): String = "${'α' + id}"
+    override fun toString(): String = idString(id, 'α', 'ω')
 }
 
 class Face(

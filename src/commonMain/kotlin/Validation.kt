@@ -1,5 +1,7 @@
 package polyhedra.common
 
+import polyhedra.common.util.*
+
 fun Polyhedron.validate() {
     validateGeometry()
     validateKinds()

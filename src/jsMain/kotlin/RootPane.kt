@@ -2,6 +2,7 @@ package polyhedra.js
 
 import kotlinx.html.js.*
 import polyhedra.common.*
+import polyhedra.common.util.*
 import polyhedra.js.components.*
 import polyhedra.js.poly.*
 import react.*

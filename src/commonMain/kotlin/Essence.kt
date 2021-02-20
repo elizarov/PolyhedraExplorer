@@ -1,5 +1,7 @@
 package polyhedra.common
 
+import polyhedra.common.util.*
+
 data class VertexFaceKind(
     val vk: VertexKind,
     val fk: FaceKind
