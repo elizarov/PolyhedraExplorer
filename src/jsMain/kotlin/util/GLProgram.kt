@@ -2,6 +2,7 @@ package polyhedra.js.util
 
 import org.khronos.webgl.*
 import polyhedra.common.*
+import polyhedra.js.poly.*
 import kotlin.reflect.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
@@ -16,10 +17,6 @@ abstract class GLProgram(val gl: GL) {
         initShaderProgram(gl, vertexShader.glShader, fragmentShader.glShader)
     }
 
-    fun useProgram() {
-        gl.useProgram(program)
-    }
-
     fun <T : ShaderType> shader(type: T, builder: ShaderBuilder.() -> Unit): Shader<T> {
         val s = ShaderBuilder()
         s.builder()
@@ -27,26 +24,26 @@ abstract class GLProgram(val gl: GL) {
     }
 
     interface Expr<T> {
-        fun dependencies(): Set<Decl<*, *>>
+        fun dependencies(): Set<Decl<*, *, *>>
     }
 
     private class BinaryOp<T>(val a: Expr<*>, val op: String, val b: Expr<*>) : Expr<T> {
-        override fun dependencies(): Set<Decl<*, *>> = a.dependencies() + b.dependencies()
+        override fun dependencies(): Set<Decl<*, *, *>> = a.dependencies() + b.dependencies()
         override fun toString(): String = "($a $op $b)"
     }
 
     private class Call<T>(val name: String, vararg val a: Expr<*>) : Expr<T> {
-        override fun dependencies(): Set<Decl<*, *>> = a.fold(emptySet()) { acc, e -> acc + e.dependencies() }
+        override fun dependencies(): Set<Decl<*, *, *>> = a.fold(emptySet()) { acc, e -> acc + e.dependencies() }
         override fun toString(): String = "$name(${a.joinToString(", ")})"
     }
 
     private class Literal<T>(val s: String): Expr<T> {
-        override fun dependencies(): Set<Decl<*, *>> = emptySet()
+        override fun dependencies(): Set<Decl<*, *, *>> = emptySet()
         override fun toString(): String = s
     }
 
     private class DotCall<T>(val a: Expr<*>, val name: String) : Expr<T> {
-        override fun dependencies(): Set<Decl<*, *>> = a.dependencies()
+        override fun dependencies(): Set<Decl<*, *, *>> = a.dependencies()
         override fun toString(): String = "$a.$name"
     }
 
@@ -73,13 +70,14 @@ abstract class GLProgram(val gl: GL) {
     fun max(a: Expr<GLType.float>, b: Double) = max(a, b.literal)
 
     fun vec4(a: Expr<GLType.vec3>, b: Expr<GLType.float>): Expr<GLType.vec4> = Call("vec4", a, b)
-    
+    fun vec4(a: Expr<GLType.vec3>, b: Double): Expr<GLType.vec4> = vec4(a, b.literal)
+
     val Expr<GLType.vec4>.rgb: Expr<GLType.vec3> get() = DotCall(this, "rgb")
     val Expr<GLType.vec4>.a: Expr<GLType.float> get() = DotCall(this, "a")
 
-    open inner class Decl<T : GLType<T>, SELF: Decl<T, SELF>>(
+    open inner class Decl<T : GLType<T, U>, U, SELF: Decl<T, U, SELF>>(
         val kind: String,
-        val type: GLType<T>,
+        val type: GLType<T, U>,
         prop: KProperty<*>
     ) : Expr<T> {
         val name: String = prop.name
@@ -87,26 +85,42 @@ abstract class GLProgram(val gl: GL) {
         @Suppress("UNCHECKED_CAST")
         operator fun getValue(program: GLProgram, prop: KProperty<*>): SELF = this as SELF
 
-        override fun dependencies(): Set<Decl<*, *>> = setOf(this)
+        override fun dependencies(): Set<Decl<*, *, *>> = setOf(this)
         override fun toString(): String = name
         open fun declaration(): String = "$kind $type $name"
     }
 
-    inner class Uniform<T : GLType<T>>(type: GLType<T>, prop: KProperty<*>) : Decl<T, Uniform<T>>("uniform", type, prop) {
+    inner class Uniform<T : GLType<T, U>, U>
+        (type: GLType<T, U>, prop: KProperty<*>
+    ) : Decl<T, U, Uniform<T, U>>("uniform", type, prop) {
         val location by lazy { gl.getUniformLocation(program, name)!! }
+
+        fun assign(value: U) {
+            type.uniformFunction(gl, location, value)
+        }
     }
 
-    inner class Attribute<T : GLType<T>>(type: GLType<T>, prop: KProperty<*>) : Decl<T, Attribute<T>>("attribute", type, prop) {
+    inner class Attribute<T : GLType<T, U>, U>(
+        type: GLType<T, U>, prop: KProperty<*>
+    ) : Decl<T, U, Attribute<T, U>>("attribute", type, prop) {
         val location by lazy { gl.getAttribLocation(program, name) }
+
+        fun assign(buffer: WebGLBuffer) {
+            gl.enableVertexAttribBuffer(location, buffer, type.bufferSize)
+        }
     }
 
-    inner class Varying<T : GLType<T>>(val precision: GLPrecision?, type: GLType<T>, prop: KProperty<*>) : Decl<T, Varying<T>>("varying", type, prop) {
+    inner class Varying<T : GLType<T, U>, U>(
+        val precision: GLPrecision?, type: GLType<T, U>, prop: KProperty<*>
+    ) : Decl<T, U, Varying<T, U>>("varying", type, prop) {
         override fun declaration(): String =
             if (precision == null) super.declaration() else "$kind $precision $type $name"
     }
 
-    inner class Builtin<T : GLType<T>>(type: GLType<T>, prop: KProperty<*>) : Decl<T, Builtin<T>>("builtin", type, prop) {
-        override fun dependencies(): Set<Decl<*, *>> = emptySet()
+    inner class Builtin<T : GLType<T, U>, U>(
+        type: GLType<T, U>, prop: KProperty<*>
+    ) : Decl<T, U, Builtin<T, U>>("builtin", type, prop) {
+        override fun dependencies(): Set<Decl<*, *, *>> = emptySet()
     }
 
     inner class Shader<T : ShaderType>(
@@ -114,12 +128,12 @@ abstract class GLProgram(val gl: GL) {
     )
 
     inner class ShaderBuilder {
-        private val dependencies = mutableSetOf<Decl<*, *>>()
+        private val dependencies = mutableSetOf<Decl<*, *, *>>()
         private val lines = ArrayList<String>()
 
         fun main(builder: BlockBuilder.() -> Unit) = function(GLType.void, "main", builder)
 
-        fun <T : GLType<T>> function(returnType: GLType<T>, name: String, builder: BlockBuilder.() -> Unit): Expr<T> {
+        fun <T : GLType<T, *>> function(returnType: GLType<T, *>, name: String, builder: BlockBuilder.() -> Unit): Expr<T> {
             lines += "$returnType $name() {"
             BlockBuilder("\t").builder()
             lines += "}"
@@ -129,7 +143,7 @@ abstract class GLProgram(val gl: GL) {
         inner class BlockBuilder(val indent: String) {
             operator fun String.unaryPlus()  { lines.add("$indent$this") }
 
-            fun <T : GLType<T>> Decl<T, *>.assign(expr: Expr<T>) {
+            fun <T : GLType<T, *>> Decl<T, *, *>.assign(expr: Expr<T>) {
                 dependencies += dependencies()
                 dependencies += expr.dependencies()
                 +"$this = $expr;"
@@ -149,24 +163,60 @@ abstract class GLProgram(val gl: GL) {
         }
     }
 
-    fun <T : GLType<T>> uniform(type: GLType<T>): Provider<Uniform<T>> = Provider { Uniform(type, it) }
-    fun <T : GLType<T>> attribute(type: GLType<T>): Provider<Attribute<T>> = Provider { Attribute(type, it) }
-    fun <T : GLType<T>> varying(type: GLType<T>, precision: GLPrecision? = null): Provider<Varying<T>> = Provider { Varying(precision, type, it) }
+    fun <T : GLType<T, U>, U> uniform(type: GLType<T, U>): Provider<Uniform<T, U>> = Provider { Uniform(type, it) }
+    fun <T : GLType<T, U>, U> attribute(type: GLType<T, U>): Provider<Attribute<T, U>> = Provider { Attribute(type, it) }
+    fun <T : GLType<T, U>, U> varying(type: GLType<T, U>, precision: GLPrecision? = null): Provider<Varying<T, U>> = Provider { Varying(precision, type, it) }
     
-    private fun <T : GLType<T>> builtin(type: GLType<T>): Provider<Builtin<T>> = Provider { Builtin(type, it) }
+    private fun <T : GLType<T, *>> builtin(type: GLType<T, *>): Provider<Builtin<T, *>> = Provider { Builtin(type, it) }
 }
 
 enum class GLPrecision { lowp, mediump, highp }
 
-sealed class GLType<T : GLType<T>> {
-    object void : GLType<void>()
-    object float : GLType<float>()
-    object vec3 : GLType<vec3>()
-    object vec4 : GLType<vec4>()
-    object mat3 : GLType<mat3>()
-    object mat4 : GLType<mat4>()
+@Suppress("ClassName")
+sealed class GLType<T : GLType<T, U>, U>(
+    val bufferSize: Int,
+    val uniformFunction: (GL, WebGLUniformLocation, U) -> Unit
+) {
+    object void : GLType<void, Unit>(
+        bufferSize = 0,
+        uniformFunction = { _, _, _ -> error("void cannot be set") }
+    )
+    
+    object float : GLType<float, Double>(
+        bufferSize = 1,
+        uniformFunction = { gl, loc, a -> gl.uniform1f(loc, a.toFloat()) }
+    )
+
+    object vec3 : GLType<vec3, Float32Array>(
+        bufferSize = 3,
+        uniformFunction = { gl, loc, a -> gl.uniform3fv(loc, a) }
+    )
+
+    object vec4 : GLType<vec4, Float32Array>(
+        bufferSize = 4,
+        uniformFunction = { gl, loc, a -> gl.uniform4fv(loc, a) }
+    )
+
+    object mat3 : GLType<mat3, Float32Array>(
+        bufferSize = 9,
+        uniformFunction = { gl, loc, a -> gl.uniformMatrix3fv(loc, false, a) }
+    )
+
+    object mat4 : GLType<mat4, Float32Array>(
+        bufferSize = 16,
+        uniformFunction = { gl, loc, a -> gl.uniformMatrix4fv(loc, false, a) }
+    )
 
     override fun toString(): String = this::class.simpleName!!
+}
+
+fun <P : GLProgram> P.use() {
+    gl.useProgram(program)
+}
+
+fun <P : GLProgram> P.use(block: P.() -> Unit) {
+    use()
+    block()
 }
 
 sealed class ShaderType(val glType: Int) {

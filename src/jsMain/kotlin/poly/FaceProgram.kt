@@ -12,7 +12,7 @@ class FaceProgram(gl: GL) : GLProgram(gl) {
     val uDirectionalLightColor by uniform(GLType.vec3)
     val uDirectionalLightVector by uniform(GLType.vec3)
 
-    val aVertexPosition by attribute(GLType.vec4)
+    val aVertexPosition by attribute(GLType.vec3)
     val aVertexNormal by attribute(GLType.vec3)
     val aVertexColor by attribute(GLType.vec4)
 
@@ -21,7 +21,7 @@ class FaceProgram(gl: GL) : GLProgram(gl) {
 
     override val vertexShader = shader(ShaderType.Vertex) {
         main {
-            gl_Position.assign(uProjectionMatrix * uModelViewMatrix * aVertexPosition)
+            gl_Position.assign(uProjectionMatrix * uModelViewMatrix * vec4(aVertexPosition, 1.0))
             val transformedNormal = uNormalMatrix * aVertexNormal
             val directional = max(dot(transformedNormal, uDirectionalLightVector), 0.0)
             vColor.assign(aVertexColor);

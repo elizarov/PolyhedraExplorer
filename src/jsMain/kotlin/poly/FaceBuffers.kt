@@ -16,18 +16,19 @@ class FaceBuffers(val gl: GL) {
 }
 
 fun FaceBuffers.draw(viewMatrices: ViewMatrices, lightning: Lightning) {
-    program.useProgram()
-    gl.uniformMatrix4fv(program.uProjectionMatrix.location, false, viewMatrices.projectionMatrix)
-    gl.uniformMatrix4fv(program.uModelViewMatrix.location, false, viewMatrices.modelViewMatrix)
-    gl.uniformMatrix3fv(program.uNormalMatrix.location, false, viewMatrices.normalMatrix)
+    program.use {
+        uProjectionMatrix.assign(viewMatrices.projectionMatrix)
+        uModelViewMatrix.assign(viewMatrices.modelViewMatrix)
+        uNormalMatrix.assign(viewMatrices.normalMatrix)
 
-    gl.uniform3fv(program.uAmbientLightColor.location, lightning.ambientLightColor)
-    gl.uniform3fv(program.uDirectionalLightColor.location, lightning.directionalLightColor)
-    gl.uniform3fv(program.uDirectionalLightVector.location, lightning.directionalLightVector)
+        uAmbientLightColor.assign(lightning.ambientLightColor)
+        uDirectionalLightColor.assign(lightning.directionalLightColor)
+        uDirectionalLightVector.assign(lightning.directionalLightVector)
 
-    gl.enableVertexAttribBuffer(program.aVertexPosition.location, positionBuffer, 3)
-    gl.enableVertexAttribBuffer(program.aVertexNormal.location, normalBuffer, 3)
-    gl.enableVertexAttribBuffer(program.aVertexColor.location, colorBuffer, 4)
+        aVertexPosition.assign(positionBuffer)
+        aVertexNormal.assign(normalBuffer)
+        aVertexColor.assign(colorBuffer)
+    }
     
     gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, indexBuffer)
     gl.drawElements(GL.TRIANGLES, nIndices, GL.UNSIGNED_SHORT, 0)
@@ -40,7 +41,7 @@ fun GL.enableVertexAttribBuffer(location: Int, buffer: WebGLBuffer, size: Int) {
 }
 
 fun FaceBuffers.initBuffers(poly: Polyhedron, style: PolyStyle) {
-    program.useProgram()
+    program.use()
     poly.vertexAttribData(gl, positionBuffer, 3) { _, v, a, i ->
         a[i] = v.pt
     }
