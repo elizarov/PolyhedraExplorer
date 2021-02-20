@@ -11,7 +11,7 @@ class FaceBuffers(val gl: GL) {
     val positionBuffer = program.aVertexPosition.createBuffer()
     val normalBuffer = program.aVertexNormal.createBuffer()
     val colorBuffer = program.aVertexColor.createBuffer()
-    val indexBuffer = gl.createBuffer()!!
+    val indexBuffer = program.createUint16Buffer()
     var nIndices = 0
 }
 
@@ -30,7 +30,7 @@ fun FaceBuffers.draw(viewMatrices: ViewMatrices, lightning: Lightning) {
         aVertexColor.assign(colorBuffer)
     }
     
-    gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, indexBuffer)
+    gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, indexBuffer.glBuffer)
     gl.drawElements(GL.TRIANGLES, nIndices, GL.UNSIGNED_SHORT, 0)
 }
 
@@ -53,7 +53,7 @@ fun FaceBuffers.initBuffers(poly: Polyhedron, style: PolyStyle) {
     }
     // indices
     nIndices = poly.fs.sumOf { 3 * (it.size - 2) }
-    val indices = Uint16Array(nIndices)
+    val indices = indexBuffer.takeData(nIndices)
     var i = 0
     var j = 0
     for (f in poly.fs) {
@@ -64,7 +64,7 @@ fun FaceBuffers.initBuffers(poly: Polyhedron, style: PolyStyle) {
         }
         i += f.size
     }
-    gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, indexBuffer)
+    gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, indexBuffer.glBuffer)
     gl.bufferData(GL.ELEMENT_ARRAY_BUFFER, indices, GL.STATIC_DRAW)
 }
 

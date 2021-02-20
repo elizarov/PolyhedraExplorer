@@ -103,12 +103,10 @@ abstract class GLProgram(val gl: GL) {
     inner class Attribute<T : GLType<T, U>, U>(
         type: T, prop: KProperty<*>
     ) : Decl<T, U, Attribute<T, U>>("attribute", type, prop) {
+        val gl: GL get() = this@GLProgram.gl
         val location by lazy { gl.getAttribLocation(program, name) }
 
-        fun createBuffer(): Buffer<T> =
-            Buffer(type, gl.createBuffer()!!)
-
-        fun assign(buffer: Buffer<T>) {
+        fun assign(buffer: Float32Buffer<T>) {
             gl.enableVertexAttribBuffer(location, buffer.glBuffer, type.bufferSize)
         }
     }
@@ -125,11 +123,6 @@ abstract class GLProgram(val gl: GL) {
     ) : Decl<T, U, Builtin<T, U>>("builtin", type, prop) {
         override fun dependencies(): Set<Decl<*, *, *>> = emptySet()
     }
-
-    inner class Buffer<T : GLType<T, *>>(
-        val type: T,
-        val glBuffer: WebGLBuffer
-    )
 
     inner class Shader<T : ShaderType>(
         val glShader: WebGLShader

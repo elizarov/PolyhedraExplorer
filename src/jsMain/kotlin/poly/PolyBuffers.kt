@@ -6,10 +6,10 @@ import polyhedra.js.util.*
 
 fun <T : GLType<T, *>> Polyhedron.vertexAttribData(
     gl: WebGLRenderingContext,
-    buffer: GLProgram.Buffer<T>,
+    buffer: Float32Buffer<T>,
     transform: (f: Face, v: Vertex, a: Float32Array, i: Int) -> Unit)
 {
-    val data = vertexArray(buffer.type.bufferSize, ::Float32Array, transform)
+    val data = vertexArray(buffer.type.bufferSize, buffer::takeData, transform)
     gl.bindBuffer(WebGLRenderingContext.ARRAY_BUFFER, buffer.glBuffer)
     gl.bufferData(WebGLRenderingContext.ARRAY_BUFFER, data, WebGLRenderingContext.STATIC_DRAW)
 }
