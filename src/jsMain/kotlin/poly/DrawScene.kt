@@ -14,7 +14,8 @@ class DrawContext(canvas: HTMLCanvasElement) {
     val viewParameters = ViewParameters()
     val viewMatrices = ViewMatrices(canvas)
     val lightning = Lightning()
-    val polyBuffers = FaceBuffers(gl)
+    val faceBuffers = FaceBuffers(gl)
+    val edgeBuffers = EdgeBuffers(gl)
 
     var prevPoly: Polyhedron? = null
     var prevStyle: PolyStyle? = null
@@ -24,7 +25,8 @@ fun DrawContext.drawScene(poly: Polyhedron, style: PolyStyle) {
     if (poly != prevPoly || style != prevStyle) {
         prevPoly = poly
         prevStyle = style
-        polyBuffers.initBuffers(poly, style)
+        faceBuffers.initBuffers(poly, style)
+        edgeBuffers.initBuffers(poly, style)
     }
 
     gl.clearColor(backgroundColor.r, backgroundColor.g, backgroundColor.b, backgroundColor.a)
@@ -34,7 +36,8 @@ fun DrawContext.drawScene(poly: Polyhedron, style: PolyStyle) {
     gl.clear(GL.COLOR_BUFFER_BIT or GL.DEPTH_BUFFER_BIT)
     
     viewMatrices.initModelAndNormalMatrices(viewParameters)
-    polyBuffers.draw(viewMatrices, lightning)
+    faceBuffers.draw(viewMatrices, lightning)
+    edgeBuffers.draw(viewMatrices)
 }
 
 

@@ -70,3 +70,4 @@ fun initShaderProgram(gl: WebGLRenderingContext, vs: WebGLShader, fs: WebGLShade
         error("Shader program error: ${gl.getProgramInfoLog(shaderProgram)}")
     return shaderProgram
 }
+

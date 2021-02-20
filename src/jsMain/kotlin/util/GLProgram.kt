@@ -17,6 +17,8 @@ abstract class GLProgram(val gl: GL) {
         initShaderProgram(gl, vertexShader.glShader, fragmentShader.glShader)
     }
 
+    private val usedUniforms = mutableSetOf<Uniform<*, *>>()
+
     fun <T : ShaderType> shader(type: T, builder: ShaderBuilder.() -> Unit): Shader<T> {
         val s = ShaderBuilder()
         s.builder()
@@ -77,6 +79,7 @@ abstract class GLProgram(val gl: GL) {
 
     open inner class Decl<T : GLType<T, U>, U, SELF: Decl<T, U, SELF>>(
         val kind: String,
+        val precision: GLPrecision?,
         val type: T,
         prop: KProperty<*>
     ) : Expr<T> {
@@ -87,40 +90,48 @@ abstract class GLProgram(val gl: GL) {
 
         override fun dependencies(): Set<Decl<*, *, *>> = setOf(this)
         override fun toString(): String = name
-        open fun declaration(): String = "$kind $type $name"
+
+        open fun emitDeclaration(): String =
+            if (precision == null) "$kind $type $name" else "$kind $precision $type $name"
     }
 
     inner class Uniform<T : GLType<T, U>, U>(
-        type: T, prop: KProperty<*>
-    ) : Decl<T, U, Uniform<T, U>>("uniform", type, prop) {
+        precision: GLPrecision?, type: T, prop: KProperty<*>
+    ) : Decl<T, U, Uniform<T, U>>("uniform", precision, type, prop) {
         val location by lazy { gl.getUniformLocation(program, name)!! }
 
         fun assign(value: U) {
-            type.uniformFunction(gl, location, value)
+            if (this in usedUniforms) {
+                type.uniformFunction(gl, location, value)
+            }
+        }
+
+        override fun emitDeclaration(): String {
+            usedUniforms += this
+            return super.emitDeclaration()
         }
     }
 
     inner class Attribute<T : GLType<T, U>, U>(
-        type: T, prop: KProperty<*>
-    ) : Decl<T, U, Attribute<T, U>>("attribute", type, prop) {
+        precision: GLPrecision?, type: T, prop: KProperty<*>
+    ) : Decl<T, U, Attribute<T, U>>("attribute", precision, type, prop) {
         val gl: GL get() = this@GLProgram.gl
-        val location by lazy { gl.getAttribLocation(program, name) }
+        private val location by lazy { gl.getAttribLocation(program, name) }
 
         fun assign(buffer: Float32Buffer<T>) {
-            gl.enableVertexAttribBuffer(location, buffer.glBuffer, type.bufferSize)
+            gl.bindBuffer(GL.ARRAY_BUFFER, buffer.glBuffer)
+            gl.vertexAttribPointer(location, type.bufferSize, GL.FLOAT, false, 0, 0)
+            gl.enableVertexAttribArray(location)
         }
     }
 
     inner class Varying<T : GLType<T, U>, U>(
-        val precision: GLPrecision?, type: T, prop: KProperty<*>
-    ) : Decl<T, U, Varying<T, U>>("varying", type, prop) {
-        override fun declaration(): String =
-            if (precision == null) super.declaration() else "$kind $precision $type $name"
-    }
+        precision: GLPrecision?, type: T, prop: KProperty<*>
+    ) : Decl<T, U, Varying<T, U>>("varying", precision, type, prop)
 
     inner class Builtin<T : GLType<T, U>, U>(
         type: T, prop: KProperty<*>
-    ) : Decl<T, U, Builtin<T, U>>("builtin", type, prop) {
+    ) : Decl<T, U, Builtin<T, U>>("builtin", null, type, prop) {
         override fun dependencies(): Set<Decl<*, *, *>> = emptySet()
     }
 
@@ -152,7 +163,7 @@ abstract class GLProgram(val gl: GL) {
         }
 
         fun source(): String = buildString {
-            for (d in dependencies) appendLine("${d.declaration()};")
+            for (d in dependencies) appendLine("${d.emitDeclaration()};")
             for (l in lines) appendLine(l)
         }
     }
@@ -164,9 +175,12 @@ abstract class GLProgram(val gl: GL) {
         }
     }
 
-    fun <T : GLType<T, U>, U> uniform(type: T): Provider<Uniform<T, U>> = Provider { Uniform(type, it) }
-    fun <T : GLType<T, U>, U> attribute(type: T): Provider<Attribute<T, U>> = Provider { Attribute(type, it) }
-    fun <T : GLType<T, U>, U> varying(type: T, precision: GLPrecision? = null): Provider<Varying<T, U>> = Provider { Varying(precision, type, it) }
+    fun <T : GLType<T, U>, U> uniform(type: T, precision: GLPrecision? = null): Provider<Uniform<T, U>> =
+        Provider { Uniform(precision, type, it) }
+    fun <T : GLType<T, U>, U> attribute(type: T, precision: GLPrecision? = null): Provider<Attribute<T, U>> =
+        Provider { Attribute(precision, type, it) }
+    fun <T : GLType<T, U>, U> varying(type: T, precision: GLPrecision? = null): Provider<Varying<T, U>> =
+        Provider { Varying(precision, type, it) }
     
     private fun <T : GLType<T, U>, U> builtin(type: T): Provider<Builtin<T, *>> = Provider { Builtin(type, it) }
 }
