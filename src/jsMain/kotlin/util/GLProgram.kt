@@ -17,8 +17,6 @@ abstract class GLProgram(val gl: GL) {
         initShaderProgram(gl, vertexShader.glShader, fragmentShader.glShader)
     }
 
-    private val usedUniforms = mutableSetOf<Uniform<*, *>>()
-
     fun <T : ShaderType> shader(type: T, builder: ShaderBuilder.() -> Unit): Shader<T> {
         val s = ShaderBuilder()
         s.builder()
@@ -99,15 +97,16 @@ abstract class GLProgram(val gl: GL) {
         precision: GLPrecision?, type: T, prop: KProperty<*>
     ) : Decl<T, U, Uniform<T, U>>("uniform", precision, type, prop) {
         val location by lazy { gl.getUniformLocation(program, name)!! }
+        private var isUsed = false
 
         fun assign(value: U) {
-            if (this in usedUniforms) {
+            if (isUsed) {
                 type.uniformFunction(gl, location, value)
             }
         }
 
         override fun emitDeclaration(): String {
-            usedUniforms += this
+            isUsed = true
             return super.emitDeclaration()
         }
     }
