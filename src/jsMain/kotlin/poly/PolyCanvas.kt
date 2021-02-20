@@ -14,6 +14,7 @@ external interface PolyCanvasProps : RProps {
     var classes: String?
     var poly: Polyhedron
     var style: PolyStyle
+    var rotationAngle: Double
     var rotate: Boolean
     var viewScale: Double
     var expand: Double
@@ -70,7 +71,8 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
             animationHandle = 0
             if (prevTime.isNaN()) prevTime = nowTime
             val dt = (nowTime - prevTime) / 1000 // in seconds
-            drawContext.viewParameters.rotate(dt * 0.6, dt * 0.9)
+            val a = 2 * PI * props.rotationAngle / 360
+            drawContext.viewParameters.rotate(dt * cos(a), dt * sin(a))
             draw()
             prevTime = nowTime
             requestAnimation()

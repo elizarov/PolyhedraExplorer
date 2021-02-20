@@ -8,6 +8,7 @@ import react.dom.*
 import kotlin.math.*
 
 external interface SliderProps : RProps {
+    var disabled: Boolean
     var min: Double
     var max: Double
     var step: Double
@@ -17,7 +18,10 @@ external interface SliderProps : RProps {
 
 fun RBuilder.slider(handler: SliderProps.() -> Unit) {
     child(Slider::class) {
-        attrs(handler)
+        attrs {
+            disabled = false
+            handler()
+        }
     }
 }
 
@@ -27,6 +31,7 @@ class Slider : RComponent<SliderProps, RState>() {
     override fun RBuilder.render() {
         input(InputType.range) {
             attrs {
+                disabled = props.disabled
                 min = (props.min / props.step).intStr()
                 max = (props.max / props.step).intStr()
                 value = (props.value / props.step).intStr()

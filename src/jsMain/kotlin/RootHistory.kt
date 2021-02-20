@@ -12,6 +12,8 @@ data class RootPaneData(
     override var transforms: List<Transform> = emptyList(),
     @SerialName("bs")
     override var baseScale: Scale = Scale.Circumradius,
+    @SerialName("ra")
+    override var rotationAngle: Double = 60.0,
     @SerialName("r")
     override var rotate: Boolean = true,
     @SerialName("vs")
@@ -26,6 +28,7 @@ fun RootPaneState.assign(other: RootPaneState) {
     seed = other.seed
     transforms = other.transforms
     baseScale = other.baseScale
+    rotationAngle = other.rotationAngle
     rotate = other.rotate
     viewScale = other.viewScale
     expand = other.expand

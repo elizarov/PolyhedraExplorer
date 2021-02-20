@@ -1,5 +1,6 @@
 package polyhedra.js
 
+import kotlinx.html.*
 import kotlinx.html.js.*
 import polyhedra.common.*
 import polyhedra.common.util.*
@@ -12,6 +13,7 @@ external interface RootPaneState : RState {
     var seed: Seed
     var transforms: List<Transform>
     var baseScale: Scale
+    var rotationAngle: Double
     var rotate: Boolean
     var viewScale: Double
     var expand: Double
@@ -73,6 +75,7 @@ class RootPane : RComponent<RProps, RootPaneState>() {
                 polyCanvas("poly") {
                     poly = curPoly
                     style = PolyStyle(state.display)
+                    rotationAngle = state.rotationAngle
                     rotate = state.rotate
                     viewScale = state.viewScale
                     expand = state.expand
@@ -104,98 +107,114 @@ class RootPane : RComponent<RProps, RootPaneState>() {
         }
 
         header("Transforms")
-        table {
-            tbody {
-                for ((i, transform) in state.transforms.withIndex()) {
-                    tr("control") {
-                        td { +"${i + 1}:" }
-                        td {
-                            dropdown<Transform> {
-                                value = transform
-                                options = Transforms
-                                onChange = { value ->
-                                    setState {
-                                        if (value != Transform.None) {
-                                            safeTransformsUpdate { it.updatedAt(i, value) }
-                                        } else {
-                                            safeTransformsUpdate { it.removedAt(i) }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+        tableBody {
+            for ((i, transform) in state.transforms.withIndex()) {
                 tr("control") {
-                    td { +"${state.transforms.size + 1}:" }
+                    td { +"${i + 1}:" }
                     td {
                         dropdown<Transform> {
-                            value = Transform.None
+                            value = transform
                             options = Transforms
                             onChange = { value ->
                                 setState {
                                     if (value != Transform.None) {
-                                        safeTransformsUpdate { it + value }
+                                        safeTransformsUpdate { it.updatedAt(i, value) }
+                                    } else {
+                                        safeTransformsUpdate { it.removedAt(i) }
                                     }
                                 }
                             }
                         }
                     }
                 }
-                for (i in state.transforms.size + 1..8) {
-                    tr("control") {
-                        td { +"${i + 1}:" }
-                        td {}
+            }
+            tr("control") {
+                td { +"${state.transforms.size + 1}:" }
+                td {
+                    dropdown<Transform> {
+                        value = Transform.None
+                        options = Transforms
+                        onChange = { value ->
+                            setState {
+                                if (value != Transform.None) {
+                                    safeTransformsUpdate { it + value }
+                                }
+                            }
+                        }
                     }
                 }
-                tr {
+            }
+            for (i in state.transforms.size + 1..8) {
+                tr("control") {
+                    td { +"${i + 1}:" }
                     td {}
-                    td {
-                        button {
-                            attrs {
-                                onClickFunction = { setState { transforms = emptyList() } }
-                            }
-                            +"Clear"
+                }
+            }
+            tr {
+                td {}
+                td {
+                    button {
+                        attrs {
+                            onClickFunction = { setState { transforms = emptyList() } }
                         }
+                        +"Clear"
                     }
                 }
             }
         }
 
         header("View")
-        div("row control") {
-            label { +"Base scale" }
-            dropdown<Scale> {
-                value = state.baseScale
-                options = Scales
-                onChange = { setState { baseScale = it } }
+        tableBody {
+            tr("control") {
+                td { +"Base scale" }
+                td {
+                    dropdown<Scale> {
+                        value = state.baseScale
+                        options = Scales
+                        onChange = { setState { baseScale = it } }
+                    }
+                }
             }
-        }
-        div("row control") {
-            label { +"Rotate" }
-            checkbox {
-                checked = state.rotate
-                onChange = { setState { rotate = it } }
+            tr("control") {
+                td { +"View scale" }
+                td {
+                    slider {
+                        min = -2.0
+                        max = 2.0
+                        step = 0.01
+                        value = state.viewScale
+                        onChange = { setState { viewScale = it } }
+                    }
+                }
             }
-        }
-        div("row control") {
-            label { +"View scale" }
-            slider {
-                min = -2.0
-                max = 2.0
-                step = 0.01
-                value = state.viewScale
-                onChange = { setState { viewScale = it } }
+            tr("control") {
+                td { +"Expand" }
+                td {
+                    slider {
+                        min = 0.0
+                        max = 2.0
+                        step = 0.01
+                        value = state.expand
+                        onChange = { setState { expand = it } }
+                    }
+                }
             }
-        }
-        div("row control") {
-            label { +"Expand" }
-            slider {
-                min = 0.0
-                max = 2.0
-                step = 0.01
-                value = state.expand
-                onChange = { setState { expand = it } }
+            tr("control") {
+                td { +"Rotate" }
+                td {
+                    slider {
+                        disabled = !state.rotate
+                        min = 0.0
+                        max = 360.0
+                        step = 1.0
+                        value = state.rotationAngle
+                        onChange = { setState { rotationAngle = it } }
+                    }
+                    checkbox {
+                        checked = state.rotate
+                        onChange = { setState { rotate = it } }
+                    }
+                }
             }
         }
 
@@ -208,5 +227,11 @@ class RootPane : RComponent<RProps, RootPaneState>() {
                 onChange = { setState { display = it } }
             }
         }
+    }
+}
+
+fun RBuilder.tableBody(block: RDOMBuilder<TBODY>.() -> Unit) {
+    table {
+        tbody(block = block)
     }
 }
