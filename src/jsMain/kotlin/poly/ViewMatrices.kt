@@ -7,6 +7,7 @@ import kotlin.math.*
 class ViewParameters {
     var rotationQuat = quat.create()
     var viewScale = 0.0
+    var expand = 0.0
 
     private val axis = Float32Array(3)
     private val deltaQuat = quat.create()
@@ -25,19 +26,21 @@ class ViewMatrices {
     val projectionMatrix = mat4.create()
     val modelViewMatrix = mat4.create()
     val normalMatrix = mat3.create()
+    var expand = 0.0
 
     private val fieldOfViewDegrees = 45
     private val modelViewTranslation = float32Of(-0.0, 0.0, -3.0)
     private val modelViewScale = Float32Array(3)
 
-    fun initProjectionMatrix(width: Int, height: Int) {
+    fun initProjection(width: Int, height: Int) {
         mat4.perspective(
             projectionMatrix, fieldOfViewDegrees * PI / 180,
             width.toDouble() / height, 0.1, 100.0
         )
     }
 
-    fun initModelAndNormalMatrices(params: ViewParameters) {
+    fun initView(params: ViewParameters) {
+        expand = params.expand
         modelViewScale.fill(2.0.pow(params.viewScale))
         mat4.fromRotationTranslationScale(modelViewMatrix, params.rotationQuat, modelViewTranslation, modelViewScale)
 

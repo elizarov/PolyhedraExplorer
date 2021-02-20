@@ -14,6 +14,7 @@ external interface RootPaneState : RState {
     var baseScale: Scale
     var rotate: Boolean
     var viewScale: Double
+    var expand: Double
     var display: Display
 }
 
@@ -74,6 +75,7 @@ class RootPane : RComponent<RProps, RootPaneState>() {
                     style = PolyStyle(state.display)
                     rotate = state.rotate
                     viewScale = state.viewScale
+                    expand = state.expand
                     onRotateChange = { setState { rotate = it } }
                     onScaleChange = { setState { viewScale = it } }
                 }
@@ -184,6 +186,16 @@ class RootPane : RComponent<RProps, RootPaneState>() {
                 step = 0.01
                 value = state.viewScale
                 onChange = { setState { viewScale = it } }
+            }
+        }
+        div("row control") {
+            label { +"Expand" }
+            slider {
+                min = 0.0
+                max = 2.0
+                step = 0.01
+                value = state.expand
+                onChange = { setState { expand = it } }
             }
         }
 

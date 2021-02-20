@@ -16,6 +16,8 @@ data class RootPaneData(
     override var rotate: Boolean = true,
     @SerialName("vs")
     override var viewScale: Double = 0.0,
+    @SerialName("e")
+    override var expand: Double = 0.0,
     @SerialName("d")
     override var display: Display = Display.Full
 ) : RootPaneState
@@ -26,6 +28,7 @@ fun RootPaneState.assign(other: RootPaneState) {
     baseScale = other.baseScale
     rotate = other.rotate
     viewScale = other.viewScale
+    expand = other.expand
     display = other.display
 }
 

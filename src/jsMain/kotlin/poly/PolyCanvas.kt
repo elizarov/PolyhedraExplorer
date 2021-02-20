@@ -16,6 +16,7 @@ external interface PolyCanvasProps : RProps {
     var style: PolyStyle
     var rotate: Boolean
     var viewScale: Double
+    var expand: Double
     var onRotateChange: (Boolean) -> Unit
     var onScaleChange: (Double) -> Unit
 }
@@ -92,7 +93,10 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
         // resize canvas if needed
         resizeCanvas(canvas.clientWidth, canvas.clientHeight)
         // then draw
-        drawContext.viewParameters.viewScale = props.viewScale
+        with(drawContext.viewParameters) {
+            viewScale = props.viewScale
+            expand = props.expand
+        }
         drawContext.drawScene(props.poly, props.style)
     }
 

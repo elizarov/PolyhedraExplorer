@@ -39,8 +39,8 @@ fun DrawContext.drawScene(poly: Polyhedron, style: PolyStyle) {
     gl.clear(GL.COLOR_BUFFER_BIT or GL.DEPTH_BUFFER_BIT)
     gl.viewport(0, 0, width, height);
 
-    viewMatrices.initProjectionMatrix(width, height)
-    viewMatrices.initModelAndNormalMatrices(viewParameters)
+    viewMatrices.initProjection(width, height)
+    viewMatrices.initView(viewParameters)
     if (style.display.hasFaces()) faceBuffers.draw(viewMatrices, lightning)
     if (style.display.hasEdges()) edgeBuffers.draw(viewMatrices)
 }

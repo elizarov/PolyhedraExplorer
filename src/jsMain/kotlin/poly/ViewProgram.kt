@@ -8,10 +8,14 @@ abstract class ViewProgram(gl: GL) : GLProgram(gl) {
     val uProjectionMatrix by uniform(GLType.mat4)
     val uModelViewMatrix by uniform(GLType.mat4)
     val uNormalMatrix by uniform(GLType.mat3)
+    val uExpand by uniform(GLType.float)
 
     fun assignView(viewMatrices: ViewMatrices) {
-        uProjectionMatrix.assign(viewMatrices.projectionMatrix)
-        uModelViewMatrix.assign(viewMatrices.modelViewMatrix)
-        uNormalMatrix.assign(viewMatrices.normalMatrix)
+        with(viewMatrices) {
+            uProjectionMatrix.assign(projectionMatrix)
+            uModelViewMatrix.assign(modelViewMatrix)
+            uNormalMatrix.assign(normalMatrix)
+            uExpand.assign(expand)
+        }
     }
 }
