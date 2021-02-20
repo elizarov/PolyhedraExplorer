@@ -1,7 +1,6 @@
 package polyhedra.js.poly
 
 import org.khronos.webgl.*
-import org.w3c.dom.*
 import polyhedra.js.util.*
 import kotlin.math.*
 
@@ -31,10 +30,10 @@ class ViewMatrices {
     private val modelViewTranslation = float32Of(-0.0, 0.0, -3.0)
     private val modelViewScale = Float32Array(3)
 
-    fun initProjectionMatrix(canvas: HTMLCanvasElement) {
+    fun initProjectionMatrix(width: Int, height: Int) {
         mat4.perspective(
             projectionMatrix, fieldOfViewDegrees * PI / 180,
-            canvas.clientWidth.toDouble() / canvas.clientHeight, 0.1, 100.0
+            width.toDouble() / height, 0.1, 100.0
         )
     }
 

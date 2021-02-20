@@ -41,8 +41,6 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
     override fun RBuilder.render() {
         canvas(props.classes) {
             attrs {
-                width = "800"
-                height = "600"
                 ref = canvasRef
             }
         }
@@ -91,8 +89,17 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
     }
 
     private fun draw() {
+        // resize canvas if needed
+        resizeCanvas(canvas.clientWidth, canvas.clientHeight)
+        // then draw
         drawContext.viewParameters.viewScale = props.viewScale
         drawContext.drawScene(props.poly, props.style)
+    }
+
+    private fun resizeCanvas(clientWidth: Int, clientHeight: Int) {
+        if (canvas.width == clientWidth && canvas.height == clientHeight) return
+        canvas.width = clientWidth
+        canvas.height = clientHeight
     }
 
     private fun savePrevMouseEvent(e: MouseEvent) {

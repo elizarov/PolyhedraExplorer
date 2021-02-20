@@ -29,13 +29,17 @@ fun DrawContext.drawScene(poly: Polyhedron, style: PolyStyle) {
         if (style.display.hasEdges()) edgeBuffers.initBuffers(poly, style)
     }
 
+    val width = gl.canvas.width
+    val height = gl.canvas.height
+
     gl.clearColor(backgroundColor.r, backgroundColor.g, backgroundColor.b, backgroundColor.a)
     gl.clearDepth(1.0f)
     gl.enable(GL.DEPTH_TEST)
     gl.depthFunc(GL.LEQUAL)
     gl.clear(GL.COLOR_BUFFER_BIT or GL.DEPTH_BUFFER_BIT)
+    gl.viewport(0, 0, width, height);
 
-    viewMatrices.initProjectionMatrix(gl.canvas)
+    viewMatrices.initProjectionMatrix(width, height)
     viewMatrices.initModelAndNormalMatrices(viewParameters)
     if (style.display.hasFaces()) faceBuffers.draw(viewMatrices, lightning)
     if (style.display.hasEdges()) edgeBuffers.draw(viewMatrices)
