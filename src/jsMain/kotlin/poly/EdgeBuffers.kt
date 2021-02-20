@@ -9,15 +9,15 @@ import org.khronos.webgl.WebGLRenderingContext as GL
 class EdgeBuffers(val gl: GL) {
     val program = EdgeProgram(gl)
     val positionBuffer = program.aVertexPosition.createBuffer()
-    val colorBuffer = program.aVertexColor.createBuffer()
     val indexBuffer = program.createUint16Buffer()
     var nIndices = 0
+    lateinit var color: Float32Array
 }
 
 fun EdgeBuffers.draw(viewMatrices: ViewMatrices) {
     program.use {
         assignView(viewMatrices)
-        aVertexColor.assign(colorBuffer)
+        uVertexColor.assign(color)
         aVertexPosition.assign(positionBuffer)
     }
     
@@ -26,12 +26,10 @@ fun EdgeBuffers.draw(viewMatrices: ViewMatrices) {
 }
 
 fun EdgeBuffers.initBuffers(poly: Polyhedron, style: PolyStyle) {
+    color = style.edgeColor.toFloat32Array()
     program.use()
     poly.verticesData(gl, positionBuffer) { v, a, i ->
         a[i] = v.pt
-    }
-    poly.verticesData(gl, colorBuffer) { _, a, i ->
-        a[i] = style.edgeColor
     }
     // indices
     nIndices = poly.es.size * 2

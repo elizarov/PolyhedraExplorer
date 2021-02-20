@@ -41,3 +41,5 @@ fun String.parseCSSColor(): Color? {
     }
     return Color(r, g, b, a)
 }
+
+fun Color.toFloat32Array(): Float32Array = float32Of(r, g, b, a)
