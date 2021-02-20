@@ -84,7 +84,7 @@ tr.control {
     border-bottom: 0.3em solid transparent;
 }
 
-/* --------- table --------- */
+/* --------- tables --------- */
 
 table {
     border: none;
@@ -108,5 +108,9 @@ td {
 td.rt {
     text-align: right;
     padding-left: 1ch;
+}
+
+tr.info {
+    vertical-align: top;
 }
 
