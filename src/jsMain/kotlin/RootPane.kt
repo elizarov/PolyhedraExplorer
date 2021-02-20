@@ -14,6 +14,7 @@ external interface RootPaneState : RState {
     var baseScale: Scale
     var rotate: Boolean
     var viewScale: Double
+    var display: Display
 }
 
 fun RootPaneState.poly(): Polyhedron =
@@ -70,7 +71,7 @@ class RootPane : RComponent<RProps, RootPaneState>() {
                 header(state.polyName())
                 polyCanvas("poly") {
                     poly = curPoly
-                    style = PolyStyle()
+                    style = PolyStyle(state.display)
                     rotate = state.rotate
                     viewScale = state.viewScale
                     onRotateChange = { setState { rotate = it } }
@@ -183,6 +184,16 @@ class RootPane : RComponent<RProps, RootPaneState>() {
                 step = 0.01
                 value = state.viewScale
                 onChange = { setState { viewScale = it } }
+            }
+        }
+
+        header("Style")
+        div("row control") {
+            label { +"Display" }
+            dropdown<Display> {
+                value = state.display
+                options = Displays
+                onChange = { setState { display = it } }
             }
         }
     }

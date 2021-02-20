@@ -25,8 +25,8 @@ fun DrawContext.drawScene(poly: Polyhedron, style: PolyStyle) {
     if (poly != prevPoly || style != prevStyle) {
         prevPoly = poly
         prevStyle = style
-        faceBuffers.initBuffers(poly, style)
-        edgeBuffers.initBuffers(poly, style)
+        if (style.display.hasFaces()) faceBuffers.initBuffers(poly, style)
+        if (style.display.hasEdges()) edgeBuffers.initBuffers(poly, style)
     }
 
     gl.clearColor(backgroundColor.r, backgroundColor.g, backgroundColor.b, backgroundColor.a)
@@ -36,8 +36,8 @@ fun DrawContext.drawScene(poly: Polyhedron, style: PolyStyle) {
     gl.clear(GL.COLOR_BUFFER_BIT or GL.DEPTH_BUFFER_BIT)
     
     viewMatrices.initModelAndNormalMatrices(viewParameters)
-    faceBuffers.draw(viewMatrices, lightning)
-    edgeBuffers.draw(viewMatrices)
+    if (style.display.hasFaces()) faceBuffers.draw(viewMatrices, lightning)
+    if (style.display.hasEdges()) edgeBuffers.draw(viewMatrices)
 }
 
 
