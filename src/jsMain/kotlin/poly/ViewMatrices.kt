@@ -22,7 +22,7 @@ class ViewParameters {
     }
 }
 
-class ViewMatrices(canvas: HTMLCanvasElement) {
+class ViewMatrices {
     val projectionMatrix = mat4.create()
     val modelViewMatrix = mat4.create()
     val normalMatrix = mat3.create()
@@ -31,7 +31,7 @@ class ViewMatrices(canvas: HTMLCanvasElement) {
     private val modelViewTranslation = float32Of(-0.0, 0.0, -3.0)
     private val modelViewScale = Float32Array(3)
 
-    init {
+    fun initProjectionMatrix(canvas: HTMLCanvasElement) {
         mat4.perspective(
             projectionMatrix, fieldOfViewDegrees * PI / 180,
             canvas.clientWidth.toDouble() / canvas.clientHeight, 0.1, 100.0

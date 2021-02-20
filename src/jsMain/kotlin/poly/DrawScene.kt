@@ -12,7 +12,7 @@ class DrawContext(canvas: HTMLCanvasElement) {
     val backgroundColor = canvas.computedStyle().backgroundColor.parseCSSColor() ?: Color(0.0f, 0.0f, 0.0f)
 
     val viewParameters = ViewParameters()
-    val viewMatrices = ViewMatrices(canvas)
+    val viewMatrices = ViewMatrices()
     val lightning = Lightning()
     val faceBuffers = FaceBuffers(gl)
     val edgeBuffers = EdgeBuffers(gl)
@@ -34,7 +34,8 @@ fun DrawContext.drawScene(poly: Polyhedron, style: PolyStyle) {
     gl.enable(GL.DEPTH_TEST)
     gl.depthFunc(GL.LEQUAL)
     gl.clear(GL.COLOR_BUFFER_BIT or GL.DEPTH_BUFFER_BIT)
-    
+
+    viewMatrices.initProjectionMatrix(gl.canvas)
     viewMatrices.initModelAndNormalMatrices(viewParameters)
     if (style.display.hasFaces()) faceBuffers.draw(viewMatrices, lightning)
     if (style.display.hasEdges()) edgeBuffers.draw(viewMatrices)
