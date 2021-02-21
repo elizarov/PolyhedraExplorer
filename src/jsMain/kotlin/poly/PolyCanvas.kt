@@ -5,6 +5,7 @@ import org.w3c.dom.*
 import org.w3c.dom.events.*
 import polyhedra.common.*
 import polyhedra.js.*
+import polyhedra.js.glsl.*
 import polyhedra.js.util.*
 import react.*
 import react.dom.*
@@ -19,6 +20,12 @@ external interface PolyCanvasProps : RProps {
     var viewScale: Double
     var expand: Double
     var transparent: Double
+    // Lighting
+    var ambientLight: Double
+    var pointLight: Double
+    var specularLight: Double
+    var specularPower: Double
+    // Events
     var onRotateChange: (Boolean) -> Unit
     var onScaleChange: (Double) -> Unit
 }
@@ -100,6 +107,12 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
             viewScale = props.viewScale
             expand = props.expand
             transparent = props.transparent
+        }
+        with(drawContext.lightning) {
+            ambientLightColor.fill(props.ambientLight)
+            pointLightColor.fill(props.pointLight)
+            specularLightColor.fill(props.specularLight)
+            specularLightPower = props.specularPower
         }
         drawContext.drawScene(props.poly, props.style)
     }

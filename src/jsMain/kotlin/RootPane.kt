@@ -10,15 +10,23 @@ import react.*
 import react.dom.*
 
 external interface RootPaneState : RState {
+    // Polyhedra
     var seed: Seed
     var transforms: List<Transform>
+    // View
     var baseScale: Scale
-    var rotationAngle: Double
-    var rotate: Boolean
     var viewScale: Double
     var expand: Double
+    var rotationAngle: Double
+    var rotate: Boolean
+    // Style
     var transparent: Double
     var display: Display
+    // Lighting
+    var ambientLight: Double
+    var pointLight: Double
+    var specularLight: Double
+    var specularPower: Double
 }
 
 fun RootPaneState.poly(): Polyhedron =
@@ -81,6 +89,10 @@ class RootPane : RComponent<RProps, RootPaneState>() {
                     viewScale = state.viewScale
                     expand = state.expand
                     transparent = if (state.display.hasFaces()) state.transparent else 0.0
+                    ambientLight = state.ambientLight
+                    pointLight = state.pointLight
+                    specularLight = state.specularLight
+                    specularPower = state.specularPower
                     onRotateChange = { setState { rotate = it } }
                     onScaleChange = { setState { viewScale = it } }
                 }
@@ -242,6 +254,58 @@ class RootPane : RComponent<RProps, RootPaneState>() {
                         step = 0.01
                         value = state.transparent
                         onChange = { setState { transparent = it } }
+                    }
+                }
+            }
+        }
+
+        header("Lighting")
+        tableBody {
+            tr("control") {
+                td { +"Ambient" }
+                td {
+                    slider {
+                        min = 0.0
+                        max = 1.0
+                        step = 0.01
+                        value = state.ambientLight
+                        onChange = { setState { ambientLight = it } }
+                    }
+                }
+            }
+            tr("control") {
+                td { +"Point" }
+                td {
+                    slider {
+                        min = 0.0
+                        max = 1.0
+                        step = 0.01
+                        value = state.pointLight
+                        onChange = { setState { pointLight = it } }
+                    }
+                }
+            }
+            tr("control") {
+                td { +"Specular" }
+                td {
+                    slider {
+                        min = 0.0
+                        max = 1.0
+                        step = 0.01
+                        value = state.specularLight
+                        onChange = { setState { specularLight = it } }
+                    }
+                }
+            }
+            tr("control") {
+                td { +"Shininess" }
+                td {
+                    slider {
+                        min = 1.0
+                        max = 100.0
+                        step = 0.1
+                        value = state.specularPower
+                        onChange = { setState { specularPower = it } }
                     }
                 }
             }
