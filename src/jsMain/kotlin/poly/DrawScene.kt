@@ -9,7 +9,6 @@ import org.khronos.webgl.WebGLRenderingContext as GL
 
 class DrawContext(canvas: HTMLCanvasElement) {
     val gl: GL = canvas.getContext("webgl") as GL
-    val backgroundColor = canvas.computedStyle().backgroundColor.parseCSSColor() ?: Color(0.0f, 0.0f, 0.0f)
 
     val viewParameters = ViewParameters()
     val viewMatrices = ViewMatrices(viewParameters)
@@ -36,7 +35,7 @@ fun DrawContext.drawScene(poly: Polyhedron, style: PolyStyle) {
     val height = gl.canvas.height
 
     gl.viewport(0, 0, width, height);
-    gl.clearColor(backgroundColor.r, backgroundColor.g, backgroundColor.b, backgroundColor.a)
+    gl.clearColor(0.0f, 0.0f, 0.0f, 0.0f)
 
     if (viewParameters.transparent == 0.0) {
         gl.enable(GL.DEPTH_TEST)

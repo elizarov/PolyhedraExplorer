@@ -34,13 +34,4 @@ fun hsvColor(h: Double, s: Double, v: Double, a: Double = 1.0): Color {
     }
 }
 
-fun String.parseCSSColor(): Color? {
-    val match = Regex("rgba?\\((\\d+), (\\d+), (\\d+)(?:, (\\d+))?\\)").matchEntire(this)
-        ?: return null
-    val (r, g, b, a) = match.groupValues.drop(1).map {
-        if (it.isEmpty()) 1.0f else it.toInt() / 255.0f
-    }
-    return Color(r, g, b, a)
-}
-
 fun Color.toFloat32Array(): Float32Array = float32Of(r, g, b, a)
