@@ -1,0 +1,38 @@
+package polyhedra.js.components
+
+import kotlinx.html.*
+import kotlinx.html.js.*
+import org.w3c.dom.*
+import polyhedra.js.params.*
+import react.*
+import react.dom.*
+import kotlin.math.*
+
+fun RBuilder.pSlider(handler: PComponentProps<DoubleParam>.() -> Unit) {
+    child(PSlider::class) {
+        attrs {
+            disabled = false
+            handler()
+        }
+    }
+}
+
+class PSlider(props: PComponentProps<DoubleParam>) : PComponent<Double, DoubleParam, PComponentProps<DoubleParam>, PComponentState<Double>>(props) {
+    private fun Double.intStr() = roundToInt().toString()
+
+    override fun RBuilder.render() {
+        input(InputType.range) {
+            attrs {
+                disabled = props.disabled
+                with(props) {
+                    min = (param.min / param.step).intStr()
+                    max = (param.max / param.step).intStr()
+                    value = (state.value / param.step).intStr()
+                }
+                onChangeFunction = { event ->
+                    props.param.value = (event.target as HTMLInputElement).value.toInt() * props.param.step
+                }
+            }
+        }
+    }
+}

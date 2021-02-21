@@ -13,9 +13,9 @@ class FaceBuffers(val gl: GL, val sharedPolyBuffers: SharedPolyBuffers)  {
     var nIndices = 0
 }
 
-fun FaceBuffers.draw(viewMatrices: ViewMatrices, lightning: Lightning) {
+fun FaceBuffers.draw(view: ViewContext, lightning: LightningContext) {
     program.use {
-        assignView(viewMatrices)
+        assignView(view)
 
         uAmbientLightColor.assign(lightning.ambientLightColor)
         uPointLightColor.assign(lightning.pointLightColor)
@@ -31,9 +31,9 @@ fun FaceBuffers.draw(viewMatrices: ViewMatrices, lightning: Lightning) {
     gl.drawElements(GL.TRIANGLES, nIndices, GL.UNSIGNED_SHORT, 0)
 }
 
-fun FaceBuffers.initBuffers(poly: Polyhedron, style: PolyStyle) {
+fun FaceBuffers.initBuffers(poly: Polyhedron) {
     poly.faceVerticesData(colorBuffer) { f, _, a, i ->
-        a.setRGB(i, style.faceColor(f))
+        a.setRGB(i, PolyStyle.faceColor(f))
     }
     colorBuffer.bindBufferData(gl)
     // indices

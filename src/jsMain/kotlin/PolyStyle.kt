@@ -10,9 +10,7 @@ private val ratio = (sqrt(5.0) - 1) / 2
 private fun paletteColor(id: Int) =
     hsvColor(hue0 + ratio * id, 0.9, 0.95)
 
-data class PolyStyle(
-    val display: Display
-) {
+object PolyStyle {
     val edgeColor = hsvColor(0.0, 0.0, 0.1)
     fun faceColor(f: Face): Color = paletteColor(f.kind.id)
 }

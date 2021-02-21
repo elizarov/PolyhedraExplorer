@@ -15,15 +15,15 @@ abstract class SharedPolyProgram(gl: GL) : GLProgram(gl) {
     val aVertexPosition by attribute(GLType.vec3)
     val aVertexNormal by attribute(GLType.vec3)
 
-    fun assignView(viewMatrices: ViewMatrices) {
-        with(viewMatrices) {
+    fun assignView(view: ViewContext) {
+        with(view) {
             uCameraPosition.assign(cameraPosition)
             uProjectionMatrix.assign(projectionMatrix)
             uModelMatrix.assign(modelMatrix)
             uNormalMatrix.assign(normalMatrix)
-            with(viewParameters) {
-                uExpand.assign(expand)
-                uColorAlpha.assign(1.0 - transparent)
+            with(params) {
+                uExpand.assign(expand.value)
+                uColorAlpha.assign(1.0 - transparent.value)
             }
         }
     }

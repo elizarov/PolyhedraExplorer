@@ -5,28 +5,21 @@ import kotlinx.html.js.*
 import polyhedra.common.*
 import polyhedra.common.util.*
 import polyhedra.js.components.*
+import polyhedra.js.params.*
 import polyhedra.js.poly.*
 import react.*
 import react.dom.*
 
+external interface RootPaneProps : RProps {
+    var params: RootParams
+}
+
 external interface RootPaneState : RState {
-    // Polyhedra
     var seed: Seed
     var transforms: List<Transform>
-    // View
     var baseScale: Scale
-    var viewScale: Double
-    var expand: Double
-    var rotationAngle: Double
-    var rotate: Boolean
-    // Style
-    var transparent: Double
     var display: Display
-    // Lighting
-    var ambientLight: Double
-    var pointLight: Double
-    var specularLight: Double
-    var specularPower: Double
+    var rotate: Boolean
 }
 
 fun RootPaneState.poly(): Polyhedron =
@@ -60,16 +53,29 @@ private fun RootPaneState.safeTransformsUpdate(update: (List<Transform>) -> List
 
 @Suppress("NON_EXPORTABLE_TYPE")
 @JsExport
-class RootPane : RComponent<RProps, RootPaneState>() {
-    override fun RootPaneState.init() {
-        assign(loadRootState())
+class RootPane(props: RootPaneProps) : RComponent<RootPaneProps, RootPaneState>(props) {
+    private lateinit var context: Param.Context
+
+    override fun RootPaneState.init(props: RootPaneProps) {
+        seed = Seed.Tetrahedron
+        transforms = emptyList()
+        setStateFromProps(props)
     }
 
-    private fun setState(transformState: RootPaneState.() -> Unit) {
-        (this as RComponent<RProps, RootPaneState>).setState {
-            transformState()
-            pushRootState(this)
+    private fun RootPaneState.setStateFromProps(props: RootPaneProps) {
+        baseScale = props.params.baseScale.value
+        display = props.params.poly.view.display.value
+        rotate = props.params.poly.animation.rotate.value
+    }
+
+    override fun componentDidMount() {
+        context = props.params.onUpdate {
+            setState { setStateFromProps(props) }
         }
+    }
+
+    override fun componentWillUnmount() {
+        context.destroy()
     }
 
     override fun RBuilder.render() {
@@ -82,19 +88,8 @@ class RootPane : RComponent<RProps, RootPaneState>() {
                 val curPoly = state.poly()
                 header(state.polyName())
                 polyCanvas("poly") {
+                    params = props.params.poly
                     poly = curPoly
-                    style = PolyStyle(state.display)
-                    rotationAngle = state.rotationAngle
-                    rotate = state.rotate
-                    viewScale = state.viewScale
-                    expand = state.expand
-                    transparent = if (state.display.hasFaces()) state.transparent else 0.0
-                    ambientLight = state.ambientLight
-                    pointLight = state.pointLight
-                    specularLight = state.specularLight
-                    specularPower = state.specularPower
-                    onRotateChange = { setState { rotate = it } }
-                    onScaleChange = { setState { viewScale = it } }
                 }
                 polyInfoPane {
                     poly = curPoly
@@ -182,78 +177,53 @@ class RootPane : RComponent<RProps, RootPaneState>() {
             tr("control") {
                 td { +"Base scale" }
                 td {
-                    dropdown<Scale> {
-                        value = state.baseScale
-                        options = Scales
-                        onChange = { setState { baseScale = it } }
+                    pDropdown<Scale> {
+                        param = props.params.baseScale
                     }
                 }
             }
             tr("control") {
                 td { +"View scale" }
                 td {
-                    slider {
-                        min = -2.0
-                        max = 2.0
-                        step = 0.01
-                        value = state.viewScale
-                        onChange = { setState { viewScale = it } }
+                    pSlider {
+                        param = props.params.poly.view.scale
                     }
                 }
             }
             tr("control") {
                 td { +"Expand" }
                 td {
-                    slider {
-                        min = 0.0
-                        max = 2.0
-                        step = 0.01
-                        value = state.expand
-                        onChange = { setState { expand = it } }
-                    }
-                }
-            }
-            tr("control") {
-                td { +"Rotate" }
-                td {
-                    slider {
-                        disabled = !state.rotate
-                        min = 0.0
-                        max = 360.0
-                        step = 1.0
-                        value = state.rotationAngle
-                        onChange = { setState { rotationAngle = it } }
-                    }
-                    checkbox {
-                        checked = state.rotate
-                        onChange = { setState { rotate = it } }
-                    }
-                }
-            }
-        }
-
-        header("Style")
-        tableBody {
-            tr("control") {
-                td { +"Display" }
-                td {
-                    dropdown<Display> {
-                        value = state.display
-                        options = Displays
-                        onChange = { setState { display = it } }
+                    pSlider {
+                        param = props.params.poly.view.expand
                     }
                 }
             }
             tr("control") {
                 td { +"Transparent" }
                 td {
-                    slider {
+                    pSlider {
                         disabled = !state.display.hasFaces()
-                        min = 0.0
-                        max = 1.0
-                        step = 0.01
-                        value = state.transparent
-                        onChange = { setState { transparent = it } }
+                        param = props.params.poly.view.transparent
+                    }
+                }
+            }
+            tr("control") {
+                td { +"Display" }
+                td {
+                    pDropdown<Display> {
+                        param = props.params.poly.view.display
+                    }
+                }
+            }
+            tr("control") {
+                td { +"Rotate" }
+                td {
+                    pSlider {
+                        disabled = !state.rotate
+                        param = props.params.poly.animation.rotationAngle
+                    }
+                    pCheckbox {
+                        param = props.params.poly.animation.rotate
                     }
                 }
             }
@@ -264,52 +234,36 @@ class RootPane : RComponent<RProps, RootPaneState>() {
             tr("control") {
                 td { +"Ambient" }
                 td {
-                    slider {
+                    pSlider {
                         disabled = !state.display.hasFaces()
-                        min = 0.0
-                        max = 1.0
-                        step = 0.01
-                        value = state.ambientLight
-                        onChange = { setState { ambientLight = it } }
+                        param = props.params.poly.lighting.ambientLight
                     }
                 }
             }
             tr("control") {
                 td { +"Point" }
                 td {
-                    slider {
+                    pSlider {
                         disabled = !state.display.hasFaces()
-                        min = 0.0
-                        max = 1.0
-                        step = 0.01
-                        value = state.pointLight
-                        onChange = { setState { pointLight = it } }
+                        param = props.params.poly.lighting.pointLight
                     }
                 }
             }
             tr("control") {
                 td { +"Specular" }
                 td {
-                    slider {
+                    pSlider {
                         disabled = !state.display.hasFaces()
-                        min = 0.0
-                        max = 1.0
-                        step = 0.01
-                        value = state.specularLight
-                        onChange = { setState { specularLight = it } }
+                        param = props.params.poly.lighting.specularLight
                     }
                 }
             }
             tr("control") {
                 td { +"Shininess" }
                 td {
-                    slider {
+                    pSlider {
                         disabled = !state.display.hasFaces()
-                        min = 1.0
-                        max = 100.0
-                        step = 0.1
-                        value = state.specularPower
-                        onChange = { setState { specularPower = it } }
+                        param = props.params.poly.lighting.specularPower
                     }
                 }
             }

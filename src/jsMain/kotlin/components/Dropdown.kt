@@ -1,11 +1,14 @@
 package polyhedra.js.components
 
+import kotlinx.html.*
 import kotlinx.html.js.*
 import org.w3c.dom.*
 import react.*
 import react.dom.*
+import react.dom.dialog
 
 external interface DropdownProps<T> : RProps {
+    var disabled: Boolean
     var value: T
     var options: List<T>
     var onChange: (T) -> Unit
@@ -13,7 +16,10 @@ external interface DropdownProps<T> : RProps {
 
 fun <T> RBuilder.dropdown(handler: DropdownProps<T>.() -> Unit) {
     child<DropdownProps<T>, Dropdown<T>> {
-        attrs(handler)
+        attrs {
+            disabled = false
+            handler()
+        }
     }
 }
 
@@ -21,6 +27,7 @@ class Dropdown<T>(props: DropdownProps<T>) : RComponent<DropdownProps<T>, RState
     override fun RBuilder.render() {
         select {
             attrs {
+                disabled = props.disabled
                 this["value"] = props.value.toString()
                 onChangeFunction = { event ->
                     val valueString = (event.target as HTMLSelectElement).value

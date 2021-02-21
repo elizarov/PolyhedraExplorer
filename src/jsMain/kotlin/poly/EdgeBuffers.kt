@@ -14,9 +14,9 @@ class EdgeBuffers(val gl: GL, val sharedPolyBuffers: SharedPolyBuffers) {
     lateinit var color: Float32Array
 }
 
-fun EdgeBuffers.draw(viewMatrices: ViewMatrices) {
+fun EdgeBuffers.draw(view: ViewContext) {
     program.use {
-        assignView(viewMatrices)
+        assignView(view)
         assignSharedPolyBuffers(sharedPolyBuffers)
         uVertexColor.assign(color)
     }
@@ -25,8 +25,8 @@ fun EdgeBuffers.draw(viewMatrices: ViewMatrices) {
     gl.drawElements(GL.LINES, nIndices, GL.UNSIGNED_SHORT, 0)
 }
 
-fun EdgeBuffers.initBuffers(poly: Polyhedron, style: PolyStyle) {
-    color = style.edgeColor.toFloat32Array()
+fun EdgeBuffers.initBuffers(poly: Polyhedron) {
+    color = PolyStyle.edgeColor.toFloat32Array()
     program.use()
     // indices
     nIndices = poly.es.size * 4

@@ -4,8 +4,6 @@ import kotlinx.browser.*
 import org.w3c.dom.*
 import org.w3c.dom.events.*
 import polyhedra.common.*
-import polyhedra.js.*
-import polyhedra.js.glsl.*
 import polyhedra.js.util.*
 import react.*
 import react.dom.*
@@ -14,26 +12,15 @@ import kotlin.math.*
 external interface PolyCanvasProps : RProps {
     var classes: String?
     var poly: Polyhedron
-    var style: PolyStyle
-    var rotationAngle: Double
-    var rotate: Boolean
-    var viewScale: Double
-    var expand: Double
-    var transparent: Double
-    // Lighting
-    var ambientLight: Double
-    var pointLight: Double
-    var specularLight: Double
-    var specularPower: Double
-    // Events
-    var onRotateChange: (Boolean) -> Unit
-    var onScaleChange: (Double) -> Unit
+    var params: PolyParams
 }
 
 fun RBuilder.polyCanvas(classes: String? = null, handler: PolyCanvasProps.() -> Unit) {
     child<PolyCanvasProps, PolyCanvas> {
-        attrs { this.classes = classes }
-        attrs(handler)
+        attrs {
+            this.classes = classes
+            handler()
+        }
     }
 }
 
@@ -58,19 +45,22 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
 
     override fun componentDidMount() {
         canvas = canvasRef.current
-        drawContext = DrawContext(canvas)
         canvas.onmousedown = this::handleMouseDown
         canvas.onmousemove = this::handleMouseMove
-        draw()
-        requestAnimation()
+        DrawContext(canvas, props.params) {
+            drawContext = it
+            draw()
+            requestAnimation()
+        }
     }
 
     override fun componentWillUnmount() {
         cancelAnimation()
+        drawContext.destroy()
     }
     
     private fun requestAnimation() {
-        if (!props.rotate) {
+        if (!props.params.animation.rotate.value) {
             cancelAnimation()
             return
         }
@@ -79,8 +69,8 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
             animationHandle = 0
             if (prevTime.isNaN()) prevTime = nowTime
             val dt = (nowTime - prevTime) / 1000 // in seconds
-            val a = 2 * PI * props.rotationAngle / 360
-            drawContext.viewParameters.rotate(dt * cos(a), dt * sin(a))
+            val a = 2 * PI * props.params.animation.rotationAngle.value / 360
+            drawContext.view.rotate(dt * cos(a), dt * sin(a))
             draw()
             prevTime = nowTime
             requestAnimation()
@@ -100,24 +90,11 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
     }
 
     private fun draw() {
-        // resize canvas if needed
-        resizeCanvas(canvas.clientWidth, canvas.clientHeight)
-        // then draw
-        with(drawContext.viewParameters) {
-            viewScale = props.viewScale
-            expand = props.expand
-            transparent = props.transparent
-        }
-        with(drawContext.lightning) {
-            ambientLightColor.fill(props.ambientLight)
-            pointLightColor.fill(props.pointLight)
-            specularLightColor.fill(props.specularLight)
-            specularLightPower = props.specularPower
-        }
-        drawContext.drawScene(props.poly, props.style)
+        resizeCanvasIfNeeded(canvas.clientWidth, canvas.clientHeight)
+        drawContext.drawScene(props.poly)
     }
 
-    private fun resizeCanvas(clientWidth: Int, clientHeight: Int) {
+    private fun resizeCanvasIfNeeded(clientWidth: Int, clientHeight: Int) {
         if (canvas.width == clientWidth && canvas.height == clientHeight) return
         canvas.width = clientWidth
         canvas.height = clientHeight
@@ -132,14 +109,14 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
         if (e.isLeftButtonPressed()) {
             savePrevMouseEvent(e)
             cancelAnimation()
-            props.onRotateChange(false)
+            props.params.animation.rotate.value = false
         }
     }
 
     private fun handleMouseMove(e: MouseEvent) {
         if (e.isLeftButtonPressed()) {
             val scale = 2 * PI / canvas.height
-            drawContext.viewParameters.rotate((e.offsetX - prevX) * scale, (e.offsetY - prevY) * scale)
+            drawContext.view.rotate((e.offsetX - prevX) * scale, (e.offsetY - prevY) * scale)
             savePrevMouseEvent(e)
             draw()
         }
