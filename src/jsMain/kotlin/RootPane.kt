@@ -265,6 +265,7 @@ class RootPane : RComponent<RProps, RootPaneState>() {
                 td { +"Ambient" }
                 td {
                     slider {
+                        disabled = !state.display.hasFaces()
                         min = 0.0
                         max = 1.0
                         step = 0.01
@@ -277,6 +278,7 @@ class RootPane : RComponent<RProps, RootPaneState>() {
                 td { +"Point" }
                 td {
                     slider {
+                        disabled = !state.display.hasFaces()
                         min = 0.0
                         max = 1.0
                         step = 0.01
@@ -289,6 +291,7 @@ class RootPane : RComponent<RProps, RootPaneState>() {
                 td { +"Specular" }
                 td {
                     slider {
+                        disabled = !state.display.hasFaces()
                         min = 0.0
                         max = 1.0
                         step = 0.01
@@ -301,6 +304,7 @@ class RootPane : RComponent<RProps, RootPaneState>() {
                 td { +"Shininess" }
                 td {
                     slider {
+                        disabled = !state.display.hasFaces()
                         min = 1.0
                         max = 100.0
                         step = 0.1
