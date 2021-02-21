@@ -3,7 +3,7 @@ package polyhedra.js.poly
 import org.khronos.webgl.*
 import polyhedra.common.*
 import polyhedra.js.*
-import polyhedra.js.util.*
+import polyhedra.js.glsl.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
 class FaceBuffers(val gl: GL, val sharedPolyBuffers: SharedPolyBuffers)  {
@@ -18,8 +18,10 @@ fun FaceBuffers.draw(viewMatrices: ViewMatrices, lightning: Lightning) {
         assignView(viewMatrices)
 
         uAmbientLightColor.assign(lightning.ambientLightColor)
-        uDirectionalLightColor.assign(lightning.directionalLightColor)
-        uDirectionalLightVector.assign(lightning.directionalLightVector)
+        uPointLightColor.assign(lightning.pointLightColor)
+        uSpecularLightColor.assign(lightning.specularLightColor)
+        uSpecularLightPower.assign(lightning.specularLightPower)
+        uLightPosition.assign(lightning.lightPosition)
 
         assignSharedPolyBuffers(sharedPolyBuffers)
         aVertexColor.assign(colorBuffer)

@@ -1,12 +1,13 @@
 package polyhedra.js.poly
 
 import org.khronos.webgl.*
-import polyhedra.js.util.*
+import polyhedra.js.glsl.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
 abstract class SharedPolyProgram(gl: GL) : GLProgram(gl) {
+    val uCameraPosition by uniform(GLType.vec3)
     val uProjectionMatrix by uniform(GLType.mat4)
-    val uModelViewMatrix by uniform(GLType.mat4)
+    val uModelMatrix by uniform(GLType.mat4)
     val uNormalMatrix by uniform(GLType.mat3)
     val uExpand by uniform(GLType.float)
     val uColorAlpha by uniform(GLType.float, GLPrecision.lowp)
@@ -16,8 +17,9 @@ abstract class SharedPolyProgram(gl: GL) : GLProgram(gl) {
 
     fun assignView(viewMatrices: ViewMatrices) {
         with(viewMatrices) {
+            uCameraPosition.assign(cameraPosition)
             uProjectionMatrix.assign(projectionMatrix)
-            uModelViewMatrix.assign(modelViewMatrix)
+            uModelMatrix.assign(modelMatrix)
             uNormalMatrix.assign(normalMatrix)
             with(viewParameters) {
                 uExpand.assign(expand)

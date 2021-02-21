@@ -1,6 +1,7 @@
 package polyhedra.js.poly
 
 import org.khronos.webgl.*
+import polyhedra.js.glsl.*
 import polyhedra.js.util.*
 import kotlin.math.*
 
@@ -24,27 +25,34 @@ class ViewParameters {
 }
 
 class ViewMatrices(val viewParameters: ViewParameters) {
+    val cameraPosition = float32Of(0.0, 0.0, 3.0)
     val projectionMatrix = mat4.create()
-    val modelViewMatrix = mat4.create()
+    val modelMatrix = mat4.create()
     val normalMatrix = mat3.create()
 
-    private val fieldOfViewDegrees = 45
-    private val modelViewTranslation = float32Of(-0.0, 0.0, -3.0)
-    private val modelViewScale = Float32Array(3)
+    private val cameraFieldOfViewDegrees = 45.0
+
+    private val modelTranslation =  Float32Array(3) // model at origin
+    private val modelScale = Float32Array(3)
+
+    private val tmpVec3 = Float32Array(3)
+    private val tmpQuat = quat.create()
 
     fun initProjection(width: Int, height: Int) {
         mat4.perspective(
-            projectionMatrix, fieldOfViewDegrees * PI / 180,
-            width.toDouble() / height, 0.1, 100.0
+            projectionMatrix, cameraFieldOfViewDegrees * PI / 180,
+            width.toDouble() / height, 0.1, 30.0
         )
+        for (i in 0..2) tmpVec3[i] = -cameraPosition[i]
+        mat4.translate(projectionMatrix, projectionMatrix, tmpVec3)
     }
 
     fun initView(params: ViewParameters) {
-        modelViewScale.fill(2.0.pow(params.viewScale))
-        mat4.fromRotationTranslationScale(modelViewMatrix, params.rotationQuat, modelViewTranslation, modelViewScale)
+        modelScale.fill(2.0.pow(params.viewScale))
+        mat4.fromRotationTranslationScale(modelMatrix, params.rotationQuat, modelTranslation, modelScale)
 
-        mat3.fromQuat(normalMatrix, params.rotationQuat)
-        mat3.invert(normalMatrix, normalMatrix)
+        quat.conjugate(tmpQuat, params.rotationQuat)
+        mat3.fromQuat(normalMatrix, tmpQuat)
         mat3.transpose(normalMatrix, normalMatrix)
     }
 }

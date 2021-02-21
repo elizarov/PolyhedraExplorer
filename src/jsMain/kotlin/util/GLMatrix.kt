@@ -10,6 +10,7 @@ external class quat {
         fun create(): quat
         fun setAxisAngle(out: quat, axis: Float32Array, rad: Number): quat
         fun multiply(out: quat, a: quat, b: quat): quat
+        fun conjugate(out: quat, a: quat): quat
     }
 }
 

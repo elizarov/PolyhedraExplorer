@@ -1,7 +1,7 @@
 package polyhedra.js.poly
 
 import polyhedra.common.*
-import polyhedra.js.util.*
+import polyhedra.js.glsl.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
 class SharedPolyBuffers(val gl: GL) {

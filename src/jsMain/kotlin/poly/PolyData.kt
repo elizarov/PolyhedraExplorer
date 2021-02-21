@@ -2,9 +2,9 @@ package polyhedra.js.poly
 
 import org.khronos.webgl.*
 import polyhedra.common.*
-import polyhedra.js.util.*
+import polyhedra.js.glsl.*
 
-fun <T : GLType<T, *>> Polyhedron.faceVerticesData(
+fun <T : GLType<T>> Polyhedron.faceVerticesData(
     buffer: Float32Buffer<T>,
     transform: (f: Face, v: Vertex, a: Float32Array, i: Int) -> Unit)
 {

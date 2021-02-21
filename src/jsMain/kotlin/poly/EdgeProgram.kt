@@ -1,6 +1,6 @@
 package polyhedra.js.poly
 
-import polyhedra.js.util.*
+import polyhedra.js.glsl.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
 class EdgeProgram(gl: GL) : SharedPolyProgram(gl) {
@@ -9,13 +9,13 @@ class EdgeProgram(gl: GL) : SharedPolyProgram(gl) {
     override val vertexShader = shader(ShaderType.Vertex) {
         main {
             val position = aVertexPosition + aVertexNormal * uExpand
-            gl_Position.assign(uProjectionMatrix * uModelViewMatrix * vec4(position, 1.0))
+            gl_Position.by(uProjectionMatrix * uModelMatrix * vec4(position, 1.0))
         }
     }
 
     override val fragmentShader = shader(ShaderType.Fragment) {
         main {
-            gl_FragColor.assign(uVertexColor)
+            gl_FragColor.by(uVertexColor)
         }
     }
 }
