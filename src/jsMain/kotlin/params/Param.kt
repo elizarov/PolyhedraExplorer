@@ -17,7 +17,10 @@ abstract class Param(val tag: String) {
         }
 
     protected fun updated() {
-        for (context in contexts) context.update()
+        // Notify contexts in the reverse order.
+        // This is important for composites: local context will get notified & updated first, and the
+        // outer (containing) context will be notified last, when all local ones were already updated.
+        for (i in contexts.size - 1 downTo 0) contexts[i].update()
     }
 
     fun onUpdate(update: () -> Unit): Context =
