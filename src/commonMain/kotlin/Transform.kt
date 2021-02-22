@@ -152,19 +152,18 @@ fun Polyhedron.bevelled(br: BevellingRatio = regularBevellingRatio()): Polyhedro
         val c = f.plane.tangentPoint // face center
         faceDirectedEdges[f]!!.flatMap { e ->
             val kind = directedEdgeKindsIndex[e.kind]!!
-            // take edge both ways on a face, the other point will have different kind
-            listOf(
-                e to VertexKind(2 * kind),
-                e.reversed() to VertexKind(2 * kind + 1)
-            )
-        }.associateBy({ it.first }, { (e, ek) ->
-            val a = e.a // vertex for cantellation
-            val b = e.b // next vertex for cantellation
+            val a = e.a
+            val b = e.b
             val ac = cr.atSegment(a.pt, c)
             val bc = cr.atSegment(b.pt, c)
-            val t = tr * e.midPointFraction(edgesMidPointDefault)
-            vertex(t.atSegment(ac, bc), ek)
-        })
+            val mf = e.midPointFraction(edgesMidPointDefault)
+            val t1 = tr * mf
+            val t2 = tr * (1 - mf)
+            listOf(
+                e to vertex(t1.atSegment(ac, bc), VertexKind(2 * kind)),
+                e.reversed() to vertex(t2.atSegment(bc, ac), VertexKind(2 * kind + 1))
+            )
+        }.associate { it }
     }
     // faces from the original faces
     for (f in fs) {
