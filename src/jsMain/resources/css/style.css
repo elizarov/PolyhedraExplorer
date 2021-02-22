@@ -34,11 +34,11 @@ body {
 }
 
 .control-column {
-    width: calc(25vw - 10px);
+    width: calc(300px);
 }
 
 .canvas-column {
-    width: calc(75vw - 20px);
+    width: calc(100vw - 330px);
 }
 
 canvas.poly {
