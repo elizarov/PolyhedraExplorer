@@ -3,17 +3,21 @@ package polyhedra.js.components
 import kotlinx.html.*
 import kotlinx.html.js.*
 import org.w3c.dom.*
+import polyhedra.common.*
 import polyhedra.js.params.*
 import react.*
 import react.dom.*
 import kotlin.math.*
 
-fun RBuilder.pSlider(param: DoubleParam, disabled: Boolean = false) {
+fun RBuilder.pSlider(param: DoubleParam, disabled: Boolean = false, showValue: Boolean = true) {
     child(PSlider::class) {
         attrs {
             this.param = param
             this.disabled = disabled
         }
+    }
+    if (showValue) {
+        span { +param.value.fmt }
     }
 }
 

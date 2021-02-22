@@ -71,10 +71,6 @@ div.row {
     padding-left: 1ch;
 }
 
-span.desc {
-    padding-left: 1ch;
-}
-
 label {
     margin-right: 1ch;
 }
@@ -89,6 +85,10 @@ tr.control {
     height: 1.8em;
     border-top: 0.3em solid transparent;
     border-bottom: 0.3em solid transparent;
+}
+
+input, button, select {
+    margin-right: 1ch;
 }
 
 /* --------- tables --------- */

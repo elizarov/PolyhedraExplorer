@@ -107,7 +107,7 @@ class RootPane(props: PComponentProps<RootParams>) : PComponent<RootParams, PCom
             controlRow("Transparent") { pSlider(props.param.poly.view.transparent, lightingDisabled) }
             controlRow("Display") { pDropdown(props.param.poly.view.display) }
             controlRow("Rotate") {
-                pSlider(props.param.poly.animation.rotationAngle, !state.rotate)
+                pSlider(props.param.poly.animation.rotationAngle, !state.rotate, showValue = false)
                 pCheckbox(props.param.poly.animation.rotate) 
             }
         }
@@ -137,7 +137,7 @@ class RootPane(props: PComponentProps<RootParams>) : PComponent<RootParams, PCom
                     }
                 }
                 if (i == state.geometryErrorIndex) {
-                    span("tooltip desc") {
+                    span("tooltip") {
                         +"⚠️"
                         span("tooltip-text") { +state.geometryErrorMessage }
                     }
