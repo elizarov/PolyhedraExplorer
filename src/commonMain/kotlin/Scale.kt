@@ -2,10 +2,10 @@ package polyhedra.common
 
 import polyhedra.common.util.*
 
-enum class Scale(val denominator: (Polyhedron) -> Double) {
-    Inradius(Polyhedron::inradius),
-    Midradius(Polyhedron::midradius),
-    Circumradius(Polyhedron::circumradius);
+enum class Scale(override val tag: String, val denominator: (Polyhedron) -> Double) : Tagged {
+    Inradius("i", Polyhedron::inradius),
+    Midradius("m", Polyhedron::midradius),
+    Circumradius("c", Polyhedron::circumradius);
 
     val transform: (Polyhedron) -> Polyhedron = {
         it.scaled(1 / denominator(it))

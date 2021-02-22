@@ -15,7 +15,11 @@ object PolyStyle {
     fun faceColor(f: Face): Color = paletteColor(f.kind.id)
 }
 
-enum class Display { Full, Faces, Edges }
+enum class Display(override val tag: String) : Tagged {
+    All("a"),
+    Faces("f"),
+    Edges("e")
+}
 
 val Displays = Display.values().toList()
 

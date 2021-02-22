@@ -3,11 +3,11 @@ package polyhedra.common
 import polyhedra.common.util.*
 import kotlin.math.*
 
-enum class Transform(val transform: (Polyhedron) -> Polyhedron) {
-    None({ it }),
-    Dual(Polyhedron::dual),
-    Rectified(Polyhedron::rectified),
-    Truncated(Polyhedron::truncated)
+enum class Transform(override val tag: String, val transform: (Polyhedron) -> Polyhedron) : Tagged {
+    None("n", { it }),
+    Dual("d", Polyhedron::dual),
+    Rectified("r", Polyhedron::rectified),
+    Truncated("t", Polyhedron::truncated)
 }
 
 val Transforms: List<Transform> by lazy { Transform.values().toList() }

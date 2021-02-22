@@ -11,7 +11,7 @@ external interface PValueComponentState<T> : RState {
     var value: T
 }
 
-abstract class PValueComponent<T, V : ValueParam<T>, P : PValueComponentProps<V>, S : PValueComponentState<T>>(
+abstract class PValueComponent<T : Any, V : ValueParam<T>, P : PValueComponentProps<V>, S : PValueComponentState<T>>(
     props: P
 ) : PComponent<V, P, S>(props) {
     override fun S.init(props: P) {

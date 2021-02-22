@@ -2,12 +2,12 @@ package polyhedra.common
 
 import kotlin.math.*
 
-enum class Seed(val poly: Polyhedron) {
-    Tetrahedron(tetrahedron),
-    Cube(cube),
-    Octahedron(octahedron),
-    Dodecahedron(dodecahedron),
-    Icosahedron(icosahedron)
+enum class Seed(override val tag: String, val poly: Polyhedron) : Tagged {
+    Tetrahedron("T", tetrahedron),
+    Cube("C", cube),
+    Octahedron("O", octahedron),
+    Dodecahedron("D", dodecahedron),
+    Icosahedron("I", icosahedron)
 }
 
 val Seeds: List<Seed> by lazy { Seed.values().toList() }

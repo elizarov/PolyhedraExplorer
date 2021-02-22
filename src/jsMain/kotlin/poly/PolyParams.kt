@@ -13,7 +13,7 @@ class ViewParams(tag: String) : Param.Composite(tag) {
     val scale = using(DoubleParam("s", 0.0, -2.0, 2.0, 0.01))
     val expand = using(DoubleParam("e", 0.0, 0.0, 2.0, 0.01))
     val transparent = using(DoubleParam("t", 0.0, 0.0, 1.0, 0.01))
-    val display = using(EnumParam("d", Display.Full, Displays))
+    val display = using(EnumParam("d", Display.All, Displays))
 }
 
 class AnimationParams(tag: String) : Param.Composite(tag) {

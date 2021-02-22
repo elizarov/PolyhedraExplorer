@@ -1,6 +1,5 @@
 plugins {
     kotlin("multiplatform") version "1.4.30"
-    kotlin("plugin.serialization") version "1.4.30"
     application
 }
 
@@ -13,7 +12,6 @@ repositories {
     maven { url = uri("https://dl.bintray.com/kotlin/kotlin-js-wrappers") }
 }
 
-val `kotlinx-serialization-version`: String by project
 val `kotlin-react-version`: String by project
 val `gl-matrix-version`: String by project
 val `history-version`: String by project
@@ -57,7 +55,6 @@ kotlin {
         }
         val jsMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:${`kotlinx-serialization-version`}")
                 implementation("org.jetbrains:kotlin-react:${`kotlin-react-version`}")
                 implementation("org.jetbrains:kotlin-react-dom:${`kotlin-react-version`}")
                 implementation(npm("gl-matrix", `gl-matrix-version`))
