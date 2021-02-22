@@ -53,5 +53,6 @@ class ValidatePolyhedra {
 private fun isOkSequence(vararg transforms: Transform): Boolean {
     val t = transforms.toList()
     if (t.drop(1).contains(Transform.Cantellated)) return false // cantellation must be first
+    if (t.drop(1).contains(Transform.Bevelled)) return false // bevelling must be first
     return true
 }

@@ -236,7 +236,7 @@ class PolyhedronBuilder {
         fs.add(Face(fs.size, a, kind))
     }
 
-    fun face(fvs: List<Vertex>, kind: FaceKind) {
+    fun face(fvs: Collection<Vertex>, kind: FaceKind) {
         fs.add(Face(fs.size, fvs.map { vs[it.id] }, kind))
     }
 
@@ -245,6 +245,11 @@ class PolyhedronBuilder {
     }
 
     fun build() = Polyhedron(vs, fs)
+
+    fun debugDump() {
+        for (v in vs) println(v)
+        for (f in fs) println(f)
+    }
 }
 
 fun polyhedron(block: PolyhedronBuilder.() -> Unit): Polyhedron =
