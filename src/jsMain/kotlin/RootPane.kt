@@ -5,14 +5,9 @@ import kotlinx.html.js.*
 import polyhedra.common.*
 import polyhedra.common.util.*
 import polyhedra.js.components.*
-import polyhedra.js.params.*
 import polyhedra.js.poly.*
 import react.*
 import react.dom.*
-
-external interface RootPaneProps : RProps {
-    var params: RootParams
-}
 
 external interface RootPaneState : RState {
     var seed: Seed
@@ -28,54 +23,33 @@ fun RootPaneState.poly(): Polyhedron =
 fun RootPaneState.polyName(): String =
     transforms.reversed().joinToString("") { "$it " } + seed
 
-private inline fun ifValidSeedTransforms(seed: Seed, transforms: List<Transform>, block: () -> Unit) {
+private fun isValidSeedTransforms(seed: Seed, transforms: List<Transform>): Boolean {
     try {
         seed.poly.transformed(transforms).validateGeometry()
-        block()
+        return true
     } catch (e: Exception) {
         println("$seed $transforms is not valid: $e")
         e.printStackTrace()
-    }
-}
-
-private fun RootPaneState.safeSeedUpdate(newSeed: Seed) {
-    ifValidSeedTransforms(newSeed, transforms) {
-        seed = newSeed
-    }
-}
-
-private fun RootPaneState.safeTransformsUpdate(update: (List<Transform>) -> List<Transform>) {
-    val newTransforms = update(transforms)
-    ifValidSeedTransforms(seed, newTransforms) {
-        transforms = newTransforms
+        return false
     }
 }
 
 @Suppress("NON_EXPORTABLE_TYPE")
 @JsExport
-class RootPane(props: RootPaneProps) : RComponent<RootPaneProps, RootPaneState>(props) {
-    private lateinit var context: Param.Context
-
-    override fun RootPaneState.init(props: RootPaneProps) {
-        seed = Seed.Tetrahedron
-        transforms = emptyList()
-        setStateFromProps(props)
+class RootPane(props: PComponentProps<RootParams>) : PComponent<RootParams, PComponentProps<RootParams>, RootPaneState>(props) {
+    override fun RootPaneState.init(props: PComponentProps<RootParams>) {
+        seed = props.param.seed.value
+        transforms = props.param.transforms.value
+        baseScale = props.param.baseScale.value
+        display = props.param.poly.view.display.value
+        rotate = props.param.poly.animation.rotate.value
     }
 
-    private fun RootPaneState.setStateFromProps(props: RootPaneProps) {
-        baseScale = props.params.baseScale.value
-        display = props.params.poly.view.display.value
-        rotate = props.params.poly.animation.rotate.value
-    }
-
-    override fun componentDidMount() {
-        context = props.params.onUpdate {
-            setState { setStateFromProps(props) }
+    private fun safeTransformsUpdate(update: (List<Transform>) -> List<Transform>) {
+        val newTransforms = update(props.param.transforms.value)
+        if (isValidSeedTransforms(props.param.seed.value, newTransforms)) {
+                props.param.transforms.value = newTransforms
         }
-    }
-
-    override fun componentWillUnmount() {
-        context.destroy()
     }
 
     override fun RBuilder.render() {
@@ -88,7 +62,7 @@ class RootPane(props: RootPaneProps) : RComponent<RootPaneProps, RootPaneState>(
                 val curPoly = state.poly()
                 header(state.polyName())
                 polyCanvas("poly") {
-                    params = props.params.poly
+                    params = props.param.poly
                     poly = curPoly
                 }
                 polyInfoPane {
@@ -108,10 +82,9 @@ class RootPane(props: RootPaneProps) : RComponent<RootPaneProps, RootPaneState>(
         header("Polyhedron")
         div("row control") {
             label { +"Seed" }
-            dropdown<Seed> {
-                value = state.seed
-                options = Seeds
-                onChange = { setState { safeSeedUpdate(it) } }
+            pDropdown<Seed> {
+                param = props.param.seed
+                validateChange = { it -> isValidSeedTransforms(it, props.param.transforms.value) }
             }
         }
 
@@ -125,12 +98,10 @@ class RootPane(props: RootPaneProps) : RComponent<RootPaneProps, RootPaneState>(
                             value = transform
                             options = Transforms
                             onChange = { value ->
-                                setState {
-                                    if (value != Transform.None) {
-                                        safeTransformsUpdate { it.updatedAt(i, value) }
-                                    } else {
-                                        safeTransformsUpdate { it.removedAt(i) }
-                                    }
+                                if (value != Transform.None) {
+                                    safeTransformsUpdate { it.updatedAt(i, value) }
+                                } else {
+                                    safeTransformsUpdate { it.removedAt(i) }
                                 }
                             }
                         }
@@ -144,10 +115,8 @@ class RootPane(props: RootPaneProps) : RComponent<RootPaneProps, RootPaneState>(
                         value = Transform.None
                         options = Transforms
                         onChange = { value ->
-                            setState {
-                                if (value != Transform.None) {
+                            if (value != Transform.None) {
                                     safeTransformsUpdate { it + value }
-                                }
                             }
                         }
                     }
@@ -164,7 +133,7 @@ class RootPane(props: RootPaneProps) : RComponent<RootPaneProps, RootPaneState>(
                 td {
                     button {
                         attrs {
-                            onClickFunction = { setState { transforms = emptyList() } }
+                            onClickFunction = { props.param.transforms.value = emptyList() }
                         }
                         +"Clear"
                     }
@@ -178,7 +147,7 @@ class RootPane(props: RootPaneProps) : RComponent<RootPaneProps, RootPaneState>(
                 td { +"Base scale" }
                 td {
                     pDropdown<Scale> {
-                        param = props.params.baseScale
+                        param = props.param.baseScale
                     }
                 }
             }
@@ -186,7 +155,7 @@ class RootPane(props: RootPaneProps) : RComponent<RootPaneProps, RootPaneState>(
                 td { +"View scale" }
                 td {
                     pSlider {
-                        param = props.params.poly.view.scale
+                        param = props.param.poly.view.scale
                     }
                 }
             }
@@ -194,7 +163,7 @@ class RootPane(props: RootPaneProps) : RComponent<RootPaneProps, RootPaneState>(
                 td { +"Expand" }
                 td {
                     pSlider {
-                        param = props.params.poly.view.expand
+                        param = props.param.poly.view.expand
                     }
                 }
             }
@@ -203,7 +172,7 @@ class RootPane(props: RootPaneProps) : RComponent<RootPaneProps, RootPaneState>(
                 td {
                     pSlider {
                         disabled = !state.display.hasFaces()
-                        param = props.params.poly.view.transparent
+                        param = props.param.poly.view.transparent
                     }
                 }
             }
@@ -211,7 +180,7 @@ class RootPane(props: RootPaneProps) : RComponent<RootPaneProps, RootPaneState>(
                 td { +"Display" }
                 td {
                     pDropdown<Display> {
-                        param = props.params.poly.view.display
+                        param = props.param.poly.view.display
                     }
                 }
             }
@@ -220,10 +189,10 @@ class RootPane(props: RootPaneProps) : RComponent<RootPaneProps, RootPaneState>(
                 td {
                     pSlider {
                         disabled = !state.rotate
-                        param = props.params.poly.animation.rotationAngle
+                        param = props.param.poly.animation.rotationAngle
                     }
                     pCheckbox {
-                        param = props.params.poly.animation.rotate
+                        param = props.param.poly.animation.rotate
                     }
                 }
             }
@@ -236,7 +205,7 @@ class RootPane(props: RootPaneProps) : RComponent<RootPaneProps, RootPaneState>(
                 td {
                     pSlider {
                         disabled = !state.display.hasFaces()
-                        param = props.params.poly.lighting.ambientLight
+                        param = props.param.poly.lighting.ambientLight
                     }
                 }
             }
@@ -245,7 +214,7 @@ class RootPane(props: RootPaneProps) : RComponent<RootPaneProps, RootPaneState>(
                 td {
                     pSlider {
                         disabled = !state.display.hasFaces()
-                        param = props.params.poly.lighting.pointLight
+                        param = props.param.poly.lighting.pointLight
                     }
                 }
             }
@@ -254,7 +223,7 @@ class RootPane(props: RootPaneProps) : RComponent<RootPaneProps, RootPaneState>(
                 td {
                     pSlider {
                         disabled = !state.display.hasFaces()
-                        param = props.params.poly.lighting.specularLight
+                        param = props.param.poly.lighting.specularLight
                     }
                 }
             }
@@ -263,7 +232,7 @@ class RootPane(props: RootPaneProps) : RComponent<RootPaneProps, RootPaneState>(
                 td {
                     pSlider {
                         disabled = !state.display.hasFaces()
-                        param = props.params.poly.lighting.specularPower
+                        param = props.param.poly.lighting.specularPower
                     }
                 }
             }

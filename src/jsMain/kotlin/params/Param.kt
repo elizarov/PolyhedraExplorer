@@ -113,3 +113,11 @@ class EnumParam<T>(
     val options: List<T>
 ) : ValueParam<T>(tag, value)
 
+class EnumListParam<T>(
+    tag: String,
+    value: List<T>,
+    val options: List<T>
+) : ValueParam<List<T>>(tag, value) {
+    override fun valueToString(): String = value.joinToString(",")
+}
+

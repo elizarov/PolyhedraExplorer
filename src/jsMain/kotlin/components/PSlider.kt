@@ -8,7 +8,7 @@ import react.*
 import react.dom.*
 import kotlin.math.*
 
-fun RBuilder.pSlider(handler: PComponentProps<DoubleParam>.() -> Unit) {
+fun RBuilder.pSlider(handler: PValueComponentProps<DoubleParam>.() -> Unit) {
     child(PSlider::class) {
         attrs {
             disabled = false
@@ -17,7 +17,7 @@ fun RBuilder.pSlider(handler: PComponentProps<DoubleParam>.() -> Unit) {
     }
 }
 
-class PSlider(props: PComponentProps<DoubleParam>) : PComponent<Double, DoubleParam, PComponentProps<DoubleParam>, PComponentState<Double>>(props) {
+class PSlider(props: PValueComponentProps<DoubleParam>) : PValueComponent<Double, DoubleParam, PValueComponentProps<DoubleParam>, PValueComponentState<Double>>(props) {
     private fun Double.intStr() = roundToInt().toString()
 
     override fun RBuilder.render() {

@@ -13,7 +13,7 @@ fun main() {
         render(document.getElementById("root")) {
             child(RootPane::class) {
                 attrs {
-                    params = rootParams
+                    param = rootParams
                 }
             }
         }
