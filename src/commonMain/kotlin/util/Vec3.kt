@@ -1,6 +1,6 @@
-package polyhedra.common
+package polyhedra.common.util
 
-import polyhedra.common.util.*
+import polyhedra.common.*
 import kotlin.math.*
 
 data class Vec3(

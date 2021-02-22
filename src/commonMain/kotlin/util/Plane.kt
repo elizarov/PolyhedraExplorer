@@ -1,8 +1,6 @@
-package polyhedra.common
+package polyhedra.common.util
 
-import polyhedra.common.util.*
-
-data class Plane(                         
+data class Plane(
     val n: Vec3,
     val d: Double
 )

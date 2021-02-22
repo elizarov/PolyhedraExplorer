@@ -1,7 +1,7 @@
 package polyhedra.js.glsl
 
 import org.khronos.webgl.*
-import polyhedra.common.*
+import polyhedra.common.util.*
 import polyhedra.js.util.*
 
 fun float32Of(vararg a: Float) = Float32Array(a.size).apply {
