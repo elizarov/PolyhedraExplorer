@@ -1,5 +1,6 @@
 package polyhedra.common
 
+import polyhedra.common.util.*
 import kotlin.math.*
 
 enum class Transform(
@@ -50,15 +51,12 @@ fun Polyhedron.rectified(): Polyhedron = polyhedron {
     }
 }
 
-fun regularTruncationRatio(n: Int): Double {
-    return 1 / (1 + cos(PI / n))
-}
+// ea == PI / face_size
+fun regularTruncationRatio(ea: Double): Double = 1 / (1 + cos(ea))
 
 fun Polyhedron.regularTruncationRatio(faceKind: FaceKind = FaceKind(0)): Double {
     val f = faceKinds[faceKind]!!.first() // take representative face of this kind
-    return regularTruncationRatio(
-        f.size // face size
-    )
+    return regularTruncationRatio(PI / f.size)
 }
 
 fun Polyhedron.truncated(tr: Double = regularTruncationRatio()): Polyhedron = polyhedron {
@@ -81,14 +79,25 @@ fun Polyhedron.truncated(tr: Double = regularTruncationRatio()): Polyhedron = po
     }
 }
 
-fun Polyhedron.regularCantellationRatio(edgeKind: EdgeKind? = null): Double {
+data class RegularFaceGeometry(
+    val ea: Double, // PI / face_size
+    val da: Double  // dihedral angle
+)
+
+fun Polyhedron.regularFaceGeometry(edgeKind: EdgeKind? = null): RegularFaceGeometry {
     val ek = edgeKind ?: edgeKinds.keys.first() // min edge kind by default
     val e = edgeKinds[ek]!!.first() // representative edge
     val f = e.r // primary face
     val g = e.l // secondary face
     val n = f.size // primary face size
+    val ea = PI / n
     val da = PI - acos(f.plane.n * g.plane.n) // dihedral angle
-    return 1 / (1 + sin(da / 2) / tan(PI / n))
+    return RegularFaceGeometry(ea, da)
+}
+
+fun Polyhedron.regularCantellationRatio(edgeKind: EdgeKind? = null): Double {
+    val (ea, da) = regularFaceGeometry(edgeKind)
+    return 1 / (1 + sin(da / 2) / tan(ea))
 }
 
 fun Polyhedron.cantellated(cr: Double = regularCantellationRatio()): Polyhedron = polyhedron {
@@ -127,22 +136,17 @@ fun Polyhedron.cantellated(cr: Double = regularCantellationRatio()): Polyhedron 
     }
 }
 
-data class BevellingRatio(val tr: Double, val cr: Double)
+data class BevellingRatio(val cr: Double, val tr: Double)
 
 fun Polyhedron.regularBevellingRatio(edgeKind: EdgeKind? = null): BevellingRatio {
-    val ek = edgeKind ?: edgeKinds.keys.first() // min edge kind by default
-    val e = edgeKinds[ek]!!.first() // representative edge
-    val f = e.r // primary face
-    val g = e.l // secondary face
-    val n = f.size // primary face size
-    val da = PI - acos(f.plane.n * g.plane.n) // dihedral angle
-    val tr = regularTruncationRatio(n)
-    val cr = (1 - tr) / (1 + sin(da / 2) / tan(PI / n) - tr)
-    return BevellingRatio(tr, cr)
+    val (ea, da) = regularFaceGeometry(edgeKind)
+    val tr = regularTruncationRatio(ea)
+    val cr = (1 - tr) / (1 + sin(da / 2) / tan(ea) - tr)
+    return BevellingRatio(cr, tr)
 }
 
 fun Polyhedron.bevelled(br: BevellingRatio = regularBevellingRatio()): Polyhedron = polyhedron {
-    val (tr, cr) = br
+    val (cr, tr) = br
     // vertices from the face-directed edges
     val fev = fs.associateWith { f ->
         val c = f.plane.tangentPoint // face center
@@ -186,4 +190,71 @@ fun Polyhedron.bevelled(br: BevellingRatio = regularBevellingRatio()): Polyhedro
         )
         face(fvs, FaceKind(kindOfs + edgeKindsIndex[e.kind]!!))
     }
+}
+
+// a * x^2 + b * x + c = 0
+private fun solve3(a: Double, b: Double, c: Double) =
+    (-b + sqrt(sqr(b) - 4 * a * c)) / (2 * a)
+
+private fun snubComputeSA(ea: Double, da: Double, cr: Double): Double {
+    val rf = 1 - cr
+    val cm = (1 - cos(da)) / 2
+    val cp = (1 + cos(da)) / 2
+    val cosGA = solve3(cp * sqr(rf), 2 * cm * rf * cos(ea), -sqr(cos(ea)) * (cm + sqr(rf)))
+    return ea - acos(cosGA)
+}
+
+private fun snubComputeA(ea: Double, da: Double, cr: Double, sa: Double): Double {
+    val h = 1 / (2 * tan(ea))
+    val ga = ea - sa
+    val rf = 1 - cr
+    val t = rf / (2 * sin(ea))
+    return Vec3(
+        2 * t * sin(ga),
+        (h - t * cos(ga)) * (cos(da) - 1),
+        (h - t * cos(ga)) * sin(da)
+    ).norm
+}
+
+private fun snubComputeB(ea: Double, da: Double, cr: Double, sa: Double): Double {
+    val h = 1 / (2 * tan(ea))
+    val ga = ea - sa
+    val ha = ea + sa
+    val rf = 1 - cr
+    val t = rf / (2 * sin(ea))
+    return Vec3(
+        t * (sin(ga) - sin(ha)),
+        (h - t * cos(ga)) * cos(da) - (h - t * cos(ha)),
+        (h - t * cos(ga)) * sin(da)
+    ).norm
+}
+
+private fun snubComputeCR(ea: Double, da: Double): Double {
+    var crL = 0.0
+    var crR = 1.0
+    while (true) {
+        val cr = (crL + crR) / 2
+        if (cr <= crL || cr >= crR) return cr // result precision is an ULP
+        val sa = snubComputeSA(ea, da, cr)
+        // error goes from positive to negative to NaN as cr goes from 0 to 1
+        val rf = 1 - cr
+        val err = snubComputeB(ea, da, cr, sa) - rf
+        if (err <= 0)
+            crL = cr else
+            crR = cr
+    }
+}
+
+data class SnubbingRatio(val cr: Double, val sa: Double)
+
+fun Polyhedron.regularSnubbingRatio(edgeKind: EdgeKind? = null): SnubbingRatio {
+    val (ea, da) = regularFaceGeometry(edgeKind)
+    val cr = snubComputeCR(ea, da)
+    val sa = snubComputeSA(ea, da, cr)
+    return SnubbingRatio(cr, sa)
+}
+
+fun Polyhedron.snub(sr: SnubbingRatio = regularSnubbingRatio()) = polyhedron {
+    val (cr, sa) = sr
+    // TODO:
 }
