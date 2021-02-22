@@ -86,183 +86,103 @@ class RootPane(props: PComponentProps<RootParams>) : PComponent<RootParams, PCom
         }
     }
 
-    private fun RBuilder.header(text: String) {
-        div("header-container") {
-            div("header") { +text }
-        }
-    }
-
-    private fun RBuilder.renderControls() {
+    private fun RDOMBuilder<DIV>.renderControls() {
         header("Polyhedron")
         div("row control") {
             label { +"Seed" }
-            pDropdown<Seed> {
-                param = props.param.seed
-            }
+            pDropdown(props.param.seed)
         }
 
         header("Transforms")
         tableBody {
-            for ((i, transform) in state.transforms.withIndex()) {
-                tr("control") {
-                    td { +"${i + 1}:" }
-                    td {
-                        dropdown<Transform> {
-                            disabled = i > state.geometryErrorIndex
-                            value = transform
-                            options = Transforms
-                            onChange = { value ->
-                                if (value != Transform.None) {
-                                    props.param.transforms.value = props.param.transforms.value.updatedAt(i, value)
-                                } else {
-                                    props.param.transforms.value = props.param.transforms.value.removedAt(i)
-                                }
-                            }
-                        }
-                        if (i == state.geometryErrorIndex) {
-                            span("tooltip desc") {
-                                +"⚠️"
-                                span("tooltip-text") { +state.geometryErrorMessage }
-                            }
-                        }
-                    }
-                }
-            }
-            tr("control") {
-                td { +"${state.transforms.size + 1}:" }
-                td {
-                    dropdown<Transform> {
-                        disabled = state.geometryErrorIndex < state.transforms.size
-                        value = Transform.None
-                        options = Transforms
-                        onChange = { value ->
-                            if (value != Transform.None) {
-                                props.param.transforms.value = props.param.transforms.value + value
-                            }
-                        }
-                    }
-                }
-            }
-            for (i in state.transforms.size + 1..8) {
-                tr("control") {
-                    td { +"${i + 1}:" }
-                    td {}
-                }
-            }
-            tr {
-                td {}
-                td {
-                    button {
-                        attrs {
-                            onClickFunction = { props.param.transforms.value = emptyList() }
-                        }
-                        +"Clear"
-                    }
-                }
-            }
+            renderTransformsRows()
         }
 
         header("View")
+        val lightingDisabled = !state.display.hasFaces()
         tableBody {
-            tr("control") {
-                td { +"Base scale" }
-                td {
-                    pDropdown<Scale> {
-                        param = props.param.baseScale
-                    }
-                }
-            }
-            tr("control") {
-                td { +"View scale" }
-                td {
-                    pSlider {
-                        param = props.param.poly.view.scale
-                    }
-                }
-            }
-            tr("control") {
-                td { +"Expand" }
-                td {
-                    pSlider {
-                        param = props.param.poly.view.expand
-                    }
-                }
-            }
-            tr("control") {
-                td { +"Transparent" }
-                td {
-                    pSlider {
-                        disabled = !state.display.hasFaces()
-                        param = props.param.poly.view.transparent
-                    }
-                }
-            }
-            tr("control") {
-                td { +"Display" }
-                td {
-                    pDropdown<Display> {
-                        param = props.param.poly.view.display
-                    }
-                }
-            }
-            tr("control") {
-                td { +"Rotate" }
-                td {
-                    pSlider {
-                        disabled = !state.rotate
-                        param = props.param.poly.animation.rotationAngle
-                    }
-                    pCheckbox {
-                        param = props.param.poly.animation.rotate
-                    }
-                }
+            controlRow("Base scale") { pDropdown(props.param.baseScale) }
+            controlRow("View scale") { pSlider(props.param.poly.view.scale) }
+            controlRow("Expand") { pSlider(props.param.poly.view.expand) }
+            controlRow("Transparent") { pSlider(props.param.poly.view.transparent, lightingDisabled) }
+            controlRow("Display") { pDropdown(props.param.poly.view.display) }
+            controlRow("Rotate") {
+                pSlider(props.param.poly.animation.rotationAngle, !state.rotate)
+                pCheckbox(props.param.poly.animation.rotate) 
             }
         }
 
         header("Lighting")
         tableBody {
-            tr("control") {
-                td { +"Ambient" }
-                td {
-                    pSlider {
-                        disabled = !state.display.hasFaces()
-                        param = props.param.poly.lighting.ambientLight
+            controlRow("Ambient") { pSlider(props.param.poly.lighting.ambientLight, lightingDisabled) }
+            controlRow("Point") { pSlider(props.param.poly.lighting.pointLight, lightingDisabled) }
+            controlRow("Specular") { pSlider(props.param.poly.lighting.specularLight, lightingDisabled) }
+            controlRow("Shininess") { pSlider(props.param.poly.lighting.specularPower, lightingDisabled) }
+        }
+    }
+
+    private fun RDOMBuilder<TBODY>.renderTransformsRows() {
+        for ((i, transform) in state.transforms.withIndex()) {
+            controlRow("${i + 1}:") {
+                dropdown<Transform> {
+                    disabled = i > state.geometryErrorIndex
+                    value = transform
+                    options = Transforms
+                    onChange = { value ->
+                        if (value != Transform.None) {
+                            props.param.transforms.value = props.param.transforms.value.updatedAt(i, value)
+                        } else {
+                            props.param.transforms.value = props.param.transforms.value.removedAt(i)
+                        }
                     }
                 }
-            }
-            tr("control") {
-                td { +"Point" }
-                td {
-                    pSlider {
-                        disabled = !state.display.hasFaces()
-                        param = props.param.poly.lighting.pointLight
-                    }
-                }
-            }
-            tr("control") {
-                td { +"Specular" }
-                td {
-                    pSlider {
-                        disabled = !state.display.hasFaces()
-                        param = props.param.poly.lighting.specularLight
-                    }
-                }
-            }
-            tr("control") {
-                td { +"Shininess" }
-                td {
-                    pSlider {
-                        disabled = !state.display.hasFaces()
-                        param = props.param.poly.lighting.specularPower
+                if (i == state.geometryErrorIndex) {
+                    span("tooltip desc") {
+                        +"⚠️"
+                        span("tooltip-text") { +state.geometryErrorMessage }
                     }
                 }
             }
         }
+        controlRow("${state.transforms.size + 1}:") {
+            dropdown<Transform> {
+                disabled = state.geometryErrorIndex < state.transforms.size
+                value = Transform.None
+                options = Transforms
+                onChange = { value ->
+                    if (value != Transform.None) {
+                        props.param.transforms.value = props.param.transforms.value + value
+                    }
+                }
+            }
+        }
+        for (i in state.transforms.size + 1..8) controlRow("${i + 1}:") {}
+        controlRow("") {
+            button {
+                attrs {
+                    onClickFunction = { props.param.transforms.value = emptyList() }
+                }
+                +"Clear"
+            }
+        }
+    }
+}
+
+private fun RDOMBuilder<DIV>.header(text: String) {
+    div("header-container") {
+        div("header") { +text }
     }
 }
 
 fun RBuilder.tableBody(block: RDOMBuilder<TBODY>.() -> Unit) {
     table {
         tbody(block = block)
+    }
+}
+
+fun RDOMBuilder<TBODY>.controlRow(label: String, block: RDOMBuilder<TD>.() -> Unit) {
+    tr("control") {
+        td { +label }
+        td(block = block)
     }
 }

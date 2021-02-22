@@ -4,11 +4,11 @@ import polyhedra.common.*
 import polyhedra.js.params.*
 import react.*
 
-fun <T : Tagged> RBuilder.pDropdown(handler: PValueComponentProps<EnumParam<T>>.() -> Unit) {
+fun <T : Tagged> RBuilder.pDropdown(param: EnumParam<T>, disabled: Boolean = false) {
     child<PValueComponentProps<EnumParam<T>>, PDropdown<T>> {
         attrs {
-            disabled = false
-            handler()
+            this.param = param
+            this.disabled = disabled
         }
     }
 }

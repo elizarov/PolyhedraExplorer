@@ -6,11 +6,11 @@ import polyhedra.js.params.*
 import react.*
 import react.dom.*
 
-fun RBuilder.pCheckbox(handler: PValueComponentProps<BooleanParam>.() -> Unit) {
+fun RBuilder.pCheckbox(param: BooleanParam, disabled: Boolean = false) {
     child(PCheckbox::class) {
         attrs {
-            disabled = false
-            handler()
+            this.param = param
+            this.disabled = disabled
         }
     }
 }

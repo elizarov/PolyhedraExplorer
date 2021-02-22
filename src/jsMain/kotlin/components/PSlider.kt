@@ -8,11 +8,11 @@ import react.*
 import react.dom.*
 import kotlin.math.*
 
-fun RBuilder.pSlider(handler: PValueComponentProps<DoubleParam>.() -> Unit) {
+fun RBuilder.pSlider(param: DoubleParam, disabled: Boolean = false) {
     child(PSlider::class) {
         attrs {
-            disabled = false
-            handler()
+            this.param = param
+            this.disabled = disabled
         }
     }
 }
