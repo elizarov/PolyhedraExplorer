@@ -8,7 +8,7 @@ data class Vec3(
     val y: Double,
     val z: Double
 ) {
-    override fun toString(): String = "(${x.fmt}, ${y.fmt}, ${z.fmt})"
+    override fun toString(): String = "[${x.fmt}, ${y.fmt}, ${z.fmt}]"
 }
 
 val Vec3.norm: Double

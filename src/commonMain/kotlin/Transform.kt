@@ -13,7 +13,8 @@ enum class Transform(
     Rectified("r", Polyhedron::rectified),
     Truncated("t", Polyhedron::truncated),
     Cantellated("c", Polyhedron::cantellated), // ~= Rectified, Rectified
-    Bevelled("b", Polyhedron::bevelled) // ~= Rectified, Truncated
+    Bevelled("b", Polyhedron::bevelled), // ~= Rectified, Truncated
+    Snub("s", Polyhedron::snub)
 }
 
 val Transforms: List<Transform> by lazy { Transform.values().toList() }
@@ -123,7 +124,7 @@ fun Polyhedron.cantellated(cr: Double = regularCantellationRatio()): Polyhedron 
     for (v in vs) {
         face(vertexDirectedEdges[v]!!.map { ev[it]!! }, FaceKind(kindOfs + v.kind.id))
     }
-    // faces from the original edges
+    // 4-faces from the original edges
     kindOfs += vertexKinds.size
     for (e in es) {
         val fvs = listOf(
@@ -177,7 +178,7 @@ fun Polyhedron.bevelled(br: BevellingRatio = regularBevellingRatio()): Polyhedro
         }
         face(fvs, FaceKind(kindOfs + v.kind.id))
     }
-    // faces from the original edges
+    // 4-faces from the original edges
     kindOfs += vertexKinds.size
     for (e in es) {
         val er = e.reversed()
@@ -255,5 +256,32 @@ fun Polyhedron.regularSnubbingRatio(edgeKind: EdgeKind? = null): SnubbingRatio {
 
 fun Polyhedron.snub(sr: SnubbingRatio = regularSnubbingRatio()) = polyhedron {
     val (cr, sa) = sr
-    // TODO:
+    // vertices from the face-vertices (directed edges)
+    val fvv = fs.associateWith { f ->
+        val c = f.plane.tangentPoint // face center
+        val m = (1 - cr) * rotationMat(f.plane.n, sa) // rotate clockwise!
+        faceDirectedEdges[f]!!.associateBy({ it.a }, { e ->
+            vertex(c + (e.a.pt - c) * m, VertexKind(directedEdgeKindsIndex[e.kind]!!))
+        })
+    }
+    // faces from the original faces
+    for (f in fs) {
+        face(fvv[f]!!.values, f.kind)
+    }
+    // faces from the original vertices
+    var kindOfs = faceKinds.size
+    for (v in vs) {
+        val fvs = vertexFaces[v]!!.map { f -> fvv[f]!![v]!! }
+        face(fvs, FaceKind(kindOfs + v.kind.id))
+    }
+    // 3-faces from the directed edges
+    kindOfs += vertexKinds.size
+    for (e in directedEdges) {
+        val fvs = listOf(
+            fvv[e.l]!![e.a]!!,
+            fvv[e.l]!![e.b]!!,
+            fvv[e.r]!![e.a]!!
+        )
+        face(fvs, FaceKind(kindOfs + directedEdgeKindsIndex[e.kind]!!))
+    }
 }
