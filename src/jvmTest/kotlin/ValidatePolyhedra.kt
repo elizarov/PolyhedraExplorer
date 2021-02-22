@@ -22,11 +22,13 @@ class ValidatePolyhedra {
     }
 
     @Test
-    fun validate2Transforms() {
+    fun validateTransforms() {
         testParameter("seed", Seeds) { seed ->
             testParameter("transform1", Transforms.filter { it != Transform.None }) { transform1 ->
                 testParameter("transform2", Transforms.filter { it != Transform.None }) { transform2 ->
-                    seed.poly.transformed(listOf(transform1, transform2)).validate()
+                    if (isOkSequence(transform1, transform2)) {
+                        seed.poly.transformed(transform1, transform2).validate()
+                    }
                 }
             }
         }
@@ -38,25 +40,18 @@ class ValidatePolyhedra {
             testParameter("transform1", Transforms.filter { it != Transform.None }) { transform1 ->
                 testParameter("transform2", Transforms.filter { it != Transform.None }) { transform2 ->
                     testParameter("transform3", Transforms.filter { it != Transform.None }) { transform3 ->
-                        seed.poly.transformed(listOf(transform1, transform2, transform3)).validate()
-                    }
-                }
-            }
-        }
-    }
-
-    @Test
-    fun validate4Transforms() {
-        testParameter("seed", Seeds) { seed ->
-            testParameter("transform1", Transforms.filter { it != Transform.None }) { transform1 ->
-                testParameter("transform2", Transforms.filter { it != Transform.None }) { transform2 ->
-                    testParameter("transform3", Transforms.filter { it != Transform.None }) { transform3 ->
-                        testParameter("transform4", Transforms.filter { it != Transform.None }) { transform4 ->
-                            seed.poly.transformed(listOf(transform1, transform2, transform3, transform4)).validate()
+                        if (isOkSequence(transform1, transform2, transform3)) {
+                            seed.poly.transformed(transform1, transform2, transform3).validate()
                         }
                     }
                 }
             }
         }
     }
+}
+
+private fun isOkSequence(vararg transforms: Transform): Boolean {
+    val t = transforms.toList()
+    if (t.drop(1).contains(Transform.Cantellated)) return false // cantellation must be first
+    return true
 }

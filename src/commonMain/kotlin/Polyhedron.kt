@@ -12,7 +12,7 @@ class Polyhedron(
             for (i in 0 until f.size) {
                 val a = f[i]
                 val b = f[(i + 1) % f.size]
-                require(a.id != b.id)
+                require(a.id != b.id) { "Duplicate vertices at face $f" }
                 if (a.id > b.id) {
                     lFaces.getOrPut(b) { HashMap() }[a] = f
                 }
@@ -167,7 +167,7 @@ class Face(
     val fvs: List<Vertex>,
     val kind: FaceKind,
 ) : Id {
-    val plane = plane3(fvs[0].pt, fvs[1].pt, fvs[2].pt)
+    val plane: Plane = plane3(fvs[0].pt, fvs[1].pt, fvs[2].pt)
 
     val size: Int
         get() = fvs.size

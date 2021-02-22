@@ -22,8 +22,11 @@ val Vec3.unit: Vec3
 
 operator fun Vec3.plus(u: Vec3): Vec3 = Vec3(x + u.x, y + u.y, z + u.z)
 operator fun Vec3.minus(u: Vec3): Vec3 = Vec3(x - u.x, y - u.y, z - u.z)
+
 operator fun Vec3.times(u: Vec3): Double = x * u.x + y * u.y + z * u.z
-operator fun Double.times(u: Vec3): Vec3 = Vec3(this * u.x, this * u.y, this * u.z)
+operator fun Vec3.times(a: Double): Vec3 = Vec3(x * a, y * a, z * a)
+operator fun Double.times(u: Vec3): Vec3 = u * this
+
 operator fun Vec3.div(d: Double): Vec3 = Vec3(x / d, y / d, z / d)
 operator fun Vec3.unaryMinus(): Vec3 = Vec3(-x, -y, -z)
 
