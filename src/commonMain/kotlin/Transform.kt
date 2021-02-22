@@ -3,19 +3,22 @@ package polyhedra.common
 import polyhedra.common.util.*
 import kotlin.math.*
 
-enum class Transform(override val tag: String, val transform: (Polyhedron) -> Polyhedron) : Tagged {
+enum class Transform(
+    override val tag: String,
+    val transform: (Polyhedron) -> Polyhedron,
+    val isApplicable: (Polyhedron) -> String? = { null }
+) : Tagged {
     None("n", { it }),
     Dual("d", Polyhedron::dual),
     Rectified("r", Polyhedron::rectified),
-    Truncated("t", Polyhedron::truncated)
+    Truncated("t", Polyhedron::truncated, {
+        if (it.regularTruncationRatio <= EPS) "Truncation ratio is too small to keep regular faces" else null
+    })
 }
 
 val Transforms: List<Transform> by lazy { Transform.values().toList() }
 
 fun Polyhedron.transformed(transform: Transform) = memoTransform(transform.transform)
-
-fun Polyhedron.transformed(transforms: List<Transform>) =
-    transforms.fold(this) { poly, transform -> poly.transformed(transform) }
 
 fun Polyhedron.dual() = polyhedron {
     val r = midradius
@@ -50,25 +53,21 @@ val Polyhedron.regularTruncationRatio: Double
         return 1 / (1 + cos(PI / n))
     }
 
-fun Polyhedron.truncated(ratio: Double = regularTruncationRatio) = when {
-    ratio <= EPS -> this
-    ratio >= 1 - EPS -> rectified()
-    else -> polyhedron {
-        // vertices from directed edges
-        val ev = directedEdges.associateWith { e ->
-            val t = ratio * e.midPointFraction(edgesMidPointDefault)
-            vertex(t.atSegment(e.a.pt, e.b.pt), VertexKind(directedEdgeKindsIndex[e.kind]!!))
+fun Polyhedron.truncated(ratio: Double = regularTruncationRatio) = polyhedron {
+    // vertices from directed edges
+    val ev = directedEdges.associateWith { e ->
+        val t = ratio * e.midPointFraction(edgesMidPointDefault)
+        vertex(t.atSegment(e.a.pt, e.b.pt), VertexKind(directedEdgeKindsIndex[e.kind]!!))
+    }
+    // faces from the original faces
+    for (f in fs) {
+        val fvIds = faceDirectedEdges[f]!!.flatMap {
+            listOf(ev[it]!!, ev[it.reversed()]!!)
         }
-        // faces from the original faces
-        for (f in fs) {
-            val fvIds = faceDirectedEdges[f]!!.flatMap {
-                listOf(ev[it]!!, ev[it.reversed()]!!)
-            }
-            face(fvIds, f.kind)
-        }
-        // faces from the original vertices
-        for (v in vs) {
-            face(vertexDirectedEdges[v]!!.map { ev[it]!! }, FaceKind(faceKinds.size + v.kind.id))
-        }
+        face(fvIds, f.kind)
+    }
+    // faces from the original vertices
+    for (v in vs) {
+        face(vertexDirectedEdges[v]!!.map { ev[it]!! }, FaceKind(faceKinds.size + v.kind.id))
     }
 }

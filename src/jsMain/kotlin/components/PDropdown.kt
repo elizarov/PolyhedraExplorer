@@ -4,29 +4,22 @@ import polyhedra.common.*
 import polyhedra.js.params.*
 import react.*
 
-external interface PDropdownProps<T : Tagged> : PValueComponentProps<EnumParam<T>> {
-    var validateChange: (T) -> Boolean
-}
-
-fun <T : Tagged> RBuilder.pDropdown(handler: PDropdownProps<T>.() -> Unit) {
-    child<PDropdownProps<T>, PDropdown<T>> {
+fun <T : Tagged> RBuilder.pDropdown(handler: PValueComponentProps<EnumParam<T>>.() -> Unit) {
+    child<PValueComponentProps<EnumParam<T>>, PDropdown<T>> {
         attrs {
             disabled = false
-            validateChange = { true }
             handler()
         }
     }
 }
 
-class PDropdown<T : Tagged>(props: PDropdownProps<T>) : PValueComponent<T, EnumParam<T>, PDropdownProps<T>, PValueComponentState<T>>(props) {
+class PDropdown<T : Tagged>(props: PValueComponentProps<EnumParam<T>>) : PValueComponent<T, EnumParam<T>, PValueComponentProps<EnumParam<T>>, PValueComponentState<T>>(props) {
     override fun RBuilder.render() {
         dropdown<T> {
             disabled = props.disabled
             value = props.param.value
             options = props.param.options
-            onChange = {
-                if (props.validateChange(it)) props.param.value = it
-            }
+            onChange = { props.param.value = it }
         }
     }
 }

@@ -71,6 +71,10 @@ div.row {
     padding-left: 1ch;
 }
 
+span.desc {
+    padding-left: 1ch;
+}
+
 label {
     margin-right: 1ch;
 }
@@ -117,3 +121,20 @@ tr.info {
     vertical-align: top;
 }
 
+/* --------- tooltip --------- */
+
+.tooltip .tooltip-text {
+    visibility: hidden;
+    position: absolute;
+    z-index: 1;
+    padding: 0.2em;
+    margin-left: -10ch;
+    margin-top: -1.6em;
+    background-color: hsl(0, 0%, 75%);
+    border: 1px solid black;
+    border-radius: 6px;
+}
+
+.tooltip:hover .tooltip-text {
+    visibility: visible;
+}

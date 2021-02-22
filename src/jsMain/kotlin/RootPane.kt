@@ -9,29 +9,20 @@ import polyhedra.js.poly.*
 import react.*
 import react.dom.*
 
+private const val MAX_DISPLAY_EDGES = (1 shl 15) - 1
+
 external interface RootPaneState : RState {
     var seed: Seed
     var transforms: List<Transform>
     var baseScale: Scale
+
+    var poly: Polyhedron
+    var polyName: String
+    var geometryErrorIndex: Int
+    var geometryErrorMessage: String
+    
     var display: Display
     var rotate: Boolean
-}
-
-fun RootPaneState.poly(): Polyhedron =
-    seed.poly.transformed(transforms).scaled(baseScale)
-
-fun RootPaneState.polyName(): String =
-    transforms.reversed().joinToString("") { "$it " } + seed
-
-private fun isValidSeedTransforms(seed: Seed, transforms: List<Transform>): Boolean {
-    try {
-        seed.poly.transformed(transforms).validateGeometry()
-        return true
-    } catch (e: Exception) {
-        println("$seed $transforms is not valid: $e")
-        e.printStackTrace()
-        return false
-    }
 }
 
 @Suppress("NON_EXPORTABLE_TYPE")
@@ -41,15 +32,39 @@ class RootPane(props: PComponentProps<RootParams>) : PComponent<RootParams, PCom
         seed = props.param.seed.value
         transforms = props.param.transforms.value
         baseScale = props.param.baseScale.value
+
+        var curPoly = seed.poly
+        var curPolyName = seed.toString()
+        var curIndex = 0
+        var curMessage = ""
+        try {
+            for (transform in transforms) {
+                val applicable = transform.isApplicable(curPoly)
+                if (applicable != null) {
+                    curMessage = applicable
+                    break
+                }
+                val newPoly = curPoly.transformed(transform)
+                val nEdges = newPoly.es.size
+                if (nEdges > MAX_DISPLAY_EDGES) {
+                    curMessage = "Polyhedron is too large to display ($nEdges edges)"
+                    break
+                }
+                newPoly.validateGeometry()
+                curPolyName = "$transform $curPolyName"
+                curPoly = newPoly
+                curIndex++
+            }
+        } catch (e: Exception) {
+            curMessage = "Transform produces invalid polyhedron geometry"
+        }
+        poly = curPoly.scaled(baseScale)
+        polyName = curPolyName
+        geometryErrorIndex = curIndex
+        geometryErrorMessage = curMessage
+        
         display = props.param.poly.view.display.value
         rotate = props.param.poly.animation.rotate.value
-    }
-
-    private fun safeTransformsUpdate(update: (List<Transform>) -> List<Transform>) {
-        val newTransforms = update(props.param.transforms.value)
-        if (isValidSeedTransforms(props.param.seed.value, newTransforms)) {
-                props.param.transforms.value = newTransforms
-        }
     }
 
     override fun RBuilder.render() {
@@ -59,14 +74,13 @@ class RootPane(props: PComponentProps<RootParams>) : PComponent<RootParams, PCom
             }
             div("canvas-column card") {
                 // Canvas & Info
-                val curPoly = state.poly()
-                header(state.polyName())
+                header(state.polyName)
                 polyCanvas("poly") {
                     params = props.param.poly
-                    poly = curPoly
+                    poly = state.poly
                 }
                 polyInfoPane {
-                    poly = curPoly
+                    poly = state.poly
                 }
             }
         }
@@ -84,7 +98,6 @@ class RootPane(props: PComponentProps<RootParams>) : PComponent<RootParams, PCom
             label { +"Seed" }
             pDropdown<Seed> {
                 param = props.param.seed
-                validateChange = { it -> isValidSeedTransforms(it, props.param.transforms.value) }
             }
         }
 
@@ -95,14 +108,21 @@ class RootPane(props: PComponentProps<RootParams>) : PComponent<RootParams, PCom
                     td { +"${i + 1}:" }
                     td {
                         dropdown<Transform> {
+                            disabled = i > state.geometryErrorIndex
                             value = transform
                             options = Transforms
                             onChange = { value ->
                                 if (value != Transform.None) {
-                                    safeTransformsUpdate { it.updatedAt(i, value) }
+                                    props.param.transforms.value = props.param.transforms.value.updatedAt(i, value)
                                 } else {
-                                    safeTransformsUpdate { it.removedAt(i) }
+                                    props.param.transforms.value = props.param.transforms.value.removedAt(i)
                                 }
+                            }
+                        }
+                        if (i == state.geometryErrorIndex) {
+                            span("tooltip desc") {
+                                +"⚠️"
+                                span("tooltip-text") { +state.geometryErrorMessage }
                             }
                         }
                     }
@@ -112,11 +132,12 @@ class RootPane(props: PComponentProps<RootParams>) : PComponent<RootParams, PCom
                 td { +"${state.transforms.size + 1}:" }
                 td {
                     dropdown<Transform> {
+                        disabled = state.geometryErrorIndex < state.transforms.size
                         value = Transform.None
                         options = Transforms
                         onChange = { value ->
                             if (value != Transform.None) {
-                                    safeTransformsUpdate { it + value }
+                                props.param.transforms.value = props.param.transforms.value + value
                             }
                         }
                     }
