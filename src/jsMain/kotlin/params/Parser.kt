@@ -35,6 +35,7 @@ class ParamParser(private val str: String) {
                     cur = parseNextToken()
                     if (cur.type != Type.Value) break
                     value = cur.value
+                    cur = parseNextToken()
                 }
                 ParsedParam.Composite(map)
             } else {
