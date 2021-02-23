@@ -2,7 +2,9 @@ package polyhedra.js.glsl
 
 import kotlin.reflect.*
 
-enum class GLDeclKind { local, function, builtin, uniform, attribute, varying }
+enum class GLDeclKind(val isGlobal: Boolean = false) {
+    builtin, uniform(true), attribute(true), varying(true), function(true), local;
+}
 
 open class GLDecl<T : GLType<T>, SELF: GLDecl<T, SELF>>(
     val kind: GLDeclKind,

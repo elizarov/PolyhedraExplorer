@@ -18,8 +18,8 @@ abstract class GLProgram(val gl: GL) {
         initShaderProgram(gl, vertexShader.glShader, fragmentShader.glShader)
     }
 
-    fun <T : ShaderType> shader(type: T, builder: ShaderBuilder.() -> Unit): Shader<T> {
-        val s = ShaderBuilder()
+    fun <S : ShaderType> shader(type: S, builder: ShaderBuilder<S>.() -> Unit): Shader<S> {
+        val s = ShaderBuilder<S>()
         s.builder()
         return Shader(loadShader(gl, type.glType, s.source()))
     }
@@ -79,53 +79,66 @@ abstract class GLProgram(val gl: GL) {
         override fun visitDecls(visitor: (GLDecl<*, *>) -> Unit) {}
     }
 
-    inner class Shader<T : ShaderType>(
+    inner class Shader<S : ShaderType>(
         val glShader: WebGLShader
     )
 
-    inner class ShaderBuilder {
-        private val uniforms = mutableSetOf<Uniform<*>>()
-        private val attributes = mutableSetOf<Attribute<*>>()
-        private val varyings = mutableSetOf<Varying<*>>()
-        private val lines = ArrayList<String>()
+    inner class ShaderBuilder<S : ShaderType> {
+        private var mainFunction: GLFunction<GLType.void>? = null
 
-        fun main(builder: BlockBuilder.() -> Unit) = function(GLType.void, "main", builder)
-
-        fun <T : GLType<T>> function(returnType: T, name: String, builder: BlockBuilder.() -> Unit): GLExpr<T> {
-            lines += "$returnType $name() {"
-            BlockBuilder("\t").builder()
-            lines += "}"
-            return glFunctionCallExpr<T>(returnType, name)
-        }
-
-        inner class BlockBuilder(val indent: String) {
-            private val locals = mutableSetOf<GLLocal<*>>()
-            operator fun String.unaryPlus()  { lines.add("$indent$this") }
-
-            infix fun <T : GLType<T>> GLDecl<T, *>.by(expr: GLExpr<T>) {
-                visitDecls(::declVisitor)
-                expr.visitDecls(::declVisitor)
-                +"$this = $expr;"
-            }
-
-            private fun declVisitor(decl: GLDecl<*, *>) {
-                when (decl) {
-                    is GLLocal<*> -> if (locals.add(decl)) {
-                        +decl.emitDeclaration()
-                    }
-                    is Uniform<*> -> uniforms += decl
-                    is Attribute<*> -> attributes += decl
-                    is Varying<*> -> varyings += decl
-                }
-            }
+        fun main(builder: BlockBuilder<GLType.void>.() -> Unit): GLFunction<GLType.void> {
+            val main = function(GLType.void, "main", builder)
+            check(mainFunction == null) { "At most one main function is allowed" }
+            mainFunction = main
+            return main
         }
 
         fun source(): String = buildString {
+            val mainFunction = mainFunction
+            check(mainFunction != null) { "main() function must be defined" }
+            val decls = mutableSetOf<GLDecl<*, *>>()
+            mainFunction.visitDecls { decl ->
+                if (decl.kind.isGlobal) decls += decl
+            }
             appendLine("precision mediump float;") // default precision
-            for (d in uniforms) appendLine(d.emitDeclaration())
-            for (d in attributes) appendLine(d.emitDeclaration())
-            for (d in varyings) appendLine(d.emitDeclaration())
-            for (l in lines) appendLine(l)
+            val sd = decls.sortedBy { it.kind }
+            for (d in sd) appendLine(d.emitDeclaration())
+        }
+    }
+
+    fun <T : GLType<T>> function(type: T, name: String, builder: BlockBuilder<T>.() -> Unit): GLFunction<T> =
+        BlockBuilder(type, name, "\t").run {
+            builder()
+            build()
+        }
+
+    inner class BlockBuilder<T : GLType<T>>(
+        val type: T,
+        val name: String,
+        private val indent: String
+    ) {
+        private val locals = mutableSetOf<GLLocal<*>>()
+        private val deps = mutableSetOf<GLDecl<*, *>>()
+        private val body = ArrayList<String>()
+
+        operator fun String.unaryPlus()  { body.add("$indent$this") }
+
+        fun build(): GLFunction<T> =
+            GLFunction(type, name, deps, body)
+
+        infix fun <T : GLType<T>> GLDecl<T, *>.by(expr: GLExpr<T>) {
+            visitDecls(::blockDeclVisitor)
+            expr.visitDecls(::blockDeclVisitor)
+            +"$this = $expr;"
+        }
+
+        private fun blockDeclVisitor(decl: GLDecl<*, *>) {
+            when (decl) {
+                is GLLocal<*> -> if (locals.add(decl)) {
+                    +decl.emitDeclaration()
+                }
+                else -> deps += decl
+            }
         }
     }
 
