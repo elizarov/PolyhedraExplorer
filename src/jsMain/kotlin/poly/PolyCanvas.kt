@@ -69,16 +69,18 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
             return
         }
         if (animationHandle != 0) return
-        animationHandle = window.requestAnimationFrame { nowTime ->
-            animationHandle = 0
-            if (prevTime.isNaN()) prevTime = nowTime
-            val dt = (nowTime - prevTime) / 1000 // in seconds
-            val a = 2 * PI * props.params.animation.rotationAngle.value / 360
-            drawContext.view.rotate(dt * cos(a), dt * sin(a))
-            draw()
-            prevTime = nowTime
-            requestAnimation()
-        }
+        animationHandle = window.requestAnimationFrame(animationFun)
+    }
+
+    private val animationFun: (Double) -> Unit = { nowTime ->
+        animationHandle = 0
+        if (prevTime.isNaN()) prevTime = nowTime
+        val dt = (nowTime - prevTime) / 1000 // in seconds
+        val a = 2 * PI * props.params.animation.rotationAngle.value / 360
+        drawContext.view.rotate(dt * cos(a), dt * sin(a))
+        draw()
+        prevTime = nowTime
+        requestAnimation()
     }
 
     private fun cancelAnimation() {
