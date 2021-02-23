@@ -5,7 +5,7 @@ import org.khronos.webgl.WebGLRenderingContext as GL
 
 class FaceProgram(gl: GL) : SharedPolyProgram(gl) {
     val uAmbientLightColor by uniform(GLType.vec3)
-    val uPointLightColor by uniform(GLType.vec3)
+    val uDiffuseLightColor by uniform(GLType.vec3)
     val uSpecularLightColor by uniform(GLType.vec3)
     val uSpecularLightPower by uniform(GLType.float)
     val uLightPosition by uniform(GLType.vec3)
@@ -36,7 +36,7 @@ class FaceProgram(gl: GL) : SharedPolyProgram(gl) {
             val normToCamera by normalize(vToCamera)
             val normToLight by normalize(vToLight)
             val halfVector by normalize(normToCamera + normToLight)
-            val light by uAmbientLightColor + uPointLightColor * max(dot(vNormal, normToLight), 0.0)
+            val light by uAmbientLightColor + uDiffuseLightColor * max(dot(vNormal, normToLight), 0.0)
             val specular by uSpecularLightColor * pow(max(dot(vNormal, halfVector), 0.0), uSpecularLightPower)
             gl_FragColor by vec4(vColor * light + specular, uColorAlpha)
         }

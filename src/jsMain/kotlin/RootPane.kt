@@ -115,7 +115,7 @@ class RootPane(props: PComponentProps<RootParams>) : PComponent<RootParams, PCom
         header("Lighting")
         tableBody {
             controlRow("Ambient") { pSlider(props.param.poly.lighting.ambientLight, lightingDisabled) }
-            controlRow("Point") { pSlider(props.param.poly.lighting.pointLight, lightingDisabled) }
+            controlRow("Diffuse") { pSlider(props.param.poly.lighting.diffuseLight, lightingDisabled) }
             controlRow("Specular") { pSlider(props.param.poly.lighting.specularLight, lightingDisabled) }
             controlRow("Shininess") { pSlider(props.param.poly.lighting.specularPower, lightingDisabled) }
         }

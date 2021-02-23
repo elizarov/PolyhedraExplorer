@@ -18,7 +18,7 @@ fun FaceBuffers.draw(view: ViewContext, lightning: LightningContext) {
         assignView(view)
 
         uAmbientLightColor.assign(lightning.ambientLightColor)
-        uPointLightColor.assign(lightning.pointLightColor)
+        uDiffuseLightColor.assign(lightning.diffuseLightColor)
         uSpecularLightColor.assign(lightning.specularLightColor)
         uSpecularLightPower.assign(lightning.specularLightPower)
         uLightPosition.assign(lightning.lightPosition)

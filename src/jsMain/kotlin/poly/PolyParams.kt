@@ -23,7 +23,7 @@ class AnimationParams(tag: String) : Param.Composite(tag) {
 
 class LightingParams(tag: String) : Param.Composite(tag) {
     val ambientLight = using(DoubleParam("a", 0.25, 0.0, 1.0, 0.01))
-    val pointLight = using(DoubleParam("p", 1.0, 0.0, 1.0, 0.01))
+    val diffuseLight = using(DoubleParam("d", 1.0, 0.0, 1.0, 0.01))
     val specularLight = using(DoubleParam("s", 1.0, 0.0, 1.0, 0.01))
     val specularPower = using(DoubleParam("sp", 30.0, 0.0, 100.0, 1.0))
 }
