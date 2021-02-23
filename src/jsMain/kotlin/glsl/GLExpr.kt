@@ -2,22 +2,16 @@ package polyhedra.js.glsl
 
 interface GLExpr<T : GLType<T>> {
     val type: T
-    fun externalsTo(destination: MutableCollection<GLDecl<*, *>>)
-    fun localsTo(destination: MutableCollection<GLLocal<*>>)
+    fun visitDecls(visitor: (GLDecl<*, *>) -> Unit)
 }
 
 private class BinaryOp<T : GLType<T>>(
     override val type: T,
     val a: GLExpr<*>, val op: String, val b: GLExpr<*>
 ) : GLExpr<T> {
-    override fun externalsTo(destination: MutableCollection<GLDecl<*, *>>) {
-        a.externalsTo(destination)
-        b.externalsTo(destination)
-    }
-
-    override fun localsTo(destination: MutableCollection<GLLocal<*>>) {
-        a.localsTo(destination)
-        b.localsTo(destination)
+    override fun visitDecls(visitor: (GLDecl<*, *>) -> Unit) {
+        a.visitDecls(visitor)
+        b.visitDecls(visitor)
     }
 
     override fun toString(): String = "($a $op $b)"
@@ -29,12 +23,8 @@ private class Call<T : GLType<T>>(
     override val type: T,
     val name: String, vararg val a: GLExpr<*>
 ) : GLExpr<T> {
-    override fun externalsTo(destination: MutableCollection<GLDecl<*, *>>) {
-        a.forEach { it.externalsTo(destination) }
-    }
-
-    override fun localsTo(destination: MutableCollection<GLLocal<*>>) {
-        a.forEach { it.localsTo(destination) }
+    override fun visitDecls(visitor: (GLDecl<*, *>) -> Unit) {
+        a.forEach { it.visitDecls(visitor) }
     }
 
     override fun toString(): String = "$name(${a.joinToString(", ")})"
@@ -44,8 +34,7 @@ private class Literal<T : GLType<T>>(
     override val type: T,
     val s: String
 ): GLExpr<T> {
-    override fun externalsTo(destination: MutableCollection<GLDecl<*, *>>) {}
-    override fun localsTo(destination: MutableCollection<GLLocal<*>>) {}
+    override fun visitDecls(visitor: (GLDecl<*, *>) -> Unit) {}
     override fun toString(): String = s
 }
 
@@ -53,12 +42,7 @@ private class DotCall<T : GLType<T>>(
     override val type: T,
     val a: GLExpr<*>, val name: String
 ) : GLExpr<T> {
-    override fun externalsTo(destination: MutableCollection<GLDecl<*, *>>) {
-        a.externalsTo(destination)
-    }
-    override fun localsTo(destination: MutableCollection<GLLocal<*>>) {
-        a.localsTo(destination)
-    }
+    override fun visitDecls(visitor: (GLDecl<*, *>) -> Unit) { a.visitDecls(visitor) }
     override fun toString(): String = "$a.$name"
 }
 

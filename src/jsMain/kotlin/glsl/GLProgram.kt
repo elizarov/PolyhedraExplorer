@@ -76,7 +76,7 @@ abstract class GLProgram(val gl: GL) {
     inner class Builtin<T : GLType<T>>(
         type: T, name: String
     ) : GLDecl<T, Builtin<T>>(GLDeclKind.builtin, null, type, name) {
-        override fun externalsTo(destination: MutableCollection<GLDecl<*, *>>) {}
+        override fun visitDecls(visitor: (GLDecl<*, *>) -> Unit) {}
     }
 
     inner class Shader<T : ShaderType>(
@@ -84,7 +84,9 @@ abstract class GLProgram(val gl: GL) {
     )
 
     inner class ShaderBuilder {
-        private val dependencies = mutableSetOf<GLDecl<*, *>>()
+        private val uniforms = mutableSetOf<Uniform<*>>()
+        private val attributes = mutableSetOf<Attribute<*>>()
+        private val varyings = mutableSetOf<Varying<*>>()
         private val lines = ArrayList<String>()
 
         fun main(builder: BlockBuilder.() -> Unit) = function(GLType.void, "main", builder)
@@ -101,22 +103,28 @@ abstract class GLProgram(val gl: GL) {
             operator fun String.unaryPlus()  { lines.add("$indent$this") }
 
             infix fun <T : GLType<T>> GLDecl<T, *>.by(expr: GLExpr<T>) {
-                externalsTo(dependencies)
-                expr.externalsTo(dependencies)
-                val newLocals = mutableSetOf<GLLocal<*>>()
-                expr.localsTo(newLocals)
-                for (local in newLocals) {
-                    if (locals.add(local)) {
-                        +"${local.emitDeclaration()};"
-                    }
-                }
+                visitDecls(::declVisitor)
+                expr.visitDecls(::declVisitor)
                 +"$this = $expr;"
+            }
+
+            private fun declVisitor(decl: GLDecl<*, *>) {
+                when (decl) {
+                    is GLLocal<*> -> if (locals.add(decl)) {
+                        +decl.emitDeclaration()
+                    }
+                    is Uniform<*> -> uniforms += decl
+                    is Attribute<*> -> attributes += decl
+                    is Varying<*> -> varyings += decl
+                }
             }
         }
 
         fun source(): String = buildString {
             appendLine("precision mediump float;") // default precision
-            for (d in dependencies) appendLine("${d.emitDeclaration()};")
+            for (d in uniforms) appendLine(d.emitDeclaration())
+            for (d in attributes) appendLine(d.emitDeclaration())
+            for (d in varyings) appendLine(d.emitDeclaration())
             for (l in lines) appendLine(l)
         }
     }

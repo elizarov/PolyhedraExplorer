@@ -2,7 +2,7 @@ package polyhedra.js.glsl
 
 import kotlin.reflect.*
 
-enum class GLDeclKind { local, builtin, uniform, attribute, varying }
+enum class GLDeclKind { local, function, builtin, uniform, attribute, varying }
 
 open class GLDecl<T : GLType<T>, SELF: GLDecl<T, SELF>>(
     val kind: GLDeclKind,
@@ -13,16 +13,14 @@ open class GLDecl<T : GLType<T>, SELF: GLDecl<T, SELF>>(
     @Suppress("UNCHECKED_CAST")
     operator fun getValue(program: GLProgram, prop: KProperty<*>): SELF = this as SELF
 
-    override fun externalsTo(destination: MutableCollection<GLDecl<*, *>>) {
-        destination.add(this)
+    override fun visitDecls(visitor: (GLDecl<*, *>) -> Unit) {
+        visitor(this)
     }
-
-    override fun localsTo(destination: MutableCollection<GLLocal<*>>) {}
 
     override fun toString(): String = name
 
     open fun emitDeclaration(): String =
-        if (precision == null) "$kind $type $name" else "$kind $precision $type $name"
+        if (precision == null) "$kind $type $name;" else "$kind $precision $type $name;"
 }
 
 class GLLocal<T : GLType<T>>(
@@ -31,19 +29,16 @@ class GLLocal<T : GLType<T>>(
     name: String,
     val value: GLExpr<T>
 ) : GLDecl<T, GLLocal<T>>(GLDeclKind.local, precision, type, name) {
-    override fun externalsTo(destination: MutableCollection<GLDecl<*, *>>) {
-        value.externalsTo(destination)
-    }
-
-    override fun localsTo(destination: MutableCollection<GLLocal<*>>) {
-        value.localsTo(destination)
-        destination.add(this)
+    override fun visitDecls(visitor: (GLDecl<*, *>) -> Unit) {
+        value.visitDecls(visitor)
+        visitor(this)
     }
 
     override fun emitDeclaration(): String = buildString {
         append(if (precision == null) "$type $name" else "$precision $type $name")
         append(" = ")
         append(value)
+        append(";")
     }
 }
 
