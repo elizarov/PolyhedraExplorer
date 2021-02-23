@@ -28,26 +28,6 @@ private class Call<T : GLType<T>>(
     override fun toString(): String = "$name(${a.joinToString(", ")})"
 }
 
-class GLFunction<T : GLType<T>>(
-    type: T,
-    name: String,
-    private val deps: Set<GLDecl<*, *>>,
-    private val body: List<String>
-) : GLDecl<T, GLFunction<T>>(GLDeclKind.function, null, type, name) {
-    override fun emitDeclaration() = buildString {
-        appendLine("$type $name() {")
-        body.forEach { appendLine(it) }
-        appendLine("}")
-    }
-
-    override fun visitDecls(visitor: (GLDecl<*, *>) -> Unit) {
-        deps.forEach { visitor(it) }
-        visitor(this)
-    }
-
-    operator fun invoke(): GLExpr<T> = Call(type, name)
-}
-
 private class Literal<T : GLType<T>>(
     override val type: T,
     val s: String

@@ -22,9 +22,7 @@ interface GLType<T : GLType<T>> {
 
     interface MatrixFloats<T : MatrixFloats<T>> : VecOrMatrixFloats<T>
 
-    object void : GLTypeBase<void>(
-        bufferSize = 0
-    )
+    object void : GLTypeBase<void>()
 
     object bool : GLTypeBase<bool>(
         bufferSize = 1
@@ -67,10 +65,13 @@ interface GLType<T : GLType<T>> {
         bufferSize = 16,
         uniformFloat32Array = { gl, loc, a -> gl.uniformMatrix4fv(loc, false, a) }
     )
+
+    // function type, cannot be manipulated by arithmetics, only called
+    data class fun0<T : GLType<T>>(val resultType: T) : GLTypeBase<fun0<T>>()
 }
 
 abstract class GLTypeBase<T : GLType<T>>(
-    override val bufferSize: Int,
+    override val bufferSize: Int = 0,
     val uniformFloat32Array: (WebGLRenderingContext, WebGLUniformLocation, Float32Array) -> Unit =
         { _, _, _ -> error("cannot be set from Float32Array") }
 ) : GLType<T> {

@@ -87,7 +87,7 @@ abstract class GLProgram(val gl: GL) {
         private var mainFunction: GLFunction<GLType.void>? = null
 
         fun main(builder: BlockBuilder<GLType.void>.() -> Unit): GLFunction<GLType.void> {
-            val main = function(GLType.void, "main", builder)
+            val main by functionVoid(builder)
             check(mainFunction == null) { "At most one main function is allowed" }
             mainFunction = main
             return main
@@ -106,14 +106,24 @@ abstract class GLProgram(val gl: GL) {
         }
     }
 
-    fun <T : GLType<T>> function(type: T, name: String, builder: BlockBuilder<T>.() -> Unit): GLFunction<T> =
-        BlockBuilder(type, name, "\t").run {
+    fun functionVoid(builder: BlockBuilder<GLType.void>.() -> Unit): Provider<GLFunction<GLType.void>> = Provider { name ->
+        BlockBuilder(GLType.void, name, "\t").run {
             builder()
             build()
         }
+    }
+
+    fun <T : GLType<T>> function(resultType: T, builder: BlockBuilder<T>.() -> GLExpr<T>): Provider<GLFunction<T>> = Provider { name ->
+        BlockBuilder(resultType, name, "\t").run {
+            val result = builder()
+            using(result)
+            +"return $result;"
+            build()
+        }
+    }
 
     inner class BlockBuilder<T : GLType<T>>(
-        val type: T,
+        val resultType: T,
         val name: String,
         private val indent: String
     ) {
@@ -124,15 +134,15 @@ abstract class GLProgram(val gl: GL) {
         operator fun String.unaryPlus()  { body.add("$indent$this") }
 
         fun build(): GLFunction<T> =
-            GLFunction(type, name, deps, body)
+            GLFunction(resultType, name, deps, body)
 
         infix fun <T : GLType<T>> GLDecl<T, *>.by(expr: GLExpr<T>) {
-            visitDecls(::blockDeclVisitor)
-            expr.visitDecls(::blockDeclVisitor)
+            using(this)
+            using(expr)
             +"$this = $expr;"
         }
 
-        private fun blockDeclVisitor(decl: GLDecl<*, *>) {
+        fun <T : GLType<T>> using(expr: GLExpr<T>) = expr.visitDecls { decl ->
             when (decl) {
                 is GLLocal<*> -> if (locals.add(decl)) {
                     +decl.emitDeclaration()
@@ -142,21 +152,18 @@ abstract class GLProgram(val gl: GL) {
         }
     }
 
-    inner class Provider<R>(val factory: (prop: KProperty<*>) -> R) {
-        operator fun provideDelegate(program: GLProgram, prop: KProperty<*>): R {
-            require(program === this@GLProgram)
-            return factory(prop)
-        }
+    inner class Provider<R>(val factory: (name: String) -> R) {
+        operator fun provideDelegate(thisRef: Any?, prop: KProperty<*>): R = factory(prop.name)
     }
 
     fun <T : GLType<T>> uniform(type: T, precision: GLPrecision? = null): Provider<Uniform<T>> =
-        Provider { Uniform(precision, type, it.name) }
+        Provider { Uniform(precision, type, it) }
     fun <T : GLType<T>> attribute(type: T, precision: GLPrecision? = null): Provider<Attribute<T>> =
-        Provider { Attribute(precision, type, it.name) }
+        Provider { Attribute(precision, type, it) }
     fun <T : GLType<T>> varying(type: T, precision: GLPrecision? = null): Provider<Varying<T>> =
-        Provider { Varying(precision, type, it.name) }
+        Provider { Varying(precision, type, it) }
     
-    private fun <T : GLType<T>> builtin(type: T): Provider<Builtin<T>> = Provider { Builtin(type, it.name) }
+    private fun <T : GLType<T>> builtin(type: T): Provider<Builtin<T>> = Provider { Builtin(type, it) }
 }
 
 fun <P : GLProgram> P.use() {

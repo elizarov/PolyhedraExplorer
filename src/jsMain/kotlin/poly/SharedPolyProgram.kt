@@ -15,6 +15,11 @@ abstract class SharedPolyProgram(gl: GL) : GLProgram(gl) {
     val aVertexPosition by attribute(GLType.vec3)
     val aVertexNormal by attribute(GLType.vec3)
 
+    // world position of the current element
+    val fPosition by function(GLType.vec4) {
+        uModelMatrix * vec4(aVertexPosition + aVertexNormal * uExpand, 1.0)
+    }
+
     fun assignView(view: ViewContext) {
         with(view) {
             uCameraPosition.assign(cameraPosition)

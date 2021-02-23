@@ -20,13 +20,12 @@ class FaceProgram(gl: GL) : SharedPolyProgram(gl) {
     override val vertexShader = shader(ShaderType.Vertex) {
         main {
             // position
-            val expandedPosition by aVertexPosition + aVertexNormal * uExpand
-            val worldPosition by uModelMatrix * vec4(expandedPosition, 1.0)
-            gl_Position by uProjectionMatrix * worldPosition
+            val position by fPosition()
+            gl_Position by uProjectionMatrix * position
             // lighting & color
             vNormal by uNormalMatrix * aVertexNormal
-            vToCamera by uCameraPosition - worldPosition.xyz
-            vToLight by uLightPosition - worldPosition.xyz
+            vToCamera by uCameraPosition - position.xyz
+            vToLight by uLightPosition - position.xyz
             vColor by aVertexColor
         }
     }
