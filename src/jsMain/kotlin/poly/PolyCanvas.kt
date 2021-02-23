@@ -43,6 +43,8 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
         }
     }
 
+    private val drawFun = { draw() }
+
     override fun componentDidMount() {
         canvas = canvasRef.current
         canvas.onmousedown = this::handleMouseDown
@@ -52,10 +54,12 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
             draw()
             requestAnimation()
         }
+        ResizeTracker.add(drawFun)
     }
 
     override fun componentWillUnmount() {
         cancelAnimation()
+        ResizeTracker.remove(drawFun)
         drawContext.destroy()
     }
     

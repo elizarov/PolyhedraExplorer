@@ -38,7 +38,7 @@ body {
 }
 
 .canvas-column {
-    width: calc(100vw - 330px);
+    width: calc(100vw - 345px);
 }
 
 canvas.poly {
