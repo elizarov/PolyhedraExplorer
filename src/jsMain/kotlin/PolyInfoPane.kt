@@ -16,13 +16,15 @@ fun RBuilder.polyInfoPane(builder: PolyInfoPaneProps.() -> Unit) {
 }
 
 class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
-    private fun RBuilder.infoHeader(name: String, cnt: Int, distName: String, distValue: Double) {
+    private fun RBuilder.infoHeader(name: String, cnt: Int, distValue: Double, distName: String) {
         tr("header") {
             td { +name }
             td { +cnt.toString() }
-            td("rt") { +distName }
             td { +distValue.fmtFix }
-            repeat(3) { td {} }
+            td {
+                attrs { colSpan = "3" }
+                +distName
+            }
         }
     }
 
@@ -31,13 +33,12 @@ class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
         table {
             tbody {
                 // Faces
-                infoHeader("Faces", poly.fs.size, "inradius", poly.inradius)
+                infoHeader("Faces", poly.fs.size, poly.inradius, "inradius")
                 for ((fk, fs) in poly.faceKinds) {
                     val fe = poly.faceEssence(fs[0])
                     tr("info") {
                         td("rt") { +"$fk faces" }
                         td { +fs.size.toString() }
-                        td("rt") { +"distance" }
                         td { +fe.dist.fmtFix }
                         td("rt") { +"adj" }
                         td { +fe.vfs.size.toString() }
@@ -45,13 +46,12 @@ class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
                     }
                 }
                 // Vertices
-                infoHeader("Vertices", poly.vs.size, "circumradius", poly.circumradius)
+                infoHeader("Vertices", poly.vs.size, poly.circumradius, "circumradius")
                 for ((vk, vs) in poly.vertexKinds) {
                     val ve = poly.vertexEssence(vs[0])
                     tr("info") {
                         td("rt") { +"$vk vertices" }
                         td { +vs.size.toString() }
-                        td("rt") { +"distance" }
                         td { +ve.dist.fmtFix }
                         td("rt") { +"adj" }
                         td { +ve.vfs.size.toString() }
@@ -59,13 +59,12 @@ class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
                     }
                 }
                 // Edges
-                infoHeader("Edges", poly.es.size, "midradius", poly.midradius)
+                infoHeader("Edges", poly.es.size, poly.midradius, "midradius")
                 for ((ek, es) in poly.edgeKinds) {
                     val e = es[0]
                     tr("info") {
                         td("rt") { +"$ek edges" }
                         td { +es.size.toString() }
-                        td("rt") { +"distance" }
                         td { +e.midPoint(MidPoint.Closest).norm.fmtFix }
                         td {}
                         td {}
