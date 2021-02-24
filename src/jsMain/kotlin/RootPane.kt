@@ -22,6 +22,7 @@ external interface RootPaneState : RState {
     var geometryErrorMessage: String
     
     var display: Display
+    var animateUpdates: Boolean
     var rotate: Boolean
 }
 
@@ -64,6 +65,7 @@ class RootPane(props: PComponentProps<RootParams>) : PComponent<RootParams, PCom
         geometryErrorMessage = curMessage
         
         display = props.param.poly.view.display.value
+        animateUpdates = props.param.poly.animation.animateUpdates.value
         rotate = props.param.poly.animation.rotate.value
     }
 
@@ -106,9 +108,17 @@ class RootPane(props: PComponentProps<RootParams>) : PComponent<RootParams, PCom
             controlRow("Expand") { pSlider(props.param.poly.view.expand) }
             controlRow("Transparent") { pSlider(props.param.poly.view.transparent, lightingDisabled) }
             controlRow("Display") { pDropdown(props.param.poly.view.display) }
+        }
+
+        header("Animation")
+        tableBody {
             controlRow("Rotate") {
-                pSlider(props.param.poly.animation.rotationAngle, !state.rotate, showValue = false)
-                pCheckbox(props.param.poly.animation.rotate) 
+                pCheckbox(props.param.poly.animation.rotate)
+                pSlider(props.param.poly.animation.rotationAngle, !state.rotate)
+            }
+            controlRow("Updates") {
+                pCheckbox(props.param.poly.animation.animateUpdates)
+                pSlider(props.param.poly.animation.animationDuration, !state.animateUpdates)
             }
         }
 
@@ -130,9 +140,9 @@ class RootPane(props: PComponentProps<RootParams>) : PComponent<RootParams, PCom
                     options = Transforms
                     onChange = { value ->
                         if (value != Transform.None) {
-                            props.param.transforms.value = props.param.transforms.value.updatedAt(i, value)
+                            props.param.transforms.updateValue(props.param.transforms.value.updatedAt(i, value))
                         } else {
-                            props.param.transforms.value = props.param.transforms.value.removedAt(i)
+                            props.param.transforms.updateValue(props.param.transforms.value.removedAt(i))
                         }
                     }
                 }
@@ -151,7 +161,7 @@ class RootPane(props: PComponentProps<RootParams>) : PComponent<RootParams, PCom
                 options = Transforms
                 onChange = { value ->
                     if (value != Transform.None) {
-                        props.param.transforms.value = props.param.transforms.value + value
+                        props.param.transforms.updateValue(props.param.transforms.value + value)
                     }
                 }
             }
@@ -160,7 +170,7 @@ class RootPane(props: PComponentProps<RootParams>) : PComponent<RootParams, PCom
         controlRow("") {
             button {
                 attrs {
-                    onClickFunction = { props.param.transforms.value = emptyList() }
+                    onClickFunction = { props.param.transforms.updateValue(emptyList()) }
                 }
                 +"Clear"
             }

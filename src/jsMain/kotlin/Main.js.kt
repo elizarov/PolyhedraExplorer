@@ -21,7 +21,7 @@ private fun onLoad() {
     val str = history.location.pathname.substringAfter('/', "")
     val parsed = ParamParser(str).parse()
     rootParams.loadFrom(parsed)
-    rootParams.onUpdate {
+    rootParams.onUpdate(Param.UpdateType.Value) {
         // throttle updates
         if (historyPushTimeout == 0) {
             historyPushTimeout = window.setTimeout({

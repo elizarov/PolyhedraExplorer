@@ -34,7 +34,7 @@ class PSlider(props: PValueComponentProps<DoubleParam>) : PValueComponent<Double
                     value = (state.value / param.step).intStr()
                 }
                 onChangeFunction = { event ->
-                    props.param.value = (event.target as HTMLInputElement).value.toInt() * props.param.step
+                    props.param.updateValue((event.target as HTMLInputElement).value.toInt() * props.param.step)
                 }
             }
         }

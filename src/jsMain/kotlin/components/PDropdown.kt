@@ -19,7 +19,7 @@ class PDropdown<T : Tagged>(props: PValueComponentProps<EnumParam<T>>) : PValueC
             disabled = props.disabled
             value = props.param.value
             options = props.param.options
-            onChange = { props.param.value = it }
+            onChange = { props.param.updateValue(it) }
         }
     }
 }

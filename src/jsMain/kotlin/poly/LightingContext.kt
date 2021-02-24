@@ -16,9 +16,9 @@ class LightningContext(override val params: LightingParams) : Param.Context() {
     }
 
     override fun update() {
-        ambientLightColor.fill(params.ambientLight.value)
-        diffuseLightColor.fill(params.diffuseLight.value)
-        specularLightColor.fill(params.specularLight.value)
-        specularLightPower = params.specularPower.value
+        ambientLightColor.fill(params.ambientLight.animatedValue)
+        diffuseLightColor.fill(params.diffuseLight.animatedValue)
+        specularLightColor.fill(params.specularLight.animatedValue)
+        specularLightPower = params.specularPower.animatedValue
     }
 }

@@ -23,6 +23,8 @@ gradlew jsBrowserDevelopmentRun
   * [ ] Render nicer edges and vertices
   * [ ] Render better-looking (physical) materials 
   * [ ] Color faces by geometry
+* Interaction
+  * [ ] Two-finger Z-rotate and zoom gestures
 * Polyhedron info
   * [ ] Show face and vertex geometry
   * [ ] Show edge dihedral angles

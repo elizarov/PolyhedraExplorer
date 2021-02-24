@@ -4,6 +4,7 @@ import kotlinx.browser.*
 import org.w3c.dom.*
 import org.w3c.dom.events.*
 import polyhedra.common.*
+import polyhedra.js.params.*
 import polyhedra.js.util.*
 import react.*
 import react.dom.*
@@ -35,6 +36,8 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
     private var prevX = 0.0
     private var prevY = 0.0
 
+    private val animations = HashMap<Param, Animation>()
+
     override fun RBuilder.render() {
         canvas(props.classes) {
             attrs {
@@ -49,12 +52,21 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
         canvas = canvasRef.current
         canvas.onmousedown = this::handleMouseDown
         canvas.onmousemove = this::handleMouseMove
-        DrawContext(canvas, props.params) {
-            drawContext = it
-            draw()
-            requestAnimation()
-        }
+        drawContext = DrawContext(canvas, props.params,
+            onNewAnimation = ::newAnimation,
+            onUpdate = ::update,
+        )
         ResizeTracker.add(drawFun)
+        update()
+    }
+
+    private fun newAnimation(animation: Animation) {
+        animations[animation.param] = animation
+    }
+
+    private fun update() {
+        draw()
+        requestAnimation()
     }
 
     override fun componentWillUnmount() {
@@ -62,9 +74,9 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
         ResizeTracker.remove(drawFun)
         drawContext.destroy()
     }
-    
+
     private fun requestAnimation() {
-        if (!props.params.animation.rotate.value) {
+        if (!props.params.animation.rotate.value && animations.isEmpty()) {
             cancelAnimation()
             return
         }
@@ -72,14 +84,27 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
         animationHandle = window.requestAnimationFrame(animationFun)
     }
 
-    private val animationFun: (Double) -> Unit = { nowTime ->
+    private val animationFun: (Double) -> Unit = af@ { nowTime ->
         animationHandle = 0
-        if (prevTime.isNaN()) prevTime = nowTime
+        if (prevTime.isNaN()) {
+            prevTime = nowTime
+            requestAnimation()
+            return@af
+        }
         val dt = (nowTime - prevTime) / 1000 // in seconds
-        val a = 2 * PI * props.params.animation.rotationAngle.value / 360
-        drawContext.view.rotate(dt * cos(a), dt * sin(a))
-        draw()
         prevTime = nowTime
+        if (props.params.animation.rotate.value) {
+            val a = 2 * PI * props.params.animation.rotationAngle.value / 360
+            drawContext.view.rotate(dt * cos(a), dt * sin(a))
+        }
+        for (animation in animations.values) {
+            // :todo: move efficient impl for multiple animations
+            animation.update(dt)
+        }
+        if (animations.values.any { it.isOver }) {
+            animations.values.removeAll { it.isOver }
+        }
+        draw()
         requestAnimation()
     }
 
@@ -115,7 +140,7 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
         if (e.isLeftButtonPressed()) {
             savePrevMouseEvent(e)
             cancelAnimation()
-            props.params.animation.rotate.value = false
+            props.params.animation.rotate.updateValue(false)
         }
     }
 

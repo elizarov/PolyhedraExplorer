@@ -47,7 +47,7 @@ class ViewContext(override val params: ViewParams) : Param.Context() {
     }
 
     override fun update() {
-        modelScale.fill(2.0.pow(params.scale.value))
+        modelScale.fill(2.0.pow(params.scale.animatedValue))
         mat4.fromRotationTranslationScale(modelMatrix, rotationQuat, modelTranslation, modelScale)
 
         quat.conjugate(tmpQuat, rotationQuat)

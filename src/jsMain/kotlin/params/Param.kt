@@ -16,22 +16,44 @@ abstract class Param(val tag: String) {
             else -> "$tag(${valueToString()})"
         }
 
-    protected fun updated() {
+    enum class UpdateType(private val mask: Int) {
+        None(0),
+        Value(1),
+        Animation(2),
+        Both(3);
+
+        fun intersects(other: UpdateType) = mask and other.mask != 0
+    }
+
+    protected fun visitAffectedContexts(update: UpdateType, visitor: (Context) -> Unit) {
         // Notify contexts in the reverse order.
         // This is important for composites: local context will get notified & updated first, and the
         // outer (containing) context will be notified last, when all local ones were already updated.
-        for (i in contexts.size - 1 downTo 0) contexts[i].update()
+        for (i in contexts.size - 1 downTo 0) {
+            contexts[i].visitAffectedContexts(update, visitor)
+        }
     }
 
-    fun onUpdate(update: () -> Unit): Context =
-        object : Context() {
+    protected fun notifyUpdate(update: UpdateType, newAnimation: Animation? = null) {
+        visitAffectedContexts(update) {
+            if (newAnimation != null) it.newAnimation(newAnimation)
+            it.update()
+        }
+    }
+
+    fun onUpdate(type: UpdateType, listener: () -> Unit): Context =
+        object : Context(type) {
             override val params: Param get() = this@Param
-            override fun update() { update() }
+            override fun update() { listener() }
             init { setup() }
         }
 
-    abstract class Context {
+    abstract class Context(private val type: UpdateType = UpdateType.Both) {
         abstract val params: Param
+
+        open fun visitAffectedContexts(update: UpdateType, visitor: (Context) -> Unit) {
+            if (type.intersects(update)) visitor(this)
+        }
 
         protected fun setupAndUpdate() {
             setup()
@@ -46,20 +68,24 @@ abstract class Param(val tag: String) {
             params.contexts -= this
         }
 
-        abstract fun update()
+        open fun newAnimation(newAnimation: Animation) {}
+
+        open fun update() {}
     }
 
     abstract class Composite(tag: String) : Param(tag) {
         private val params = ArrayList<Param>(2)
         private val tagMap by lazy { params.associateBy { it.tag } }
 
-        private val context = object : Param.Context() {
+        private val context = object : Param.Context(UpdateType.None) {
             override val params: Param
                 get() = this@Composite
 
-            override fun update() {
-                updated()
+            override fun visitAffectedContexts(update: UpdateType, visitor: (Context) -> Unit) {
+                this@Composite.visitAffectedContexts(update, visitor)
             }
+
+            override fun update() { error("Should not be called") }
 
             override fun destroy() {
                 super.destroy()
@@ -95,11 +121,13 @@ abstract class ValueParam<T : Any>(tag: String, value: T) : Param(tag) {
     val defaultValue: T = value
     
     var value: T = value
-        set(value: T) {
-            if (field == value) return
-            field = value
-            updated()
-        }
+        protected set
+
+    open fun updateValue(value: T) {
+        if (this.value == value) return
+        this.value = value
+        notifyUpdate(UpdateType.Value)
+    }
 
     override fun loadFrom(parsed: ParsedParam) {
         if (parsed !is ParsedParam.Value) return
@@ -112,12 +140,46 @@ abstract class ValueParam<T : Any>(tag: String, value: T) : Param(tag) {
     abstract fun parseValue(value: String): T?
 }
 
+abstract class AnimatedValueParam<T : Any, P : AnimatedValueParam<T, P>>(
+    tag: String,
+    value: T,
+    val animationParams: AnimationParams? = null
+) : ValueParam<T>(tag, value) {
+    var animation: ValueAnimation<T, P>? = null
+        private set
+
+    val animatedValue: T
+        get() = animation?.animatedValue ?: value
+
+    fun resetAnimation() {
+        animation = null
+    }
+
+    fun notifyAnimationUpdate() {
+        // :todo: move efficient impl for multiple animations
+        notifyUpdate(UpdateType.Animation)
+    }
+
+    override fun updateValue(value: T) {
+        if (this.value == value) return
+        val oldValue = animatedValue
+        this.value = value
+        val newAnimation = animationParams
+            ?.takeIf { it.animateUpdates.value }
+            ?.let { createAnimation(it.animationDuration.value, oldValue) }
+            ?.also { animation = it }
+        notifyUpdate(UpdateType.Value, newAnimation)
+    }
+
+    abstract fun createAnimation(duration: Double, oldValue: T): ValueAnimation<T, P>
+}
+
 class BooleanParam(
     tag: String,
     value: Boolean
 ) : ValueParam<Boolean>(tag, value) {
     fun toggle() {
-        value = !value
+        updateValue(!value)
     }
 
     override fun valueToString(): String = if (value) "y" else "n"
@@ -134,8 +196,11 @@ class DoubleParam(
     value: Double,
     val min: Double,
     val max: Double,
-    val step: Double
-) : ValueParam<Double>(tag, value) {
+    val step: Double,
+    animationParams: AnimationParams? = null
+) : AnimatedValueParam<Double, DoubleParam>(tag, value, animationParams) {
+    override fun createAnimation(duration: Double, oldValue: Double): DoubleAnimation =
+        DoubleAnimation(this, duration, oldValue)
     override fun valueToString(): String = value.fmt
     override fun parseValue(value: String): Double? = value.toDoubleOrNull()
 }
