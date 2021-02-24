@@ -18,10 +18,9 @@ abstract class GLProgram(val gl: GL) {
         initShaderProgram(gl, vertexShader.glShader, fragmentShader.glShader)
     }
 
-    fun <S : ShaderType> shader(type: S, builder: ShaderBuilder<S>.() -> Unit): Shader<S> {
-        val s = ShaderBuilder<S>()
-        s.builder()
-        return Shader(loadShader(gl, type.glType, s.source()))
+    fun <S : ShaderType> shader(type: S, builder: BlockBuilder<GLType.void>.() -> Unit): Shader<S> {
+        val main by functionVoid(builder)
+        return Shader(loadShader(gl, type.glType, shaderSource(main)))
     }
 
 
@@ -83,27 +82,14 @@ abstract class GLProgram(val gl: GL) {
         val glShader: WebGLShader
     )
 
-    inner class ShaderBuilder<S : ShaderType> {
-        private var mainFunction: GLFunction<GLType.void>? = null
-
-        fun main(builder: BlockBuilder<GLType.void>.() -> Unit): GLFunction<GLType.void> {
-            val main by functionVoid(builder)
-            check(mainFunction == null) { "At most one main function is allowed" }
-            mainFunction = main
-            return main
+    private fun shaderSource(main: GLFunction<GLType.void>): String = buildString {
+        val decls = mutableSetOf<GLDecl<*, *>>()
+        main.visitDecls { decl ->
+            if (decl.kind.isGlobal) decls += decl
         }
-
-        fun source(): String = buildString {
-            val mainFunction = mainFunction
-            check(mainFunction != null) { "main() function must be defined" }
-            val decls = mutableSetOf<GLDecl<*, *>>()
-            mainFunction.visitDecls { decl ->
-                if (decl.kind.isGlobal) decls += decl
-            }
-            appendLine("precision mediump float;") // default precision
-            val sd = decls.sortedBy { it.kind }
-            for (d in sd) appendLine(d.emitDeclaration())
-        }
+        appendLine("precision mediump float;") // default precision
+        val sd = decls.sortedBy { it.kind }
+        for (d in sd) appendLine(d.emitDeclaration())
     }
 
     fun functionVoid(builder: BlockBuilder<GLType.void>.() -> Unit): Provider<GLFunction<GLType.void>> = Provider { name ->

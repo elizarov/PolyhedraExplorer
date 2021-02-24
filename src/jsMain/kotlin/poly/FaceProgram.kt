@@ -18,26 +18,22 @@ class FaceProgram(gl: GL) : SharedPolyProgram(gl) {
     private val vColor by varying(GLType.vec3, GLPrecision.lowp)
 
     override val vertexShader = shader(ShaderType.Vertex) {
-        main {
-            // position
-            val position by fPosition()
-            gl_Position by uProjectionMatrix * position
-            // lighting & color
-            vNormal by uNormalMatrix * aVertexNormal
-            vToCamera by uCameraPosition - position.xyz
-            vToLight by uLightPosition - position.xyz
-            vColor by aVertexColor
-        }
+        // position
+        val position by fPosition()
+        gl_Position by uProjectionMatrix * position
+        // lighting & color
+        vNormal by uNormalMatrix * aVertexNormal
+        vToCamera by uCameraPosition - position.xyz
+        vToLight by uLightPosition - position.xyz
+        vColor by aVertexColor
     }
 
     override val fragmentShader = shader(ShaderType.Fragment) {
-        main {
-            val normToCamera by normalize(vToCamera)
-            val normToLight by normalize(vToLight)
-            val halfVector by normalize(normToCamera + normToLight)
-            val light by uAmbientLightColor + uDiffuseLightColor * max(dot(vNormal, normToLight), 0.0)
-            val specular by uSpecularLightColor * pow(max(dot(vNormal, halfVector), 0.0), uSpecularLightPower)
-            gl_FragColor by vec4(vColor * light + specular, uColorAlpha)
-        }
+        val normToCamera by normalize(vToCamera)
+        val normToLight by normalize(vToLight)
+        val halfVector by normalize(normToCamera + normToLight)
+        val light by uAmbientLightColor + uDiffuseLightColor * max(dot(vNormal, normToLight), 0.0)
+        val specular by uSpecularLightColor * pow(max(dot(vNormal, halfVector), 0.0), uSpecularLightPower)
+        gl_FragColor by vec4(vColor * light + specular, uColorAlpha)
     }
 }
