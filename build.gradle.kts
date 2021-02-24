@@ -13,6 +13,7 @@ repositories {
 }
 
 val `kotlin-react-version`: String by project
+val `react-version`: String by project
 val `gl-matrix-version`: String by project
 val `history-version`: String by project
 
@@ -57,6 +58,7 @@ kotlin {
             dependencies {
                 implementation("org.jetbrains:kotlin-react:${`kotlin-react-version`}")
                 implementation("org.jetbrains:kotlin-react-dom:${`kotlin-react-version`}")
+                implementation(npm("react", `react-version`))
                 implementation(npm("gl-matrix", `gl-matrix-version`))
                 implementation(npm("history", `history-version`))
             }
