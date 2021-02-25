@@ -38,3 +38,6 @@ infix fun Vec3.cross(u: Vec3) = Vec3(
 
 fun Double.atSegment(a: Vec3, b: Vec3): Vec3 = // a + this * (b - a)
     Vec3(a.x + this * (b.x - a.x), a.y + this * (b.y - a.y), a.z + this * (b.z - a.z))
+
+infix fun Vec3.approx(u: Vec3): Boolean =
+    x approx u.x && y approx u.y && z approx u.z

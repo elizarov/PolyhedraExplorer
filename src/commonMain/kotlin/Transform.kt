@@ -259,9 +259,9 @@ fun Polyhedron.snub(sr: SnubbingRatio = regularSnubbingRatio()) = polyhedron {
     // vertices from the face-vertices (directed edges)
     val fvv = fs.associateWith { f ->
         val c = f.plane.tangentPoint // face center
-        val m = (1 - cr) * rotationMat(f.plane.n, sa) // rotate clockwise!
+        val r = rotationQuat(-sa, f.plane.n)
         faceDirectedEdges[f]!!.associateBy({ it.a }, { e ->
-            vertex(c + (e.a.pt - c) * m, VertexKind(directedEdgeKindsIndex[e.kind]!!))
+            vertex(c + ((1 - cr) * (e.a.pt - c)).rotated(r), VertexKind(directedEdgeKindsIndex[e.kind]!!))
         })
     }
     // faces from the original faces
