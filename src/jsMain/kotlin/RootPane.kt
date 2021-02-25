@@ -65,7 +65,7 @@ class RootPane(props: PComponentProps<RootParams>) : PComponent<RootParams, PCom
         geometryErrorMessage = curMessage
         
         display = props.param.poly.view.display.value
-        animateUpdates = props.param.poly.animation.animateUpdates.value
+        animateUpdates = props.param.poly.animation.animateValueUpdates.value
         rotate = props.param.poly.animation.rotate.value
     }
 
@@ -117,7 +117,7 @@ class RootPane(props: PComponentProps<RootParams>) : PComponent<RootParams, PCom
                 pSlider(props.param.poly.animation.rotationAngle, !state.rotate)
             }
             controlRow("Updates") {
-                pCheckbox(props.param.poly.animation.animateUpdates)
+                pCheckbox(props.param.poly.animation.animateValueUpdates)
                 pSlider(props.param.poly.animation.animationDuration, !state.animateUpdates)
             }
         }

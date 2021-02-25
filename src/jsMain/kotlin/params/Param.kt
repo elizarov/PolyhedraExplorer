@@ -154,7 +154,7 @@ abstract class AnimatedValueParam<T : Any, P : AnimatedValueParam<T, P>>(
     value: T,
     val animationParams: AnimationParams?
 ) : ValueParam<T>(tag, value) {
-    var animation: ValueAnimation<T, P>? = null
+    var animation: ValueUpdateAnimation<T, P>? = null
         private set
 
     val animatedValue: T
@@ -174,13 +174,13 @@ abstract class AnimatedValueParam<T : Any, P : AnimatedValueParam<T, P>>(
         val oldValue = animatedValue
         this.value = value
         val newAnimation = animationParams
-            ?.takeIf { it.animateUpdates.value }
-            ?.let { createAnimation(it.animationDuration.value, oldValue) }
+            ?.takeIf { it.animateValueUpdates.value }
+            ?.let { createValueUpdateAnimation(it.animationDuration.value, oldValue) }
             ?.also { animation = it }
         notifyUpdate(UpdateType.Value, newAnimation)
     }
 
-    abstract fun createAnimation(duration: Double, oldValue: T): ValueAnimation<T, P>
+    abstract fun createValueUpdateAnimation(duration: Double, oldValue: T): ValueUpdateAnimation<T, P>
 }
 
 class BooleanParam(
@@ -230,8 +230,8 @@ class DoubleParam(
 ) : AnimatedValueParam<Double, DoubleParam>(tag, value, animationParams) {
     override var value: Double = value
         protected set
-    override fun createAnimation(duration: Double, oldValue: Double): DoubleAnimation =
-        DoubleAnimation(this, duration, oldValue)
+    override fun createValueUpdateAnimation(duration: Double, oldValue: Double): DoubleUpdateAnimation =
+        DoubleUpdateAnimation(this, duration, oldValue)
     override fun valueToString(): String =
         value.fmt
     override fun parseValue(value: String): Double? =
@@ -249,8 +249,8 @@ class RotationParam(
         get() = _quat.copy()
         set(value) { _quat by value }
 
-    override fun createAnimation(duration: Double, oldValue: Quat): RotationAnimation =
-        RotationAnimation(this, duration, oldValue)
+    override fun createValueUpdateAnimation(duration: Double, oldValue: Quat): RotationUpdateAnimation =
+        RotationUpdateAnimation(this, duration, oldValue)
     override fun valueToString(): String =
         value.toAngles().toList().joinToString(",")
     override fun parseValue(value: String): Quat? =
