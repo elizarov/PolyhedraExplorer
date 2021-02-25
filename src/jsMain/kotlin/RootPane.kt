@@ -147,7 +147,7 @@ class RootPane(props: PComponentProps<RootParams>) : PComponent<RootParams, PCom
                     }
                 }
                 if (i == state.geometryErrorIndex) {
-                    span("tooltip") {
+                    span {
                         +"⚠️"
                         span("tooltip-text") { +state.geometryErrorMessage }
                     }

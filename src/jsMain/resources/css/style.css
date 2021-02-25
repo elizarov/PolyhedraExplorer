@@ -121,9 +121,22 @@ tr.info {
     vertical-align: top;
 }
 
+/* --------- canvas fps --------- */
+
+.fps-container {
+    position: relative;
+}
+
+.fps {
+    position: absolute;
+    margin-right: 5px;
+    bottom: 0;
+    right: 0;
+}
+
 /* --------- tooltip --------- */
 
-.tooltip .tooltip-text {
+.tooltip-text {
     visibility: hidden;
     position: absolute;
     z-index: 1;
@@ -135,6 +148,6 @@ tr.info {
     border-radius: 6px;
 }
 
-.tooltip:hover .tooltip-text {
+*:hover > .tooltip-text {
     visibility: visible;
 }

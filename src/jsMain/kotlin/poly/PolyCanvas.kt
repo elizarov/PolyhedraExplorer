@@ -28,7 +28,7 @@ fun RBuilder.polyCanvas(classes: String? = null, handler: PolyCanvasProps.() -> 
 @Suppress("NON_EXPORTABLE_TYPE")
 @JsExport
 class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RState>(props) {
-    private val canvasRef = createRef<HTMLCanvasElement>()
+    private val fpsRef = createRef<HTMLDivElement>()
     private lateinit var canvas: HTMLCanvasElement
     private lateinit var drawContext: DrawContext
     private var animationHandle = 0
@@ -36,12 +36,23 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
     private var prevX = 0.0
     private var prevY = 0.0
 
+    private val canvasRef = createRef<HTMLCanvasElement>()
+    private var drawCount = 0
+    private var fpsTimeout = 0
+    
     private val animations = HashMap<Param, Animation>()
 
     override fun RBuilder.render() {
-        canvas(props.classes) {
-            attrs {
-                ref = canvasRef
+        div("fps-container") {
+            canvas(props.classes) {
+                attrs {
+                    ref = canvasRef
+                }
+            }
+            div("fps") {
+                attrs {
+                    ref = fpsRef
+                }
             }
         }
     }
@@ -52,12 +63,14 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
         canvas = canvasRef.current
         canvas.onmousedown = this::handleMouseDown
         canvas.onmousemove = this::handleMouseMove
-        drawContext = DrawContext(canvas, props.params,
+        drawContext = DrawContext(
+            canvas, props.params,
             onNewAnimation = ::newAnimation,
             onUpdate = ::update,
         )
         ResizeTracker.add(drawFun)
         update()
+        requestFpsTimeout()
     }
 
     private fun newAnimation(animation: Animation) {
@@ -71,6 +84,7 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
 
     override fun componentWillUnmount() {
         cancelAnimation()
+        cancelFpsTimeout()
         ResizeTracker.remove(drawFun)
         drawContext.destroy()
     }
@@ -84,7 +98,7 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
         animationHandle = window.requestAnimationFrame(animationFun)
     }
 
-    private val animationFun: (Double) -> Unit = af@ { nowTime ->
+    private val animationFun: (Double) -> Unit = af@{ nowTime ->
         animationHandle = 0
         if (prevTime.isNaN()) {
             prevTime = nowTime
@@ -123,6 +137,7 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
     private fun draw() {
         resizeCanvasIfNeeded(canvas.clientWidth, canvas.clientHeight)
         drawContext.drawScene(props.poly)
+        drawCount++
     }
 
     private fun resizeCanvasIfNeeded(clientWidth: Int, clientHeight: Int) {
@@ -151,5 +166,23 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
             savePrevMouseEvent(e)
             draw()
         }
+    }
+
+    private fun requestFpsTimeout() {
+        if (fpsTimeout != 0) return
+        fpsTimeout = window.setTimeout(fpsTimeoutFun, 1000)
+    }
+
+    private val fpsTimeoutFun: () -> Unit = {
+        fpsRef.current.textContent = if (drawCount == 0) "" else "$drawCount fps"
+        fpsTimeout = 0
+        drawCount = 0
+        requestFpsTimeout()
+    }
+
+    private fun cancelFpsTimeout() {
+        if (fpsTimeout == 0) return
+        window.clearTimeout(fpsTimeout)
+        fpsTimeout = 0
     }
 }
