@@ -1,5 +1,7 @@
 package polyhedra.js.params
 
+import polyhedra.common.util.*
+
 open class AnimationParams(tag: String) : Param.Composite(tag) {
     val animateUpdates = using(BooleanParam("u", true))
     val animationDuration = using(DoubleParam("d", 0.5, 0.0, 2.0, 0.1))
@@ -44,5 +46,16 @@ class DoubleAnimation(
     override val animatedValue: Double get() {
         val f = fraction
         return oldValue * (1 - f) + param.value * f
+    }
+}
+
+class RotationAnimation(
+    param: RotationParam,
+    duration: Double,
+    val oldValue: Quat
+) : ValueAnimation<Quat, RotationParam>(param, duration) {
+    override val animatedValue: Quat get() {
+        val f = fraction
+        return (oldValue * (1 - f) + param.value * f).unit
     }
 }

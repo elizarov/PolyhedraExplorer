@@ -1,6 +1,7 @@
 package polyhedra.js.params
 
 import polyhedra.common.*
+import polyhedra.common.util.*
 
 abstract class Param(val tag: String) {
     private val contexts = ArrayList<Context>(2)
@@ -119,31 +120,39 @@ abstract class Param(val tag: String) {
 
 abstract class ValueParam<T : Any>(tag: String, value: T) : Param(tag) {
     val defaultValue: T = value
-    
-    var value: T = value
+
+    abstract var value: T
         protected set
 
-    open fun updateValue(value: T) {
-        if (this.value == value) return
-        this.value = value
-        notifyUpdate(UpdateType.Value)
-    }
+    abstract fun updateValue(value: T)
+
+    override fun isDefault(): Boolean = value == defaultValue
+
+    override fun valueToString(): String = value.toString()
 
     override fun loadFrom(parsed: ParsedParam) {
         if (parsed !is ParsedParam.Value) return
         parseValue(parsed.value)?.let { value = it }
     }
 
-    override fun isDefault(): Boolean = value == defaultValue
-    override fun valueToString(): String = value.toString()
-
     abstract fun parseValue(value: String): T?
+}
+
+abstract class ImmutableValueParam<T : Any>(tag: String, value: T) : ValueParam<T>(tag, value) {
+    override var value: T = value
+        protected set
+
+    override fun updateValue(value: T) {
+        if (this.value == value) return
+        this.value = value
+        notifyUpdate(UpdateType.Value)
+    }
 }
 
 abstract class AnimatedValueParam<T : Any, P : AnimatedValueParam<T, P>>(
     tag: String,
     value: T,
-    val animationParams: AnimationParams? = null
+    val animationParams: AnimationParams?
 ) : ValueParam<T>(tag, value) {
     var animation: ValueAnimation<T, P>? = null
         private set
@@ -177,7 +186,7 @@ abstract class AnimatedValueParam<T : Any, P : AnimatedValueParam<T, P>>(
 class BooleanParam(
     tag: String,
     value: Boolean
-) : ValueParam<Boolean>(tag, value) {
+) : ImmutableValueParam<Boolean>(tag, value) {
     fun toggle() {
         updateValue(!value)
     }
@@ -191,25 +200,11 @@ class BooleanParam(
     }
 }
 
-class DoubleParam(
-    tag: String,
-    value: Double,
-    val min: Double,
-    val max: Double,
-    val step: Double,
-    animationParams: AnimationParams? = null
-) : AnimatedValueParam<Double, DoubleParam>(tag, value, animationParams) {
-    override fun createAnimation(duration: Double, oldValue: Double): DoubleAnimation =
-        DoubleAnimation(this, duration, oldValue)
-    override fun valueToString(): String = value.fmt
-    override fun parseValue(value: String): Double? = value.toDoubleOrNull()
-}
-
 class EnumParam<T : Tagged>(
     tag: String,
     value: T,
     val options: List<T>
-) : ValueParam<T>(tag, value) {
+) : ImmutableValueParam<T>(tag, value) {
     override fun valueToString(): String = value.tag
     override fun parseValue(value: String): T? = options.find { it.tag == value }
 }
@@ -218,10 +213,49 @@ class EnumListParam<T : Tagged>(
     tag: String,
     value: List<T>,
     val options: List<T>
-) : ValueParam<List<T>>(tag, value) {
+) : ImmutableValueParam<List<T>>(tag, value) {
     override fun valueToString(): String = value.joinToString(",") { it.tag }
     override fun parseValue(value: String): List<T> = value.split(",").mapNotNull { element ->
         options.find { it.tag == element }
     }
 }
 
+class DoubleParam(
+    tag: String,
+    value: Double,
+    val min: Double,
+    val max: Double,
+    val step: Double,
+    animationParams: AnimationParams? = null
+) : AnimatedValueParam<Double, DoubleParam>(tag, value, animationParams) {
+    override var value: Double = value
+        protected set
+    override fun createAnimation(duration: Double, oldValue: Double): DoubleAnimation =
+        DoubleAnimation(this, duration, oldValue)
+    override fun valueToString(): String =
+        value.fmt
+    override fun parseValue(value: String): Double? =
+        value.toDoubleOrNull()
+}
+
+class RotationParam(
+    tag: String,
+    value: Quat,
+    animationParams: AnimationParams? = null
+) : AnimatedValueParam<Quat, RotationParam>(tag, value, animationParams) {
+    private val _quat = MutableQuat()
+
+    override var value: Quat
+        get() = _quat.copy()
+        set(value) { _quat by value }
+
+    override fun createAnimation(duration: Double, oldValue: Quat): RotationAnimation =
+        RotationAnimation(this, duration, oldValue)
+    override fun valueToString(): String =
+        value.toAngles().toList().joinToString(",")
+    override fun parseValue(value: String): Quat? =
+        value.split(",").mapNotNull { it.toDoubleOrNull() }.toVec3OrNull()?.anglesToQuat()
+}
+
+private fun Vec3.toList() = listOf(x, y, z)
+private fun List<Double>.toVec3OrNull() = if (size < 3) null else Vec3(get(0), get(1), get(2))

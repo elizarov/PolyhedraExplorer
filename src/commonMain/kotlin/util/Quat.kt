@@ -1,6 +1,7 @@
 package polyhedra.common.util
 
 import polyhedra.common.*
+import kotlin.js.*
 import kotlin.math.*
 
 interface Quat {
@@ -20,6 +21,36 @@ data class MutableQuat(
         "Quat[${w.fmt}, ${x.fmt}, ${y.fmt}, ${z.fmt}]"
 }
 
+@JsName("MutableQuatId")
+fun MutableQuat(): MutableQuat = MutableQuat(1.0, 0.0, 0.0, 0.0)
+
+infix fun MutableQuat.by(q: Quat) = by(q.w, q.x, q.y, q.z)
+
+fun MutableQuat.by(w: Double, x: Double, y: Double, z: Double) {
+    this.w = w
+    this.x = x
+    this.y = y
+    this.z = z
+}
+
+fun norm(w: Double, x: Double, y: Double, z: Double): Double =
+    sqrt(sqr(w) + sqr(x) + sqr(y) + sqr(z))
+
+val Quat.norm: Double
+    get() = norm(w, x, y, z)
+
+val Quat.unit: MutableQuat get() {
+   val n = norm
+   if (n < EPS) return MutableQuat()
+   return MutableQuat(w / n, x / n, y / n, z / n)
+}
+
+operator fun Quat.times(a: Double): MutableQuat =
+    MutableQuat(w * a, x * a, y * a, z * a)
+
+operator fun Quat.plus(q: Quat): MutableQuat =
+    MutableQuat(w  + q.w, x + q.x, y + q.y, z + q.z)
+
 fun Vec3.toRotationAroundQuat(angle: Double): MutableQuat =
     rotationAroundQuat(x, y, z, angle)
 
@@ -35,31 +66,22 @@ fun MutableQuat.rotateAroundFront(x: Double, y: Double, z: Double, angle: Double
     multiplyFront(w, s * x, s * y, s * z)
 }
 
-
-fun MutableQuat.multiplyFront(a: Double, b: Double, c: Double, d: Double) {
-    val rw = a * this.w - b * this.x - c * this.y - d * this.z
-    val rx = a * this.x + b * this.w + c * this.z - d * this.y
-    val ry = a * this.y - b * this.z + c * this.w + d * this.x
-    val rz = a * this.z + b * this.y - c * this.x + d * this.w
-    this.w = rw
-    this.x = rx
-    this.y = ry
-    this.z = rz
-}
+fun MutableQuat.multiplyFront(a: Double, b: Double, c: Double, d: Double) = by(
+    a * w - b * x - c * y - d * z,
+    a * x + b * w + c * z - d * y,
+    a * y - b * z + c * w + d * x,
+    a * z + b * y - c * x + d * w
+)
 
 fun MutableQuat.multiplyFront(q: Quat) = multiplyFront(q.w, q.x, q.y, q.z)
 
 // multiplies by a pure quaternion of the given vector
-fun MutableQuat.multiplyFront(v: Vec3) {
-    val rw = -v.x * x - v.y * y - v.z * z
-    val rx = +v.x * w + v.y * z - v.z * y
-    val ry = -v.x * z + v.y * w + v.z * x
-    val rz = +v.x * y - v.y * x + v.z * w
-    w = rw
-    x = rx
-    y = ry
-    z = rz
-}
+fun MutableQuat.multiplyFront(v: Vec3) = by(
+    -v.x * x - v.y * y - v.z * z,
+    +v.x * w + v.y * z - v.z * y,
+    -v.x * z + v.y * w + v.z * x,
+    +v.x * y - v.y * x + v.z * w
+)
 
 fun Vec3.rotated(q: Quat): Vec3 {
     val r = MutableQuat(q.w, -q.x, -q.y, -q.z)
