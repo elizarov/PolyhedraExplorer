@@ -1,60 +1,96 @@
 package polyhedra.common.util
 
+import polyhedra.common.*
 import kotlin.math.*
 
 interface Quat {
-    val a: Double
-    val b: Double
-    val c: Double
-    val d: Double
+    val w: Double
+    val x: Double
+    val y: Double
+    val z: Double
 }
 
-class MutableQuat(
-    override var a: Double,
-    override var b: Double,
-    override var c: Double,
-    override var d: Double,
-) : Quat
-
-fun rotationQuat(angle: Double, x: Double, y: Double, z: Double): MutableQuat {
-    val s = sin(angle / 2)
-    val a = cos(angle / 2)
-    return MutableQuat(a, s * x, s * y, s * z)
+data class MutableQuat(
+    override var w: Double,
+    override var x: Double,
+    override var y: Double,
+    override var z: Double,
+) : Quat {
+    override fun toString(): String =
+        "Quat[${w.fmt}, ${x.fmt}, ${y.fmt}, ${z.fmt}]"
 }
 
-fun rotationQuat(angle: Double, v: Vec3): MutableQuat = rotationQuat(angle, v.x, v.y, v.z)
+fun Vec3.toRotationAroundQuat(angle: Double): MutableQuat =
+    rotationAroundQuat(x, y, z, angle)
 
-fun MutableQuat.multiplyFront(quat: Quat) {
-    val ra = quat.a * a - quat.b * b - quat.c * c - quat.d * d
-    val rb = quat.a * b + quat.b * a + quat.c * d - quat.d * c
-    val rc = quat.a * c - quat.b * d + quat.c * a + quat.d * b
-    val rd = quat.a * d + quat.b * c - quat.c * b + quat.d * a
-    a = ra
-    b = rb
-    c = rc
-    d = rd
+fun rotationAroundQuat(x: Double, y: Double, z: Double, angle: Double): MutableQuat {
+    val s = sin(angle * 0.5) / norm(x, y, z)
+    val w = cos(angle * 0.5)
+    return MutableQuat(w, s * x, s * y, s * z)
 }
 
-fun MutableQuat.rotateFront(angle: Double, x: Double, y: Double, z: Double) {
-    val s = sin(angle / 2)
-    val a1 = cos(angle / 2)
-    val b1 = s * x
-    val c1 = s * y
-    val d1 = s * z
-    val ra = a1 * a - b1 * b - c1 * c - d1 * d
-    val rb = a1 * b + b1 * a + c1 * d - d1 * c
-    val rc = a1 * c - b1 * d + c1 * a + d1 * b
-    val rd = a1 * d + b1 * c - c1 * b + d1 * a
-    a = ra
-    b = rb
-    c = rc
-    d = rd
+fun MutableQuat.rotateAroundFront(x: Double, y: Double, z: Double, angle: Double) {
+    val s = sin(angle * 0.5) / norm(x, y, z)
+    val w = cos(angle * 0.5)
+    multiplyFront(w, s * x, s * y, s * z)
+}
+
+
+fun MutableQuat.multiplyFront(a: Double, b: Double, c: Double, d: Double) {
+    val rw = a * this.w - b * this.x - c * this.y - d * this.z
+    val rx = a * this.x + b * this.w + c * this.z - d * this.y
+    val ry = a * this.y - b * this.z + c * this.w + d * this.x
+    val rz = a * this.z + b * this.y - c * this.x + d * this.w
+    this.w = rw
+    this.x = rx
+    this.y = ry
+    this.z = rz
+}
+
+fun MutableQuat.multiplyFront(q: Quat) = multiplyFront(q.w, q.x, q.y, q.z)
+
+// multiplies by a pure quaternion of the given vector
+fun MutableQuat.multiplyFront(v: Vec3) {
+    val rw = -v.x * x - v.y * y - v.z * z
+    val rx = +v.x * w + v.y * z - v.z * y
+    val ry = -v.x * z + v.y * w + v.z * x
+    val rz = +v.x * y - v.y * x + v.z * w
+    w = rw
+    x = rx
+    y = ry
+    z = rz
 }
 
 fun Vec3.rotated(q: Quat): Vec3 {
-    val r = MutableQuat(q.a, -q.b, -q.c, -q.d)
-    val t = MutableQuat(0.0, x, y, z)
-    r.multiplyFront(t)
+    val r = MutableQuat(q.w, -q.x, -q.y, -q.z)
+    r.multiplyFront(this)
     r.multiplyFront(q)
-    return Vec3(r.b, r.c, r.d)
+    return Vec3(r.x, r.y, r.z)
 }
+
+fun Quat.toAngles(): Vec3 {
+    val x = atan2(2 * (w * x + y * z), 1 - 2 * (x * x + y * y))
+    val siny = 2 * (w * y - z * x);
+    val y = if (siny.absoluteValue >= 1) (PI / 2) * siny.sign else asin(siny)
+    val z = atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z));
+    return Vec3(x, y, z)
+}
+
+fun Vec3.anglesToQuat(): MutableQuat {
+    val cy = cos(z * 0.5);
+    val sy = sin(z * 0.5);
+    val cp = cos(y * 0.5);
+    val sp = sin(y * 0.5);
+    val cr = cos(x * 0.5);
+    val sr = sin(x * 0.5);
+    return MutableQuat(
+        cr * cp * cy + sr * sp * sy,
+        sr * cp * cy - cr * sp * sy,
+        cr * sp * cy + sr * cp * sy,
+        cr * cp * sy - sr * sp * cy
+    )
+}
+
+infix fun Quat.approx(q: Quat): Boolean =
+    w approx q.w && x approx q.x && y approx q.y && z approx q.z
+
