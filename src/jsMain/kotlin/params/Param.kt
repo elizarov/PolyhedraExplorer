@@ -23,8 +23,8 @@ abstract class Param(val tag: String) {
         ValueUpdate(1),
         ValueAnimation(2),
         ValueUpdateOrAnimation(3),
-        ActiveAnimationsList(4),
-        ValueUpdateAndNewAnimation(5);
+        AnimationEffects(4),
+        ValueUpdateAndAnimationEffects(5);
 
         fun intersects(other: UpdateType) = mask and other.mask != 0
     }
@@ -195,7 +195,7 @@ abstract class AnimatedValueParam<T : Any, P : AnimatedValueParam<T, P>>(
             ?.also { valueUpdateAnimation = it }
         notifyUpdate(
             if (newAnimation != null)
-                UpdateType.ValueUpdateAndNewAnimation else
+                UpdateType.ValueUpdateAndAnimationEffects else
                 UpdateType.ValueUpdate
         )
     }
@@ -275,7 +275,7 @@ class RotationParam(
     // todo: destroy it when dynamic params are supported
     private val context = rotationAnimationParams?.animatedRotation?.onUpdate(type = UpdateType.ValueUpdate) {
         if (updateAnimation(rotationAnimationParams)) {
-            notifyUpdate(UpdateType.ActiveAnimationsList)
+            notifyUpdate(UpdateType.AnimationEffects)
         }
     }
 
@@ -311,8 +311,8 @@ class RotationParam(
     }
 
     override fun visitActiveAnimations(visitor: (Param, Animation) -> Unit) {
-        super.visitActiveAnimations(visitor)
         rotationAnimationParams?.let { updateAnimation(it) }
+        super.visitActiveAnimations(visitor)
         rotationAnimation?.let { visitor(this, it) }
     }
 

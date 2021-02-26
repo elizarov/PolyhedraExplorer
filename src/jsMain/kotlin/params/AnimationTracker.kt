@@ -4,10 +4,12 @@ import kotlinx.browser.*
 import polyhedra.common.*
 import kotlin.math.*
 
-class AnimationTracker(override val params: Param) : Param.Context(Param.UpdateType.ActiveAnimationsList) {
+class AnimationTracker(override val params: Param) : Param.Context(Param.UpdateType.AnimationEffects) {
     private var prevTime = Double.NaN
     private var animationHandle = 0
-    private val animations = ArrayList<Animation>()
+
+    private var dirtyAnimationsList = true
+    private val animationsList = ArrayList<Animation>()
     private val affectedContexts = ArrayList<Param.Context>() // in reverse order
 
     fun start() {
@@ -15,12 +17,18 @@ class AnimationTracker(override val params: Param) : Param.Context(Param.UpdateT
     }
 
     override fun update() {
-        animations.clear()
+        dirtyAnimationsList = true
+        requestAnimation()
+    }
+
+    private fun rebuildAnimationsList() {
+        dirtyAnimationsList = false
+        animationsList.clear()
         affectedContexts.clear()
         val affectedThis = ArrayList<Param.Context>()
         val affectedSet = HashSet<Param.Context>()
         params.visitActiveAnimations { p, a ->
-            animations += a
+            animationsList += a
             p.visitAffectedContexts(Param.UpdateType.ValueAnimation) { affectedThis += it }
             // the last affected should be root, start from it
             for (i in affectedThis.size - 1 downTo 0) {
@@ -29,11 +37,10 @@ class AnimationTracker(override val params: Param) : Param.Context(Param.UpdateT
             }
             affectedThis.clear()
         }
-        requestAnimation()
     }
 
     private fun requestAnimation() {
-        if (animations.isEmpty()) {
+        if (animationsList.isEmpty() && !dirtyAnimationsList) {
             cancelAnimation()
             return
         }
@@ -50,17 +57,19 @@ class AnimationTracker(override val params: Param) : Param.Context(Param.UpdateT
         }
         val dt = (nowTime - prevTime) / 1000 // in seconds
         prevTime = nowTime
-        for (animation in animations) {
+        if (dirtyAnimationsList) {
+            rebuildAnimationsList()
+        }
+        for (animation in animationsList) {
             animation.update(dt)
         }
         for (i in affectedContexts.size - 1 downTo 0) {
             affectedContexts[i].update()
         }
-        if (animations.any { it.isOver }) {
-            update()
-        } else {
-            requestAnimation()
+        if (animationsList.any { it.isOver }) {
+            dirtyAnimationsList = true
         }
+        requestAnimation()
     }
 
     private fun cancelAnimation() {
