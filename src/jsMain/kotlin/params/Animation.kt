@@ -15,11 +15,11 @@ abstract class Animation {
 
 abstract class ValueUpdateAnimation<T : Any, P : AnimatedValueParam<T, P>>(
     override val param: P,
-    val duration: Double
+    private val duration: Double
 ) : Animation() {
     abstract val animatedValue: T
 
-    var position = 0.0
+    private var position = 0.0
 
     val fraction: Double
         get() = if (duration <= 0.0) 1.0 else (position / duration).coerceIn(0.0, 1.0)
@@ -37,7 +37,7 @@ abstract class ValueUpdateAnimation<T : Any, P : AnimatedValueParam<T, P>>(
 class DoubleUpdateAnimation(
     param: DoubleParam,
     duration: Double,
-    val oldValue: Double
+    private val oldValue: Double
 ) : ValueUpdateAnimation<Double, DoubleParam>(param, duration) {
     override val animatedValue: Double get() {
         val f = fraction
@@ -48,7 +48,7 @@ class DoubleUpdateAnimation(
 class RotationUpdateAnimation(
     param: RotationParam,
     duration: Double,
-    val oldValue: Quat
+    private val oldValue: Quat
 ) : ValueUpdateAnimation<Quat, RotationParam>(param, duration) {
     override val animatedValue: Quat get() {
         val f = fraction

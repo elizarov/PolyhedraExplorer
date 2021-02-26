@@ -28,6 +28,12 @@ data class MutableQuat(
 @JsName("MutableQuatId")
 fun MutableQuat(): MutableQuat = MutableQuat(0.0, 0.0, 0.0, 1.0)
 
+fun Quat.toMutableQuat(): MutableQuat =
+    MutableQuat(x, y, z, w)
+
+fun Quat(x: Double, y: Double, z: Double, w: Double): Quat =
+    MutableQuat(x, y, z, w)
+
 infix fun MutableQuat.by(q: Quat) = by(q.x, q.y, q.z, q.w)
 
 fun MutableQuat.by(x: Double, y: Double, z: Double, w: Double) {
@@ -43,38 +49,42 @@ fun norm(x: Double, y: Double, z: Double, w: Double): Double =
 val Quat.norm: Double
     get() = norm(x, y, z, w)
 
-val Quat.unit: MutableQuat get() {
+val Quat.unit: Quat get() {
    val n = norm
    if (n < EPS) return MutableQuat()
-   return MutableQuat(x / n, y / n, z / n, w / n)
+   return Quat(x / n, y / n, z / n, w / n)
 }
 
-operator fun Quat.times(a: Double): MutableQuat =
-    MutableQuat(x * a, y * a, z * a, w * a)
+operator fun Quat.plus(q: Quat): Quat =
+    Quat(x + q.x, y + q.y, z + q.z, w  + q.w)
 
-operator fun Quat.plus(q: Quat): MutableQuat =
-    MutableQuat(x + q.x, y + q.y, z + q.z, w  + q.w)
+operator fun Quat.times(q: Quat): Quat =
+    q.toMutableQuat().also { it.multiplyFront(this) }
 
-fun Vec3.toRotationAroundQuat(angle: Double): MutableQuat =
+operator fun Quat.times(a: Double): Quat =
+    Quat(x * a, y * a, z * a, w * a)
+
+fun Vec3.toRotationAroundQuat(angle: Double): Quat =
     rotationAroundQuat(x, y, z, angle)
 
-fun rotationAroundQuat(x: Double, y: Double, z: Double, angle: Double): MutableQuat {
+fun rotationAroundQuat(x: Double, y: Double, z: Double, angle: Double): Quat {
     val s = sin(angle * 0.5) / norm(x, y, z)
     val w = cos(angle * 0.5)
-    return MutableQuat(s * x, s * y, s * z, w)
+    return Quat(s * x, s * y, s * z, w)
 }
 
-fun MutableQuat.multiplyFront(x: Double, y: Double, z: Double, w: Double) = by(
+fun MutableQuat.multiplyFront(x: Double, y: Double, z: Double, w: Double): Unit = by(
     w * this.x + x * this.w + y * this.z - z * this.y,
     w * this.y - x * this.z + y * this.w + z * this.x,
     w * this.z + x * this.y - y * this.x + z * this.w,
     w * this.w - x * this.x - y * this.y - z * this.z
 )
 
-fun MutableQuat.multiplyFront(q: Quat) = multiplyFront(q.x, q.y, q.z, q.w)
+fun MutableQuat.multiplyFront(q: Quat): Unit =
+    multiplyFront(q.x, q.y, q.z, q.w)
 
 // multiplies by a pure quaternion of the given vector
-fun MutableQuat.multiplyFront(v: Vec3) = by(
+fun MutableQuat.multiplyFront(v: Vec3): Unit = by(
     +v.x * w + v.y * z - v.z * y,
     -v.x * z + v.y * w + v.z * x,
     +v.x * y - v.y * x + v.z * w,
@@ -99,17 +109,17 @@ fun Quat.toAngles(): Vec3 {
     return Vec3(atan2(cx, sx), asin(sy), atan2(cz, sz))
 }
 
-fun Vec3.anglesToQuat(): MutableQuat =
+fun Vec3.anglesToQuat(): Quat =
     anglesToQuat(x, y, z)
 
-fun anglesToQuat(x: Double, y: Double, z: Double): MutableQuat {
+fun anglesToQuat(x: Double, y: Double, z: Double): Quat {
     val cy = cos(z * 0.5);
     val sy = sin(z * 0.5);
     val cp = cos(y * 0.5);
     val sp = sin(y * 0.5);
     val cr = cos(x * 0.5);
     val sr = sin(x * 0.5);
-    return MutableQuat(
+    return Quat(
         sr * cp * cy - cr * sp * sy,
         cr * sp * cy + sr * cp * sy,
         cr * cp * sy - sr * sp * cy,
