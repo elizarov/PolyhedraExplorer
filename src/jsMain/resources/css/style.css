@@ -91,6 +91,10 @@ input, button, select {
     margin-right: 1ch;
 }
 
+.download {
+    display: none;
+}
+
 /* --------- tables --------- */
 
 table {

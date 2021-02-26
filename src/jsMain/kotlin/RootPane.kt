@@ -20,7 +20,7 @@ external interface RootPaneState : RState {
     var polyName: String
     var geometryErrorIndex: Int
     var geometryErrorMessage: String
-    
+
     var display: Display
     var animateUpdates: Boolean
     var rotate: Boolean
@@ -28,7 +28,9 @@ external interface RootPaneState : RState {
 
 @Suppress("NON_EXPORTABLE_TYPE")
 @JsExport
-class RootPane(props: PComponentProps<RootParams>) : PComponent<RootParams, PComponentProps<RootParams>, RootPaneState>(props) {
+class RootPane(props: PComponentProps<RootParams>) :
+    PComponent<RootParams, PComponentProps<RootParams>, RootPaneState>(props)
+{
     override fun RootPaneState.init(props: PComponentProps<RootParams>) {
         seed = props.param.seed.value
         transforms = props.param.transforms.value
@@ -63,7 +65,7 @@ class RootPane(props: PComponentProps<RootParams>) : PComponent<RootParams, PCom
         polyName = curPolyName
         geometryErrorIndex = curIndex
         geometryErrorMessage = curMessage
-        
+
         display = props.param.poly.view.display.value
         animateUpdates = props.param.animation.animateValueUpdates.value
         rotate = props.param.animation.animatedRotation.value
@@ -129,6 +131,19 @@ class RootPane(props: PComponentProps<RootParams>) : PComponent<RootParams, PCom
             controlRow("Diffuse") { pSlider(props.param.poly.lighting.diffuseLight, lightingDisabled) }
             controlRow("Specular") { pSlider(props.param.poly.lighting.specularLight, lightingDisabled) }
             controlRow("Shininess") { pSlider(props.param.poly.lighting.specularPower, lightingDisabled) }
+        }
+
+        header("Export")
+        div("control row") {
+            button {
+                attrs {
+                    onClickFunction = {
+                        val name = state.polyName.replace(' ', '_').lowercase()
+                        download("$name.scad", state.poly.exportGeometryToScad(name))
+                    }
+                }
+                +"Geometry to SCAD"
+            }
         }
     }
 
@@ -197,7 +212,12 @@ fun RDOMBuilder<TBODY>.controlRow(label: String, block: RDOMBuilder<TD>.() -> Un
         td(block = block)
     }
 }
-fun RDOMBuilder<TBODY>.controlRow2(label: String, block1: RDOMBuilder<TD>.() -> Unit, block2: RDOMBuilder<TD>.() -> Unit) {
+
+fun RDOMBuilder<TBODY>.controlRow2(
+    label: String,
+    block1: RDOMBuilder<TD>.() -> Unit,
+    block2: RDOMBuilder<TD>.() -> Unit
+) {
     tr("control") {
         td { +label }
         td(block = block1)

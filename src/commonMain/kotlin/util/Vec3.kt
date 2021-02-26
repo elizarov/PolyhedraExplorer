@@ -8,6 +8,7 @@ data class Vec3(
     val y: Double,
     val z: Double
 ) {
+    fun toPreciseString(): String = "[$x, $y, $z]"
     override fun toString(): String = "[${x.fmt}, ${y.fmt}, ${z.fmt}]"
 }
 
