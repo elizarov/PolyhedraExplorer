@@ -9,6 +9,10 @@ interface Quat {
     val x: Double
     val y: Double
     val z: Double
+
+    companion object {
+        val ID: Quat = MutableQuat()
+    }
 }
 
 data class MutableQuat(
@@ -91,14 +95,20 @@ fun Vec3.rotated(q: Quat): Vec3 {
 }
 
 fun Quat.toAngles(): Vec3 {
-    val x = atan2(2 * (w * x + y * z), 1 - 2 * (x * x + y * y))
-    val siny = 2 * (w * y - z * x);
-    val y = if (siny.absoluteValue >= 1) (PI / 2) * siny.sign else asin(siny)
-    val z = atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z));
-    return Vec3(x, y, z)
+    val sinx = 1 - 2 * (x * x + y * y)
+    val cosx = 2 * (w * x + y * z)
+    val siny = 2 * (w * y - z * x)
+    val sinz = 1 - 2 * (y * y + z * z)
+    val cosz = 2 * (w * z + x * y)
+    if (siny.absoluteValue >= 1 - EPS)
+        return Vec3(0.0, PI * 0.5 * siny.sign, 0.0)
+    return Vec3(atan2(cosx, sinx), asin(siny), atan2(cosz, sinz))
 }
 
-fun Vec3.anglesToQuat(): MutableQuat {
+fun Vec3.anglesToQuat(): MutableQuat =
+    anglesToQuat(x, y, z)
+
+fun anglesToQuat(x: Double, y: Double, z: Double): MutableQuat {
     val cy = cos(z * 0.5);
     val sy = sin(z * 0.5);
     val cp = cos(y * 0.5);
@@ -114,5 +124,6 @@ fun Vec3.anglesToQuat(): MutableQuat {
 }
 
 infix fun Quat.approx(q: Quat): Boolean =
-    w approx q.w && x approx q.x && y approx q.y && z approx q.z
+    w approx q.w && x approx q.x && y approx q.y && z approx q.z ||
+    w approx -q.w && x approx -q.x && y approx -q.y && z approx -q.z
 

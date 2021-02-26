@@ -2,6 +2,7 @@ package polyhedra.js.params
 
 import polyhedra.common.*
 import polyhedra.common.util.*
+import kotlin.math.*
 
 abstract class Param(val tag: String) {
     private val contexts = ArrayList<Context>(2)
@@ -249,12 +250,22 @@ class RotationParam(
         get() = _quat.copy()
         set(value) { _quat by value }
 
+    fun rotate(x: Double, y: Double, z: Double, updateType: UpdateType) {
+        _quat.multiplyFront(anglesToQuat(x, y, z))
+        notifyUpdate(updateType)
+    }
+
     override fun createValueUpdateAnimation(duration: Double, oldValue: Quat): RotationUpdateAnimation =
         RotationUpdateAnimation(this, duration, oldValue)
+
     override fun valueToString(): String =
-        value.toAngles().toList().joinToString(",")
+        value.toAngles().toList().joinToString(",") {
+            (180 * it / PI).fmt(1)
+        }
     override fun parseValue(value: String): Quat? =
-        value.split(",").mapNotNull { it.toDoubleOrNull() }.toVec3OrNull()?.anglesToQuat()
+        value.split(",").mapNotNull { s ->
+            s.toDoubleOrNull()?.let { (PI * it) / 180 }
+        }.toVec3OrNull()?.anglesToQuat()
 }
 
 private fun Vec3.toList() = listOf(x, y, z)

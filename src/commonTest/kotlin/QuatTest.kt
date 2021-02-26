@@ -1,5 +1,6 @@
 import polyhedra.common.util.*
 import kotlin.math.*
+import kotlin.random.*
 import kotlin.test.*
 
 class QuatTest {
@@ -7,7 +8,12 @@ class QuatTest {
     private val uy = Vec3(0.0, 1.0, 0.0)
     private val uz = Vec3(0.0, 0.0, 1.0)
 
-    private val ra = PI / 2
+    private val ra = PI / 2 // 90 deg
+    private val rb = PI / 3 // 60 deg
+    private val rc = PI / 4 // 45 deg
+    private val rd = PI / 6 // 30 deg
+
+    private val testAngles = listOf(0.0, ra, rb, rc, rd, -ra, -rb, -rc, -rd)
 
     @Test
     fun testRotation() {
@@ -24,16 +30,33 @@ class QuatTest {
 
     @Test
     fun testToAngles() {
-        assertAnglesApprox(ra * ux, ux.toRotationAroundQuat(ra).toAngles())
-        assertAnglesApprox(ra * uy + PI * uz, uy.toRotationAroundQuat(ra).toAngles())
-        assertAnglesApprox(ra * uz, uz.toRotationAroundQuat(ra).toAngles())
+        for (r in testAngles) {
+            assertApprox(r * ux, ux.toRotationAroundQuat(r).toAngles())
+            assertApprox(r * uy, uy.toRotationAroundQuat(r).toAngles())
+            assertApprox(r * uz, uz.toRotationAroundQuat(r).toAngles())
+        }
     }
 
     @Test
     fun testAnglesToQuat() {
-        assertApprox(ux.toRotationAroundQuat(ra), (ux * ra).anglesToQuat())
-        assertApprox(uy.toRotationAroundQuat(ra), (uy * ra).anglesToQuat())
-        assertApprox(uz.toRotationAroundQuat(ra), (uz * ra).anglesToQuat())
+        for (r in testAngles) {
+            assertApprox(ux.toRotationAroundQuat(r), (ux * r).anglesToQuat())
+            assertApprox(uy.toRotationAroundQuat(r), (uy * r).anglesToQuat())
+            assertApprox(uz.toRotationAroundQuat(r), (uz * r).anglesToQuat())
+        }
+    }
+
+    @Test
+    fun testToAnglesAndBack() {
+        val rnd = Random(1)
+        repeat(10) {
+            val original = rotationAroundQuat(
+                rnd.nextDouble(), rnd.nextDouble(), rnd.nextDouble(), rnd.nextDouble() * 2 * PI
+            )
+            val angles = original.toAngles()
+            val quat = angles.anglesToQuat()
+            assertApprox(original, quat)
+        }
     }
 
     private fun assertApprox(expect: Quat, actual: Quat) {
@@ -43,11 +66,6 @@ class QuatTest {
 
     private fun assertApprox(expect: Vec3, actual: Vec3) {
         if (expect approx actual) return
-        fail("Expected: $expect, actual: $actual")
-    }
-
-    private fun assertAnglesApprox(expect: Vec3, actual: Vec3) {
-        if (expect anglesApprox actual) return
         fail("Expected: $expect, actual: $actual")
     }
 }

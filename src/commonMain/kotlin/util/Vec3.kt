@@ -44,6 +44,3 @@ fun Double.atSegment(a: Vec3, b: Vec3): Vec3 = // a + this * (b - a)
 
 infix fun Vec3.approx(u: Vec3): Boolean =
     x approx u.x && y approx u.y && z approx u.z
-
-infix fun Vec3.anglesApprox(u: Vec3): Boolean =
-    x angleApprox u.x && y angleApprox u.y && z angleApprox u.z

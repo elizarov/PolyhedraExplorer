@@ -7,8 +7,6 @@ import polyhedra.js.util.*
 import kotlin.math.*
 
 class ViewContext(override val params: ViewParams) : Param.Context() {
-    var rotationQuat = quat.create()
-
     val cameraPosition = float32Of(0.0, 0.0, 3.0)
     val projectionMatrix = mat4.create()
     val modelMatrix = mat4.create()
@@ -21,17 +19,6 @@ class ViewContext(override val params: ViewParams) : Param.Context() {
 
     private val tmpQuat = quat.create()
     private val tmpVec3 = Float32Array(3)
-
-    fun rotate(dx: Double, dy: Double) {
-        val angle = sqrt(dx * dx + dy * dy)
-        if (angle == 0.0) return
-        tmpVec3[0] = dy / angle
-        tmpVec3[1] = dx / angle
-        tmpVec3[2] = 0.0
-        quat.setAxisAngle(tmpQuat, tmpVec3, angle)
-        quat.multiply(rotationQuat, tmpQuat, rotationQuat)
-        update()
-    }
 
     fun initProjection(width: Int, height: Int) {
         mat4.perspective(
@@ -48,9 +35,14 @@ class ViewContext(override val params: ViewParams) : Param.Context() {
 
     override fun update() {
         modelScale.fill(2.0.pow(params.scale.animatedValue))
-        mat4.fromRotationTranslationScale(modelMatrix, rotationQuat, modelTranslation, modelScale)
+        val r = params.rotate.value
+        tmpQuat[0] = r.x
+        tmpQuat[1] = r.y
+        tmpQuat[2] = r.z
+        tmpQuat[3] = r.w
+        mat4.fromRotationTranslationScale(modelMatrix, tmpQuat, modelTranslation, modelScale)
 
-        quat.conjugate(tmpQuat, rotationQuat)
+        quat.conjugate(tmpQuat, tmpQuat)
         mat3.fromQuat(normalMatrix, tmpQuat)
         mat3.transpose(normalMatrix, normalMatrix)
     }

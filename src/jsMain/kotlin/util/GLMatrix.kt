@@ -5,19 +5,17 @@ package polyhedra.js.util
 import kotlin.js.*
 import org.khronos.webgl.*
 
-external class quat {
-    companion object {
-        fun create(): quat
-        fun setAxisAngle(out: quat, axis: Float32Array, rad: Number): quat
-        fun multiply(out: quat, a: quat, b: quat): quat
-        fun conjugate(out: quat, a: quat): quat
-    }
+external object quat {
+    fun create(): quat_t
+    fun setAxisAngle(out: quat_t, axis: Float32Array, rad: Number): quat_t
+    fun multiply(out: quat_t, a: quat_t, b: quat_t): quat_t
+    fun conjugate(out: quat_t, a: quat_t): quat_t
 }
 
 external object mat3 {
     fun create(): Float32Array
 
-    fun fromQuat(out: Float32Array, q: quat): Float32Array
+    fun fromQuat(out: Float32Array, q: quat_t): Float32Array
     fun invert(out: Float32Array, a: Float32Array): Float32Array
     fun transpose(out: Float32Array, a: Float32Array): Float32Array
 }
@@ -37,8 +35,8 @@ external object mat4 {
     fun scale(out: Float32Array, a: Float32Array, v: Float32Array): Float32Array
 
     fun fromTranslation(out: Float32Array, v: Float32Array): Float32Array
-    fun fromRotationTranslation(out: Float32Array, q: quat, v: Float32Array): Float32Array
-    fun fromRotationTranslationScale(out: Float32Array, q: quat, v: Float32Array, s: Float32Array): Float32Array
+    fun fromRotationTranslation(out: Float32Array, q: quat_t, v: Float32Array): Float32Array
+    fun fromRotationTranslationScale(out: Float32Array, q: quat_t, v: Float32Array, s: Float32Array): Float32Array
 }
 
 

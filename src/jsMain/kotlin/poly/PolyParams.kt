@@ -1,5 +1,6 @@
 package polyhedra.js.poly
 
+import polyhedra.common.util.*
 import polyhedra.js.*
 import polyhedra.js.params.*
 
@@ -15,6 +16,7 @@ class ViewAnimationParams(tag: String) : AnimationParams(tag) {
 }
 
 class ViewParams(tag: String, animationParams: AnimationParams) : Param.Composite(tag) {
+    val rotate = using(RotationParam("r", Quat.ID, animationParams))
     val scale = using(DoubleParam("s", 0.0, -2.0, 2.0, 0.01, animationParams))
     val expand = using(DoubleParam("e", 0.0, 0.0, 2.0, 0.01, animationParams))
     val transparent = using(DoubleParam("t", 0.0, 0.0, 1.0, 0.01, animationParams))

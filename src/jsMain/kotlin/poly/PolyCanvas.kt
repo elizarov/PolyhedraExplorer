@@ -39,7 +39,7 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
     private val canvasRef = createRef<HTMLCanvasElement>()
     private var drawCount = 0
     private var fpsTimeout = 0
-    
+
     private val animations = HashMap<Param, Animation>()
 
     override fun RBuilder.render() {
@@ -109,7 +109,7 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
         prevTime = nowTime
         if (props.params.animation.rotate.value) {
             val a = 2 * PI * props.params.animation.rotationAngle.value / 360
-            drawContext.view.rotate(dt * cos(a), dt * sin(a))
+            props.params.view.rotate.rotate(dt * cos(a), dt * sin(a), 0.0, Param.UpdateType.Animation)
         }
         for (animation in animations.values) {
             // :todo: move efficient impl for multiple animations
@@ -118,8 +118,8 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
         if (animations.values.any { it.isOver }) {
             animations.values.removeAll { it.isOver }
         }
-        draw()
-        requestAnimation()
+//        draw()
+//        requestAnimation()
     }
 
     private fun cancelAnimation() {
@@ -161,10 +161,11 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
 
     private fun handleMouseMove(e: MouseEvent) {
         if (e.isLeftButtonPressed()) {
-            val scale = 2 * PI / canvas.height
-            drawContext.view.rotate((e.offsetX - prevX) * scale, (e.offsetY - prevY) * scale)
+            val scale = 2 * PI / minOf(canvas.height, canvas.width)
+            props.params.view.rotate.rotate(
+                (e.offsetY - prevY) * scale, (e.offsetX - prevX) * scale, 0.0, Param.UpdateType.Value
+            )
             savePrevMouseEvent(e)
-            draw()
         }
     }
 
