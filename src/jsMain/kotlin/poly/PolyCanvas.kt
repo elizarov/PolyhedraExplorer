@@ -95,7 +95,7 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
     private fun handleMouseDown(e: MouseEvent) {
         if (e.isLeftButtonPressed()) {
             savePrevMouseEvent(e)
-            props.params.animation.animatedRotation.updateValue(false)
+            props.params.animation?.animatedRotation?.updateValue(false)
         }
     }
 

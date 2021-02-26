@@ -65,8 +65,8 @@ class RootPane(props: PComponentProps<RootParams>) : PComponent<RootParams, PCom
         geometryErrorMessage = curMessage
         
         display = props.param.poly.view.display.value
-        animateUpdates = props.param.poly.animation.animateValueUpdates.value
-        rotate = props.param.poly.animation.animatedRotation.value
+        animateUpdates = props.param.animation.animateValueUpdates.value
+        rotate = props.param.animation.animatedRotation.value
     }
 
     override fun RBuilder.render() {
@@ -112,14 +112,14 @@ class RootPane(props: PComponentProps<RootParams>) : PComponent<RootParams, PCom
 
         header("Animation")
         tableBody {
-            controlRow2("Rotation", { pCheckbox(props.param.poly.animation.animatedRotation) }) {
-                pSlider(props.param.poly.animation.rotationSpeed, !state.rotate)
+            controlRow2("Rotation", { pCheckbox(props.param.animation.animatedRotation) }) {
+                pSlider(props.param.animation.rotationSpeed, !state.rotate)
             }
             controlRow2("Angle", {}, {
-                pSlider(props.param.poly.animation.rotationAngle, !state.rotate)
+                pSlider(props.param.animation.rotationAngle, !state.rotate)
             })
-            controlRow2("Updates", { pCheckbox(props.param.poly.animation.animateValueUpdates) }) {
-                pSlider(props.param.poly.animation.animationDuration, !state.animateUpdates)
+            controlRow2("Updates", { pCheckbox(props.param.animation.animateValueUpdates) }) {
+                pSlider(props.param.animation.animationDuration, !state.animateUpdates)
             }
         }
 

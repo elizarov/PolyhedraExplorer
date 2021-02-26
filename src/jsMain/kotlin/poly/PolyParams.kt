@@ -5,9 +5,8 @@ import polyhedra.js.*
 import polyhedra.js.params.*
 import kotlin.math.*
 
-class PolyParams(tag: String) : Param.Composite(tag) {
-    val animation = using(ViewAnimationParams("a"))
-    val view = using(ViewParams("v", animation, animation))
+class PolyParams(tag: String, val animation: ViewAnimationParams?) : Param.Composite(tag) {
+    val view = using(ViewParams("v", animation))
     val lighting = using(LightingParams("l", animation))
 }
 
@@ -32,20 +31,19 @@ class ViewAnimationParams(tag: String) : Param.Composite(tag), ValueAnimationPar
 
 class ViewParams(
     tag: String,
-    valueAnimationParams: ValueAnimationParams,
-    rotationAnimationParams: RotationAnimationParams
+    animation: ViewAnimationParams?,
 ) : Param.Composite(tag) {
-    val rotate = using(RotationParam("r", Quat.ID, valueAnimationParams, rotationAnimationParams))
-    val scale = using(DoubleParam("s", 0.0, -2.0, 2.0, 0.01, valueAnimationParams))
-    val expand = using(DoubleParam("e", 0.0, 0.0, 2.0, 0.01, valueAnimationParams))
-    val transparent = using(DoubleParam("t", 0.0, 0.0, 1.0, 0.01, valueAnimationParams))
+    val rotate = using(RotationParam("r", Quat.ID, animation, animation))
+    val scale = using(DoubleParam("s", 0.0, -2.0, 2.0, 0.01, animation))
+    val expand = using(DoubleParam("e", 0.0, 0.0, 2.0, 0.01, animation))
+    val transparent = using(DoubleParam("t", 0.0, 0.0, 1.0, 0.01, animation))
     val display = using(EnumParam("d", Display.All, Displays))
 }
 
-class LightingParams(tag: String, valueAnimationParams: ValueAnimationParams) : Param.Composite(tag) {
-    val ambientLight = using(DoubleParam("a", 0.25, 0.0, 1.0, 0.01, valueAnimationParams))
-    val diffuseLight = using(DoubleParam("d", 1.0, 0.0, 1.0, 0.01, valueAnimationParams))
-    val specularLight = using(DoubleParam("s", 1.0, 0.0, 1.0, 0.01, valueAnimationParams))
-    val specularPower = using(DoubleParam("sp", 30.0, 0.0, 100.0, 1.0, valueAnimationParams))
+class LightingParams(tag: String, animation: ViewAnimationParams?) : Param.Composite(tag) {
+    val ambientLight = using(DoubleParam("a", 0.25, 0.0, 1.0, 0.01, animation))
+    val diffuseLight = using(DoubleParam("d", 1.0, 0.0, 1.0, 0.01, animation))
+    val specularLight = using(DoubleParam("s", 1.0, 0.0, 1.0, 0.01, animation))
+    val specularPower = using(DoubleParam("sp", 30.0, 0.0, 100.0, 1.0, animation))
 }
 

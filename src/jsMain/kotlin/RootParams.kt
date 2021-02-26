@@ -8,5 +8,8 @@ class RootParams : Param.Composite("") {
     val seed = using(EnumParam("s", Seed.Tetrahedron, Seeds))
     val transforms = using(EnumListParam("t", emptyList(), Transforms))
     val baseScale = using(EnumParam("bs", Scale.Circumradius, Scales))
-    val poly = using(PolyParams(""))
+    val animation = using(ViewAnimationParams("a"))
+    val poly = using(PolyParams("", animation))
+
 }
+
