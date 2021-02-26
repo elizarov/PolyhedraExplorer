@@ -10,7 +10,6 @@ import org.khronos.webgl.WebGLRenderingContext as GL
 class DrawContext(
     canvas: HTMLCanvasElement,
     override val params: PolyParams,
-    private val onNewAnimation: (Animation) -> Unit,
     private val onUpdate: () -> Unit,
 ) : Param.Context() {
     val gl: GL = canvas.getContext("webgl") as GL
@@ -27,10 +26,6 @@ class DrawContext(
 
     init {
         setup()
-    }
-
-    override fun newAnimation(newAnimation: Animation) {
-        onNewAnimation(newAnimation)
     }
 
     override fun update() {

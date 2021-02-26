@@ -64,6 +64,8 @@ operator fun Quat.times(q: Quat): Quat =
 operator fun Quat.times(a: Double): Quat =
     Quat(x * a, y * a, z * a, w * a)
 
+operator fun Double.times(q: Quat): Quat = q * this
+
 fun Vec3.toRotationAroundQuat(angle: Double): Quat =
     rotationAroundQuat(x, y, z, angle)
 

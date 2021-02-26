@@ -31,16 +31,12 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
     private val fpsRef = createRef<HTMLDivElement>()
     private lateinit var canvas: HTMLCanvasElement
     private lateinit var drawContext: DrawContext
-    private var animationHandle = 0
-    private var prevTime = Double.NaN
     private var prevX = 0.0
     private var prevY = 0.0
 
     private val canvasRef = createRef<HTMLCanvasElement>()
     private var drawCount = 0
     private var fpsTimeout = 0
-
-    private val animations = HashMap<Param, Animation>()
 
     override fun RBuilder.render() {
         div("fps-container") {
@@ -63,75 +59,20 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
         canvas = canvasRef.current
         canvas.onmousedown = this::handleMouseDown
         canvas.onmousemove = this::handleMouseMove
-        drawContext = DrawContext(
-            canvas, props.params,
-            onNewAnimation = ::newAnimation,
-            onUpdate = ::update,
-        )
+        drawContext = DrawContext(canvas, props.params, drawFun)
         ResizeTracker.add(drawFun)
-        update()
+        draw()
         requestFpsTimeout()
     }
 
-    private fun newAnimation(animation: Animation) {
-        animations[animation.param] = animation
-    }
-
-    private fun update() {
-        draw()
-        requestAnimation()
-    }
-
     override fun componentWillUnmount() {
-        cancelAnimation()
         cancelFpsTimeout()
         ResizeTracker.remove(drawFun)
         drawContext.destroy()
     }
 
-    private fun requestAnimation() {
-        if (!props.params.animation.rotate.value && animations.isEmpty()) {
-            cancelAnimation()
-            return
-        }
-        if (animationHandle != 0) return
-        animationHandle = window.requestAnimationFrame(animationFun)
-    }
-
-    private val animationFun: (Double) -> Unit = af@{ nowTime ->
-        animationHandle = 0
-        if (prevTime.isNaN()) {
-            prevTime = nowTime
-            requestAnimation()
-            return@af
-        }
-        val dt = (nowTime - prevTime) / 1000 // in seconds
-        prevTime = nowTime
-        if (props.params.animation.rotate.value) {
-            val a = 2 * PI * props.params.animation.rotationAngle.value / 360
-            props.params.view.rotate.rotate(dt * cos(a), dt * sin(a), 0.0, Param.UpdateType.Animation)
-        }
-        for (animation in animations.values) {
-            // :todo: move efficient impl for multiple animations
-            animation.update(dt)
-        }
-        if (animations.values.any { it.isOver }) {
-            animations.values.removeAll { it.isOver }
-        }
-//        draw()
-//        requestAnimation()
-    }
-
-    private fun cancelAnimation() {
-        if (animationHandle == 0) return
-        window.cancelAnimationFrame(animationHandle)
-        animationHandle = 0
-        prevTime = Double.NaN
-    }
-
     override fun componentDidUpdate(prevProps: PolyCanvasProps, prevState: RState, snapshot: Any) {
         draw()
-        requestAnimation()
     }
 
     private fun draw() {
@@ -154,8 +95,7 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
     private fun handleMouseDown(e: MouseEvent) {
         if (e.isLeftButtonPressed()) {
             savePrevMouseEvent(e)
-            cancelAnimation()
-            props.params.animation.rotate.updateValue(false)
+            props.params.animation.animatedRotation.updateValue(false)
         }
     }
 
@@ -163,7 +103,7 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
         if (e.isLeftButtonPressed()) {
             val scale = 2 * PI / minOf(canvas.height, canvas.width)
             props.params.view.rotate.rotate(
-                (e.offsetY - prevY) * scale, (e.offsetX - prevX) * scale, 0.0, Param.UpdateType.Value
+                (e.offsetY - prevY) * scale, (e.offsetX - prevX) * scale, 0.0, Param.UpdateType.ValueUpdate
             )
             savePrevMouseEvent(e)
         }

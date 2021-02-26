@@ -21,7 +21,7 @@ private fun onLoad() {
     val str = history.location.pathname.substringAfter('/', "")
     val parsed = ParamParser(str).parse()
     rootParams.loadFrom(parsed)
-    rootParams.onUpdate(Param.UpdateType.Value) {
+    rootParams.onUpdate(Param.UpdateType.ValueUpdate) {
         // throttle updates
         if (historyPushTimeout == 0) {
             historyPushTimeout = window.setTimeout({
@@ -30,6 +30,8 @@ private fun onLoad() {
             }, historyPushThrottle)
         }
     }
+    // Start animation tracker
+    AnimationTracker(rootParams).start()
     // Unit UI
     render(document.getElementById("root")) {
         child(RootPane::class) {

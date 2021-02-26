@@ -35,7 +35,7 @@ class ViewContext(override val params: ViewParams) : Param.Context() {
 
     override fun update() {
         modelScale.fill(2.0.pow(params.scale.animatedValue))
-        val r = params.rotate.value
+        val r = params.rotate.animatedValue
         tmpQuat[0] = r.x
         tmpQuat[1] = r.y
         tmpQuat[2] = r.z

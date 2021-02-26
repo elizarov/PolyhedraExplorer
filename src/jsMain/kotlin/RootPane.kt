@@ -66,7 +66,7 @@ class RootPane(props: PComponentProps<RootParams>) : PComponent<RootParams, PCom
         
         display = props.param.poly.view.display.value
         animateUpdates = props.param.poly.animation.animateValueUpdates.value
-        rotate = props.param.poly.animation.rotate.value
+        rotate = props.param.poly.animation.animatedRotation.value
     }
 
     override fun RBuilder.render() {
@@ -112,12 +112,13 @@ class RootPane(props: PComponentProps<RootParams>) : PComponent<RootParams, PCom
 
         header("Animation")
         tableBody {
-            controlRow("Rotate") {
-                pCheckbox(props.param.poly.animation.rotate)
-                pSlider(props.param.poly.animation.rotationAngle, !state.rotate)
+            controlRow2("Rotation", { pCheckbox(props.param.poly.animation.animatedRotation) }) {
+                pSlider(props.param.poly.animation.rotationSpeed, !state.rotate)
             }
-            controlRow("Updates") {
-                pCheckbox(props.param.poly.animation.animateValueUpdates)
+            controlRow2("Angle", {}, {
+                pSlider(props.param.poly.animation.rotationAngle, !state.rotate)
+            })
+            controlRow2("Updates", { pCheckbox(props.param.poly.animation.animateValueUpdates) }) {
                 pSlider(props.param.poly.animation.animationDuration, !state.animateUpdates)
             }
         }
@@ -194,5 +195,12 @@ fun RDOMBuilder<TBODY>.controlRow(label: String, block: RDOMBuilder<TD>.() -> Un
     tr("control") {
         td { +label }
         td(block = block)
+    }
+}
+fun RDOMBuilder<TBODY>.controlRow2(label: String, block1: RDOMBuilder<TD>.() -> Unit, block2: RDOMBuilder<TD>.() -> Unit) {
+    tr("control") {
+        td { +label }
+        td(block = block1)
+        td(block = block2)
     }
 }
