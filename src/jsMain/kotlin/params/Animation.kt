@@ -24,7 +24,6 @@ abstract class ValueUpdateAnimation<T : Any, P : AnimatedValueParam<T, P>>(
     override fun update(dt: Double) {
         position += dt
         if (isOver) param.resetValueUpdateAnimation()
-        param.notifyAnimationUpdate() // :todo: move efficient impl for multiple animations
     }
 }
 
@@ -58,6 +57,6 @@ class RotationAnimation(
 
     override fun update(dt: Double) {
         if (isOver) return
-        param.rotate((dt * animation.animatedRotationAngles).anglesToQuat(), Param.UpdateType.ValueAnimation)
+        param.rotate((dt * animation.animatedRotationAngles).anglesToQuat(), Param.UpdateType.None)
     }
 }

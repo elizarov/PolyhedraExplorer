@@ -29,9 +29,9 @@ abstract class Param(val tag: String) {
         fun intersects(other: UpdateType) = mask and other.mask != 0
     }
 
-    open fun visitActiveAnimations(visitor: (Animation) -> Unit) {}
+    open fun visitActiveAnimations(visitor: (Param, Animation) -> Unit) {}
 
-    protected fun visitAffectedContexts(update: UpdateType, visitor: (Context) -> Unit) {
+    fun visitAffectedContexts(update: UpdateType, visitor: (Context) -> Unit) {
         // Notify contexts in the reverse order.
         // This is important for composites: local context will get notified & updated first, and the
         // outer (containing) context will be notified last, when all local ones were already updated.
@@ -102,7 +102,7 @@ abstract class Param(val tag: String) {
             return param
         }
 
-        override fun visitActiveAnimations(visitor: (Animation) -> Unit) {
+        override fun visitActiveAnimations(visitor: (Param, Animation) -> Unit) {
             params.forEach { it.visitActiveAnimations(visitor) }
         }
 
@@ -173,11 +173,11 @@ abstract class AnimatedValueParam<T : Any, P : AnimatedValueParam<T, P>>(
         valueUpdateAnimation = null
     }
 
-    override fun visitActiveAnimations(visitor: (Animation) -> Unit) {
+    override fun visitActiveAnimations(visitor: (Param, Animation) -> Unit) {
         valueUpdateAnimation?.let {
             if (it.isOver)
                 valueUpdateAnimation = null else    
-                visitor(it)
+                visitor(this, it)
         }
     }
 
@@ -307,13 +307,13 @@ class RotationParam(
 
     fun rotate(q: Quat, updateType: UpdateType) {
         _quat.multiplyFront(q)
-        notifyUpdate(updateType)
+        if (updateType != UpdateType.None) notifyUpdate(updateType)
     }
 
-    override fun visitActiveAnimations(visitor: (Animation) -> Unit) {
+    override fun visitActiveAnimations(visitor: (Param, Animation) -> Unit) {
         super.visitActiveAnimations(visitor)
         rotationAnimationParams?.let { updateAnimation(it) }
-        rotationAnimation?.let { visitor(it) }
+        rotationAnimation?.let { visitor(this, it) }
     }
 
     override fun createValueUpdateAnimation(duration: Double, oldValue: Quat): RotationUpdateAnimation =
