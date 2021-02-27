@@ -11,7 +11,7 @@ abstract class ValueUpdateAnimation<T : Any, P : AnimatedValueParam<T, P>>(
     protected val param: P,
     private val duration: Double
 ) : Animation() {
-    abstract val animatedValue: T
+    abstract val value: T
 
     private var position = 0.0
 
@@ -32,9 +32,9 @@ class DoubleUpdateAnimation(
     duration: Double,
     private val oldValue: Double
 ) : ValueUpdateAnimation<Double, DoubleParam>(param, duration) {
-    override val animatedValue: Double get() {
+    override val value: Double get() {
         val f = fraction
-        return oldValue * (1 - f) + param.value * f
+        return oldValue * (1 - f) + param.targetValue * f
     }
 }
 
@@ -43,9 +43,9 @@ class RotationUpdateAnimation(
     duration: Double,
     private val oldValue: Quat
 ) : ValueUpdateAnimation<Quat, RotationParam>(param, duration) {
-    override val animatedValue: Quat get() {
+    override val value: Quat get() {
         val f = fraction
-        return (oldValue * (1 - f) + param.value * f).unit
+        return (oldValue * (1 - f) + param.targetValue * f).unit
     }
 }
 

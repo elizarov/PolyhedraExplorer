@@ -15,7 +15,7 @@ abstract class PValueComponent<T : Any, V : ValueParam<T>, P : PValueComponentPr
     props: P
 ) : PComponent<V, P, S>(props) {
     override fun S.init(props: P) {
-        value = props.param.value
+        value = props.param.targetValue
     }
 }
 

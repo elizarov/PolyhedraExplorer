@@ -9,19 +9,21 @@ import react.*
 import react.dom.*
 import kotlin.math.*
 
+external interface PSliderProps : PValueComponentProps<DoubleParam> {
+    var showValue: Boolean
+}
+
 fun RBuilder.pSlider(param: DoubleParam, disabled: Boolean = false, showValue: Boolean = true) {
     child(PSlider::class) {
         attrs {
             this.param = param
             this.disabled = disabled
+            this.showValue = showValue
         }
-    }
-    if (showValue) {
-        span { +param.value.fmt }
     }
 }
 
-class PSlider(props: PValueComponentProps<DoubleParam>) : PValueComponent<Double, DoubleParam, PValueComponentProps<DoubleParam>, PValueComponentState<Double>>(props) {
+class PSlider(props: PSliderProps) : PValueComponent<Double, DoubleParam, PSliderProps, PValueComponentState<Double>>(props) {
     private fun Double.intStr() = roundToInt().toString()
 
     override fun RBuilder.render() {
@@ -37,6 +39,9 @@ class PSlider(props: PValueComponentProps<DoubleParam>) : PValueComponent<Double
                     props.param.updateValue((event.target as HTMLInputElement).value.toInt() * props.param.step)
                 }
             }
+        }
+        if (props.showValue) {
+            span { +state.value.fmt }
         }
     }
 }

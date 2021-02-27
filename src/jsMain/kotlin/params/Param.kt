@@ -127,7 +127,10 @@ abstract class Param(val tag: String) {
 abstract class ValueParam<T : Any>(tag: String, value: T) : Param(tag) {
     private val defaultValue: T = value
 
-    abstract var value: T
+    open val value: T
+        get() = targetValue
+    
+    abstract var targetValue: T
         protected set
 
     abstract fun updateValue(value: T)
@@ -138,19 +141,18 @@ abstract class ValueParam<T : Any>(tag: String, value: T) : Param(tag) {
 
     override fun loadFrom(parsed: ParsedParam) {
         if (parsed !is ParsedParam.Value) return
-        parseValue(parsed.value)?.let { value = it }
+        parseValue(parsed.value)?.let { targetValue = it }
     }
 
     abstract fun parseValue(value: String): T?
 }
 
 abstract class ImmutableValueParam<T : Any>(tag: String, value: T) : ValueParam<T>(tag, value) {
-    override var value: T = value
-        protected set
+    override var targetValue: T = value
 
     override fun updateValue(value: T) {
-        if (this.value == value) return
-        this.value = value
+        if (targetValue == value) return
+        targetValue = value
         notifyUpdate(UpdateType.ValueUpdate)
     }
 }
@@ -166,8 +168,8 @@ abstract class AnimatedValueParam<T : Any, P : AnimatedValueParam<T, P>>(
 ) : ValueParam<T>(tag, value) {
     private var valueUpdateAnimation: ValueUpdateAnimation<T, P>? = null
 
-    val animatedValue: T
-        get() = valueUpdateAnimation?.animatedValue ?: value
+    override val value: T
+        get() = valueUpdateAnimation?.value ?: targetValue
 
     fun resetValueUpdateAnimation() {
         valueUpdateAnimation = null
@@ -187,9 +189,9 @@ abstract class AnimatedValueParam<T : Any, P : AnimatedValueParam<T, P>>(
     }
 
     override fun updateValue(value: T) {
-        if (this.value == value) return
-        val oldValue = animatedValue
-        this.value = value
+        if (targetValue == value) return
+        val oldValue = this.value
+        targetValue = value
         val newAnimation = valueAnimationParams?.animateValueUpdatesDuration
             ?.let { createValueUpdateAnimation(it, oldValue) }
             ?.also { valueUpdateAnimation = it }
@@ -248,8 +250,7 @@ class DoubleParam(
     val step: Double,
     valueAnimationParams: ValueAnimationParams? = null
 ) : AnimatedValueParam<Double, DoubleParam>(tag, value, valueAnimationParams) {
-    override var value: Double = value
-        protected set
+    override var targetValue: Double = value
     override fun createValueUpdateAnimation(duration: Double, oldValue: Double): DoubleUpdateAnimation =
         DoubleUpdateAnimation(this, duration, oldValue)
     override fun valueToString(): String =
@@ -297,7 +298,7 @@ class RotationParam(
         }
     }
 
-    override var value: Quat
+    override var targetValue: Quat
         get() = _quat.copy()
         set(value) { _quat by value }
 
