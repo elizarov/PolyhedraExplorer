@@ -4,6 +4,7 @@ import org.khronos.webgl.*
 import polyhedra.common.*
 import polyhedra.js.poly.*
 import polyhedra.js.util.*
+import kotlin.properties.*
 import kotlin.reflect.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
@@ -18,11 +19,10 @@ abstract class GLProgram(val gl: GL) {
         initShaderProgram(gl, vertexShader.glShader, fragmentShader.glShader)
     }
 
-    fun <S : ShaderType> shader(type: S, builder: BlockBuilder<GLType.void>.() -> Unit): Shader<S> {
+    fun <S : ShaderType> shader(type: S, builder: GLBlockBuilder<GLType.void>.() -> Unit): Shader<S> {
         val main by functionVoid(builder)
         return Shader(loadShader(gl, type.glType, shaderSource(main)))
     }
-
 
     inner class Uniform<T : GLType<T>>(
         precision: GLPrecision?, type: T, name: String
@@ -36,15 +36,19 @@ abstract class GLProgram(val gl: GL) {
         }
     }
 
-    // todo: rename
-    fun Uniform<GLType.float>.assign(value: Double) {
+    infix fun Uniform<GLType.int>.by(value: Int) {
+        if (isUsed) {
+            gl.uniform1i(location, value)
+        }
+    }
+
+    infix fun Uniform<GLType.float>.by(value: Double) {
         if (isUsed) {
             gl.uniform1f(location, value.toFloat())
         }
     }
 
-    // todo: rename
-    fun <T : GLType.VecOrMatrixFloats<T>> Uniform<T>.assign(value: Float32Array) {
+    infix fun <T : GLType.VecOrMatrixFloats<T>> Uniform<T>.by(value: Float32Array) {
         if (isUsed) {
             type.uniformFloat32Array(gl, location, value)
         }
@@ -57,8 +61,7 @@ abstract class GLProgram(val gl: GL) {
         val location by lazy { gl.getAttribLocation(program, name) }
     }
 
-    // todo: rename
-    fun <T : GLType.Floats<T>> Attribute<T>.assign(buffer: Float32Buffer<T>) {
+    infix fun <T : GLType.Floats<T>> Attribute<T>.by(buffer: Float32Buffer<T>) {
         gl.bindBuffer(GL.ARRAY_BUFFER, buffer.glBuffer)
         enable()
     }
@@ -82,7 +85,7 @@ abstract class GLProgram(val gl: GL) {
         val glShader: WebGLShader
     )
 
-    private fun shaderSource(main: GLFunction<GLType.void>): String = buildString {
+    private fun shaderSource(main: GLFun0<GLType.void>): String = buildString {
         val decls = mutableSetOf<GLDecl<*, *>>()
         main.visitDecls { decl ->
             if (decl.kind.isGlobal) decls += decl
@@ -92,64 +95,14 @@ abstract class GLProgram(val gl: GL) {
         for (d in sd) appendLine(d.emitDeclaration())
     }
 
-    fun functionVoid(builder: BlockBuilder<GLType.void>.() -> Unit): Provider<GLFunction<GLType.void>> = Provider { name ->
-        BlockBuilder(GLType.void, name, "\t").run {
-            builder()
-            build()
-        }
-    }
-
-    fun <T : GLType<T>> function(resultType: T, builder: BlockBuilder<T>.() -> GLExpr<T>): Provider<GLFunction<T>> = Provider { name ->
-        BlockBuilder(resultType, name, "\t").run {
-            val result = builder()
-            using(result)
-            +"return $result;"
-            build()
-        }
-    }
-
-    inner class BlockBuilder<T : GLType<T>>(
-        val resultType: T,
-        val name: String,
-        private val indent: String
-    ) {
-        private val locals = mutableSetOf<GLLocal<*>>()
-        private val deps = mutableSetOf<GLDecl<*, *>>()
-        private val body = ArrayList<String>()
-
-        operator fun String.unaryPlus()  { body.add("$indent$this") }
-
-        fun build(): GLFunction<T> =
-            GLFunction(resultType, name, deps, body)
-
-        infix fun <T : GLType<T>> GLDecl<T, *>.by(expr: GLExpr<T>) {
-            using(this)
-            using(expr)
-            +"$this = $expr;"
-        }
-
-        fun <T : GLType<T>> using(expr: GLExpr<T>) = expr.visitDecls { decl ->
-            when (decl) {
-                is GLLocal<*> -> if (locals.add(decl)) {
-                    +decl.emitDeclaration()
-                }
-                else -> deps += decl
-            }
-        }
-    }
-
-    inner class Provider<R>(val factory: (name: String) -> R) {
-        operator fun provideDelegate(thisRef: Any?, prop: KProperty<*>): R = factory(prop.name)
-    }
-
-    fun <T : GLType<T>> uniform(type: T, precision: GLPrecision? = null): Provider<Uniform<T>> =
-        Provider { Uniform(precision, type, it) }
-    fun <T : GLType<T>> attribute(type: T, precision: GLPrecision? = null): Provider<Attribute<T>> =
-        Provider { Attribute(precision, type, it) }
-    fun <T : GLType<T>> varying(type: T, precision: GLPrecision? = null): Provider<Varying<T>> =
-        Provider { Varying(precision, type, it) }
-    
-    private fun <T : GLType<T>> builtin(type: T): Provider<Builtin<T>> = Provider { Builtin(type, it) }
+    fun <T : GLType<T>> uniform(type: T, precision: GLPrecision? = null): DelegateProvider<Uniform<T>> =
+        DelegateProvider { Uniform(precision, type, it) }
+    fun <T : GLType<T>> attribute(type: T, precision: GLPrecision? = null): DelegateProvider<Attribute<T>> =
+        DelegateProvider { Attribute(precision, type, it) }
+    fun <T : GLType<T>> varying(type: T, precision: GLPrecision? = null): DelegateProvider<Varying<T>> =
+        DelegateProvider { Varying(precision, type, it) }
+    private fun <T : GLType<T>> builtin(type: T): DelegateProvider<Builtin<T>> =
+        DelegateProvider { Builtin(type, it) }
 }
 
 fun <P : GLProgram> P.use() {

@@ -22,7 +22,7 @@ class FaceProgram(gl: GL) : SharedPolyProgram(gl) {
         val position by fPosition()
         gl_Position by uProjectionMatrix * position
         // lighting & color
-        vNormal by uNormalMatrix * aVertexNormal
+        vNormal by fNormal()
         vToCamera by uCameraPosition - position.xyz
         vToLight by uLightPosition - position.xyz
         vColor by aVertexColor

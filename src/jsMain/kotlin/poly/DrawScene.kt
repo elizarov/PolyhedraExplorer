@@ -73,16 +73,25 @@ private fun DrawContext.drawImpl(display: Display) {
         gl[GL.CULL_FACE] = true
         gl.cullFace(GL.FRONT)
         faceBuffers.draw(view, lightning)
+        if (display.hasEdges()) {
+            edgeBuffers.draw(view, 1)
+        }
         gl.cullFace(GL.BACK)
         faceBuffers.draw(view, lightning)
-    } else if (display.hasFaces()) {
-        // regular draw faces
-        val solid = params.view.expandFaces.animatedValue == 0.0
-        gl[GL.CULL_FACE] = solid // can cull faces when drawing solid
-        faceBuffers.draw(view, lightning)
+        if (display.hasEdges()) {
+            edgeBuffers.draw(view, -1)
+        }
+    } else {
+        if (display.hasFaces()) {
+            // regular draw faces
+            val solid = params.view.expandFaces.animatedValue == 0.0
+            gl[GL.CULL_FACE] = solid // can cull faces when drawing solid
+            faceBuffers.draw(view, lightning)
+        }
+        if (display.hasEdges()) {
+            edgeBuffers.draw(view)
+        }
     }
-    
-    if (display.hasEdges()) edgeBuffers.draw(view)
 }
 
 

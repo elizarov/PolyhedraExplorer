@@ -20,15 +20,29 @@ abstract class SharedPolyProgram(gl: GL) : GLProgram(gl) {
         uModelMatrix * vec4(aVertexPosition + aVertexNormal * uExpand, 1.0)
     }
 
+    // world normal of the current element
+    val fNormal by function(GLType.vec3) {
+        uNormalMatrix * aVertexNormal
+    }
+
+    // face direction: > 0 - front-face, < 0 - back-face
+    val fFaceDirection by function(
+        GLType.float,
+        "position", GLType.vec4,
+        "normal", GLType.vec3
+    ) { position, normal ->
+        dot((position.xyz - uCameraPosition), normal)
+    }
+
     fun assignView(view: ViewContext) {
         with(view) {
-            uCameraPosition.assign(cameraPosition)
-            uProjectionMatrix.assign(projectionMatrix)
-            uModelMatrix.assign(modelMatrix)
-            uNormalMatrix.assign(normalMatrix)
+            uCameraPosition by cameraPosition
+            uProjectionMatrix by projectionMatrix
+            uModelMatrix by modelMatrix
+            uNormalMatrix by normalMatrix
             with(params) {
-                uExpand.assign(expandFaces.animatedValue)
-                uColorAlpha.assign(1.0 - transparentFaces.animatedValue)
+                uExpand by expandFaces.animatedValue
+                uColorAlpha by 1.0 - transparentFaces.animatedValue
             }
         }
     }

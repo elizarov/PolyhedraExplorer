@@ -3,7 +3,13 @@ package polyhedra.js.glsl
 import kotlin.reflect.*
 
 enum class GLDeclKind(val isGlobal: Boolean = false) {
-    builtin, uniform(true), attribute(true), varying(true), function(true), local;
+    builtin,
+    uniform(true),
+    attribute(true),
+    varying(true),
+    function(true),
+    parameter,
+    local;
 }
 
 open class GLDecl<T : GLType<T>, SELF: GLDecl<T, SELF>>(
@@ -26,11 +32,11 @@ open class GLDecl<T : GLType<T>, SELF: GLDecl<T, SELF>>(
 }
 
 private class FunctionCall<T : GLType<T>>(
-    val function: GLFunction<T>,
-    val name: String, vararg val a: GLExpr<*>
+    override val type: T,
+    val function: GLDecl<*, *>,
+    val name: String,
+    vararg val a: GLExpr<*>
 ) : GLExpr<T> {
-    override val type: T = function.resultType
-
     override fun visitDecls(visitor: (GLDecl<*, *>) -> Unit) {
         function.visitDecls(visitor)
         a.forEach { it.visitDecls(visitor) }
@@ -39,14 +45,16 @@ private class FunctionCall<T : GLType<T>>(
     override fun toString(): String = "$name(${a.joinToString(", ")})"
 }
 
-class GLFunction<T : GLType<T>>(
+abstract class GLFunX<T : GLType<T>, F : GLType<F>, SELF : GLFunX<T, F, SELF>>(
     val resultType: T,
+    funType: F,
     name: String,
     private val deps: Set<GLDecl<*, *>>,
-    private val body: List<String>
-) : GLDecl<GLType.fun0<T>, GLFunction<T>>(GLDeclKind.function, null, GLType.fun0(resultType), name) {
+    private val body: List<String>,
+    private vararg val params: GLParameter<*>
+) : GLDecl<F, SELF>(GLDeclKind.function, null, funType, name) {
     override fun emitDeclaration() = buildString {
-        appendLine("$resultType $name() {")
+        appendLine("$resultType $name(${params.joinToString { it.emitDeclaration() }}) {")
         body.forEach { appendLine(it) }
         append("}")
     }
@@ -55,8 +63,50 @@ class GLFunction<T : GLType<T>>(
         deps.forEach { visitor(it) }
         visitor(this)
     }
+}
 
-    operator fun invoke(): GLExpr<T> = FunctionCall(this, name)
+class GLFun0<T : GLType<T>>(
+    resultType: T,
+    name: String,
+    deps: Set<GLDecl<*, *>>,
+    body: List<String>
+) : GLFunX<T, GLType.fun0<T>, GLFun0<T>>(resultType, GLType.fun0(resultType), name, deps, body) {
+    operator fun invoke(): GLExpr<T> = FunctionCall(resultType, this, name)
+}
+
+class GLFun1<T : GLType<T>, P1 : GLType<P1>>(
+    resultType: T,
+    name: String,
+    deps: Set<GLDecl<*, *>>,
+    body: List<String>,
+    param1: GLParameter<P1>,
+) : GLFunX<T, GLType.fun1<T, P1>, GLFun1<T, P1>>(resultType, GLType.fun1(resultType), name, deps, body, param1) {
+    operator fun invoke(p1: GLExpr<P1>): GLExpr<T> = FunctionCall(resultType,this, name, p1)
+}
+
+class GLFun2<T : GLType<T>, P1 : GLType<P1>, P2 : GLType<P2>>(
+    resultType: T,
+    name: String,
+    deps: Set<GLDecl<*, *>>,
+    body: List<String>,
+    param1: GLParameter<P1>,
+    param2: GLParameter<P2>,
+) : GLFunX<T, GLType.fun2<T, P1, P2>, GLFun2<T, P1, P2>>(resultType, GLType.fun2(resultType), name, deps, body, param1, param2) {
+    operator fun invoke(p1: GLExpr<P1>, p2: GLExpr<P2>): GLExpr<T> = FunctionCall(resultType,this, name, p1, p2)
+}
+
+class GLParameter<T : GLType<T>>(
+    precision: GLPrecision?,
+    type: T,
+    name: String
+) : GLDecl<T, GLLocal<T>>(GLDeclKind.parameter, precision, type, name) {
+    override fun visitDecls(visitor: (GLDecl<*, *>) -> Unit) {
+        visitor(this)
+    }
+
+    override fun emitDeclaration(): String = buildString {
+        append(if (precision == null) "$type $name" else "$precision $type $name")
+    }
 }
 
 class GLLocal<T : GLType<T>>(

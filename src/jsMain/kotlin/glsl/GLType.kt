@@ -7,7 +7,9 @@ enum class GLPrecision { lowp, mediump, highp }
 @Suppress("ClassName")
 interface GLType<T : GLType<T>> {
     val bufferSize: Int
-    
+
+    interface Comparable<T : Comparable<T>> : GLType<T>
+
     interface Numbers<T : Numbers<T>> : GLType<T>
 
     interface Floats<T : Floats<T>> : Numbers<T>
@@ -28,11 +30,11 @@ interface GLType<T : GLType<T>> {
         bufferSize = 1
     )
 
-    object int : Numbers<int>, GLTypeBase<int>(
+    object int : Numbers<int>, Comparable<int>, GLTypeBase<int>(
         bufferSize = 1
     )
 
-    object float : NonMatrixFloats<float>, GLTypeBase<float>(
+    object float : NonMatrixFloats<float>, Comparable<float>, GLTypeBase<float>(
         bufferSize = 1
     )
 
@@ -68,6 +70,8 @@ interface GLType<T : GLType<T>> {
 
     // function type, cannot be manipulated by arithmetics, only called
     data class fun0<T : GLType<T>>(val resultType: T) : GLTypeBase<fun0<T>>()
+    data class fun1<T : GLType<T>, P1 : GLType<P1>>(val resultType: T) : GLTypeBase<fun1<T, P1>>()
+    data class fun2<T : GLType<T>, P1 : GLType<P1>, P2 : GLType<P2>>(val resultType: T) : GLTypeBase<fun2<T, P1, P2>>()
 }
 
 abstract class GLTypeBase<T : GLType<T>>(

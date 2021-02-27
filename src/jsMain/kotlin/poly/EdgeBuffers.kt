@@ -14,11 +14,13 @@ class EdgeBuffers(val gl: GL, val sharedPolyBuffers: SharedPolyBuffers) {
     lateinit var color: Float32Array
 }
 
-fun EdgeBuffers.draw(view: ViewContext) {
+// cullMode: 0 - no, 1 - cull front, -1 - cull back
+fun EdgeBuffers.draw(view: ViewContext, cullMode: Int = 0) {
     program.use {
         assignView(view)
         assignSharedPolyBuffers(sharedPolyBuffers)
-        uVertexColor.assign(color)
+        uVertexColor by color
+        uCullMode by cullMode.toDouble()
     }
 
     gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, indexBuffer.glBuffer)

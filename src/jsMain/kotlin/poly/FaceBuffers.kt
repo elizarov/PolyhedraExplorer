@@ -17,14 +17,14 @@ fun FaceBuffers.draw(view: ViewContext, lightning: LightningContext) {
     program.use {
         assignView(view)
 
-        uAmbientLightColor.assign(lightning.ambientLightColor)
-        uDiffuseLightColor.assign(lightning.diffuseLightColor)
-        uSpecularLightColor.assign(lightning.specularLightColor)
-        uSpecularLightPower.assign(lightning.specularLightPower)
-        uLightPosition.assign(lightning.lightPosition)
+        uAmbientLightColor by lightning.ambientLightColor
+        uDiffuseLightColor by lightning.diffuseLightColor
+        uSpecularLightColor by lightning.specularLightColor
+        uSpecularLightPower by lightning.specularLightPower
+        uLightPosition by lightning.lightPosition
 
         assignSharedPolyBuffers(sharedPolyBuffers)
-        aVertexColor.assign(colorBuffer)
+        aVertexColor by colorBuffer
     }
     
     gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, indexBuffer.glBuffer)

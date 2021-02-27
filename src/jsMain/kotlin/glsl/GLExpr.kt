@@ -44,6 +44,12 @@ private class DotCall<T : GLType<T>>(
     override fun toString(): String = "$a.$name"
 }
 
+val Boolean.literal: GLExpr<GLType.bool>
+    get() = Literal(GLType.bool, toString())
+
+val Int.literal: GLExpr<GLType.int>
+    get() = Literal(GLType.int, toString())
+
 val Double.literal: GLExpr<GLType.float>
     get() {
         val s0 = toString()
@@ -59,7 +65,12 @@ operator fun <T : GLType.Numbers<T>> GLExpr<T>.div(other: GLExpr<T>): GLExpr<T> 
 
 // matrix or vector with float
 operator fun <T : GLType.VecOrMatrixFloats<T>> GLExpr<T>.times(other: GLExpr<GLType.float>): GLExpr<T> = BinaryOp(type, this, "*", other)
+operator fun <T : GLType.VecOrMatrixFloats<T>> GLExpr<GLType.float>.times(other: GLExpr<T>): GLExpr<T> = BinaryOp(other.type, this, "*", other)
+operator fun <T : GLType.VecOrMatrixFloats<T>> GLExpr<T>.times(other: Double): GLExpr<T> = this * other.literal
+operator fun <T : GLType.VecOrMatrixFloats<T>> Double.times(other: GLExpr<T>): GLExpr<T> = literal * other
+
 operator fun <T : GLType.VecOrMatrixFloats<T>> GLExpr<T>.div(other: GLExpr<GLType.float>): GLExpr<T> = BinaryOp(type, this, "/", other)
+operator fun <T : GLType.VecOrMatrixFloats<T>> GLExpr<T>.div(other: Double): GLExpr<T> = div(other.literal)
 
 // matrix vector multiplication
 operator fun GLExpr<GLType.mat2>.times(other: GLExpr<GLType.vec2>): GLExpr<GLType.vec2> = BinaryOp(GLType.vec2, this, "*", other)
@@ -116,12 +127,49 @@ fun <T : GLType.NonMatrixFloats<T>> mod(a: GLExpr<T>, b: Double): GLExpr<T> = mo
 fun <T : GLType.NonMatrixFloats<T>> min(a: GLExpr<T>, b: Double): GLExpr<T> = min(a, b.literal)
 fun <T : GLType.NonMatrixFloats<T>> max(a: GLExpr<T>, b: Double): GLExpr<T> = max(a, b.literal)
 
-// conversions
-fun vec4(a: GLExpr<GLType.vec3>, b: GLExpr<GLType.float>): GLExpr<GLType.vec4> = Call(GLType.vec4, "vec4", a, b)
-fun vec4(a: GLExpr<GLType.vec3>, b: Double): GLExpr<GLType.vec4> = vec4(a, b.literal)
+// conversions & constructors
+fun vec4(xyz: GLExpr<GLType.vec3>, w: GLExpr<GLType.float>): GLExpr<GLType.vec4> = Call(GLType.vec4, "vec4", xyz, w)
+fun vec4(xyz: GLExpr<GLType.vec3>, w: Double): GLExpr<GLType.vec4> = vec4(xyz, w.literal)
+fun vec4(x: GLExpr<GLType.float>, y: GLExpr<GLType.float>, z: GLExpr<GLType.float>, w: GLExpr<GLType.float>): GLExpr<GLType.vec4> =
+    Call(GLType.vec4, "vec4", x, y, z, w)
+fun vec4(x: Double, y: Double, z: Double, w: Double): GLExpr<GLType.vec4> =
+    vec4(x.literal, y.literal, z.literal, w.literal)
 
 // swizzling
+val GLExpr<GLType.vec4>.x: GLExpr<GLType.float> get() = DotCall(GLType.float, this, "x")
+val GLExpr<GLType.vec4>.y: GLExpr<GLType.float> get() = DotCall(GLType.float, this, "y")
+val GLExpr<GLType.vec4>.z: GLExpr<GLType.float> get() = DotCall(GLType.float, this, "z")
+val GLExpr<GLType.vec4>.w: GLExpr<GLType.float> get() = DotCall(GLType.float, this, "w")
 val GLExpr<GLType.vec4>.xyz: GLExpr<GLType.vec3> get() = DotCall(GLType.vec3, this, "xyz")
 val GLExpr<GLType.vec4>.rgb: GLExpr<GLType.vec3> get() = DotCall(GLType.vec3, this, "rgb")
 val GLExpr<GLType.vec4>.a: GLExpr<GLType.float> get() = DotCall(GLType.float, this, "a")
 
+// comparisons
+infix fun <T : GLType.Comparable<T>> GLExpr<T>.eq(other: GLExpr<T>): GLExpr<GLType.bool> = BinaryOp(GLType.bool, this, "==", other)
+infix fun <T : GLType.Comparable<T>> GLExpr<T>.ne(other: GLExpr<T>): GLExpr<GLType.bool> = BinaryOp(GLType.bool, this, "!=", other)
+infix fun <T : GLType.Comparable<T>> GLExpr<T>.lt(other: GLExpr<T>): GLExpr<GLType.bool> = BinaryOp(GLType.bool, this, "<", other)
+infix fun <T : GLType.Comparable<T>> GLExpr<T>.gt(other: GLExpr<T>): GLExpr<GLType.bool> = BinaryOp(GLType.bool, this, ">", other)
+infix fun <T : GLType.Comparable<T>> GLExpr<T>.le(other: GLExpr<T>): GLExpr<GLType.bool> = BinaryOp(GLType.bool, this, "<=", other)
+infix fun <T : GLType.Comparable<T>> GLExpr<T>.ge(other: GLExpr<T>): GLExpr<GLType.bool> = BinaryOp(GLType.bool, this, ">=", other)
+
+// boolean operators
+infix fun GLExpr<GLType.bool>.and(other: GLExpr<GLType.bool>): GLExpr<GLType.bool> = BinaryOp(GLType.bool, this, "&&", other)
+infix fun GLExpr<GLType.bool>.or(other: GLExpr<GLType.bool>): GLExpr<GLType.bool> = BinaryOp(GLType.bool, this, "||", other)
+infix fun GLExpr<GLType.bool>.xor(other: GLExpr<GLType.bool>): GLExpr<GLType.bool> = BinaryOp(GLType.bool, this, "^^", other)
+
+private class SelectOp<T : GLType<T>>(
+    override val type: T,
+    val condition: GLExpr<GLType.bool>,
+    val ifTrue: GLExpr<T>,
+    val ifFalse: GLExpr<T>
+) : GLExpr<T> {
+    override fun visitDecls(visitor: (GLDecl<*, *>) -> Unit) {
+        condition.visitDecls(visitor)
+        ifTrue.visitDecls(visitor)
+        ifFalse.visitDecls(visitor)
+    }
+    override fun toString(): String = "($condition ? $ifTrue : $ifFalse)"
+}
+
+fun <T : GLType<T>> select(condition: GLExpr<GLType.bool>, ifTrue: GLExpr<T>, ifFalse: GLExpr<T>): GLExpr<T> =
+    SelectOp(ifTrue.type, condition, ifTrue, ifFalse)
