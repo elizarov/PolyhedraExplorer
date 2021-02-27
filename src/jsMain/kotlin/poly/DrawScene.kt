@@ -65,7 +65,10 @@ private fun DrawContext.drawImpl(display: Display) {
     gl.viewport(0, 0, width, height)
     gl.clear(GL.COLOR_BUFFER_BIT or GL.DEPTH_BUFFER_BIT)
 
-    val transparent = params.view.transparentFaces.animatedValue != 0.0 && display.hasFaces()
+    val transparentFaces = params.view.transparentFaces.animatedValue
+    val hasFaces = display.hasFaces() && transparentFaces < 1.0
+    val hasEdges = display.hasEdges()
+    val transparent = transparentFaces != 0.0 && hasFaces
     gl[GL.DEPTH_TEST] = !transparent
     gl[GL.BLEND] = transparent
     if (transparent) {
@@ -73,22 +76,18 @@ private fun DrawContext.drawImpl(display: Display) {
         gl[GL.CULL_FACE] = true
         gl.cullFace(GL.FRONT)
         faceBuffers.draw(view, lightning)
-        if (display.hasEdges()) {
-            edgeBuffers.draw(view, 1)
-        }
+        if (hasEdges) edgeBuffers.draw(view, 1)
         gl.cullFace(GL.BACK)
         faceBuffers.draw(view, lightning)
-        if (display.hasEdges()) {
-            edgeBuffers.draw(view, -1)
-        }
+        if (hasEdges) edgeBuffers.draw(view, -1)
     } else {
-        if (display.hasFaces()) {
+        if (hasFaces) {
             // regular draw faces
             val solid = params.view.expandFaces.animatedValue == 0.0
             gl[GL.CULL_FACE] = solid // can cull faces when drawing solid
             faceBuffers.draw(view, lightning)
         }
-        if (display.hasEdges()) {
+        if (hasEdges) {
             edgeBuffers.draw(view)
         }
     }
