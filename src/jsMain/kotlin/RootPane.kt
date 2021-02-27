@@ -107,8 +107,8 @@ class RootPane(props: PComponentProps<RootParams>) :
         tableBody {
             controlRow("Base scale") { pDropdown(props.param.baseScale) }
             controlRow("View scale") { pSlider(props.param.poly.view.scale) }
-            controlRow("Expand") { pSlider(props.param.poly.view.expand) }
-            controlRow("Transparent") { pSlider(props.param.poly.view.transparent, lightingDisabled) }
+            controlRow("Expand") { pSlider(props.param.poly.view.expandFaces) }
+            controlRow("Transparent") { pSlider(props.param.poly.view.transparentFaces, lightingDisabled) }
             controlRow("Display") { pDropdown(props.param.poly.view.display) }
         }
 

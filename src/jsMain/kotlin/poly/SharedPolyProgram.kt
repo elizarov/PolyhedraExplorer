@@ -27,8 +27,8 @@ abstract class SharedPolyProgram(gl: GL) : GLProgram(gl) {
             uModelMatrix.assign(modelMatrix)
             uNormalMatrix.assign(normalMatrix)
             with(params) {
-                uExpand.assign(expand.animatedValue)
-                uColorAlpha.assign(1.0 - transparent.animatedValue)
+                uExpand.assign(expandFaces.animatedValue)
+                uColorAlpha.assign(1.0 - transparentFaces.animatedValue)
             }
         }
     }

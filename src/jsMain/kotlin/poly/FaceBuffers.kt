@@ -42,10 +42,11 @@ fun FaceBuffers.initBuffers(poly: Polyhedron) {
     var i = 0
     var j = 0
     for (f in poly.fs) {
+        // Note: In GL front faces are CCW
         for (k in 2 until f.size) {
             indices[j++] = i
-            indices[j++] = i + k - 1
             indices[j++] = i + k
+            indices[j++] = i + k - 1
         }
         i += f.size
     }

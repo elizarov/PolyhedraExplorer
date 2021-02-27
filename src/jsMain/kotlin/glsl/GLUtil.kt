@@ -3,6 +3,7 @@ package polyhedra.js.glsl
 import org.khronos.webgl.*
 import polyhedra.common.util.*
 import polyhedra.js.util.*
+import org.khronos.webgl.WebGLRenderingContext as GL
 
 fun float32Of(vararg a: Float) = Float32Array(a.size).apply {
     for (i in a.indices) this[i] = a[i]
@@ -46,11 +47,11 @@ inline operator fun Uint16Array.set(i: Int, x: Int) {
     set(i, x.toShort())
 }
 
-fun loadShader(gl: WebGLRenderingContext, type: Int, source: String): WebGLShader {
+fun loadShader(gl: GL, type: Int, source: String): WebGLShader {
     val shader = gl.createShader(type)!!
     gl.shaderSource(shader, source)
     gl.compileShader(shader)
-    if (gl.getShaderParameter(shader, WebGLRenderingContext.COMPILE_STATUS) != true) {
+    if (gl.getShaderParameter(shader, GL.COMPILE_STATUS) != true) {
         val error = gl.getShaderInfoLog(shader)
         println("Error while compiling shader: $error")
         println("// --- begin source ---")
@@ -61,13 +62,20 @@ fun loadShader(gl: WebGLRenderingContext, type: Int, source: String): WebGLShade
     return shader
 }
 
-fun initShaderProgram(gl: WebGLRenderingContext, vs: WebGLShader, fs: WebGLShader): WebGLProgram {
+fun initShaderProgram(gl: GL, vs: WebGLShader, fs: WebGLShader): WebGLProgram {
     val shaderProgram = gl.createProgram()!!
     gl.attachShader(shaderProgram, vs)
     gl.attachShader(shaderProgram, fs)
     gl.linkProgram(shaderProgram)
-    if (gl.getProgramParameter(shaderProgram, WebGLRenderingContext.LINK_STATUS) != true)
+    if (gl.getProgramParameter(shaderProgram, GL.LINK_STATUS) != true)
         error("Shader program error: ${gl.getProgramInfoLog(shaderProgram)}")
     return shaderProgram
+}
+
+operator fun GL.set(cap: Int, value: Boolean) {
+    if (value)
+        enable(cap)
+    else
+        disable(cap)
 }
 

@@ -1,9 +1,11 @@
 package polyhedra.js.poly
 
+import kotlinext.js.*
 import org.khronos.webgl.*
 import org.w3c.dom.*
 import polyhedra.common.*
 import polyhedra.js.*
+import polyhedra.js.glsl.*
 import polyhedra.js.params.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
@@ -12,7 +14,9 @@ class DrawContext(
     override val params: PolyParams,
     private val onUpdate: () -> Unit,
 ) : Param.Context() {
-    val gl: GL = canvas.getContext("webgl") as GL
+    val gl: GL = canvas.getContext("webgl", js {
+        premultipliedAlpha = false  // Ask for non-premultiplied alpha
+    } as Any) as GL
 
     val view = ViewContext(params.view)
     val lightning = LightningContext(params.lighting)
@@ -26,11 +30,19 @@ class DrawContext(
 
     init {
         setup()
+        initGL()
     }
 
     override fun update() {
         onUpdate()
     }
+}
+
+private fun DrawContext.initGL() {
+    gl.blendFunc(GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA);
+    gl.depthFunc(GL.LEQUAL)
+    gl.clearColor(0.0f, 0.0f, 0.0f, 0.0f)
+    gl.clearDepth(1.0f)
 }
 
 fun DrawContext.drawScene(poly: Polyhedron) {
@@ -49,20 +61,27 @@ private fun DrawContext.drawImpl(display: Display) {
     val width = gl.canvas.width
     val height = gl.canvas.height
 
+    view.initProjection(width, height)
     gl.viewport(0, 0, width, height)
-    gl.clearColor(0.0f, 0.0f, 0.0f, 0.0f)
-
-    if (params.view.transparent.value != 0.0 && display.hasFaces()) {
-        gl.disable(GL.DEPTH_TEST)
-    } else {
-        gl.enable(GL.DEPTH_TEST)
-        gl.clearDepth(1.0f)
-        gl.depthFunc(GL.LEQUAL)
-    }
     gl.clear(GL.COLOR_BUFFER_BIT or GL.DEPTH_BUFFER_BIT)
 
-    view.initProjection(width, height)
-    if (display.hasFaces()) faceBuffers.draw(view, lightning)
+    val transparent = params.view.transparentFaces.animatedValue != 0.0 && display.hasFaces()
+    gl[GL.DEPTH_TEST] = !transparent
+    gl[GL.BLEND] = transparent
+    if (transparent) {
+        // special code for transparent faces - draw back faces, then front faces
+        gl[GL.CULL_FACE] = true
+        gl.cullFace(GL.FRONT)
+        faceBuffers.draw(view, lightning)
+        gl.cullFace(GL.BACK)
+        faceBuffers.draw(view, lightning)
+    } else if (display.hasFaces()) {
+        // regular draw faces
+        val solid = params.view.expandFaces.animatedValue == 0.0
+        gl[GL.CULL_FACE] = solid // can cull faces when drawing solid
+        faceBuffers.draw(view, lightning)
+    }
+    
     if (display.hasEdges()) edgeBuffers.draw(view)
 }
 

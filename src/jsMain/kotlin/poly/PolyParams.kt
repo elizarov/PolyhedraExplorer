@@ -35,8 +35,8 @@ class ViewParams(
 ) : Param.Composite(tag) {
     val rotate = using(RotationParam("r", Quat.ID, animation, animation))
     val scale = using(DoubleParam("s", 0.0, -2.0, 2.0, 0.01, animation))
-    val expand = using(DoubleParam("e", 0.0, 0.0, 2.0, 0.01, animation))
-    val transparent = using(DoubleParam("t", 0.0, 0.0, 1.0, 0.01, animation))
+    val expandFaces = using(DoubleParam("e", 0.0, 0.0, 2.0, 0.01, animation))
+    val transparentFaces = using(DoubleParam("t", 0.0, 0.0, 1.0, 0.01, animation))
     val display = using(EnumParam("d", Display.All, Displays))
 }
 
