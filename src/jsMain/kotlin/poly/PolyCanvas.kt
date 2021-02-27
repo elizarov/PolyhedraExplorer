@@ -82,9 +82,12 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
     }
 
     private fun resizeCanvasIfNeeded(clientWidth: Int, clientHeight: Int) {
-        if (canvas.width == clientWidth && canvas.height == clientHeight) return
-        canvas.width = clientWidth
-        canvas.height = clientHeight
+        val dpr = window.devicePixelRatio
+        val width = (clientWidth * dpr).toInt()
+        val height = (clientHeight * dpr).toInt()
+        if (canvas.width == width && canvas.height == height) return
+        canvas.width = width
+        canvas.height = height
     }
 
     private fun savePrevMouseEvent(e: MouseEvent) {
