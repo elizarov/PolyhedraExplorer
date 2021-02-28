@@ -40,10 +40,11 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
     private var prevValidTransforms: List<Transform> = emptyList()
 
     override fun update() {
-        val curSeed = seed.value.poly
+        val curSeed = seed.value
+        val curSeedPoly = curSeed.poly
         val curTransforms = transforms.value
         val curScale = baseScale.value
-        var curPoly = curSeed
+        var curPoly = curSeedPoly
         var curPolyName = curSeed.toString()
         var curIndex = 0
         var curMessage: String? = null
@@ -75,7 +76,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         val validTransforms = curTransforms.subList(0, curIndex)
         val animationDuration = animationParams?.animateValueUpdatesDuration
         if (animationDuration != null) when {
-            curSeed != prevSeed -> updateAnimation(null)
+            curSeedPoly != prevSeed -> updateAnimation(null)
             validTransforms != prevValidTransforms -> {
                 var commonSize = 0
                 while (commonSize < validTransforms.size && commonSize < prevValidTransforms.size &&
@@ -84,7 +85,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
                 }
                 if (validTransforms.size <= commonSize + 1 && prevValidTransforms.size <= commonSize + 1) {
                     val prefix = curTransforms.subList(0, commonSize)
-                    val basePoly = curSeed.transformed(prefix).scaled(curScale)
+                    val basePoly = curSeedPoly.transformed(prefix).scaled(curScale)
                     val prevTransform = prevValidTransforms.getOrNull(commonSize) ?: Transform.None
                     val curTransform = validTransforms.getOrNull(commonSize) ?: Transform.None
                     updateAnimation(transformUpdateAnimation(this, basePoly, curScale, prevTransform, curTransform, animationDuration))
@@ -95,7 +96,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         } else {
             updateAnimation(null)
         }
-        prevSeed = curSeed
+        prevSeed = curSeedPoly
         prevValidTransforms = validTransforms
     }
 
