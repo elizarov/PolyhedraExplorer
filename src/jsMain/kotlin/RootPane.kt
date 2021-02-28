@@ -29,17 +29,17 @@ class RootPane(props: PComponentProps<RootParams>) :
     PComponent<RootParams, PComponentProps<RootParams>, RootPaneState>(props)
 {
     override fun RootPaneState.init(props: PComponentProps<RootParams>) {
-        seed = props.param.poly.seed.value
-        transforms = props.param.poly.transforms.value
-        baseScale = props.param.poly.baseScale.value
+        seed = props.param.render.poly.seed.value
+        transforms = props.param.render.poly.transforms.value
+        baseScale = props.param.render.poly.baseScale.value
 
-        poly = props.param.poly.poly
-        polyName = props.param.poly.polyName
-        transformError = props.param.poly.transformError
+        poly = props.param.render.poly.poly
+        polyName = props.param.render.poly.polyName
+        transformError = props.param.render.poly.transformError
 
-        display = props.param.poly.view.display.value
-        animateUpdates = props.param.animation.animateValueUpdates.value
-        rotate = props.param.animation.animatedRotation.value
+        display = props.param.render.view.display.value
+        animateUpdates = props.param.animationParams.animateValueUpdates.value
+        rotate = props.param.animationParams.animatedRotation.value
     }
 
     override fun RBuilder.render() {
@@ -51,7 +51,7 @@ class RootPane(props: PComponentProps<RootParams>) :
                 // Canvas & Info
                 header(state.polyName)
                 polyCanvas("poly") {
-                    params = props.param.poly
+                    params = props.param.render
                     poly = state.poly
                 }
                 polyInfoPane {
@@ -65,7 +65,7 @@ class RootPane(props: PComponentProps<RootParams>) :
         header("Polyhedron")
         div("row control") {
             label { +"Seed" }
-            pDropdown(props.param.poly.seed)
+            pDropdown(props.param.render.poly.seed)
         }
 
         header("Transforms")
@@ -76,32 +76,32 @@ class RootPane(props: PComponentProps<RootParams>) :
         header("View")
         val lightingDisabled = !state.display.hasFaces()
         tableBody {
-            controlRow("Base scale") { pDropdown(props.param.poly.baseScale) }
-            controlRow("View scale") { pSlider(props.param.poly.view.scale) }
-            controlRow("Expand") { pSlider(props.param.poly.view.expandFaces) }
-            controlRow("Transparent") { pSlider(props.param.poly.view.transparentFaces, lightingDisabled) }
-            controlRow("Display") { pDropdown(props.param.poly.view.display) }
+            controlRow("Base scale") { pDropdown(props.param.render.poly.baseScale) }
+            controlRow("View scale") { pSlider(props.param.render.view.scale) }
+            controlRow("Expand") { pSlider(props.param.render.view.expandFaces) }
+            controlRow("Transparent") { pSlider(props.param.render.view.transparentFaces, lightingDisabled) }
+            controlRow("Display") { pDropdown(props.param.render.view.display) }
         }
 
         header("Animation")
         tableBody {
-            controlRow2("Rotation", { pCheckbox(props.param.animation.animatedRotation) }) {
-                pSlider(props.param.animation.rotationSpeed, !state.rotate)
+            controlRow2("Rotation", { pCheckbox(props.param.animationParams.animatedRotation) }) {
+                pSlider(props.param.animationParams.rotationSpeed, !state.rotate)
             }
             controlRow2("Angle", {}, {
-                pSlider(props.param.animation.rotationAngle, !state.rotate)
+                pSlider(props.param.animationParams.rotationAngle, !state.rotate)
             })
-            controlRow2("Updates", { pCheckbox(props.param.animation.animateValueUpdates) }) {
-                pSlider(props.param.animation.animationDuration, !state.animateUpdates)
+            controlRow2("Updates", { pCheckbox(props.param.animationParams.animateValueUpdates) }) {
+                pSlider(props.param.animationParams.animationDuration, !state.animateUpdates)
             }
         }
 
         header("Lighting")
         tableBody {
-            controlRow("Ambient") { pSlider(props.param.poly.lighting.ambientLight, lightingDisabled) }
-            controlRow("Diffuse") { pSlider(props.param.poly.lighting.diffuseLight, lightingDisabled) }
-            controlRow("Specular") { pSlider(props.param.poly.lighting.specularLight, lightingDisabled) }
-            controlRow("Shininess") { pSlider(props.param.poly.lighting.specularPower, lightingDisabled) }
+            controlRow("Ambient") { pSlider(props.param.render.lighting.ambientLight, lightingDisabled) }
+            controlRow("Diffuse") { pSlider(props.param.render.lighting.diffuseLight, lightingDisabled) }
+            controlRow("Specular") { pSlider(props.param.render.lighting.specularLight, lightingDisabled) }
+            controlRow("Shininess") { pSlider(props.param.render.lighting.specularPower, lightingDisabled) }
         }
 
         header("Export")
@@ -128,9 +128,9 @@ class RootPane(props: PComponentProps<RootParams>) :
                     options = Transforms
                     onChange = { value ->
                         if (value != Transform.None) {
-                            props.param.poly.transforms.updateValue(props.param.poly.transforms.value.updatedAt(i, value))
+                            props.param.render.poly.transforms.updateValue(props.param.render.poly.transforms.value.updatedAt(i, value))
                         } else {
-                            props.param.poly.transforms.updateValue(props.param.poly.transforms.value.removedAt(i))
+                            props.param.render.poly.transforms.updateValue(props.param.render.poly.transforms.value.removedAt(i))
                         }
                     }
                 }
@@ -149,7 +149,7 @@ class RootPane(props: PComponentProps<RootParams>) :
                 options = Transforms
                 onChange = { value ->
                     if (value != Transform.None) {
-                        props.param.poly.transforms.updateValue(props.param.poly.transforms.value + value)
+                        props.param.render.poly.transforms.updateValue(props.param.render.poly.transforms.value + value)
                     }
                 }
             }
@@ -158,7 +158,7 @@ class RootPane(props: PComponentProps<RootParams>) :
         controlRow("") {
             button {
                 attrs {
-                    onClickFunction = { props.param.poly.transforms.updateValue(emptyList()) }
+                    onClickFunction = { props.param.render.poly.transforms.updateValue(emptyList()) }
                 }
                 +"Clear"
             }

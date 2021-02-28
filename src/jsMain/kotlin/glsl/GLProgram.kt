@@ -63,10 +63,6 @@ abstract class GLProgram(val gl: GL) {
 
     infix fun <T : GLType.Floats<T>> Attribute<T>.by(buffer: Float32Buffer<T>) {
         gl.bindBuffer(GL.ARRAY_BUFFER, buffer.glBuffer)
-        enable()
-    }
-
-    fun <T : GLType.Numbers<T>> Attribute<T>.enable() {
         gl.vertexAttribPointer(location, type.bufferSize, GL.FLOAT, false, 0, 0)
         gl.enableVertexAttribArray(location)
     }
@@ -97,10 +93,13 @@ abstract class GLProgram(val gl: GL) {
 
     fun <T : GLType<T>> uniform(type: T, precision: GLPrecision? = null): DelegateProvider<Uniform<T>> =
         DelegateProvider { Uniform(precision, type, it) }
+
     fun <T : GLType<T>> attribute(type: T, precision: GLPrecision? = null): DelegateProvider<Attribute<T>> =
         DelegateProvider { Attribute(precision, type, it) }
+
     fun <T : GLType<T>> varying(type: T, precision: GLPrecision? = null): DelegateProvider<Varying<T>> =
         DelegateProvider { Varying(precision, type, it) }
+
     private fun <T : GLType<T>> builtin(type: T): DelegateProvider<Builtin<T>> =
         DelegateProvider { Builtin(type, it) }
 }

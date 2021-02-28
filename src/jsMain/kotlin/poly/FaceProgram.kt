@@ -3,7 +3,7 @@ package polyhedra.js.poly
 import polyhedra.js.glsl.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
-class FaceProgram(gl: GL) : SharedPolyProgram(gl) {
+class FaceProgram(gl: GL) : PolyGeometryProgram(gl) {
     val uAmbientLightColor by uniform(GLType.vec3)
     val uDiffuseLightColor by uniform(GLType.vec3)
     val uSpecularLightColor by uniform(GLType.vec3)

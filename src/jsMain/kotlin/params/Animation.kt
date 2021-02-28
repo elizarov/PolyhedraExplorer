@@ -12,12 +12,14 @@ abstract class ValueUpdateAnimation<T : Any, P : AnimatedValueParam<T, P>>(
     override val param: P,
     private val duration: Double
 ) : Animation() {
+    init { require(duration > 0) }
+
     abstract val value: T
 
     private var position = 0.0
 
-    val fraction: Double
-        get() = if (duration <= 0.0) 1.0 else (position / duration).coerceIn(0.0, 1.0)
+    protected val fraction: Double
+        get() = (position / duration).coerceIn(0.0, 1.0)
 
     override val isOver: Boolean
         get() = position >= duration

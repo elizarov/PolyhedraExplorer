@@ -6,12 +6,13 @@ import kotlin.math.*
 enum class Transform(
     override val tag: String,
     val transform: (Polyhedron) -> Polyhedron,
-    val isApplicable: (Polyhedron) -> String? = { null } // todo: not defined usefully now
+    val isApplicable: (Polyhedron) -> String? = { null }, // todo: not defined usefully now
+    val truncationRatio: (Polyhedron) -> Double? = { null }
 ) : Tagged {
-    None("n", { it }),
+    None("n", { it }, truncationRatio = { 0.0 }),
     Dual("d", Polyhedron::dual),
-    Rectified("r", Polyhedron::rectified),
-    Truncated("t", Polyhedron::truncated),
+    Rectified("r", Polyhedron::rectified, truncationRatio = { 1.0 }),
+    Truncated("t", Polyhedron::truncated, truncationRatio = { it.regularTruncationRatio() }),
     Cantellated("c", Polyhedron::cantellated), // ~= Rectified, Rectified
     Bevelled("b", Polyhedron::bevelled), // ~= Rectified, Truncated
     Snub("s", Polyhedron::snub)
@@ -21,7 +22,7 @@ val Transforms: List<Transform> by lazy { Transform.values().toList() }
 
 fun Polyhedron.transformed(transform: Transform) = memoTransform(transform.transform)
 
-fun Polyhedron.transformed(vararg transforms: Transform) =
+fun Polyhedron.transformed(transforms: List<Transform>) =
     transforms.fold(this) { poly, transform -> poly.transformed(transform) }
 
 fun Polyhedron.dual(): Polyhedron = polyhedron {

@@ -15,8 +15,8 @@ fun main() {
 }
 
 class RootParams : Param.Composite("") {
-    val animation = using(ViewAnimationParams("a"))
-    val poly = using(PolyParams("", animation))
+    val animationParams = using(ViewAnimationParams("a"))
+    val render = using(RenderParams("", animationParams))
 }
 
 private fun onLoad() {

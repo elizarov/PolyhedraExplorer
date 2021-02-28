@@ -3,7 +3,6 @@ package polyhedra.js.poly
 import kotlinext.js.*
 import org.khronos.webgl.*
 import org.w3c.dom.*
-import polyhedra.common.*
 import polyhedra.js.*
 import polyhedra.js.glsl.*
 import polyhedra.js.params.*
@@ -11,7 +10,7 @@ import org.khronos.webgl.WebGLRenderingContext as GL
 
 class DrawContext(
     canvas: HTMLCanvasElement,
-    override val params: PolyParams,
+    override val params: RenderParams,
     private val onUpdate: () -> Unit,
 ) : Param.Context() {
     val gl: GL = canvas.getContext("webgl", js {
@@ -21,12 +20,9 @@ class DrawContext(
     val view = ViewContext(params.view)
     val lightning = LightningContext(params.lighting)
     
-    val sharedPolyBuffers = SharedPolyBuffers(gl)
-    val faceBuffers = FaceBuffers(gl, sharedPolyBuffers)
-    val edgeBuffers = EdgeBuffers(gl, sharedPolyBuffers)
-
-    var prevPoly: Polyhedron? = null
-    var prevDisplay: Display? = null
+    val polyContext = PolyContext(gl, params.poly)
+    val faceContext = FaceContext(gl, polyContext, params.poly)
+    val edgeContext = EdgeContext(gl, polyContext, params.poly)
 
     init {
         setup()
@@ -45,19 +41,7 @@ private fun DrawContext.initGL() {
     gl.clearDepth(1.0f)
 }
 
-fun DrawContext.drawScene(poly: Polyhedron) {
-    val display = params.view.display.value
-    if (poly != prevPoly || prevDisplay != display) {
-        prevPoly = poly
-        prevDisplay = display
-        sharedPolyBuffers.initBuffers(poly)
-        if (display.hasFaces()) faceBuffers.initBuffers(poly)
-        if (display.hasEdges()) edgeBuffers.initBuffers(poly)
-    }
-    drawImpl(display)
-}
-
-private fun DrawContext.drawImpl(display: Display) {
+fun DrawContext.drawScene() {
     val width = gl.canvas.width
     val height = gl.canvas.height
 
@@ -66,6 +50,7 @@ private fun DrawContext.drawImpl(display: Display) {
     gl.clear(GL.COLOR_BUFFER_BIT or GL.DEPTH_BUFFER_BIT)
 
     val transparentFaces = params.view.transparentFaces.value
+    val display = params.view.display.value
     val hasFaces = display.hasFaces() && transparentFaces < 1.0
     val hasEdges = display.hasEdges()
     val transparent = transparentFaces != 0.0 && hasFaces
@@ -75,20 +60,20 @@ private fun DrawContext.drawImpl(display: Display) {
         // special code for transparent faces - draw back faces, then front faces
         gl[GL.CULL_FACE] = true
         gl.cullFace(GL.FRONT)
-        faceBuffers.draw(view, lightning)
-        if (hasEdges) edgeBuffers.draw(view, 1)
+        faceContext.draw(view, lightning)
+        if (hasEdges) edgeContext.draw(view, 1)
         gl.cullFace(GL.BACK)
-        faceBuffers.draw(view, lightning)
-        if (hasEdges) edgeBuffers.draw(view, -1)
+        faceContext.draw(view, lightning)
+        if (hasEdges) edgeContext.draw(view, -1)
     } else {
         if (hasFaces) {
             // regular draw faces
             val solid = params.view.expandFaces.value == 0.0
             gl[GL.CULL_FACE] = solid // can cull faces when drawing solid
-            faceBuffers.draw(view, lightning)
+            faceContext.draw(view, lightning)
         }
         if (hasEdges) {
-            edgeBuffers.draw(view)
+            edgeContext.draw(view)
         }
     }
 }

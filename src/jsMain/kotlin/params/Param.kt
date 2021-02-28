@@ -193,11 +193,6 @@ abstract class AnimatedValueParam<T : Any, P : AnimatedValueParam<T, P>>(
         }
     }
 
-    fun notifyAnimationUpdate() {
-        // :todo: move efficient impl for multiple animations
-        notifyUpdate(UpdateType.ValueAnimation)
-    }
-
     override fun updateValue(value: T) {
         if (targetValue == value) return
         val oldValue = this.value

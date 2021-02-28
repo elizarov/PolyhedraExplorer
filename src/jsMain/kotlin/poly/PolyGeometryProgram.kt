@@ -4,7 +4,7 @@ import org.khronos.webgl.*
 import polyhedra.js.glsl.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
-abstract class SharedPolyProgram(gl: GL) : GLProgram(gl) {
+abstract class PolyGeometryProgram(gl: GL) : GLProgram(gl) {
     val uCameraPosition by uniform(GLType.vec3)
     val uProjectionMatrix by uniform(GLType.mat4)
     val uModelMatrix by uniform(GLType.mat4)
@@ -14,6 +14,9 @@ abstract class SharedPolyProgram(gl: GL) : GLProgram(gl) {
 
     val aVertexPosition by attribute(GLType.vec3)
     val aVertexNormal by attribute(GLType.vec3)
+
+    val aPrevVertexPosition by attribute(GLType.vec3)
+    val aPrevVertexNormal by attribute(GLType.vec3)
 
     // world position of the current element
     val fPosition by function(GLType.vec4) {
@@ -48,10 +51,11 @@ abstract class SharedPolyProgram(gl: GL) : GLProgram(gl) {
     }
 }
 
-fun SharedPolyProgram.assignSharedPolyBuffers(sharedPolyBuffers: SharedPolyBuffers) {
-    gl.bindBuffer(GL.ARRAY_BUFFER, sharedPolyBuffers.positionBuffer.glBuffer)
-    aVertexPosition.enable()
-
-    gl.bindBuffer(GL.ARRAY_BUFFER, sharedPolyBuffers.normalBuffer.glBuffer)
-    aVertexNormal.enable()
+fun PolyGeometryProgram.assignPolyGeometry(polyContext: PolyContext) {
+    aVertexPosition by polyContext.target.positionBuffer
+    aVertexNormal by polyContext.target.normalBuffer
+    if (polyContext.animated) {
+        aPrevVertexPosition by polyContext.prev.positionBuffer
+        aPrevVertexNormal by polyContext.prev.normalBuffer
+    }
 }
