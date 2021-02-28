@@ -5,7 +5,7 @@ import polyhedra.js.util.*
 import kotlin.math.*
 
 private const val hue0 = 57.0 / 360
-private const val divisor = 3
+private const val divisor = 4
 
 private fun paletteColor(id: Int): Color {
     var phase = 0.0
@@ -16,7 +16,7 @@ private fun paletteColor(id: Int): Color {
         if (phase > 0) count *= 2
         phase += 0.5 / count
     }
-    return hsvColor(hue0 + phase + rem.toDouble() / count, 0.9, 0.95)
+    return hsvColor(hue0 + phase + rem.toDouble() / count, 0.8, 0.95)
 }
 
 object PolyStyle {
