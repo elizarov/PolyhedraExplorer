@@ -9,8 +9,6 @@ import polyhedra.js.poly.*
 import react.*
 import react.dom.*
 
-private const val MAX_DISPLAY_EDGES = (1 shl 15) - 1
-
 external interface RootPaneState : RState {
     var seed: Seed
     var transforms: List<Transform>
@@ -18,8 +16,7 @@ external interface RootPaneState : RState {
 
     var poly: Polyhedron
     var polyName: String
-    var geometryErrorIndex: Int
-    var geometryErrorMessage: String
+    var transformError: TransformError?
 
     var display: Display
     var animateUpdates: Boolean
@@ -36,35 +33,9 @@ class RootPane(props: PComponentProps<RootParams>) :
         transforms = props.param.poly.transforms.value
         baseScale = props.param.poly.baseScale.value
 
-        var curPoly = seed.poly
-        var curPolyName = seed.toString()
-        var curIndex = 0
-        var curMessage = ""
-        try {
-            for (transform in transforms) {
-                val applicable = transform.isApplicable(curPoly)
-                if (applicable != null) {
-                    curMessage = applicable
-                    break
-                }
-                val newPoly = curPoly.transformed(transform)
-                val nEdges = newPoly.es.size
-                if (nEdges > MAX_DISPLAY_EDGES) {
-                    curMessage = "Polyhedron is too large to display ($nEdges edges)"
-                    break
-                }
-                newPoly.validateGeometry()
-                curPolyName = "$transform $curPolyName"
-                curPoly = newPoly
-                curIndex++
-            }
-        } catch (e: Exception) {
-            curMessage = "Transform produces invalid polyhedron geometry"
-        }
-        poly = curPoly.scaled(baseScale)
-        polyName = curPolyName
-        geometryErrorIndex = curIndex
-        geometryErrorMessage = curMessage
+        poly = props.param.poly.poly
+        polyName = props.param.poly.polyName
+        transformError = props.param.poly.transformError
 
         display = props.param.poly.view.display.value
         animateUpdates = props.param.animation.animateValueUpdates.value
@@ -148,10 +119,11 @@ class RootPane(props: PComponentProps<RootParams>) :
     }
 
     private fun RDOMBuilder<TBODY>.renderTransformsRows() {
+        val errorIndex = state.transformError?.index ?: Int.MAX_VALUE
         for ((i, transform) in state.transforms.withIndex()) {
             controlRow("${i + 1}:") {
                 dropdown<Transform> {
-                    disabled = i > state.geometryErrorIndex
+                    disabled = i > errorIndex
                     value = transform
                     options = Transforms
                     onChange = { value ->
@@ -162,17 +134,17 @@ class RootPane(props: PComponentProps<RootParams>) :
                         }
                     }
                 }
-                if (i == state.geometryErrorIndex) {
+                if (i == errorIndex) {
                     span {
                         +"⚠️"
-                        span("tooltip-text") { +state.geometryErrorMessage }
+                        span("tooltip-text") { +"${state.transformError?.message}" }
                     }
                 }
             }
         }
         controlRow("${state.transforms.size + 1}:") {
             dropdown<Transform> {
-                disabled = state.geometryErrorIndex < state.transforms.size
+                disabled = errorIndex < state.transforms.size
                 value = Transform.None
                 options = Transforms
                 onChange = { value ->

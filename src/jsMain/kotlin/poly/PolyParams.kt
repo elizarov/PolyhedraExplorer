@@ -6,7 +6,9 @@ import polyhedra.js.*
 import polyhedra.js.params.*
 import kotlin.math.*
 
-class PolyParams(tag: String, val animation: ViewAnimationParams?) : Param.Composite(tag) {
+private const val MAX_DISPLAY_EDGES = (1 shl 15) - 1
+
+class PolyParams(tag: String, val animation: ViewAnimationParams?) : Param.Composite(tag, UpdateType.ValueUpdate) {
     // what to show
     val seed = using(EnumParam("s", Seed.Tetrahedron, Seeds))
     val transforms = using(EnumListParam("t", emptyList(), Transforms))
@@ -14,11 +16,52 @@ class PolyParams(tag: String, val animation: ViewAnimationParams?) : Param.Compo
     // how to show
     val view = using(ViewParams("v", animation))
     val lighting = using(LightingParams("l", animation))
+
     // computed value of the currently shown polyhedron
     var poly: Polyhedron = Seed.Tetrahedron.poly
         private set
-        
+    var polyName: String = ""
+        private set
+    var transformError: TransformError? = null
+        private set
+
+    override fun update() {
+        var curPoly = seed.value.poly
+        var curPolyName = seed.value.toString()
+        var curIndex = 0
+        var curMessage: String? = null
+        try {
+            for (transform in transforms.value) {
+                val applicable = transform.isApplicable(curPoly)
+                if (applicable != null) {
+                    curMessage = applicable
+                    break
+                }
+                val newPoly = curPoly.transformed(transform)
+                val nEdges = newPoly.es.size
+                if (nEdges > MAX_DISPLAY_EDGES) {
+                    curMessage = "Polyhedron is too large to display ($nEdges edges)"
+                    break
+                }
+                newPoly.validateGeometry()
+                curPolyName = "$transform $curPolyName"
+                curPoly = newPoly
+                curIndex++
+            }
+        } catch (e: Exception) {
+            curMessage = "Transform produces invalid polyhedron geometry"
+        }
+        poly = curPoly.scaled(baseScale.value)
+        polyName = curPolyName
+        transformError = if (curMessage != null)
+            TransformError(curIndex, curMessage) else null
+    }
 }
+
+data class TransformError(
+    val index: Int,
+    val message: String
+)
 
 // Optionally passed from the outside (not needed in the backend)
 class ViewAnimationParams(tag: String) : Param.Composite(tag), ValueAnimationParams, RotationAnimationParams  {
