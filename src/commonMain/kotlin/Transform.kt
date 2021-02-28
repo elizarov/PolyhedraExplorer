@@ -8,14 +8,19 @@ enum class Transform(
     val transform: (Polyhedron) -> Polyhedron,
     val isApplicable: (Polyhedron) -> String? = { null }, // todo: not defined usefully now
     val truncationRatio: (Polyhedron) -> Double? = { null },
-    val cantellationRatio: (Polyhedron) -> Double? = { null }
+    val cantellationRatio: (Polyhedron) -> Double? = { null },
+    val bevellingRatio: (Polyhedron) -> BevellingRatio? = {
+        val cr = cantellationRatio(it)
+        val tr = truncationRatio(it)
+        if (cr == null && tr == null) null else BevellingRatio(cr ?: 0.0, tr ?: 0.0)
+    }
 ) : Tagged {
     None("n", { it }, truncationRatio = { 0.0 }, cantellationRatio = { 0.0 }),
     Truncated("t", Polyhedron::truncated, truncationRatio = { it.regularTruncationRatio() }),
     Rectified("r", Polyhedron::rectified, truncationRatio = { 1.0 }),
     Cantellated("c", Polyhedron::cantellated, cantellationRatio = { it.regularCantellationRatio() }), // ~= Rectified, Rectified
     Dual("d", Polyhedron::dual, cantellationRatio = { 1.0 }),
-    Bevelled("b", Polyhedron::bevelled), // ~= Rectified, Truncated
+    Bevelled("b", Polyhedron::bevelled, bevellingRatio = { it.regularBevellingRatio() }), // ~= Rectified, Truncated
     Snub("s", Polyhedron::snub)
 }
 
@@ -181,7 +186,10 @@ fun Polyhedron.bevelled(br: BevellingRatio = regularBevellingRatio()): Polyhedro
         val fvs = vertexDirectedEdges[v]!!.flatMap { e ->
             listOf(fev[e.l]!![e]!!, fev[e.r]!![e]!!)
         }
-        face(fvs, FaceKind(kindOfs + v.kind.id))
+        face(fvs,
+            FaceKind(kindOfs + v.kind.id),
+            FaceKind(v.kind.id) // dual kind
+        )
     }
     // 4-faces from the original edges
     kindOfs += vertexKinds.size

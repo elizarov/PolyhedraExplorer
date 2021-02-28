@@ -7,7 +7,7 @@ class TransformAnimation(
     override val param: PolyParams,
     private val duration: Double,
     val prev: TransformKeyframe,
-    val target: TransformKeyframe
+    val target: TransformKeyframe,
 ) : Animation() {
     init { require(duration > 0) }
 
@@ -21,23 +21,44 @@ class TransformAnimation(
         if (isOver) param.resetTransformAnimation()
     }
 
-    private val desiredRatio: Double get() {
-        val f = (position / duration).coerceIn(0.0, 1.0)
-        return (1 - f) * prev.desiredRatio + f * target.desiredRatio
-    }
+    private val fraction: Double
+        get() = (position / duration).coerceIn(0.0, 1.0)
 
     val prevPoly = prev.poly
     val prevFraction: Double
-        get() = (desiredRatio - target.polyRatio) / (prev.polyRatio - target.polyRatio)
+        get() = (fraction - target.fraction) / (prev.fraction - target.fraction)
 
     val targetPoly: Polyhedron = target.poly
     val targetFraction: Double
-        get() = (desiredRatio - prev.polyRatio) / (target.polyRatio - prev.polyRatio)
+        get() = (fraction - prev.fraction) / (target.fraction - prev.fraction)
 }
 
 data class TransformKeyframe(
     val poly: Polyhedron,
-    val polyRatio: Double,
-    val desiredRatio: Double,
+    val fraction: Double,
     val dual: Boolean = false
 )
+
+private const val GAP = 0.01
+
+fun prevFractionGap(ratio: Double): Double =
+    if (ratio <= 0 || ratio >= 1) GAP else 0.0
+
+fun curFractionGap(ratio: Double): Double =
+    if (ratio <= 0 || ratio >= 1) 1 - GAP else 1.0
+
+fun Double.interpolate(prev: Double, target: Double): Double =
+    (1 - this) * prev + this * target
+
+fun prevFractionGap(ratio: BevellingRatio): Double =
+    if (ratio.cr <= 0 || ratio.cr >= 1 || ratio.tr <= 0 || ratio.tr >= 1) GAP else 0.0
+
+fun curFractionGap(ratio: BevellingRatio): Double =
+    if (ratio.cr <= 0 || ratio.cr >= 1 || ratio.tr <= 0 || ratio.tr >= 1) 1 - GAP else 1.0
+
+
+fun Double.interpolate(prev: BevellingRatio, target: BevellingRatio): BevellingRatio =
+    BevellingRatio(
+        (1 - this) * prev.cr + this * target.cr,
+        (1 - this) * prev.tr + this * target.tr
+    )

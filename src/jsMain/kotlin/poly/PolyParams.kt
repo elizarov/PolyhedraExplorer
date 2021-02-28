@@ -7,7 +7,6 @@ import polyhedra.js.params.*
 import kotlin.math.*
 
 private const val MAX_DISPLAY_EDGES = (1 shl 15) - 1
-private val KEY_POSITION_RANGE = 0.01..0.99
 
 class RenderParams(tag: String, val animationParams: ViewAnimationParams?) : Param.Composite(tag) {
     val poly = using(PolyParams("", animationParams))
@@ -88,50 +87,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
                     val basePoly = curSeed.transformed(prefix).scaled(curScale)
                     val prevTransform = prevValidTransforms.getOrNull(commonSize) ?: Transform.None
                     val curTransform = validTransforms.getOrNull(commonSize) ?: Transform.None
-                    val prevTruncationRatio = prevTransform.truncationRatio(basePoly)
-                    val curTruncationRatio = curTransform.truncationRatio(basePoly)
-                    val prevCantellationRatio = prevTransform.cantellationRatio(basePoly)
-                    val curCantellationRatio = curTransform.cantellationRatio(basePoly)
-                    val animation = when {
-                        // Truncation animation
-                        prevTruncationRatio != null && curTruncationRatio != null -> {
-                            val prevCoerced = prevTruncationRatio.coerceIn(KEY_POSITION_RANGE)
-                            val curCoerced = curTruncationRatio.coerceIn(KEY_POSITION_RANGE)
-                            TransformAnimation(this, animationDuration,
-                                TransformKeyframe(
-                                    basePoly.truncated(prevCoerced).scaled(curScale),
-                                    prevCoerced,
-                                    prevTruncationRatio
-                                ),
-                                TransformKeyframe(
-                                    basePoly.truncated(curCoerced).scaled(curScale),
-                                    curCoerced,
-                                    curTruncationRatio
-                                )
-                            )
-                        }
-                        // Cantellation animation
-                        prevCantellationRatio != null && curCantellationRatio != null -> {
-                            val prevCoerced = prevCantellationRatio.coerceIn(KEY_POSITION_RANGE)
-                            val curCoerced = curCantellationRatio.coerceIn(KEY_POSITION_RANGE)
-                            TransformAnimation(this, animationDuration,
-                                TransformKeyframe(
-                                    basePoly.cantellated(prevCoerced).scaled(curScale),
-                                    prevCoerced,
-                                    prevCantellationRatio,
-                                    prevCantellationRatio == 1.0
-                                ),
-                                TransformKeyframe(
-                                    basePoly.cantellated(curCoerced).scaled(curScale),
-                                    curCoerced,
-                                    curCantellationRatio,
-                                    curCantellationRatio == 1.0
-                                )
-                            )
-                        }
-                        else -> null
-                    }
-                    updateAnimation(animation)
+                    updateAnimation(transformUpdateAnimation(this, basePoly, curScale, prevTransform, curTransform, animationDuration))
                 } else {
                     updateAnimation(null)
                 }
@@ -158,6 +114,67 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         transformAnimation?.let { visitor(it) }
     }
 }
+
+private fun transformUpdateAnimation(
+    params: PolyParams,
+    basePoly: Polyhedron,
+    curScale: Scale,
+    prevTransform: Transform,
+    curTransform: Transform,
+    animationDuration: Double
+): TransformAnimation? {
+    val prevTruncationRatio = prevTransform.truncationRatio(basePoly)
+    val curTruncationRatio = curTransform.truncationRatio(basePoly)
+    val prevCantellationRatio = prevTransform.cantellationRatio(basePoly)
+    val curCantellationRatio = curTransform.cantellationRatio(basePoly)
+    val prevBevellingRatio = prevTransform.bevellingRatio(basePoly)
+    val curBevellingRatio = curTransform.bevellingRatio(basePoly)
+    return when {
+        // Truncation animation
+        prevTruncationRatio != null && curTruncationRatio != null -> {
+            val prevF = prevFractionGap(prevTruncationRatio)
+            val curF = curFractionGap(curTruncationRatio)
+            val prevR = prevF.interpolate(prevTruncationRatio, curTruncationRatio)
+            val curR = curF.interpolate(prevTruncationRatio, curTruncationRatio)
+            TransformAnimation(
+                params,
+                animationDuration,
+                TransformKeyframe(basePoly.truncated(prevR).scaled(curScale), prevF),
+                TransformKeyframe(basePoly.truncated(curR).scaled(curScale), curF)
+            )
+        }
+        // Cantellation animation
+        prevCantellationRatio != null && curCantellationRatio != null -> {
+            val prevF = prevFractionGap(prevCantellationRatio)
+            val curF = curFractionGap(curCantellationRatio)
+            val prevR = prevF.interpolate(prevCantellationRatio, curCantellationRatio)
+            val curR = curF.interpolate(prevCantellationRatio, curCantellationRatio)
+            TransformAnimation(
+                params,
+                animationDuration,
+                TransformKeyframe(basePoly.cantellated(prevR).scaled(curScale), prevF, prevCantellationRatio == 1.0),
+                TransformKeyframe(basePoly.cantellated(curR).scaled(curScale), curF, curCantellationRatio == 1.0)
+            )
+        }
+        // Bevelling animation
+        prevBevellingRatio != null && curBevellingRatio != null -> {
+            val prevF = prevFractionGap(prevBevellingRatio)
+            val curF = curFractionGap(curBevellingRatio)
+            val prevR = prevF.interpolate(prevBevellingRatio, curBevellingRatio)
+            val curR = curF.interpolate(prevBevellingRatio, curBevellingRatio)
+            TransformAnimation(
+                params,
+                animationDuration,
+                TransformKeyframe(basePoly.bevelled(prevR).scaled(curScale), prevF, prevBevellingRatio.cr == 1.0),
+                TransformKeyframe(basePoly.bevelled(curR).scaled(curScale), curF, curBevellingRatio.cr == 1.0)
+            )
+        }
+        else -> null
+    }
+}
+
+private fun BevellingRatio.coerceIn(range: ClosedFloatingPointRange<Double>): BevellingRatio =
+    BevellingRatio(cr.coerceIn(range), tr.coerceIn(range))
 
 data class TransformError(
     val index: Int,
