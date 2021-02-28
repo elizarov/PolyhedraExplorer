@@ -42,7 +42,7 @@ class EdgeContext(val gl: GL, val polyContext: PolyContext, override val params:
 fun EdgeContext.draw(view: ViewContext, cullMode: Int = 0) {
     program.use {
         assignView(view)
-        assignPolyGeometry(polyContext)
+        assignPolyContext(polyContext)
         uVertexColor by color
         uCullMode by cullMode.toDouble()
     }

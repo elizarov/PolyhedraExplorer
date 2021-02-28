@@ -4,7 +4,7 @@ import org.khronos.webgl.*
 import polyhedra.js.glsl.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
-abstract class PolyGeometryProgram(gl: GL) : GLProgram(gl) {
+abstract class PolyProgram(gl: GL) : GLProgram(gl) {
     val uCameraPosition by uniform(GLType.vec3)
     val uProjectionMatrix by uniform(GLType.mat4)
     val uModelMatrix by uniform(GLType.mat4)
@@ -63,7 +63,7 @@ abstract class PolyGeometryProgram(gl: GL) : GLProgram(gl) {
     }
 }
 
-fun PolyGeometryProgram.assignPolyGeometry(polyContext: PolyContext) {
+fun PolyProgram.assignPolyContext(polyContext: PolyContext) {
     aVertexPosition by polyContext.target.positionBuffer
     aVertexNormal by polyContext.target.normalBuffer
     val animation = polyContext.animation

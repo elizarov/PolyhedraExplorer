@@ -3,7 +3,7 @@ package polyhedra.js.poly
 import polyhedra.js.glsl.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
-class EdgeProgram(gl: GL) : PolyGeometryProgram(gl) {
+class EdgeProgram(gl: GL) : PolyProgram(gl) {
     val uVertexColor by uniform(GLType.vec4, GLPrecision.lowp)
     val uCullMode by uniform(GLType.float) // 0 - no, 1 - cull front, -1 - cull back
     val vColorMul by varying(GLType.float)

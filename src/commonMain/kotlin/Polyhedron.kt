@@ -166,6 +166,7 @@ class Face(
     override val id: Int,
     val fvs: List<Vertex>,
     val kind: FaceKind,
+    val dualKind: FaceKind = kind // used only for by cantellation
 ) : Id {
     val plane: Plane = plane3(fvs[0].pt, fvs[1].pt, fvs[2].pt)
 
@@ -236,12 +237,12 @@ class PolyhedronBuilder {
         fs.add(Face(fs.size, a, kind))
     }
 
-    fun face(fvs: Collection<Vertex>, kind: FaceKind) {
-        fs.add(Face(fs.size, fvs.map { vs[it.id] }, kind))
+    fun face(fvs: Collection<Vertex>, kind: FaceKind, dualKind: FaceKind = kind) {
+        fs.add(Face(fs.size, fvs.map { vs[it.id] }, kind, dualKind))
     }
 
     fun face(f: Face) {
-        face(f.fvs, f.kind)
+        face(f.fvs, f.kind, f.dualKind)
     }
 
     fun build() = Polyhedron(vs, fs)

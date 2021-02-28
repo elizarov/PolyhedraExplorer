@@ -7,13 +7,14 @@ enum class Transform(
     override val tag: String,
     val transform: (Polyhedron) -> Polyhedron,
     val isApplicable: (Polyhedron) -> String? = { null }, // todo: not defined usefully now
-    val truncationRatio: (Polyhedron) -> Double? = { null }
+    val truncationRatio: (Polyhedron) -> Double? = { null },
+    val cantellationRatio: (Polyhedron) -> Double? = { null }
 ) : Tagged {
-    None("n", { it }, truncationRatio = { 0.0 }),
-    Dual("d", Polyhedron::dual),
-    Rectified("r", Polyhedron::rectified, truncationRatio = { 1.0 }),
+    None("n", { it }, truncationRatio = { 0.0 }, cantellationRatio = { 0.0 }),
     Truncated("t", Polyhedron::truncated, truncationRatio = { it.regularTruncationRatio() }),
-    Cantellated("c", Polyhedron::cantellated), // ~= Rectified, Rectified
+    Rectified("r", Polyhedron::rectified, truncationRatio = { 1.0 }),
+    Cantellated("c", Polyhedron::cantellated, cantellationRatio = { it.regularCantellationRatio() }), // ~= Rectified, Rectified
+    Dual("d", Polyhedron::dual, cantellationRatio = { 1.0 }),
     Bevelled("b", Polyhedron::bevelled), // ~= Rectified, Truncated
     Snub("s", Polyhedron::snub)
 }
@@ -24,18 +25,6 @@ fun Polyhedron.transformed(transform: Transform) = memoTransform(transform.trans
 
 fun Polyhedron.transformed(transforms: List<Transform>) =
     transforms.fold(this) { poly, transform -> poly.transformed(transform) }
-
-fun Polyhedron.dual(): Polyhedron = polyhedron {
-    val r = midradius
-    // vertices from the original faces
-    val fv = fs.associateWith { f ->
-        vertex(f.plane.dualPoint(r), VertexKind(f.kind.id))
-    }
-    // faces from the original vertices
-    for ((v, fl) in vertexFaces) {
-        face(fl.map { fv[it]!! }, FaceKind(v.kind.id))
-    }
-}
 
 fun Polyhedron.rectified(): Polyhedron = polyhedron {
     // vertices from the original edges
@@ -123,7 +112,10 @@ fun Polyhedron.cantellated(cr: Double = regularCantellationRatio()): Polyhedron 
     // faces from the original vertices
     var kindOfs = faceKinds.size
     for (v in vs) {
-        face(vertexDirectedEdges[v]!!.map { ev[it]!! }, FaceKind(kindOfs + v.kind.id))
+        face(vertexDirectedEdges[v]!!.map { ev[it]!! },
+            FaceKind(kindOfs + v.kind.id), // cantellated kind
+            FaceKind(v.kind.id) // dual kind
+        )
     }
     // 4-faces from the original edges
     kindOfs += vertexKinds.size
@@ -135,6 +127,18 @@ fun Polyhedron.cantellated(cr: Double = regularCantellationRatio()): Polyhedron 
             fvv[e.r]!![e.b]!!
         )
         face(fvs, FaceKind(kindOfs + edgeKindsIndex[e.kind]!!))
+    }
+}
+
+fun Polyhedron.dual(): Polyhedron = polyhedron {
+    val r = midradius
+    // vertices from the original faces
+    val fv = fs.associateWith { f ->
+        vertex(f.plane.dualPoint(r), VertexKind(f.kind.id))
+    }
+    // faces from the original vertices
+    for ((v, fl) in vertexFaces) {
+        face(fl.map { fv[it]!! }, FaceKind(v.kind.id))
     }
 }
 

@@ -90,14 +90,43 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
                     val curTransform = validTransforms.getOrNull(commonSize) ?: Transform.None
                     val prevTruncationRatio = prevTransform.truncationRatio(basePoly)
                     val curTruncationRatio = curTransform.truncationRatio(basePoly)
+                    val prevCantellationRatio = prevTransform.cantellationRatio(basePoly)
+                    val curCantellationRatio = curTransform.cantellationRatio(basePoly)
                     val animation = when {
                         // Truncation animation
                         prevTruncationRatio != null && curTruncationRatio != null -> {
                             val prevCoerced = prevTruncationRatio.coerceIn(KEY_POSITION_RANGE)
                             val curCoerced = curTruncationRatio.coerceIn(KEY_POSITION_RANGE)
                             TransformAnimation(this, animationDuration,
-                                TransformKeyframe(basePoly.truncated(prevCoerced).scaled(curScale), prevCoerced, prevTruncationRatio),
-                                TransformKeyframe(basePoly.truncated(curCoerced).scaled(curScale), curCoerced, curTruncationRatio)
+                                TransformKeyframe(
+                                    basePoly.truncated(prevCoerced).scaled(curScale),
+                                    prevCoerced,
+                                    prevTruncationRatio
+                                ),
+                                TransformKeyframe(
+                                    basePoly.truncated(curCoerced).scaled(curScale),
+                                    curCoerced,
+                                    curTruncationRatio
+                                )
+                            )
+                        }
+                        // Cantellation animation
+                        prevCantellationRatio != null && curCantellationRatio != null -> {
+                            val prevCoerced = prevCantellationRatio.coerceIn(KEY_POSITION_RANGE)
+                            val curCoerced = curCantellationRatio.coerceIn(KEY_POSITION_RANGE)
+                            TransformAnimation(this, animationDuration,
+                                TransformKeyframe(
+                                    basePoly.cantellated(prevCoerced).scaled(curScale),
+                                    prevCoerced,
+                                    prevCantellationRatio,
+                                    prevCantellationRatio == 1.0
+                                ),
+                                TransformKeyframe(
+                                    basePoly.cantellated(curCoerced).scaled(curScale),
+                                    curCoerced,
+                                    curCantellationRatio,
+                                    curCantellationRatio == 1.0
+                                )
                             )
                         }
                         else -> null

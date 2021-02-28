@@ -6,8 +6,8 @@ import polyhedra.js.params.*
 class TransformAnimation(
     override val param: PolyParams,
     private val duration: Double,
-    private val prev: TransformKeyframe,
-    private val target: TransformKeyframe
+    val prev: TransformKeyframe,
+    val target: TransformKeyframe
 ) : Animation() {
     init { require(duration > 0) }
 
@@ -38,5 +38,6 @@ class TransformAnimation(
 data class TransformKeyframe(
     val poly: Polyhedron,
     val polyRatio: Double,
-    val desiredRatio: Double
+    val desiredRatio: Double,
+    val dual: Boolean = false
 )
