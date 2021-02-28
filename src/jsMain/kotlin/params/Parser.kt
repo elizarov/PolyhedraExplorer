@@ -1,6 +1,18 @@
 package polyhedra.js.params
 
-class ParamParser(private val str: String) {
+sealed class ParsedParam {
+    data class Value(val value: String) : ParsedParam()
+    data class Composite(val map: Map<String, ParsedParam>) : ParsedParam()
+}
+
+fun Param.loadFromString(str: String) {
+    val parsed = ParamParser(str).parse()
+    val updated = ArrayList<Param>()
+    loadFrom(parsed) { updated += it }
+    updated.collectAffectedDependencies(Param.UpdateType.ValueUpdate).forEach { it.update() }
+}
+
+private class ParamParser(private val str: String) {
     private var pos = 0
     private var cur = parseNextToken()
 
@@ -44,9 +56,4 @@ class ParamParser(private val str: String) {
         }
     }
 
-}
-
-sealed class ParsedParam {
-    data class Value(val value: String) : ParsedParam()
-    data class Composite(val map: Map<String, ParsedParam>) : ParsedParam()
 }

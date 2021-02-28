@@ -10,7 +10,7 @@ class AnimationTracker(override val params: Param) : Param.Context(Param.UpdateT
 
     private var dirtyAnimationsList = true
     private val animationsList = ArrayList<Animation>()
-    private val affectedContexts = ArrayList<Param.Context>() // in reverse order
+    private var affectedDependencies: List<Param.Dependency> = emptyList()
 
     fun start() {
         setupAndUpdate()
@@ -24,19 +24,8 @@ class AnimationTracker(override val params: Param) : Param.Context(Param.UpdateT
     private fun rebuildAnimationsList() {
         dirtyAnimationsList = false
         animationsList.clear()
-        affectedContexts.clear()
-        val affectedThis = ArrayList<Param.Context>()
-        val affectedSet = HashSet<Param.Context>()
-        params.visitActiveAnimations { p, a ->
-            animationsList += a
-            p.visitAffectedContexts(Param.UpdateType.ValueAnimation) { affectedThis += it }
-            // the last affected should be root, start from it
-            for (i in affectedThis.size - 1 downTo 0) {
-                val c = affectedThis[i]
-                if (affectedSet.add(c)) affectedContexts += c
-            }
-            affectedThis.clear()
-        }
+        params.visitActiveAnimations { animationsList += it }
+        affectedDependencies = animationsList.map { it.param }.collectAffectedDependencies(Param.UpdateType.ValueAnimation)
     }
 
     private fun requestAnimation() {
@@ -49,6 +38,9 @@ class AnimationTracker(override val params: Param) : Param.Context(Param.UpdateT
     }
 
     private val animationFun: (Double) -> Unit = af@{ nowTime ->
+        if (dirtyAnimationsList) {
+            rebuildAnimationsList()
+        }
         animationHandle = 0
         if (prevTime.isNaN()) {
             prevTime = nowTime
@@ -57,15 +49,8 @@ class AnimationTracker(override val params: Param) : Param.Context(Param.UpdateT
         }
         val dt = (nowTime - prevTime) / 1000 // in seconds
         prevTime = nowTime
-        if (dirtyAnimationsList) {
-            rebuildAnimationsList()
-        }
-        for (animation in animationsList) {
-            animation.update(dt)
-        }
-        for (i in affectedContexts.size - 1 downTo 0) {
-            affectedContexts[i].update()
-        }
+        animationsList.forEach { it.update(dt) }
+        affectedDependencies.forEach { it.update() }
         if (animationsList.any { it.isOver }) {
             dirtyAnimationsList = true
         }

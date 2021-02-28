@@ -32,9 +32,9 @@ class RootPane(props: PComponentProps<RootParams>) :
     PComponent<RootParams, PComponentProps<RootParams>, RootPaneState>(props)
 {
     override fun RootPaneState.init(props: PComponentProps<RootParams>) {
-        seed = props.param.seed.value
-        transforms = props.param.transforms.value
-        baseScale = props.param.baseScale.value
+        seed = props.param.poly.seed.value
+        transforms = props.param.poly.transforms.value
+        baseScale = props.param.poly.baseScale.value
 
         var curPoly = seed.poly
         var curPolyName = seed.toString()
@@ -94,7 +94,7 @@ class RootPane(props: PComponentProps<RootParams>) :
         header("Polyhedron")
         div("row control") {
             label { +"Seed" }
-            pDropdown(props.param.seed)
+            pDropdown(props.param.poly.seed)
         }
 
         header("Transforms")
@@ -105,7 +105,7 @@ class RootPane(props: PComponentProps<RootParams>) :
         header("View")
         val lightingDisabled = !state.display.hasFaces()
         tableBody {
-            controlRow("Base scale") { pDropdown(props.param.baseScale) }
+            controlRow("Base scale") { pDropdown(props.param.poly.baseScale) }
             controlRow("View scale") { pSlider(props.param.poly.view.scale) }
             controlRow("Expand") { pSlider(props.param.poly.view.expandFaces) }
             controlRow("Transparent") { pSlider(props.param.poly.view.transparentFaces, lightingDisabled) }
@@ -156,9 +156,9 @@ class RootPane(props: PComponentProps<RootParams>) :
                     options = Transforms
                     onChange = { value ->
                         if (value != Transform.None) {
-                            props.param.transforms.updateValue(props.param.transforms.value.updatedAt(i, value))
+                            props.param.poly.transforms.updateValue(props.param.poly.transforms.value.updatedAt(i, value))
                         } else {
-                            props.param.transforms.updateValue(props.param.transforms.value.removedAt(i))
+                            props.param.poly.transforms.updateValue(props.param.poly.transforms.value.removedAt(i))
                         }
                     }
                 }
@@ -177,7 +177,7 @@ class RootPane(props: PComponentProps<RootParams>) :
                 options = Transforms
                 onChange = { value ->
                     if (value != Transform.None) {
-                        props.param.transforms.updateValue(props.param.transforms.value + value)
+                        props.param.poly.transforms.updateValue(props.param.poly.transforms.value + value)
                     }
                 }
             }
@@ -186,7 +186,7 @@ class RootPane(props: PComponentProps<RootParams>) :
         controlRow("") {
             button {
                 attrs {
-                    onClickFunction = { props.param.transforms.updateValue(emptyList()) }
+                    onClickFunction = { props.param.poly.transforms.updateValue(emptyList()) }
                 }
                 +"Clear"
             }

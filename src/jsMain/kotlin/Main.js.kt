@@ -4,6 +4,7 @@ import react.dom.render
 import kotlinx.browser.document
 import kotlinx.browser.window
 import polyhedra.js.params.*
+import polyhedra.js.poly.*
 import polyhedra.js.util.*
 
 private const val historyPushThrottle = 500
@@ -13,24 +14,13 @@ fun main() {
     window.onload = { onLoad() }
 }
 
+class RootParams : Param.Composite("") {
+    val animation = using(ViewAnimationParams("a"))
+    val poly = using(PolyParams("", animation))
+}
+
 private fun onLoad() {
-    // Load params
-    val rootParams = RootParams()
-    val history = createHashHistory()
-    var historyPushTimeout = 0
-    val str = history.location.pathname.substringAfter('/', "")
-    val parsed = ParamParser(str).parse()
-    rootParams.loadFrom(parsed)
-    rootParams.onUpdate(Param.UpdateType.ValueUpdate) {
-        // throttle updates
-        if (historyPushTimeout == 0) {
-            historyPushTimeout = window.setTimeout({
-                historyPushTimeout = 0
-                history.push("/$rootParams")
-            }, historyPushThrottle)
-        }
-    }
-    // Start animation tracker
+    val rootParams = loadAndAutoSaveRootParams()
     AnimationTracker(rootParams).start()
     // Unit UI
     render(document.getElementById("root")) {
@@ -40,6 +30,23 @@ private fun onLoad() {
             }
         }
     }
+}
+
+private fun loadAndAutoSaveRootParams(): RootParams {
+    val rootParams = RootParams()
+    val history = createHashHistory()
+    var historyPushTimeout = 0
+    rootParams.loadFromString(history.location.pathname.substringAfter('/', ""))
+    rootParams.onUpdate(Param.UpdateType.ValueUpdate) {
+        // throttle updates
+        if (historyPushTimeout == 0) {
+            historyPushTimeout = window.setTimeout({
+                historyPushTimeout = 0
+                history.push("/$rootParams")
+            }, historyPushThrottle)
+        }
+    }
+    return rootParams
 }
 
 

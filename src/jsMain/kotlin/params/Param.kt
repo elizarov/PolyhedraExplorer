@@ -5,9 +5,9 @@ import polyhedra.common.util.*
 import kotlin.math.*
 
 abstract class Param(val tag: String) {
-    private val contexts = ArrayList<Context>(2)
+    private val dependencies = ArrayList<Dependency>(2)
 
-    abstract fun loadFrom(parsed: ParsedParam)
+    abstract fun loadFrom(parsed: ParsedParam, update: (Param) -> Unit)
     abstract fun isDefault(): Boolean
     abstract fun valueToString(): String
     
@@ -17,6 +17,35 @@ abstract class Param(val tag: String) {
             tag.isEmpty() -> valueToString()
             else -> "$tag(${valueToString()})"
         }
+
+    open fun visitActiveAnimations(visitor: (Animation) -> Unit) {}
+
+    open fun visitAffectedDependencies(update: UpdateType, visitor: (Dependency) -> Unit) {
+        // Notify dependencies in the reverse order.
+        // This is important for composites: local context will get notified & updated first, and the
+        // outer (containing) context will be notified last, when all local ones were already updated.
+        for (i in dependencies.size - 1 downTo 0) {
+            dependencies[i].visitAffectedDependencies(update, visitor)
+        }
+    }
+
+    protected fun notifyUpdate(update: UpdateType) {
+        visitAffectedDependencies(update) {
+            it.update()
+        }
+    }
+
+    fun onUpdate(type: UpdateType, listener: () -> Unit): Dependency =
+        object : Context(type) {
+            override val params: Param get() = this@Param
+            override fun update() { listener() }
+            init { setup() }
+        }
+
+    // todo: does not really work for params
+    open fun destroy() {}
+
+    // ----------- Nested classes and interfaces -----------
 
     enum class UpdateType(private val mask: Int) {
         None(0),
@@ -29,35 +58,17 @@ abstract class Param(val tag: String) {
         fun intersects(other: UpdateType) = mask and other.mask != 0
     }
 
-    open fun visitActiveAnimations(visitor: (Param, Animation) -> Unit) {}
-
-    fun visitAffectedContexts(update: UpdateType, visitor: (Context) -> Unit) {
-        // Notify contexts in the reverse order.
-        // This is important for composites: local context will get notified & updated first, and the
-        // outer (containing) context will be notified last, when all local ones were already updated.
-        for (i in contexts.size - 1 downTo 0) {
-            contexts[i].visitAffectedContexts(update, visitor)
-        }
+    interface Dependency {
+        fun visitAffectedDependencies(update: UpdateType, visitor: (Dependency) -> Unit)
+        fun update()
+        fun destroy()
     }
 
-    protected fun notifyUpdate(update: UpdateType) {
-        visitAffectedContexts(update) {
-            it.update()
-        }
-    }
-
-    fun onUpdate(type: UpdateType, listener: () -> Unit): Context =
-        object : Context(type) {
-            override val params: Param get() = this@Param
-            override fun update() { listener() }
-            init { setup() }
-        }
-
-    abstract class Context(private val type: UpdateType = UpdateType.ValueUpdateOrAnimation) {
+    abstract class Context(private val tracksUpdateType: UpdateType = UpdateType.ValueUpdateOrAnimation) : Dependency {
         abstract val params: Param
 
-        open fun visitAffectedContexts(update: UpdateType, visitor: (Context) -> Unit) {
-            if (type.intersects(update)) visitor(this)
+        override fun visitAffectedDependencies(update: UpdateType, visitor: (Dependency) -> Unit) {
+            if (tracksUpdateType.intersects(update)) visitor(this)
         }
 
         protected fun setupAndUpdate() {
@@ -66,56 +77,54 @@ abstract class Param(val tag: String) {
         }
 
         protected fun setup() {
-            params.contexts += this
+            params.dependencies += this
         }
 
-        open fun destroy() {
-            params.contexts -= this
+        override fun destroy() {
+            params.dependencies -= this
         }
 
-        open fun update() {}
+        override fun update() {}
     }
 
-    abstract class Composite(tag: String) : Param(tag) {
+    abstract class Composite(
+        tag: String,
+        private val tracksUpdateType: UpdateType = UpdateType.None
+    ) : Param(tag), Dependency {
         private val params = ArrayList<Param>(2)
         private val tagMap by lazy { params.associateBy { it.tag } }
 
-        private val context = object : Param.Context(UpdateType.None) {
-            override val params: Param
-                get() = this@Composite
+        override fun visitAffectedDependencies(update: UpdateType, visitor: (Dependency) -> Unit) {
+            super.visitAffectedDependencies(update, visitor)
+            if (tracksUpdateType.intersects(update)) visitor(this)
+        }
 
-            override fun visitAffectedContexts(update: UpdateType, visitor: (Context) -> Unit) {
-                this@Composite.visitAffectedContexts(update, visitor)
-            }
+        override fun update() {}
 
-            override fun update() { error("Should not be called") }
-
-            override fun destroy() {
-                super.destroy()
-                for (param in this@Composite.params) param.contexts -= this
-            }
+        override fun destroy() {
+            for (param in params) param.dependencies -= this
         }
 
         fun <T : Param> using(param: T): T {
             params += param
-            param.contexts += context
+            param.dependencies += this
             return param
         }
 
-        override fun visitActiveAnimations(visitor: (Param, Animation) -> Unit) {
+        override fun visitActiveAnimations(visitor: (Animation) -> Unit) {
             params.forEach { it.visitActiveAnimations(visitor) }
         }
 
-        override fun loadFrom(parsed: ParsedParam) {
+        override fun loadFrom(parsed: ParsedParam, update: (Param) -> Unit) {
             if (parsed !is ParsedParam.Composite) return
             val defaultParam = tagMap[""]
             for ((k, v) in parsed.map) {
                 val param = tagMap[k]
                 if (param == null) {
-                    defaultParam?.loadFrom(parsed)
+                    defaultParam?.loadFrom(parsed, update)
                     continue
                 }
-                param.loadFrom(v)
+                param.loadFrom(v, update)
             }
         }
 
@@ -139,9 +148,10 @@ abstract class ValueParam<T : Any>(tag: String, value: T) : Param(tag) {
 
     override fun valueToString(): String = value.toString()
 
-    override fun loadFrom(parsed: ParsedParam) {
+    override fun loadFrom(parsed: ParsedParam, update: (Param) -> Unit) {
         if (parsed !is ParsedParam.Value) return
         parseValue(parsed.value)?.let { targetValue = it }
+        update(this)
     }
 
     abstract fun parseValue(value: String): T?
@@ -175,11 +185,11 @@ abstract class AnimatedValueParam<T : Any, P : AnimatedValueParam<T, P>>(
         valueUpdateAnimation = null
     }
 
-    override fun visitActiveAnimations(visitor: (Param, Animation) -> Unit) {
+    override fun visitActiveAnimations(visitor: (Animation) -> Unit) {
         valueUpdateAnimation?.let {
             if (it.isOver)
                 valueUpdateAnimation = null else    
-                visitor(this, it)
+                visitor(it)
         }
     }
 
@@ -273,11 +283,14 @@ class RotationParam(
     private val _quat = MutableQuat()
     private var rotationAnimation: RotationAnimation? = null
 
-    // todo: destroy it when dynamic params are supported
-    private val context = rotationAnimationParams?.animatedRotation?.onUpdate(type = UpdateType.ValueUpdate) {
+    private val rotationDep = rotationAnimationParams?.animatedRotation?.onUpdate(type = UpdateType.ValueUpdate) {
         if (updateAnimation(rotationAnimationParams)) {
             notifyUpdate(UpdateType.AnimationEffects)
         }
+    }
+
+    override fun destroy() {
+        rotationDep?.destroy()
     }
 
     private fun updateAnimation(rotationAnimationParams: RotationAnimationParams): Boolean {
@@ -311,10 +324,10 @@ class RotationParam(
         if (updateType != UpdateType.None) notifyUpdate(updateType)
     }
 
-    override fun visitActiveAnimations(visitor: (Param, Animation) -> Unit) {
+    override fun visitActiveAnimations(visitor: (Animation) -> Unit) {
         rotationAnimationParams?.let { updateAnimation(it) }
         super.visitActiveAnimations(visitor)
-        rotationAnimation?.let { visitor(this, it) }
+        rotationAnimation?.let { visitor(it) }
     }
 
     override fun createValueUpdateAnimation(duration: Double, oldValue: Quat): RotationUpdateAnimation =

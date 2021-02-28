@@ -1,15 +1,26 @@
 package polyhedra.js.poly
 
+import polyhedra.common.*
 import polyhedra.common.util.*
 import polyhedra.js.*
 import polyhedra.js.params.*
 import kotlin.math.*
 
 class PolyParams(tag: String, val animation: ViewAnimationParams?) : Param.Composite(tag) {
+    // what to show
+    val seed = using(EnumParam("s", Seed.Tetrahedron, Seeds))
+    val transforms = using(EnumListParam("t", emptyList(), Transforms))
+    val baseScale = using(EnumParam("bs", Scale.Circumradius, Scales))
+    // how to show
     val view = using(ViewParams("v", animation))
     val lighting = using(LightingParams("l", animation))
+    // computed value of the currently shown polyhedron
+    var poly: Polyhedron = Seed.Tetrahedron.poly
+        private set
+        
 }
 
+// Optionally passed from the outside (not needed in the backend)
 class ViewAnimationParams(tag: String) : Param.Composite(tag), ValueAnimationParams, RotationAnimationParams  {
     val animateValueUpdates = using(BooleanParam("u", true))
     val animationDuration = using(DoubleParam("d", 0.5, 0.0, 2.0, 0.1))

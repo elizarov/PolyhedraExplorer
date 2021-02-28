@@ -3,12 +3,13 @@ package polyhedra.js.params
 import polyhedra.common.util.*
 
 abstract class Animation {
+    abstract val param: Param
     abstract val isOver: Boolean
     abstract fun update(dt: Double)
 }
 
 abstract class ValueUpdateAnimation<T : Any, P : AnimatedValueParam<T, P>>(
-    protected val param: P,
+    override val param: P,
     private val duration: Double
 ) : Animation() {
     abstract val value: T
@@ -50,7 +51,7 @@ class RotationUpdateAnimation(
 }
 
 class RotationAnimation(
-    private val param: RotationParam,
+    override val param: RotationParam,
     private val animation: RotationAnimationParams
 ) : Animation() {
     override var isOver: Boolean = false

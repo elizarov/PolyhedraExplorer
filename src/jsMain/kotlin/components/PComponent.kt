@@ -8,15 +8,15 @@ external interface PComponentProps<V : Param> : RProps {
 }
 
 abstract class PComponent<V : Param, P : PComponentProps<V>, S : RState>(props: P) : RComponent<P, S>(props) {
-    private lateinit var context: Param.Context
+    private lateinit var dependency: Param.Dependency
 
     abstract override fun S.init(props: P)
 
     final override fun componentDidMount() {
-        context = props.param.onUpdate(Param.UpdateType.ValueUpdate) { setState { init(props) } }
+        dependency = props.param.onUpdate(Param.UpdateType.ValueUpdate) { setState { init(props) } }
     }
 
     final override fun componentWillUnmount() {
-        context.destroy()
+        dependency.destroy()
     }
 }
