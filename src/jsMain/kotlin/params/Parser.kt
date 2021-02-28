@@ -9,7 +9,7 @@ fun Param.loadFromString(str: String) {
     val parsed = ParamParser(str).parse()
     val updated = ArrayList<Param>()
     loadFrom(parsed) { updated += it }
-    updated.collectAffectedDependencies(Param.UpdateType.ValueUpdate).forEach { it.update() }
+    updated.collectAffectedDependencies(Param.UpdateType.TargetValue).forEach { it.update() }
 }
 
 private class ParamParser(private val str: String) {

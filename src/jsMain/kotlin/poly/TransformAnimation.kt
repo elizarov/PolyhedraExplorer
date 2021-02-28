@@ -33,10 +33,9 @@ class TransformAnimation(
     val targetPoly: Polyhedron = target.poly
     val targetFraction: Double
         get() = (desiredRatio - prev.polyRatio) / (target.polyRatio - prev.polyRatio)
-
 }
 
-class TransformKeyframe(
+data class TransformKeyframe(
     val poly: Polyhedron,
     val polyRatio: Double,
     val desiredRatio: Double

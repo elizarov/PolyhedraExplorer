@@ -49,11 +49,11 @@ abstract class Param(val tag: String) {
 
     enum class UpdateType(private val mask: Int) {
         None(0),
-        ValueUpdate(1),
-        ValueAnimation(2),
-        ValueUpdateOrAnimation(3),
-        AnimationEffects(4),
-        ValueUpdateAndAnimationEffects(5);
+        TargetValue(1), // target value changed, save state, update controls, redraw
+        AnimatedValue(2), // value changed due to animation, redraw
+        Value(3), // any value change (target changed or animated)
+        AnimationsList(4), // a list of active animations changed (for animation tracker's notice)
+        TargetValueAndAnimationsList(5); // target value change + new animation is in effect
 
         fun intersects(other: UpdateType) = mask and other.mask != 0
     }
@@ -64,7 +64,7 @@ abstract class Param(val tag: String) {
         fun destroy()
     }
 
-    abstract class Context(private val tracksUpdateType: UpdateType = UpdateType.ValueUpdateOrAnimation) : Dependency {
+    abstract class Context(private val tracksUpdateType: UpdateType = UpdateType.Value) : Dependency {
         abstract val params: Param
 
         override fun visitAffectedDependencies(update: UpdateType, visitor: (Dependency) -> Unit) {
@@ -95,8 +95,8 @@ abstract class Param(val tag: String) {
         private val tagMap by lazy { params.associateBy { it.tag } }
 
         override fun visitAffectedDependencies(update: UpdateType, visitor: (Dependency) -> Unit) {
-            super.visitAffectedDependencies(update, visitor)
             if (tracksUpdateType.intersects(update)) visitor(this)
+            super.visitAffectedDependencies(update, visitor)
         }
 
         override fun update() {}
@@ -163,7 +163,7 @@ abstract class ImmutableValueParam<T : Any>(tag: String, value: T) : ValueParam<
     override fun updateValue(value: T) {
         if (targetValue == value) return
         targetValue = value
-        notifyUpdate(UpdateType.ValueUpdate)
+        notifyUpdate(UpdateType.TargetValue)
     }
 }
 
@@ -202,8 +202,8 @@ abstract class AnimatedValueParam<T : Any, P : AnimatedValueParam<T, P>>(
             ?.also { valueUpdateAnimation = it }
         notifyUpdate(
             if (newAnimation != null)
-                UpdateType.ValueUpdateAndAnimationEffects else
-                UpdateType.ValueUpdate
+                UpdateType.TargetValueAndAnimationsList else
+                UpdateType.TargetValue
         )
     }
 
@@ -278,9 +278,9 @@ class RotationParam(
     private val _quat = MutableQuat()
     private var rotationAnimation: RotationAnimation? = null
 
-    private val rotationDep = rotationAnimationParams?.animatedRotation?.onUpdate(type = UpdateType.ValueUpdate) {
+    private val rotationDep = rotationAnimationParams?.animatedRotation?.onUpdate(type = UpdateType.TargetValue) {
         if (updateAnimation(rotationAnimationParams)) {
-            notifyUpdate(UpdateType.AnimationEffects)
+            notifyUpdate(UpdateType.AnimationsList)
         }
     }
 

@@ -18,14 +18,26 @@ abstract class PolyGeometryProgram(gl: GL) : GLProgram(gl) {
     val aPrevVertexPosition by attribute(GLType.vec3)
     val aPrevVertexNormal by attribute(GLType.vec3)
 
+    val uTargetFraction by uniform(GLType.float)
+    val uPrevFraction by uniform(GLType.float)
+
+    val fInterpolatedPosition by function(GLType.vec3) {
+        aVertexPosition * uTargetFraction + aPrevVertexPosition * uPrevFraction
+    }
+
+    val fInterpolatedNormal by function(GLType.vec3) {
+        aVertexNormal * uTargetFraction + aPrevVertexNormal * uPrevFraction
+    }
+
     // world position of the current element
     val fPosition by function(GLType.vec4) {
-        uModelMatrix * vec4(aVertexPosition + aVertexNormal * uExpand, 1.0)
+        // todo: optimize when not expanded?
+        uModelMatrix * vec4(fInterpolatedPosition() + fInterpolatedNormal() * uExpand, 1.0)
     }
 
     // world normal of the current element
     val fNormal by function(GLType.vec3) {
-        uNormalMatrix * aVertexNormal
+        uNormalMatrix * fInterpolatedNormal()
     }
 
     // face direction: > 0 - front-face, < 0 - back-face
@@ -54,8 +66,16 @@ abstract class PolyGeometryProgram(gl: GL) : GLProgram(gl) {
 fun PolyGeometryProgram.assignPolyGeometry(polyContext: PolyContext) {
     aVertexPosition by polyContext.target.positionBuffer
     aVertexNormal by polyContext.target.normalBuffer
-    if (polyContext.animated) {
+    val animation = polyContext.animation
+    if (animation != null) {
+        uTargetFraction by animation.targetFraction
+        uPrevFraction by animation.prevFraction
         aPrevVertexPosition by polyContext.prev.positionBuffer
         aPrevVertexNormal by polyContext.prev.normalBuffer
+    } else {
+        uTargetFraction by 1.0
+        uPrevFraction by 0.0
+        aPrevVertexPosition by polyContext.target.positionBuffer
+        aPrevVertexNormal by polyContext.target.normalBuffer
     }
 }

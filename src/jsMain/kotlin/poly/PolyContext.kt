@@ -5,10 +5,10 @@ import polyhedra.js.glsl.*
 import polyhedra.js.params.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
-class PolyContext(val gl: GL, override val params: PolyParams) : Param.Context(Param.UpdateType.ValueUpdateAndAnimationEffects) {
+class PolyContext(val gl: GL, override val params: PolyParams) : Param.Context(Param.UpdateType.TargetValueAndAnimationsList) {
     val target = PolyBuffers(gl)
-    val prev = PolyBuffers(gl)
-    var animated: Boolean = false
+    val prev = PolyBuffers(gl) // only filled when animation != null
+    var animation: TransformAnimation? = null
         private set
 
     init {
@@ -16,7 +16,14 @@ class PolyContext(val gl: GL, override val params: PolyParams) : Param.Context(P
     }
 
     override fun update() {
-        target.initBuffers(params.poly)
+        val animation = params.transformAnimation
+        this.animation = animation
+        if (animation != null) {
+            target.initBuffers(animation.targetPoly)
+            prev.initBuffers(animation.prevPoly)
+        } else {
+            target.initBuffers(params.poly)
+        }
     }
 }
 

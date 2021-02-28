@@ -6,7 +6,7 @@ import polyhedra.js.glsl.*
 import polyhedra.js.params.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
-class FaceContext(val gl: GL, val polyContext: PolyContext, override val params: PolyParams) : Param.Context(Param.UpdateType.ValueUpdateAndAnimationEffects)  {
+class FaceContext(val gl: GL, val polyContext: PolyContext, override val params: PolyParams) : Param.Context(Param.UpdateType.TargetValueAndAnimationsList)  {
     val program = FaceProgram(gl)
     val colorBuffer = program.aVertexColor.createBuffer()
     val indexBuffer = program.createUint16Buffer()
@@ -17,7 +17,7 @@ class FaceContext(val gl: GL, val polyContext: PolyContext, override val params:
     }
 
     override fun update() {
-        val poly = params.poly
+        val poly = params.targetPoly
         poly.faceVerticesData(colorBuffer) { f, _, a, i ->
             a.setRGB(i, PolyStyle.faceColor(f))
         }

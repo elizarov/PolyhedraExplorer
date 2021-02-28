@@ -13,7 +13,7 @@ abstract class PComponent<V : Param, P : PComponentProps<V>, S : RState>(props: 
     abstract override fun S.init(props: P)
 
     final override fun componentDidMount() {
-        dependency = props.param.onUpdate(Param.UpdateType.ValueUpdate) { setState { init(props) } }
+        dependency = props.param.onUpdate(Param.UpdateType.TargetValue) { setState { init(props) } }
     }
 
     final override fun componentWillUnmount() {

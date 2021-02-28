@@ -15,7 +15,7 @@ class RenderParams(tag: String, val animationParams: ViewAnimationParams?) : Par
     val lighting = using(LightingParams("l", animationParams))
 }
 
-class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param.Composite(tag, UpdateType.ValueUpdate) {
+class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param.Composite(tag, UpdateType.TargetValue) {
     val seed = using(EnumParam("s", Seed.Tetrahedron, Seeds))
     val transforms = using(EnumListParam("t", emptyList(), Transforms))
     val baseScale = using(EnumParam("bs", Scale.Circumradius, Scales))
@@ -31,6 +31,10 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
     // polyhedra transformation animation
     var transformAnimation: TransformAnimation? = null
         private set
+
+    // for geometry extraction
+    val targetPoly: Polyhedron
+        get() = transformAnimation?.targetPoly ?: poly
 
     // previous state stored to compute animated transformations
     private var prevSeed: Polyhedron = Seed.Tetrahedron.poly
@@ -113,11 +117,16 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
     private fun updateAnimation(transformAnimation: TransformAnimation?) {
         if (this.transformAnimation == transformAnimation) return
         this.transformAnimation = transformAnimation
-        notifyUpdate(UpdateType.AnimationEffects)
+        notifyUpdate(UpdateType.AnimationsList)
     }
 
     fun resetTransformAnimation() {
         updateAnimation(null)
+    }
+
+    override fun visitActiveAnimations(visitor: (Animation) -> Unit) {
+        super.visitActiveAnimations(visitor)
+        transformAnimation?.let { visitor(it) }
     }
 }
 

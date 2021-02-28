@@ -4,7 +4,7 @@ import kotlinx.browser.*
 import polyhedra.common.*
 import kotlin.math.*
 
-class AnimationTracker(override val params: Param) : Param.Context(Param.UpdateType.AnimationEffects) {
+class AnimationTracker(override val params: Param) : Param.Context(Param.UpdateType.AnimationsList) {
     private var prevTime = Double.NaN
     private var animationHandle = 0
 
@@ -25,7 +25,7 @@ class AnimationTracker(override val params: Param) : Param.Context(Param.UpdateT
         dirtyAnimationsList = false
         animationsList.clear()
         params.visitActiveAnimations { animationsList += it }
-        affectedDependencies = animationsList.map { it.param }.collectAffectedDependencies(Param.UpdateType.ValueAnimation)
+        affectedDependencies = animationsList.map { it.param }.collectAffectedDependencies(Param.UpdateType.AnimatedValue)
     }
 
     private fun requestAnimation() {

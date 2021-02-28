@@ -106,7 +106,7 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
         if (e.isLeftButtonPressed()) {
             val scale = 2 * PI / minOf(canvas.height, canvas.width)
             props.params.view.rotate.rotate(
-                (e.offsetY - prevY) * scale, (e.offsetX - prevX) * scale, 0.0, Param.UpdateType.ValueUpdate
+                (e.offsetY - prevY) * scale, (e.offsetX - prevX) * scale, 0.0, Param.UpdateType.TargetValue
             )
             savePrevMouseEvent(e)
         }
