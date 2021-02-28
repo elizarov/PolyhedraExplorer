@@ -13,6 +13,9 @@ enum class Transform(
         val cr = cantellationRatio(it)
         val tr = truncationRatio(it)
         if (cr == null && tr == null) null else BevellingRatio(cr ?: 0.0, tr ?: 0.0)
+    },
+    val snubbingRatio: (Polyhedron) -> SnubbingRatio? = {
+        cantellationRatio(it)?.let { cr -> SnubbingRatio(cr, 0.0) }
     }
 ) : Tagged {
     None("n", { it }, truncationRatio = { 0.0 }, cantellationRatio = { 0.0 }),
@@ -21,7 +24,7 @@ enum class Transform(
     Cantellated("c", Polyhedron::cantellated, cantellationRatio = { it.regularCantellationRatio() }), // ~= Rectified, Rectified
     Dual("d", Polyhedron::dual, cantellationRatio = { 1.0 }),
     Bevelled("b", Polyhedron::bevelled, bevellingRatio = { it.regularBevellingRatio() }), // ~= Rectified, Truncated
-    Snub("s", Polyhedron::snub)
+    Snub("s", Polyhedron::snub, snubbingRatio = { it.regularSnubbingRatio() })
 }
 
 val Transforms: List<Transform> by lazy { Transform.values().toList() }

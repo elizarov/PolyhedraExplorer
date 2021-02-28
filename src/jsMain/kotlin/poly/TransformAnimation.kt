@@ -56,9 +56,20 @@ fun prevFractionGap(ratio: BevellingRatio): Double =
 fun curFractionGap(ratio: BevellingRatio): Double =
     if (ratio.cr <= 0 || ratio.cr >= 1 || ratio.tr <= 0 || ratio.tr >= 1) 1 - GAP else 1.0
 
-
 fun Double.interpolate(prev: BevellingRatio, target: BevellingRatio): BevellingRatio =
     BevellingRatio(
         (1 - this) * prev.cr + this * target.cr,
         (1 - this) * prev.tr + this * target.tr
+    )
+
+fun prevFractionGap(ratio: SnubbingRatio): Double =
+    if (ratio.cr <= 0 || ratio.cr >= 1) GAP else 0.0
+
+fun curFractionGap(ratio: SnubbingRatio): Double =
+    if (ratio.cr <= 0 || ratio.cr >= 1) 1 - GAP else 1.0
+
+fun Double.interpolate(prev: SnubbingRatio, target: SnubbingRatio): SnubbingRatio =
+    SnubbingRatio(
+        (1 - this) * prev.cr + this * target.cr,
+        (1 - this) * prev.sa + this * target.sa
     )
