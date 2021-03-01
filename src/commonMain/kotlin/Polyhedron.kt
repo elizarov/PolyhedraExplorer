@@ -228,29 +228,38 @@ val Edge.len: Double
     get() = vec.norm
 
 class PolyhedronBuilder {
-    private val vs = ArrayList<Vertex>()
+    private val vs = ArrayList<Vertex?>()
     private val fs = ArrayList<Face>()
 
     fun vertex(p: Vec3, kind: VertexKind = VertexKind(0)): Vertex =
         Vertex(vs.size, p, kind).also { vs.add(it) }
 
+    // force vertex id (reserve or fill a gap)
+    fun vertex(id: Int, p: Vec3, kind: VertexKind): Vertex {
+        val v = Vertex(id, p, kind)
+        while (vs.size <= id) vs.add(null)
+        vs[id] = v
+        return v
+    }
+
     fun vertex(x: Double, y: Double, z: Double, kind: VertexKind = VertexKind(0)): Vertex =
         vertex(Vec3(x, y, z), kind)
 
     fun face(vararg fvIds: Int, kind: FaceKind = FaceKind(0)) {
-        val a = List(fvIds.size) { vs[fvIds[it]] }
+        val a = List(fvIds.size) { vs[fvIds[it]]!! }
         fs.add(Face(fs.size, a, kind))
     }
 
     fun face(fvs: Collection<Vertex>, kind: FaceKind, dualKind: FaceKind = kind) {
-        fs.add(Face(fs.size, fvs.map { vs[it.id] }, kind, dualKind))
+        fs.add(Face(fs.size, fvs.map { vs[it.id]!! }, kind, dualKind))
     }
 
     fun face(f: Face) {
         face(f.fvs, f.kind, f.dualKind)
     }
 
-    fun build() = Polyhedron(vs, fs)
+    @Suppress("UNCHECKED_CAST")
+    fun build() = Polyhedron(vs as List<Vertex>, fs)
 
     fun debugDump() {
         for (v in vs) println(v)

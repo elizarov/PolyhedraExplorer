@@ -21,10 +21,11 @@ enum class Transform(
     None("n", { it }, truncationRatio = { 0.0 }, cantellationRatio = { 0.0 }),
     Truncated("t", Polyhedron::truncated, truncationRatio = { it.regularTruncationRatio() }),
     Rectified("r", Polyhedron::rectified, truncationRatio = { 1.0 }),
-    Cantellated("c", Polyhedron::cantellated, cantellationRatio = { it.regularCantellationRatio() }), // ~= Rectified, Rectified
+    Cantellated("e", Polyhedron::cantellated, cantellationRatio = { it.regularCantellationRatio() }), // ~= Rectified, Rectified
     Dual("d", Polyhedron::dual, cantellationRatio = { 1.0 }),
     Bevelled("b", Polyhedron::bevelled, bevellingRatio = { it.regularBevellingRatio() }), // ~= Rectified, Truncated
-    Snub("s", Polyhedron::snub, snubbingRatio = { it.regularSnubbingRatio() })
+    Snub("s", Polyhedron::snub, snubbingRatio = { it.regularSnubbingRatio() }),
+    Chamfered("c", Polyhedron::chamfered)
 }
 
 val Transforms: List<Transform> by lazy { Transform.values().toList() }
@@ -305,5 +306,53 @@ fun Polyhedron.snub(sr: SnubbingRatio = regularSnubbingRatio()) = polyhedron {
             fvv[e.r]!![e.a]!!
         )
         face(fvs, FaceKind(kindOfs + directedEdgeKindsIndex[e.kind]!!))
+    }
+}
+
+fun Polyhedron.chamfered(cr: Double = 0.5): Polyhedron = polyhedron {
+    val rr = dualReciprocationRadius
+    // shifted original vertices (reserved ids for them, will add later)
+    var vertexId = vs.size
+    val vertexKindOfs = vertexKinds.size
+    // vertices from the directed edges (leave gap in ids)
+    val ev = directedEdges.associateWith { e ->
+        val a = e.a // vertex for cantellation
+        val f = e.r // primary face for cantellation
+        val c = f.plane.dualPoint(rr) // for regular polygons -- face center
+        vertex(
+            vertexId++,
+            cr.atSegment(a.pt, c),
+            VertexKind(vertexKindOfs + directedEdgeKindsIndex[e.kind]!!)
+        )
+    }
+    val fvv = ev.entries
+        .groupBy{ it.key.r }
+        .mapValues { e ->
+            e.value.associateBy({ it.key.a }, { it.value })
+        }
+    // compute plane intersections for the original vertices
+    for (v in vs) {
+        val e = vertexDirectedEdges[v]!![0] // take any edge from this vertex
+        // use 3 points to build a plane
+        val p = plane3(fvv[e.r]!![e.a]!!.pt, fvv[e.r]!![e.b]!!.pt, fvv[e.l]!![e.a]!!.pt) // plane
+        vertex(v.id, p.intersection(v.pt), v.kind)
+    }
+    // faces from the original faces
+    for (f in fs) {
+        val fvs = faceDirectedEdges[f]!!.map { ev[it]!! }
+        face(fvs, f.kind)
+    }
+    // 6-faces from the original edges
+    val faceKindOfs = faceKinds.size
+    for (e in es) {
+        val fvs = listOf(
+            fvv[e.r]!![e.a]!!,
+            e.a,
+            fvv[e.l]!![e.a]!!,
+            fvv[e.l]!![e.b]!!,
+            e.b,
+            fvv[e.r]!![e.b]!!
+        )
+        face(fvs, FaceKind(faceKindOfs + edgeKindsIndex[e.kind]!!))
     }
 }

@@ -36,15 +36,53 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         get() = transformAnimation?.targetPoly ?: poly
 
     // previous state stored to compute animated transformations
-    private var prevSeed: Polyhedron = Seed.Tetrahedron.poly
+    private var prevSeed: Seed = Seed.Tetrahedron
+    private var prevTransforms: List<Transform> = emptyList()
+    private var prevScale: Scale = Scale.Circumradius
     private var prevValidTransforms: List<Transform> = emptyList()
 
     override fun update() {
         val curSeed = seed.value
-        val curSeedPoly = curSeed.poly
         val curTransforms = transforms.value
         val curScale = baseScale.value
-        var curPoly = curSeedPoly
+        if (prevSeed == curSeed && prevTransforms == curTransforms && prevScale == curScale) {
+            return // nothing to do
+        }
+        val validTransforms = recomputeTransforms(curSeed, curTransforms, curScale)
+        // compute transformation animation
+        val animationDuration = animationParams?.animateValueUpdatesDuration
+        if (animationDuration != null) when {
+            curSeed != prevSeed -> updateAnimation(null)
+            validTransforms != prevValidTransforms -> {
+                var commonSize = 0
+                while (commonSize < validTransforms.size && commonSize < prevValidTransforms.size &&
+                        validTransforms[commonSize] == prevValidTransforms[commonSize]) {
+                    commonSize++
+                }
+                if (validTransforms.size <= commonSize + 1 && prevValidTransforms.size <= commonSize + 1) {
+                    val prefix = curTransforms.subList(0, commonSize)
+                    val basePoly = curSeed.poly.transformed(prefix).scaled(curScale)
+                    val prevTransform = prevValidTransforms.getOrNull(commonSize) ?: Transform.None
+                    val curTransform = validTransforms.getOrNull(commonSize) ?: Transform.None
+                    updateAnimation(transformUpdateAnimation(this, basePoly, curScale, prevTransform, curTransform, animationDuration))
+                } else {
+                    updateAnimation(null)
+                }
+            }
+        } else {
+            updateAnimation(null)
+        }
+        // save to optimize future updates
+        prevSeed = curSeed
+        prevTransforms = curTransforms
+        prevScale = curScale
+        prevValidTransforms = validTransforms
+    }
+
+    // updates poly, polyName, transformError
+    // returns valid transforms
+    private fun recomputeTransforms(curSeed: Seed, curTransforms: List<Transform>, curScale: Scale): List<Transform> {
+        var curPoly = curSeed.poly
         var curPolyName = curSeed.toString()
         var curIndex = 0
         var curMessage: String? = null
@@ -68,36 +106,12 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
             }
         } catch (e: Exception) {
             curMessage = "Transform produces invalid polyhedron geometry"
+            e.printStackTrace() // print exception onto console
         }
         poly = curPoly.scaled(curScale)
         polyName = curPolyName
         transformError = if (curMessage != null) TransformError(curIndex, curMessage) else null
-        // compute transformation animation
-        val validTransforms = curTransforms.subList(0, curIndex)
-        val animationDuration = animationParams?.animateValueUpdatesDuration
-        if (animationDuration != null) when {
-            curSeedPoly != prevSeed -> updateAnimation(null)
-            validTransforms != prevValidTransforms -> {
-                var commonSize = 0
-                while (commonSize < validTransforms.size && commonSize < prevValidTransforms.size &&
-                        validTransforms[commonSize] == prevValidTransforms[commonSize]) {
-                    commonSize++
-                }
-                if (validTransforms.size <= commonSize + 1 && prevValidTransforms.size <= commonSize + 1) {
-                    val prefix = curTransforms.subList(0, commonSize)
-                    val basePoly = curSeedPoly.transformed(prefix).scaled(curScale)
-                    val prevTransform = prevValidTransforms.getOrNull(commonSize) ?: Transform.None
-                    val curTransform = validTransforms.getOrNull(commonSize) ?: Transform.None
-                    updateAnimation(transformUpdateAnimation(this, basePoly, curScale, prevTransform, curTransform, animationDuration))
-                } else {
-                    updateAnimation(null)
-                }
-            }
-        } else {
-            updateAnimation(null)
-        }
-        prevSeed = curSeedPoly
-        prevValidTransforms = validTransforms
+        return curTransforms.subList(0, curIndex)
     }
 
     private fun updateAnimation(transformAnimation: TransformAnimation?) {
