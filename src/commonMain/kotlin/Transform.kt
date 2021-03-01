@@ -34,6 +34,9 @@ fun Polyhedron.transformed(transform: Transform) = memoTransform(transform.trans
 fun Polyhedron.transformed(transforms: List<Transform>) =
     transforms.fold(this) { poly, transform -> poly.transformed(transform) }
 
+fun Polyhedron.transformed(vararg transforms: Transform) =
+    transformed(transforms.toList())
+
 fun Polyhedron.rectified(): Polyhedron = polyhedron {
     // vertices from the original edges
     val ev = es.associateWith { e ->
@@ -100,11 +103,12 @@ fun Polyhedron.regularCantellationRatio(edgeKind: EdgeKind? = null): Double {
 }
 
 fun Polyhedron.cantellated(cr: Double = regularCantellationRatio()): Polyhedron = polyhedron {
+    val rr = dualReciprocationRadius
     // vertices from the directed edges
     val ev = directedEdges.associateWith { e ->
         val a = e.a // vertex for cantellation
         val f = e.r // primary face for cantellation
-        val c = f.plane.tangentPoint // face center
+        val c = f.plane.dualPoint(rr) // for regular polygons -- face center
         vertex(cr.atSegment(a.pt, c), VertexKind(directedEdgeKindsIndex[e.kind]!!))
     }
     val fvv = ev.entries
@@ -139,10 +143,10 @@ fun Polyhedron.cantellated(cr: Double = regularCantellationRatio()): Polyhedron 
 }
 
 fun Polyhedron.dual(): Polyhedron = polyhedron {
-    val r = midradius
+    val rr = dualReciprocationRadius
     // vertices from the original faces
     val fv = fs.associateWith { f ->
-        vertex(f.plane.dualPoint(r), VertexKind(f.kind.id))
+        vertex(f.plane.dualPoint(rr), VertexKind(f.kind.id))
     }
     // faces from the original vertices
     for ((v, fl) in vertexFaces) {
@@ -161,9 +165,10 @@ fun Polyhedron.regularBevellingRatio(edgeKind: EdgeKind? = null): BevellingRatio
 
 fun Polyhedron.bevelled(br: BevellingRatio = regularBevellingRatio()): Polyhedron = polyhedron {
     val (cr, tr) = br
+    val rr = dualReciprocationRadius
     // vertices from the face-directed edges
     val fev = fs.associateWith { f ->
-        val c = f.plane.tangentPoint // face center
+        val c = f.plane.dualPoint(rr) // for regular polygons -- face center
         faceDirectedEdges[f]!!.flatMap { e ->
             val kind = directedEdgeKindsIndex[e.kind]!!
             val a = e.a
@@ -272,9 +277,10 @@ fun Polyhedron.regularSnubbingRatio(edgeKind: EdgeKind? = null): SnubbingRatio {
 
 fun Polyhedron.snub(sr: SnubbingRatio = regularSnubbingRatio()) = polyhedron {
     val (cr, sa) = sr
+    val rr = dualReciprocationRadius
     // vertices from the face-vertices (directed edges)
     val fvv = fs.associateWith { f ->
-        val c = f.plane.tangentPoint // face center
+        val c = f.plane.dualPoint(rr) // for regular polygons -- face center
         val r = f.plane.n.toRotationAroundQuat(-sa)
         faceDirectedEdges[f]!!.associateBy({ it.a }, { e ->
             vertex(c + ((1 - cr) * (e.a.pt - c)).rotated(r), VertexKind(directedEdgeKindsIndex[e.kind]!!))

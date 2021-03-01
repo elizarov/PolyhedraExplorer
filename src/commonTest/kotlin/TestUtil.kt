@@ -1,5 +1,3 @@
-package polyhedra.test
-
 fun <T> testParameter(name: String, list: Iterable<T>, block: (T) -> Unit) {
     for (value in list) {
         try {

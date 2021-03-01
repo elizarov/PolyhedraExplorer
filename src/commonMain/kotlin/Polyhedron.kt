@@ -86,6 +86,11 @@ class Polyhedron(
     val midradius: Double by lazy { es.avgOf { e -> e.midPoint(MidPoint.Closest).norm } }
     val circumradius: Double by lazy { vs.maxOf { v -> v.pt.norm } }
 
+    // Radius that is used for for polar reciprocation to compute dual,
+    // the key requirement is that dual points of regular polygon's faces must be in the centers of those faces
+    val dualReciprocationRadius: Double
+        get() = inradius
+
     val edgesMidPointDefault: MidPoint by lazy {
         if (es.all { e -> e.isTangentInSegment() }) MidPoint.Tangent else MidPoint.Center
     }

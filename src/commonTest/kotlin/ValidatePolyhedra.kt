@@ -1,8 +1,6 @@
-package polyhedra.test
-
 import polyhedra.common.*
 
-import org.junit.*
+import kotlin.test.*
 
 class ValidatePolyhedra {
     @Test
@@ -52,8 +50,7 @@ class ValidatePolyhedra {
 
 private fun isOkSequence(vararg transforms: Transform): Boolean {
     val t = transforms.toList()
-    if (t.drop(1).contains(Transform.Cantellated)) return false // cantellation must be first
-    if (t.drop(1).contains(Transform.Bevelled)) return false // bevelling must be first
-    if (t.drop(1).contains(Transform.Snub)) return false // Snub must be first
+    if (t.lastIndexOf(Transform.Bevelled) > 1) return false // bevelling must be first or second
+    if (t.lastIndexOf(Transform.Snub) > 0) return false // Snub must be first
     return true
 }
