@@ -6,13 +6,24 @@ class ValidatePolyhedra {
     @Test
     fun validateSeeds() {
         testParameter("seed", Seeds) { seed ->
-            seed.poly.validate()
+            val poly = seed.poly
+            poly.validate()
+            when (seed.type) {
+                SeedType.Platonic -> {
+                    check(poly.faceKinds.size == 1)
+                    check(poly.edgeKinds.size == 1)
+                    check(poly.vertexKinds.size == 1)
+                }
+                SeedType.Arhimedean -> {
+//                    check(poly.vertexKinds.size == 1)
+                }
+            }
         }
     }
 
     @Test
-    fun validateTransform() {
-        testParameter("seed", Seeds) { seed ->
+    fun validatePlatonicTransform() {
+        testParameter("seed", Seeds.filter { it.type == SeedType.Platonic} ) { seed ->
             testParameter("transform", Transforms.filter { it != Transform.None }) { transform ->
                 seed.poly.transformed(transform).validate()
             }
@@ -21,8 +32,8 @@ class ValidatePolyhedra {
 
     // Should be able to cantellate any Platonic seed as long as needed
     @Test
-    fun validateCantellationSequence() {
-        testParameter("seed", Seeds) { seed ->
+    fun validatePlatonicCantellationSequence() {
+        testParameter("seed", Seeds.filter { it.type == SeedType.Platonic}) { seed ->
             testParameter("n", 1..5) { n ->
                 seed.poly.transformed(List(n) { Transform.Cantellated }).validate()
             }
@@ -30,8 +41,8 @@ class ValidatePolyhedra {
     }
 
     @Test
-    fun validate2Transforms() {
-        testParameter("seed", Seeds) { seed ->
+    fun validatePlatonic2Transforms() {
+        testParameter("seed", Seeds.filter { it.type == SeedType.Platonic}) { seed ->
             testParameter("transform1", Transforms.filter { it != Transform.None }) { transform1 ->
                 testParameter("transform2", Transforms.filter { it != Transform.None }) { transform2 ->
                     if (isOkSequence(transform1, transform2)) {
@@ -43,8 +54,8 @@ class ValidatePolyhedra {
     }
 
     @Test
-    fun validate3Transforms() {
-        testParameter("seed", Seeds) { seed ->
+    fun validatePlatonic3Transforms() {
+        testParameter("seed", Seeds.filter { it.type == SeedType.Platonic}) { seed ->
             testParameter("transform1", Transforms.filter { it != Transform.None }) { transform1 ->
                 testParameter("transform2", Transforms.filter { it != Transform.None }) { transform2 ->
                     testParameter("transform3", Transforms.filter { it != Transform.None }) { transform3 ->

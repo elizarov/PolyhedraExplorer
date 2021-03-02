@@ -1,5 +1,6 @@
 package polyhedra.js.glsl
 
+import polyhedra.common.util.*
 import kotlin.reflect.*
 
 class GLBlockBuilder<T : GLType<T>>(
@@ -96,7 +97,4 @@ private fun <T : GLType<T>, F> functionX(
         }
     }
 
-class DelegateProvider<R>(val factory: (name: String) -> R) {
-    operator fun provideDelegate(thisRef: Any?, prop: KProperty<*>): R = factory(prop.name)
-}
 

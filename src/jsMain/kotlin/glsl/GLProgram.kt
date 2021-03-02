@@ -2,6 +2,7 @@ package polyhedra.js.glsl
 
 import org.khronos.webgl.*
 import polyhedra.common.*
+import polyhedra.common.util.*
 import polyhedra.js.poly.*
 import polyhedra.js.util.*
 import kotlin.properties.*

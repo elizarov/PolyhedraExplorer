@@ -21,7 +21,7 @@ enum class Transform(
 ) : Tagged {
     None("n", { it }, truncationRatio = { 0.0 }, cantellationRatio = { 0.0 }, chamferingRatio = { 0.0 }),
     Truncated("t", Polyhedron::truncated, truncationRatio = { it.regularTruncationRatio() }),
-    Rectified("r", Polyhedron::rectified, truncationRatio = { 1.0 }),
+    Rectified("a", Polyhedron::rectified, truncationRatio = { 1.0 }),
     Cantellated("e", Polyhedron::cantellated, cantellationRatio = { it.regularCantellationRatio() }), // ~= Rectified, Rectified
     Dual("d", Polyhedron::dual, cantellationRatio = { 1.0 }),
     Bevelled("b", Polyhedron::bevelled, bevellingRatio = { it.regularBevellingRatio() }), // ~= Rectified, Truncated
