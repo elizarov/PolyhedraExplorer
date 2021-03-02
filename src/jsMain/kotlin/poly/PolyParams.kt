@@ -146,6 +146,8 @@ private fun transformUpdateAnimation(
     val curBevellingRatio = curTransform.bevellingRatio(poly)
     val prevSnubbingRatio = prevTransform.snubbingRatio(poly)
     val curSnubbingRatio = curTransform.snubbingRatio(poly)
+    val prevChamferingRatio = prevTransform.chamferingRatio(poly)
+    val curChamferingRatio = curTransform.chamferingRatio(poly)
     return when {
         // Truncation animation
         prevTruncationRatio != null && curTruncationRatio != null -> {
@@ -197,6 +199,19 @@ private fun transformUpdateAnimation(
                 animationDuration,
                 TransformKeyframe(poly.snub(prevR).scaled(scale), prevF, prevSnubbingRatio.cr == 1.0),
                 TransformKeyframe(poly.snub(curR).scaled(scale), curF, curSnubbingRatio.cr == 1.0)
+            )
+        }
+        // Chamfering animation
+        prevChamferingRatio != null && curChamferingRatio != null -> {
+            val prevF = prevFractionGap(prevChamferingRatio)
+            val curF = curFractionGap(curChamferingRatio)
+            val prevR = prevF.interpolate(prevChamferingRatio, curChamferingRatio)
+            val curR = curF.interpolate(prevChamferingRatio, curChamferingRatio)
+            TransformAnimation(
+                params,
+                animationDuration,
+                TransformKeyframe(poly.chamfered(prevR).scaled(scale), prevF),
+                TransformKeyframe(poly.chamfered(curR).scaled(scale), curF)
             )
         }
         else -> null

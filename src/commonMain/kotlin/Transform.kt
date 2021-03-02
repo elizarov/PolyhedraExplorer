@@ -16,16 +16,17 @@ enum class Transform(
     },
     val snubbingRatio: (Polyhedron) -> SnubbingRatio? = {
         cantellationRatio(it)?.let { cr -> SnubbingRatio(cr, 0.0) }
-    }
+    },
+    val chamferingRatio: (Polyhedron) -> Double? = { null }
 ) : Tagged {
-    None("n", { it }, truncationRatio = { 0.0 }, cantellationRatio = { 0.0 }),
+    None("n", { it }, truncationRatio = { 0.0 }, cantellationRatio = { 0.0 }, chamferingRatio = { 0.0 }),
     Truncated("t", Polyhedron::truncated, truncationRatio = { it.regularTruncationRatio() }),
     Rectified("r", Polyhedron::rectified, truncationRatio = { 1.0 }),
     Cantellated("e", Polyhedron::cantellated, cantellationRatio = { it.regularCantellationRatio() }), // ~= Rectified, Rectified
     Dual("d", Polyhedron::dual, cantellationRatio = { 1.0 }),
     Bevelled("b", Polyhedron::bevelled, bevellingRatio = { it.regularBevellingRatio() }), // ~= Rectified, Truncated
     Snub("s", Polyhedron::snub, snubbingRatio = { it.regularSnubbingRatio() }),
-    Chamfered("c", Polyhedron::chamfered)
+    Chamfered("c", Polyhedron::chamfered, chamferingRatio = { it.regularChamferingRatio() })
 }
 
 val Transforms: List<Transform> by lazy { Transform.values().toList() }
@@ -309,7 +310,7 @@ fun Polyhedron.snub(sr: SnubbingRatio = regularSnubbingRatio()) = polyhedron {
     }
 }
 
-fun Polyhedron.regularChamferFraction(edgeKind: EdgeKind? = null): Double {
+fun Polyhedron.regularChamferingRatio(edgeKind: EdgeKind? = null): Double {
     val ek = edgeKind ?: edgeKinds.keys.first() // min edge kind by default
     val e = edgeKinds[ek]!!.first() // representative edge
     val a = e.a.pt // primary vertex coordinate
@@ -342,7 +343,7 @@ fun Polyhedron.regularChamferFraction(edgeKind: EdgeKind? = null): Double {
     }
 }
 
-fun Polyhedron.chamfered(cr: Double = regularChamferFraction()): Polyhedron = polyhedron {
+fun Polyhedron.chamfered(cr: Double = regularChamferingRatio()): Polyhedron = polyhedron {
     val rr = dualReciprocationRadius
     // shifted original vertices (reserved ids for them, will add later)
     var vertexId = vs.size
