@@ -309,7 +309,40 @@ fun Polyhedron.snub(sr: SnubbingRatio = regularSnubbingRatio()) = polyhedron {
     }
 }
 
-fun Polyhedron.chamfered(cr: Double = 0.5): Polyhedron = polyhedron {
+fun Polyhedron.regularChamferFraction(edgeKind: EdgeKind? = null): Double {
+    val ek = edgeKind ?: edgeKinds.keys.first() // min edge kind by default
+    val e = edgeKinds[ek]!!.first() // representative edge
+    val a = e.a.pt // primary vertex coordinate
+    val b = e.b.pt // secondary vertex coordinate
+    val f = e.r // primary face
+    val g = e.l // secondary face
+    val rr = dualReciprocationRadius
+    val cf = f.plane.dualPoint(rr) // for regular polygons -- face center
+    val cg = g.plane.dualPoint(rr) // for regular polygons -- face center
+    // binary search
+    var crL = 0.0
+    var crR = 1.0
+    while (true) {
+        val cr = (crL + crR) / 2
+        if (cr <= crL || cr >= crR) return cr // result precision is an ULP
+        // compute cantellated 2 cantellated points
+        val caf = cr.atSegment(a, cf)
+        val cbf = cr.atSegment(b, cf)
+        val cag = cr.atSegment(a, cg)
+        // plane through 3 point to intersect with vertex vector
+        val p = plane3(caf, cbf, cag)
+        val aa = p.intersection(a) // never vertex position
+        val lenEdge =  caf.minus(cbf).norm
+        val lenVert = caf.minus(aa).norm
+        if (lenEdge > lenVert) {
+            crL = cr // edge is too long -- cantellate more
+        } else {
+            crR = cr // edge is too short - cantellate less
+        }
+    }
+}
+
+fun Polyhedron.chamfered(cr: Double = regularChamferFraction()): Polyhedron = polyhedron {
     val rr = dualReciprocationRadius
     // shifted original vertices (reserved ids for them, will add later)
     var vertexId = vs.size
