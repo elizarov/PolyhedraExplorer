@@ -18,6 +18,8 @@ class ValidatePolyhedra {
 //                    check(poly.vertexKinds.size == 1)
                 }
             }
+            // check FEV counts
+            assertEquals(seed.fev, poly.fev())
         }
     }
 

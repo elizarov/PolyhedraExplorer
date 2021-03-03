@@ -17,6 +17,7 @@ class Seed(
     override val tag: String,
     val name: String,
     val type: SeedType,
+    val fev: FEV,
     val wikiName: String,
     private val producer: SC.() -> Polyhedron
 ) : Tagged {
@@ -32,7 +33,7 @@ val Seeds: List<Seed>
 @Suppress("ObjectPropertyName")
 private val _seeds = ArrayList<Seed>()
 
-private fun seed(tag: String, type: SeedType, wikiName: String? = null, producer: SC.() -> Polyhedron) =
+private fun seed(tag: String, type: SeedType, fev: FEV, wikiName: String? = null, producer: SC.() -> Polyhedron) =
     DelegateProvider { propertyName ->
         val name = buildString {
             for ((i, c) in propertyName.withIndex()) {
@@ -44,13 +45,16 @@ private fun seed(tag: String, type: SeedType, wikiName: String? = null, producer
                 }
             }
         }
-        val seed = Seed(tag, name, type,wikiName ?: name, producer)
+        val seed = Seed(tag, name, type,fev, wikiName ?: name, producer)
         _seeds += seed
         ValueDelegate(seed)
     }
 
+private fun seed(tag: String, type: SeedType, poly: Polyhedron) =
+    seed(tag, type, poly.fev()) { poly }
+
 private fun seed(tag: String, type: SeedType, transform: Transform, base: Seed, wikiName: String? = null) =
-    seed(tag, type, wikiName) {
+    seed(tag, type, transform.fev * base.fev, wikiName) {
         base.poly.transformed(transform)
     }
 
@@ -124,11 +128,11 @@ private val _icosahedron = polyhedron {
 
 // --------------------- 5 Platonic Solids ---------------------
 
-val SC.Tetrahedron by seed("T", SeedType.Platonic) { _tetrahedron }
-val SC.Cube by seed("C", SeedType.Platonic) { _cube }
-val SC.Octahedron by seed("O", SeedType.Platonic, Transform.Dual, SC.Cube)
-val SC.Dodecahedron by seed("D", SeedType.Platonic) { _icosahedron.dual() }
-val SC.Icosahedron by seed("I", SeedType.Platonic) { _icosahedron }
+val SC.Tetrahedron by seed("T", SeedType.Platonic, _tetrahedron)
+val SC.Cube by seed("C", SeedType.Platonic, _cube)
+val SC.Octahedron by seed("O", SeedType.Platonic, _cube.dual())
+val SC.Dodecahedron by seed("D", SeedType.Platonic, _icosahedron.dual())
+val SC.Icosahedron by seed("I", SeedType.Platonic, _icosahedron)
 
 // --------------------- 13 Arhimedean Solids ---------------------
 

@@ -17,16 +17,91 @@ enum class Transform(
     val snubbingRatio: (Polyhedron) -> SnubbingRatio? = {
         cantellationRatio(it)?.let { cr -> SnubbingRatio(cr, 0.0) }
     },
-    val chamferingRatio: (Polyhedron) -> Double? = { null }
+    val chamferingRatio: (Polyhedron) -> Double? = { null },
+    val fev: TransformFEV
 ) : Tagged {
-    None("n", { it }, truncationRatio = { 0.0 }, cantellationRatio = { 0.0 }, chamferingRatio = { 0.0 }),
-    Truncated("t", Polyhedron::truncated, truncationRatio = { it.regularTruncationRatio() }),
-    Rectified("a", Polyhedron::rectified, truncationRatio = { 1.0 }),
-    Cantellated("e", Polyhedron::cantellated, cantellationRatio = { it.regularCantellationRatio() }), // ~= Rectified, Rectified
-    Dual("d", Polyhedron::dual, cantellationRatio = { 1.0 }),
-    Bevelled("b", Polyhedron::bevelled, bevellingRatio = { it.regularBevellingRatio() }), // ~= Rectified, Truncated
-    Snub("s", Polyhedron::snub, snubbingRatio = { it.regularSnubbingRatio() }),
-    Chamfered("c", Polyhedron::chamfered, chamferingRatio = { it.regularChamferingRatio() })
+    None(
+        "n",
+        { it },
+        truncationRatio = { 0.0 },
+        cantellationRatio = { 0.0 },
+        chamferingRatio = { 0.0 },
+        fev = TransformFEV(
+            1, 0, 0,
+            0, 1, 0,
+            0, 0, 1
+        )
+    ),
+    Truncated(
+        "t",
+        Polyhedron::truncated,
+        truncationRatio = { it.regularTruncationRatio() },
+        fev = TransformFEV(
+            1, 0, 1,
+            0, 3, 0,
+            0, 2, 0
+        )
+    ),
+    Rectified(
+        "a",
+        Polyhedron::rectified,
+        truncationRatio = { 1.0 },
+        fev = TransformFEV(
+            1, 0, 1,
+            0, 2, 0,
+            0, 1, 0
+        )
+    ),
+    Cantellated( // ~= Rectified, Rectified
+        "e",
+        Polyhedron::cantellated,
+        cantellationRatio = { it.regularCantellationRatio() },
+        fev = TransformFEV(
+            1, 1, 1,
+            0, 4, 0,
+            0, 2, 0
+        )
+    ),
+    Dual(
+        "d",
+        Polyhedron::dual,
+        cantellationRatio = { 1.0 },
+        fev = TransformFEV(
+            0, 0, 1,
+            0, 1, 0,
+            1, 0, 0
+        )
+    ),
+    Bevelled( // ~= Rectified, Truncated
+        "b",
+        Polyhedron::bevelled,
+        bevellingRatio = { it.regularBevellingRatio() },
+        fev = TransformFEV(
+            1, 1, 1,
+            0, 6, 0,
+            0, 4, 0
+        )
+    ),
+    Snub(
+        "s",
+        Polyhedron::snub,
+        snubbingRatio = { it.regularSnubbingRatio() },
+        fev = TransformFEV(
+            1, 2, 1,
+            0, 5, 0,
+            0, 2, 0
+        )
+    ),
+    Chamfered(
+        "c",
+        Polyhedron::chamfered,
+        chamferingRatio = { it.regularChamferingRatio() },
+        fev = TransformFEV(
+            1, 2, 0,
+            0, 4, 0,
+            0, 1, 1
+        )
+    )
 }
 
 val Transforms: List<Transform> by lazy { Transform.values().toList() }
