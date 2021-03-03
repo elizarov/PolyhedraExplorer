@@ -93,12 +93,13 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
                     curMessage = applicable
                     break
                 }
-                val newPoly = curPoly.transformed(transform)
-                val nEdges = newPoly.es.size
-                if (nEdges > MAX_DISPLAY_EDGES) {
-                    curMessage = "Polyhedron is too large to display ($nEdges edges)"
+                // compute FEV before doing an actual transform
+                val fev = transform.fev * curPoly.fev()
+                if (fev.e > MAX_DISPLAY_EDGES) {
+                    curMessage = "Polyhedron is too large to display ($fev)"
                     break
                 }
+                val newPoly = curPoly.transformed(transform)
                 newPoly.validateGeometry()
                 curPolyName = "$transform $curPolyName"
                 curPoly = newPoly

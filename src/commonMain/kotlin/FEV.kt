@@ -5,7 +5,9 @@ data class FEV(
     val f: Int,
     val e: Int,
     val v: Int
-)
+) {
+    override fun toString(): String = "F=$f, E=$e, V=$v"
+}
 
 fun Polyhedron.fev(): FEV = FEV(fs.size, es.size, vs.size)
 
