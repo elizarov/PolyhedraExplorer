@@ -49,6 +49,11 @@ private fun seed(tag: String, type: SeedType, wikiName: String? = null, producer
         ValueDelegate(seed)
     }
 
+private fun seed(tag: String, type: SeedType, transform: Transform, base: Seed, wikiName: String? = null) =
+    seed(tag, type, wikiName) {
+        base.poly.transformed(transform)
+    }
+
 // --------------------- Basic platonic geometry ---------------------
 
 @Suppress("ObjectPropertyName")
@@ -121,22 +126,22 @@ private val _icosahedron = polyhedron {
 
 val SC.Tetrahedron by seed("T", SeedType.Platonic) { _tetrahedron }
 val SC.Cube by seed("C", SeedType.Platonic) { _cube }
-val SC.Octahedron by seed("O", SeedType.Platonic) { _cube.dual() }
+val SC.Octahedron by seed("O", SeedType.Platonic, Transform.Dual, SC.Cube)
 val SC.Dodecahedron by seed("D", SeedType.Platonic) { _icosahedron.dual() }
 val SC.Icosahedron by seed("I", SeedType.Platonic) { _icosahedron }
 
 // --------------------- 13 Arhimedean Solids ---------------------
 
-val SC.TruncatedTetrahedron by seed("tT", SeedType.Arhimedean) { Tetrahedron.poly.truncated() }
-val SC.Cuboctahedron by seed("aC", SeedType.Arhimedean) { Cube.poly.rectified() }
-val SC.TruncatedCube by seed("tC", SeedType.Arhimedean) { Cube.poly.truncated() }
-val SC.TruncatedOctahedron by seed("tO", SeedType.Arhimedean) { Octahedron.poly.truncated() }
-val SC.Rhombicuboctahedron by seed("eC", SeedType.Arhimedean) { Cube.poly.cantellated() }
-val SC.RhombitruncatedCuboctahedron by seed("bC", SeedType.Arhimedean, "Truncated cuboctahedron") { Cube.poly.bevelled() }
-val SC.SnubCube by seed("sC", SeedType.Arhimedean) { Cube.poly.snub() }
-val SC.Icosidodecahedron by seed("aD", SeedType.Arhimedean) { Dodecahedron.poly.rectified() }
-val SC.TruncatedDodecahedron by seed("tD", SeedType.Arhimedean) { Dodecahedron.poly.truncated() }
-val SC.TruncatedIcosahedron by seed("tI", SeedType.Arhimedean) { Icosahedron.poly.truncated() }
-val SC.Rhombicosidodecahedron by seed("eD", SeedType.Arhimedean) { Dodecahedron.poly.cantellated() }
-val SC.RhombitruncatedIcosidodecahedron by seed("bD", SeedType.Arhimedean, "Truncated icosidodecahedron") { Dodecahedron.poly.bevelled() }
-val SC.SnubDodecahedron by seed("sD", SeedType.Arhimedean) { Dodecahedron.poly.snub() }
+val SC.TruncatedTetrahedron by seed("tT", SeedType.Arhimedean, Transform.Truncated, SC.Tetrahedron)
+val SC.Cuboctahedron by seed("aC", SeedType.Arhimedean, Transform.Rectified, SC.Cube)
+val SC.TruncatedCube by seed("tC", SeedType.Arhimedean, Transform.Truncated, SC.Cube)
+val SC.TruncatedOctahedron by seed("tO", SeedType.Arhimedean, Transform.Truncated, SC.Octahedron)
+val SC.Rhombicuboctahedron by seed("eC", SeedType.Arhimedean, Transform.Cantellated, SC.Cube)
+val SC.RhombitruncatedCuboctahedron by seed("bC", SeedType.Arhimedean, Transform.Bevelled, SC.Cube, "Truncated cuboctahedron")
+val SC.SnubCube by seed("sC", SeedType.Arhimedean, Transform.Snub, SC.Cube)
+val SC.Icosidodecahedron by seed("aD", SeedType.Arhimedean, Transform.Rectified, SC.Dodecahedron)
+val SC.TruncatedDodecahedron by seed("tD", SeedType.Arhimedean, Transform.Truncated, SC.Dodecahedron)
+val SC.TruncatedIcosahedron by seed("tI", SeedType.Arhimedean, Transform.Truncated, SC.Icosahedron)
+val SC.Rhombicosidodecahedron by seed("eD", SeedType.Arhimedean, Transform.Cantellated, SC.Dodecahedron)
+val SC.RhombitruncatedIcosidodecahedron by seed("bD", SeedType.Arhimedean, Transform.Bevelled, SC.Dodecahedron, "Truncated icosidodecahedron")
+val SC.SnubDodecahedron by seed("sD", SeedType.Arhimedean, Transform.Snub, SC.Dodecahedron)
