@@ -160,7 +160,8 @@ fun Polyhedron.truncated(tr: Double = regularTruncationRatio()): Polyhedron = po
 
 data class RegularFaceGeometry(
     val ea: Double, // PI / face_size
-    val da: Double  // dihedral angle
+    val da: Double,  // dihedral angle
+    val e: Edge // representative edge that was used
 )
 
 fun Polyhedron.regularFaceGeometry(edgeKind: EdgeKind? = null): RegularFaceGeometry {
@@ -171,7 +172,7 @@ fun Polyhedron.regularFaceGeometry(edgeKind: EdgeKind? = null): RegularFaceGeome
     val n = f.size // primary face size
     val ea = PI / n
     val da = PI - acos(f.plane.n * g.plane.n) // dihedral angle
-    return RegularFaceGeometry(ea, da)
+    return RegularFaceGeometry(ea, da, e)
 }
 
 fun Polyhedron.regularCantellationRatio(edgeKind: EdgeKind? = null): Double {
@@ -386,66 +387,47 @@ fun Polyhedron.snub(sr: SnubbingRatio = regularSnubbingRatio()) = polyhedron {
 }
 
 fun Polyhedron.regularChamferingRatio(edgeKind: EdgeKind? = null): Double {
-    val ek = edgeKind ?: edgeKinds.keys.first() // min edge kind by default
-    val e = edgeKinds[ek]!!.first() // representative edge
-    val a = e.a.pt // primary vertex coordinate
-    val b = e.b.pt // secondary vertex coordinate
-    val f = e.r // primary face
-    val g = e.l // secondary face
-    val rr = dualReciprocationRadius
-    val cf = f.plane.dualPoint(rr) // for regular polygons -- face center
-    val cg = g.plane.dualPoint(rr) // for regular polygons -- face center
-    // binary search
-    var crL = 0.0
-    var crR = 1.0
-    while (true) {
-        val cr = (crL + crR) / 2
-        if (cr <= crL || cr >= crR) return cr // result precision is an ULP
-        // compute cantellated 2 cantellated points
-        val caf = cr.atSegment(a, cf)
-        val cbf = cr.atSegment(b, cf)
-        val cag = cr.atSegment(a, cg)
-        // plane through 3 point to intersect with vertex vector
-        val p = plane3(caf, cbf, cag)
-        val aa = p.intersection(a) // never vertex position
-        val lenEdge =  caf.minus(cbf).norm
-        val lenVert = caf.minus(aa).norm
-        if (lenEdge > lenVert) {
-            crL = cr // edge is too long -- cantellate more
-        } else {
-            crR = cr // edge is too short - cantellate less
-        }
+    if (edgeKind != null) {
+        val (ea, da, e) = regularFaceGeometry(edgeKind)
+        val ev = e.vec.norm // edge length
+        val et = e.tangentPoint().norm // distance from edge to origin
+        return ev / et * cos(da / 2) * cos(ea) / (1 + 2 * sin(ea))
+    } else {
+        // min for all edge kinds
+        return edgeKinds.keys.minOf { regularChamferingRatio(it) }
     }
 }
 
-fun Polyhedron.chamfered(cr: Double = regularChamferingRatio()): Polyhedron = polyhedron {
-    val rr = dualReciprocationRadius
-    // shifted original vertices (reserved ids for them, will add later)
-    var vertexId = vs.size
-    val vertexKindOfs = vertexKinds.size
-    // vertices from the directed edges (leave gap in ids)
-    val ev = directedEdges.associateWith { e ->
-        val a = e.a // vertex for cantellation
-        val f = e.r // primary face for cantellation
-        val c = f.plane.dualPoint(rr) // for regular polygons -- face center
-        vertex(
-            vertexId++,
-            cr.atSegment(a.pt, c),
-            VertexKind(vertexKindOfs + directedEdgeKindsIndex[e.kind]!!)
-        )
+fun Polyhedron.chamfered(vr: Double = regularChamferingRatio()): Polyhedron = polyhedron {
+    // shifted original vertices
+    val vf = 1 - vr
+    for (v in vs) {
+        vertex(vf * v.pt, v.kind)
     }
+    // compute chamfered edge planes
+    val ep = directedEdges.associateWith { e ->
+        val a = vf * e.a.pt // chamfered vertex
+        planePN(a, e.tangentPoint()) // chamfered edge plane
+    }
+    // vertices from the directed edges (leave gap in ids)
+    val vertexKindOfs = vertexKinds.size
+    val ev = faceDirectedEdges.flatMap { entry ->
+        val f = entry.key // face
+        val es = entry.value
+        // now cycle over edges
+        es.indices.map { i ->
+            val e0 = es[i] // this edge
+            val e1 = es[(i + 1) % es.size] // next edge
+            check(e0.b === e1.a) // double-check edges are propery ordered
+            val p = planeIntersection(ep[e0]!!, ep[e1]!!, f.plane)
+            e1 to vertex(p, VertexKind(vertexKindOfs + directedEdgeKindsIndex[e1.kind]!!))
+        }
+    }.toMap()
     val fvv = ev.entries
         .groupBy{ it.key.r }
         .mapValues { e ->
             e.value.associateBy({ it.key.a }, { it.value })
         }
-    // compute plane intersections for the original vertices
-    for (v in vs) {
-        val e = vertexDirectedEdges[v]!![0] // take any edge from this vertex
-        // use 3 points to build a plane
-        val p = plane3(fvv[e.r]!![e.a]!!.pt, fvv[e.r]!![e.b]!!.pt, fvv[e.l]!![e.a]!!.pt) // plane
-        vertex(v.id, p.intersection(v.pt), v.kind)
-    }
     // faces from the original faces
     for (f in fs) {
         val fvs = faceDirectedEdges[f]!!.map { ev[it]!! }

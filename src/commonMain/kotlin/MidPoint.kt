@@ -31,5 +31,8 @@ fun Edge.midPointFraction(midPoint: MidPoint): Double =
 fun Edge.midPoint(midPoint: MidPoint): Vec3 =
     midPointFraction(midPoint).atSegment(a.pt, b.pt)
 
+fun Edge.tangentPoint(): Vec3 =
+    tangentFraction(a.pt, b.pt).atSegment(a.pt, b.pt)
+
 
 

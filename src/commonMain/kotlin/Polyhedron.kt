@@ -64,6 +64,7 @@ class Polyhedron(
             .mapValues { e -> e.value.map { it.r } }
     }
 
+    // edges are properly ordered
     val faceDirectedEdges: IdMap<Face, List<Edge>> by lazy {
         directedEdges
             .groupById { it.r }
