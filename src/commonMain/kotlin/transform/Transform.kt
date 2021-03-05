@@ -1,5 +1,6 @@
-package polyhedra.common
+package polyhedra.common.transform
 
+import polyhedra.common.*
 import polyhedra.common.util.*
 import kotlin.math.*
 
@@ -160,8 +161,7 @@ fun Polyhedron.truncated(tr: Double = regularTruncationRatio()): Polyhedron = po
 
 data class RegularFaceGeometry(
     val ea: Double, // PI / face_size
-    val da: Double,  // dihedral angle
-    val e: Edge // representative edge that was used
+    val da: Double  // dihedral angle
 )
 
 fun Polyhedron.regularFaceGeometry(edgeKind: EdgeKind? = null): RegularFaceGeometry {
@@ -172,7 +172,7 @@ fun Polyhedron.regularFaceGeometry(edgeKind: EdgeKind? = null): RegularFaceGeome
     val n = f.size // primary face size
     val ea = PI / n
     val da = PI - acos(f.plane.n * g.plane.n) // dihedral angle
-    return RegularFaceGeometry(ea, da, e)
+    return RegularFaceGeometry(ea, da)
 }
 
 fun Polyhedron.regularCantellationRatio(edgeKind: EdgeKind? = null): Double {
@@ -189,11 +189,7 @@ fun Polyhedron.cantellated(cr: Double = regularCantellationRatio()): Polyhedron 
         val c = f.plane.dualPoint(rr) // for regular polygons -- face center
         vertex(cr.atSegment(a.pt, c), VertexKind(directedEdgeKindsIndex[e.kind]!!))
     }
-    val fvv = ev.entries
-        .groupBy{ it.key.r }
-        .mapValues { e ->
-            e.value.associateBy({ it.key.a }, { it.value })
-        }
+    val fvv = ev.directedEdgeToFaceVertexMap()
     // faces from the original faces
     for (f in fs) {
         val fvs = faceDirectedEdges[f]!!.map { ev[it]!! }
@@ -386,64 +382,3 @@ fun Polyhedron.snub(sr: SnubbingRatio = regularSnubbingRatio()) = polyhedron {
     }
 }
 
-fun Polyhedron.regularChamferingRatio(edgeKind: EdgeKind? = null): Double {
-    if (edgeKind != null) {
-        val (ea, da, e) = regularFaceGeometry(edgeKind)
-        val ev = e.vec.norm // edge length
-        val et = e.tangentPoint().norm // distance from edge to origin
-        return ev / et * cos(da / 2) * cos(ea) / (1 + 2 * sin(ea))
-    } else {
-        // min for all edge kinds
-        return edgeKinds.keys.minOf { regularChamferingRatio(it) }
-    }
-}
-
-fun Polyhedron.chamfered(vr: Double = regularChamferingRatio()): Polyhedron = polyhedron {
-    // shifted original vertices
-    val vf = 1 - vr
-    for (v in vs) {
-        vertex(vf * v.pt, v.kind)
-    }
-    // compute chamfered edge planes
-    val ep = directedEdges.associateWith { e ->
-        val a = vf * e.a.pt // chamfered vertex
-        planePN(a, e.tangentPoint()) // chamfered edge plane
-    }
-    // vertices from the directed edges (leave gap in ids)
-    val vertexKindOfs = vertexKinds.size
-    val ev = faceDirectedEdges.flatMap { entry ->
-        val f = entry.key // face
-        val es = entry.value
-        // now cycle over edges
-        es.indices.map { i ->
-            val e0 = es[i] // this edge
-            val e1 = es[(i + 1) % es.size] // next edge
-            check(e0.b === e1.a) // double-check edges are propery ordered
-            val p = planeIntersection(ep[e0]!!, ep[e1]!!, f.plane)
-            e1 to vertex(p, VertexKind(vertexKindOfs + directedEdgeKindsIndex[e1.kind]!!))
-        }
-    }.toMap()
-    val fvv = ev.entries
-        .groupBy{ it.key.r }
-        .mapValues { e ->
-            e.value.associateBy({ it.key.a }, { it.value })
-        }
-    // faces from the original faces
-    for (f in fs) {
-        val fvs = faceDirectedEdges[f]!!.map { ev[it]!! }
-        face(fvs, f.kind)
-    }
-    // 6-faces from the original edges
-    val faceKindOfs = faceKinds.size
-    for (e in es) {
-        val fvs = listOf(
-            fvv[e.r]!![e.a]!!,
-            e.a,
-            fvv[e.l]!![e.a]!!,
-            fvv[e.l]!![e.b]!!,
-            e.b,
-            fvv[e.r]!![e.b]!!
-        )
-        face(fvs, FaceKind(faceKindOfs + edgeKindsIndex[e.kind]!!))
-    }
-}

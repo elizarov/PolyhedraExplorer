@@ -1,6 +1,7 @@
 package polyhedra.js.poly
 
 import polyhedra.common.*
+import polyhedra.common.transform.*
 import polyhedra.js.params.*
 
 class TransformAnimation(

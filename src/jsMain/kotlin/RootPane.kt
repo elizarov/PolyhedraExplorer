@@ -3,6 +3,7 @@ package polyhedra.js
 import kotlinx.html.*
 import kotlinx.html.js.*
 import polyhedra.common.*
+import polyhedra.common.transform.*
 import polyhedra.common.util.*
 import polyhedra.js.components.*
 import polyhedra.js.poly.*

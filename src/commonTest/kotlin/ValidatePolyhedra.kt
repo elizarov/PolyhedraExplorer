@@ -1,4 +1,5 @@
 import polyhedra.common.*
+import polyhedra.common.transform.*
 
 import kotlin.test.*
 
