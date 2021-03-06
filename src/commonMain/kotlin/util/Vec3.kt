@@ -47,3 +47,10 @@ fun Double.atSegment(a: Vec3, b: Vec3): Vec3 = // a + this * (b - a)
 
 infix fun Vec3.approx(u: Vec3): Boolean =
     x approx u.x && y approx u.y && z approx u.z
+
+// distance from this point to a line A-B
+fun Vec3.distanceToLine(a: Vec3, b: Vec3): Double {
+    val a0 = a - this
+    val b0 = b - this
+    return tangentFraction(a0, b0).atSegment(a0, b0).norm
+}

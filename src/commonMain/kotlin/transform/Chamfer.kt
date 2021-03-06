@@ -3,13 +3,40 @@ package polyhedra.common.transform
 import polyhedra.common.*
 import polyhedra.common.util.*
 
-class ChamferGeometry(val poly: Polyhedron) {
+enum class ChamferAngle {
+    Orthonormal,
+    Bisector,
+    FaceRegular
+}
+
+class ChamferGeometry(val poly: Polyhedron, angle: ChamferAngle) {
     // Directed edge movement direction over its right face
     val ded = poly.directedEdges.associateWith { e ->
         // face point H on the edge A-B, so that OH is tangent to AB
         val h = e.tangentPoint()
-        // vector that bisects the angle between both faces -- normal for the new chamfered face
-        val cn = (e.r.plane.n + e.l.plane.n).unit
+        // compute normal for the new chamfered face
+        val cn = when(angle) {
+            // face normal to the edge plane
+            ChamferAngle.Orthonormal -> h
+            // face along the vector that bisects the angle between both faces --
+            ChamferAngle.Bisector -> e.r.plane.n + e.l.plane.n
+            // angle that cuts both faces evenly
+            ChamferAngle.FaceRegular -> {
+                // both face planes
+                val f = e.r.plane
+                val g = e.l.plane
+                // meet at tangent points on faces
+                val fc = f.tangentPoint
+                val gc = g.tangentPoint
+                // distance from the point to the edge
+                val fd = e.distanceTo(fc)
+                val gd = e.distanceTo(gc)
+                // resulting vector v = x * fn + y * gn
+                // where x * gd == y * fd, so with x = 1 we get
+                val y = gd / fd
+                f.n + y * g.n
+            }
+        }.unit // unit vector
         // project h onto cn and invert to get the actual edge direction vector
         val de = cn * -(cn * h)
         // normal to the edge in the R face
@@ -38,7 +65,8 @@ class ChamferGeometry(val poly: Polyhedron) {
     }
 }
 
-fun Polyhedron.chamferGeometry() = ChamferGeometry(this)
+fun Polyhedron.chamferGeometry(angle: ChamferAngle = ChamferAngle.FaceRegular) =
+    ChamferGeometry(this, angle)
 
 fun Polyhedron.regularChamferingRatio(edgeKind: EdgeKind? = null): Double =
     chamferGeometry().regularChamferingRatio(edgeKind)

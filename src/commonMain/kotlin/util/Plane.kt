@@ -5,7 +5,7 @@ data class Plane(
     val d: Double
 )
 
-// Plance through a point with a given normal
+// Plane through a point with a given normal
 fun planePN(p: Vec3, n: Vec3): Plane {
     val u = n.unit
     return Plane(u, p * u)

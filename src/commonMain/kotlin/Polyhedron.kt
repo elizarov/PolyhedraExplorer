@@ -228,6 +228,9 @@ val Edge.vec: Vec3
 val Edge.len: Double
     get() = vec.norm
 
+fun Edge.distanceTo(p: Vec3): Double =
+    p.distanceToLine(a.pt, b.pt)
+
 class PolyhedronBuilder {
     private val vs = ArrayList<Vertex?>()
     private val fs = ArrayList<Face>()
