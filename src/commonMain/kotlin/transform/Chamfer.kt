@@ -4,14 +4,28 @@ import polyhedra.common.*
 import polyhedra.common.util.*
 
 enum class ChamferAngle {
+    // chamfer normally to the plane that goes through edge and origin
     Orthonormal,
+    // chamfer normally to the bisector between planes that meet at the edge
     Bisector,
+    // chamfer in such a way that both faces are evenly cut towards their respective tangent points
     FaceRegular
 }
 
+enum class ChamferLimit {
+    // chamfer till the new edges have the same length
+    EdgeRegular,
+    // chamfer till the new face distance is an average between original face distances
+    // (resulting is circumscribed over sphere, dual is inscribed into sphere)
+    FaceDistanceAverage
+}
+
+val defaultChamferAngle = ChamferAngle.FaceRegular
+val defaultChamferLimit = ChamferLimit.EdgeRegular
+
 class ChamferGeometry(val poly: Polyhedron, angle: ChamferAngle) {
-    // Directed edge movement direction over its right face
-    val ded = poly.directedEdges.associateWith { e ->
+    // Edge movement direction vector
+    val edgeDir = poly.es.associateWith { e ->
         // face point H on the edge A-B, so that OH is tangent to AB
         val h = e.tangentPoint()
         // compute normal for the new chamfered face
@@ -38,7 +52,12 @@ class ChamferGeometry(val poly: Polyhedron, angle: ChamferAngle) {
             }
         }.unit // unit vector
         // project h onto cn and invert to get the actual edge direction vector
-        val de = cn * -(cn * h)
+        cn * -(cn * h)
+    }
+
+    // Directed edge movement direction over its right face
+    val directedEdgeFaceDir = poly.directedEdges.associateWith { e ->
+        val de = edgeDir[e.normalizedDirection()]!!
         // normal to the edge in the R face
         val fn = (e.r.plane.n cross (e.a.pt - e.b.pt)).unit
         // project de onto fn to get edge movement vector on the face
@@ -51,8 +70,8 @@ class ChamferGeometry(val poly: Polyhedron, angle: ChamferAngle) {
             val e = fes[i]
             val g = fes[(i + 1) % fes.size]
             check(e.b === g.a)
-            val a = ded[e]!!
-            val b = ded[g]!!
+            val a = directedEdgeFaceDir[e]!!
+            val b = directedEdgeFaceDir[g]!!
             val ab = a * b
             val ab2 = ab * ab
             val a2 = a * a
@@ -65,26 +84,39 @@ class ChamferGeometry(val poly: Polyhedron, angle: ChamferAngle) {
     }
 }
 
-fun Polyhedron.chamferGeometry(angle: ChamferAngle = ChamferAngle.FaceRegular) =
+fun Polyhedron.chamferGeometry(angle: ChamferAngle = defaultChamferAngle) =
     ChamferGeometry(this, angle)
 
-fun Polyhedron.regularChamferingRatio(edgeKind: EdgeKind? = null): Double =
-    chamferGeometry().regularChamferingRatio(edgeKind)
+fun Polyhedron.chamferingRatio(edgeKind: EdgeKind? = null): Double =
+    chamferGeometry().chamferingRatio(edgeKind)
 
-fun ChamferGeometry.regularChamferingRatio(edgeKind: EdgeKind? = null): Double {
+fun ChamferGeometry.chamferingRatio(edgeKind: EdgeKind? = null, limit: ChamferLimit = defaultChamferLimit): Double {
     // min for all edge kinds by default
-    if (edgeKind == null) return poly.edgeKinds.keys.minOf { regularChamferingRatio(it) }
+    if (edgeKind == null) return poly.edgeKinds.keys.minOf { chamferingRatio(it) }
     // computing for a specific edge
     val e = poly.edgeKinds[edgeKind]!!.first() // representative edge
-    val f = e.r // looking at right face
-    val ev = e.vec // A -> B vector
-    val el = ev.norm
-    val eu = ev / el // A -> B unit vector
-    val dl = eu * fvd[f]!![e.a]!! - eu * fvd[f]!![e.b]!! // edge length reduction ratio
-    // resulting reduced edge length = el - f * dl
-    val dv = (e.a.pt + fvd[f]!![e.a]!!).norm
-    // result new edge length = f * dv
-    return el / (dl + dv)
+    return when (limit) {
+        ChamferLimit.EdgeRegular -> {
+            val f = e.r // looking at right face
+            val ev = e.vec // A -> B vector
+            val el = ev.norm
+            val eu = ev / el // A -> B unit vector
+            val dl = eu * fvd[f]!![e.a]!! - eu * fvd[f]!![e.b]!! // edge length reduction ratio
+            // resulting reduced edge length = el - f * dl
+            val dv = (e.a.pt + fvd[f]!![e.a]!!).norm
+            // result new edge length = f * dv
+            el / (dl + dv)
+        }
+        ChamferLimit.FaceDistanceAverage -> {
+            // target distance -- average
+            val target = (e.r.plane.d + e.l.plane.d) / 2
+            // direction of edge chamfering
+            val dir = edgeDir[e.normalizedDirection()]!!
+            // cur distance (a zero chamfering fraction)
+            val cur = -(dir.unit * e.a.pt)
+            (cur - target) / dir.norm
+        }
+    }
 }
 
 fun Polyhedron.chamfered(): Polyhedron =
@@ -93,7 +125,7 @@ fun Polyhedron.chamfered(): Polyhedron =
 fun Polyhedron.chamfered(vr: Double): Polyhedron =
     chamferGeometry().chamfered(vr)
 
-fun ChamferGeometry.chamfered(vr: Double = regularChamferingRatio()): Polyhedron = with(poly) {
+fun ChamferGeometry.chamfered(vr: Double = chamferingRatio()): Polyhedron = with(poly) {
     polyhedron {
         // shifted original vertices
         for (v in vs) {

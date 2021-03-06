@@ -96,7 +96,7 @@ enum class Transform(
     Chamfered(
         "c",
         Polyhedron::chamfered,
-        chamferingRatio = { it.regularChamferingRatio() },
+        chamferingRatio = { it.chamferingRatio() },
         fev = TransformFEV(
             1, 2, 0,
             0, 4, 0,
