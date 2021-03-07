@@ -3,14 +3,26 @@ package polyhedra.common.util
 import polyhedra.common.*
 import kotlin.math.*
 
-data class Vec3(
-    val x: Double,
-    val y: Double,
+interface Vec3 {
+    val x: Double
+    val y: Double
     val z: Double
-) {
-    fun toPreciseString(): String = "[$x, $y, $z]"
+}
+
+open class MutableVec3(
+    override var x: Double = 0.0,
+    override var y: Double = 0.0,
+    override var z: Double = 0.0
+) : Vec3 {
     override fun toString(): String = "[${x.fmt}, ${y.fmt}, ${z.fmt}]"
 }
+
+fun Vec3.toPreciseString(): String =
+    "[$x, $y, $z]"
+
+fun Vec3(x: Double, y: Double, z: Double): Vec3 = MutableVec3(x, y, z)
+
+fun Vec3.toMutableVec3(): MutableVec3 = MutableVec3(x, y, z)
 
 fun norm(x: Double, y: Double, z: Double): Double =
     sqrt(sqr(x) + sqr(y) + sqr(z))

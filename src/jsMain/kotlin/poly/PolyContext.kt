@@ -39,7 +39,7 @@ private fun PolyBuffers.initBuffers(poly: Polyhedron) {
     positionBuffer.bindBufferData(gl)
 
     poly.faceVerticesData(normalBuffer) { f, _, a, i ->
-        a[i] = f.plane.n
+        a[i] = f.plane
     }
     normalBuffer.bindBufferData(gl)
 }

@@ -33,7 +33,7 @@ class ChamferGeometry(val poly: Polyhedron, angle: ChamferAngle) {
             // face normal to the edge plane
             ChamferAngle.Orthonormal -> h
             // face along the vector that bisects the angle between both faces --
-            ChamferAngle.Bisector -> e.r.plane.n + e.l.plane.n
+            ChamferAngle.Bisector -> e.r.plane + e.l.plane
             // angle that cuts both faces evenly
             ChamferAngle.FaceRegular -> {
                 // both face planes
@@ -48,7 +48,7 @@ class ChamferGeometry(val poly: Polyhedron, angle: ChamferAngle) {
                 // resulting vector v = x * fn + y * gn
                 // where x * gd == y * fd, so with x = 1 we get
                 val y = gd / fd
-                f.n + y * g.n
+                f + y * g
             }
         }.unit // unit vector
         // project h onto cn and invert to get the actual edge direction vector
@@ -59,7 +59,7 @@ class ChamferGeometry(val poly: Polyhedron, angle: ChamferAngle) {
     val directedEdgeFaceDir = poly.directedEdges.associateWith { e ->
         val de = edgeDir[e.normalizedDirection()]!!
         // normal to the edge in the R face
-        val fn = (e.r.plane.n cross (e.a.pt - e.b.pt)).unit
+        val fn = (e.r.plane cross (e.a.pt - e.b.pt)).unit
         // project de onto fn to get edge movement vector on the face
         fn * ((de * de) / (fn * de))
     }

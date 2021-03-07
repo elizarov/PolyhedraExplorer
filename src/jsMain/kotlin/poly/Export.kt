@@ -3,6 +3,7 @@ package polyhedra.js.poly
 import kotlinx.browser.*
 import org.w3c.dom.*
 import polyhedra.common.*
+import polyhedra.common.util.*
 
 fun Polyhedron.exportGeometryToScad(name: String): String = buildString {
     appendLine("// polyhedron($name[0], $name[1]);")

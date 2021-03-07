@@ -28,7 +28,7 @@ fun Polyhedron.validateGeometry() {
             val b = f[(i + 1) % f.size].pt
             val c = f[(i + 2) % f.size].pt
             val rot = (c - a) cross (b - a)
-            require(rot * f.plane.n > -EPS) {
+            require(rot * f.plane > -EPS) {
                 "Face is not clockwise: $f, vertices $a $b $c"
             }
         }

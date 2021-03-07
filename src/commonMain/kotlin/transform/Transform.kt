@@ -171,7 +171,7 @@ fun Polyhedron.regularFaceGeometry(edgeKind: EdgeKind? = null): RegularFaceGeome
     val g = e.l // secondary face
     val n = f.size // primary face size
     val ea = PI / n
-    val da = PI - acos(f.plane.n * g.plane.n) // dihedral angle
+    val da = PI - acos(f.plane * g.plane) // dihedral angle
     return RegularFaceGeometry(ea, da)
 }
 
@@ -355,7 +355,7 @@ fun Polyhedron.snub(sr: SnubbingRatio = regularSnubbingRatio()) = polyhedron {
     // vertices from the face-vertices (directed edges)
     val fvv = fs.associateWith { f ->
         val c = f.plane.dualPoint(rr) // for regular polygons -- face center
-        val r = f.plane.n.toRotationAroundQuat(-sa)
+        val r = f.plane.toRotationAroundQuat(-sa)
         faceDirectedEdges[f]!!.associateBy({ it.a }, { e ->
             vertex(c + ((1 - cr) * (e.a.pt - c)).rotated(r), VertexKind(directedEdgeKindsIndex[e.kind]!!))
         })
