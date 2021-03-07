@@ -171,7 +171,7 @@ fun Polyhedron.regularFaceGeometry(edgeKind: EdgeKind? = null): RegularFaceGeome
     val g = e.l // secondary face
     val n = f.size // primary face size
     val ea = PI / n
-    val da = PI - acos(f.plane * g.plane) // dihedral angle
+    val da = PI - acos(f * g) // dihedral angle
     return RegularFaceGeometry(ea, da)
 }
 
@@ -186,7 +186,7 @@ fun Polyhedron.cantellated(cr: Double = regularCantellationRatio()): Polyhedron 
     val ev = directedEdges.associateWith { e ->
         val a = e.a // vertex for cantellation
         val f = e.r // primary face for cantellation
-        val c = f.plane.dualPoint(rr) // for regular polygons -- face center
+        val c = f.dualPoint(rr) // for regular polygons -- face center
         vertex(cr.atSegment(a, c), VertexKind(directedEdgeKindsIndex[e.kind]!!))
     }
     val fvv = ev.directedEdgeToFaceVertexMap()
@@ -220,7 +220,7 @@ fun Polyhedron.dual(): Polyhedron = polyhedron {
     val rr = dualReciprocationRadius
     // vertices from the original faces
     val fv = fs.associateWith { f ->
-        vertex(f.plane.dualPoint(rr), VertexKind(f.kind.id))
+        vertex(f.dualPoint(rr), VertexKind(f.kind.id))
     }
     // faces from the original vertices
     for ((v, fl) in vertexFaces) {
@@ -242,7 +242,7 @@ fun Polyhedron.bevelled(br: BevellingRatio = regularBevellingRatio()): Polyhedro
     val rr = dualReciprocationRadius
     // vertices from the face-directed edges
     val fev = fs.associateWith { f ->
-        val c = f.plane.dualPoint(rr) // for regular polygons -- face center
+        val c = f.dualPoint(rr) // for regular polygons -- face center
         faceDirectedEdges[f]!!.flatMap { e ->
             val kind = directedEdgeKindsIndex[e.kind]!!
             val a = e.a
@@ -354,8 +354,8 @@ fun Polyhedron.snub(sr: SnubbingRatio = regularSnubbingRatio()) = polyhedron {
     val rr = dualReciprocationRadius
     // vertices from the face-vertices (directed edges)
     val fvv = fs.associateWith { f ->
-        val c = f.plane.dualPoint(rr) // for regular polygons -- face center
-        val r = f.plane.toRotationAroundQuat(-sa)
+        val c = f.dualPoint(rr) // for regular polygons -- face center
+        val r = f.toRotationAroundQuat(-sa)
         faceDirectedEdges[f]!!.associateBy({ it.a }, { e ->
             vertex(c + ((1 - cr) * (e.a - c)).rotated(r), VertexKind(directedEdgeKindsIndex[e.kind]!!))
         })

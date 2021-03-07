@@ -16,19 +16,19 @@ fun Polyhedron.validateGeometry() {
     }
     // Validate faces
     for (f in fs) {
-        require(f.plane.d > 0) {
-            "Face normal does not point outwards: $f ${f.plane} "
+        require(f.d > 0) {
+            "Face normal does not point outwards: $f $f "
         }
         for (v in f.fvs)
-            require(v in f.plane) {
-                "Face is not planar: $f, $v !in ${f.plane}"
+            require(v in f) {
+                "Face is not planar: $f, $v !in $f"
             }
         for (i in 0 until f.size) {
             val a = f[i]
             val b = f[(i + 1) % f.size]
             val c = f[(i + 2) % f.size]
             val rot = (c - a) cross (b - a)
-            require(rot * f.plane > -EPS) {
+            require(rot * f > -EPS) {
                 "Face is not clockwise: $f, vertices $a $b $c"
             }
         }

@@ -83,7 +83,7 @@ class Polyhedron(
             .distinctIndexed { it }
     }
 
-    val inradius: Double by lazy { fs.minOf { f -> f.plane.d } }
+    val inradius: Double by lazy { fs.minOf { f -> f.d } }
     val midradius: Double by lazy { es.avgOf { e -> e.midPoint(MidPoint.Closest).norm } }
     val circumradius: Double by lazy { vs.maxOf { v -> v.norm } }
 
@@ -161,7 +161,7 @@ class MutableVertex(
     override val id: Int,
     pt: Vec3,
     override val kind: VertexKind,
-) : MutableVec3(pt), Vertex {
+) : Vertex, MutableVec3(pt) {
     override fun equals(other: Any?): Boolean = other is Vertex && id == other.id
     override fun hashCode(): Int = id
     override fun toString(): String = "$kind vertex(id=$id, ${super.toString()})"
@@ -172,24 +172,27 @@ inline class FaceKind(override val id: Int) : Id, Comparable<FaceKind> {
     override fun toString(): String = idString(id, 'α', 'ω')
 }
 
-class Face(
+interface Face : Id, Plane {
+    val fvs: List<Vertex>
+    val kind: FaceKind
+    val dualKind: FaceKind
+}
+
+class MutableFace(
     override val id: Int,
-    val fvs: List<Vertex>,
-    val kind: FaceKind,
-    val dualKind: FaceKind = kind // used only for by cantellation
-) : Id {
-    val plane: Plane = plane3(fvs[0], fvs[1], fvs[2])
-
-    val size: Int
-        get() = fvs.size
-    operator fun get(index: Int): Vertex = fvs[index]
-    operator fun iterator(): Iterator<Vertex> = fvs.iterator()
-
+    override val fvs: List<Vertex>,
+    override val kind: FaceKind,
+    override val dualKind: FaceKind = kind // used only for by cantellation
+) : Face, MutablePlane(plane3(fvs[0], fvs[1], fvs[2])) {
     override fun equals(other: Any?): Boolean = other is Face && id == other.id
     override fun hashCode(): Int = id
     override fun toString(): String =
         "$kind face(id=$id, [${fvs.map { it.id }.joinToString(", ")}])"
 }
+
+val Face.size: Int get() = fvs.size
+operator fun Face.get(index: Int): Vertex = fvs[index]
+operator fun Face.iterator(): Iterator<Vertex> = fvs.iterator()
 
 data class EdgeKind(val a: VertexKind, val b: VertexKind, val l: FaceKind, val r: FaceKind) : Comparable<EdgeKind> {
     override fun compareTo(other: EdgeKind): Int {
@@ -247,11 +250,11 @@ class PolyhedronBuilder {
 
     fun face(vararg fvIds: Int, kind: FaceKind = FaceKind(0)) {
         val a = List(fvIds.size) { vs[fvIds[it]] }
-        fs.add(Face(fs.size, a, kind))
+        fs.add(MutableFace(fs.size, a, kind))
     }
 
     fun face(fvs: Collection<Vertex>, kind: FaceKind, dualKind: FaceKind = kind) {
-        fs.add(Face(fs.size, fvs.map { vs[it.id] }, kind, dualKind))
+        fs.add(MutableFace(fs.size, fvs.map { vs[it.id] }, kind, dualKind))
     }
 
     fun face(f: Face) {

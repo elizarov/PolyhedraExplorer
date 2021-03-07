@@ -29,16 +29,16 @@ class ChamferGeometry(val poly: Polyhedron, angle: ChamferAngle) {
         // face point H on the edge A-B, so that OH is tangent to AB
         val h = e.tangentPoint()
         // compute normal for the new chamfered face
-        val cn = when(angle) {
+        val cn = when (angle) {
             // face normal to the edge plane
             ChamferAngle.Orthonormal -> h
             // face along the vector that bisects the angle between both faces --
-            ChamferAngle.Bisector -> e.r.plane + e.l.plane
+            ChamferAngle.Bisector -> e.r + e.l
             // angle that cuts both faces evenly
             ChamferAngle.FaceRegular -> {
                 // both face planes
-                val f = e.r.plane
-                val g = e.l.plane
+                val f = e.r
+                val g = e.l
                 // meet at tangent points on faces
                 val fc = f.tangentPoint
                 val gc = g.tangentPoint
@@ -59,7 +59,7 @@ class ChamferGeometry(val poly: Polyhedron, angle: ChamferAngle) {
     val directedEdgeFaceDir = poly.directedEdges.associateWith { e ->
         val de = edgeDir[e.normalizedDirection()]!!
         // normal to the edge in the R face
-        val fn = (e.r.plane cross (e.a - e.b)).unit
+        val fn = (e.r cross (e.a - e.b)).unit
         // project de onto fn to get edge movement vector on the face
         fn * ((de * de) / (fn * de))
     }
@@ -109,7 +109,7 @@ fun ChamferGeometry.chamferingRatio(edgeKind: EdgeKind? = null, limit: ChamferLi
         }
         ChamferLimit.FaceDistanceAverage -> {
             // target distance -- average
-            val target = (e.r.plane.d + e.l.plane.d) / 2
+            val target = (e.r.d + e.l.d) / 2
             // direction of edge chamfering
             val dir = edgeDir[e.normalizedDirection()]!!
             // cur distance (a zero chamfering fraction)

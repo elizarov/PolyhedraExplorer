@@ -1,6 +1,7 @@
 package polyhedra.js.poly
 
 import org.khronos.webgl.*
+import polyhedra.common.*
 import polyhedra.js.*
 import polyhedra.js.glsl.*
 import polyhedra.js.params.*

@@ -11,7 +11,8 @@ open class MutablePlane(
     y: Double,
     z: Double,
     override var d: Double
-) : MutableVec3(x, y, z), Plane {
+) : Plane, MutableVec3(x, y, z) {
+    constructor(p: Plane) : this(p.x, p.y, p.z, p.d)
     override fun toString(): String =
         "Plane(n=${super.toString()}, d=${d.fmt})"
 }
