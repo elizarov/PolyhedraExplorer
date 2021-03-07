@@ -32,22 +32,24 @@ fun Polyhedron.canonical(): Polyhedron {
                 val err = 1.0 - d
                 if (abs(err) < TARGET_TOLERANCE) continue // ok
                 ok = false
-                val adj = err * tf.atSegment(a, b)
-                dv[a.id] += adj / vertexFaces[a]!!.size.toDouble()
-                dv[b.id] += adj / vertexFaces[b]!!.size.toDouble()
+                val adj = 0.5 * err * tf.atSegment(a, b)
+                dv[a.id] += adj
+                dv[b.id] += adj
             }
         }
-        // compute current center of gravity (taking adjustment into account)
+        // apply average of edge adjustments
+        for (i in vs.indices) {
+            vs[i] += dv[i] / vertexFaces[vs[i]]!!.size.toDouble()
+            dv[i].setToZero()
+        }
+        // compute current center of gravity
         for (i in vs.indices) {
             center += vs[i]
-            center += dv[i]
         }
         center /= vs.size.toDouble()
-        // adjust all vertices & clear temp vars
+        // recenter all vertices
         for (i in vs.indices) {
-            vs[i] += dv[i]
             vs[i] -= center
-            dv[i].setToZero()
         }
         center.setToZero()
         // check all faces & project vertices
