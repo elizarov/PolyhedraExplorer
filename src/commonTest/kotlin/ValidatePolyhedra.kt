@@ -89,6 +89,7 @@ class ValidatePolyhedra {
                 }
             }
         }
+        println("Total iterations $totalIterations")
     }
 }
 

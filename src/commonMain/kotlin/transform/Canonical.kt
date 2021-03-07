@@ -6,6 +6,8 @@ import kotlin.math.*
 
 private const val TARGET_TOLERANCE = 1e-13
 
+var totalIterations = 0
+
 // Algorithm from https://www.georgehart.com/virtual-polyhedra/canonical.html
 fun Polyhedron.canonical(): Polyhedron {
     // copy vertices to mutate them
@@ -17,9 +19,9 @@ fun Polyhedron.canonical(): Polyhedron {
     val dv = vs.map { MutableVec3() }
     val center = MutableVec3()
     val normSum = MutableVec3()
-    var interactions = 0
+    var iterations = 0
     do {
-        interactions++
+        iterations++
         var ok = true
         // check all edges
         for (f in fs) {
@@ -32,7 +34,7 @@ fun Polyhedron.canonical(): Polyhedron {
                 val err = 1.0 - d
                 if (abs(err) < TARGET_TOLERANCE) continue // ok
                 ok = false
-                val adj = 0.5 * err * tf.atSegment(a, b)
+                val adj = 0.95 * err * tf.atSegment(a, b)
                 dv[a.id] += adj
                 dv[b.id] += adj
             }
@@ -83,7 +85,8 @@ fun Polyhedron.canonical(): Polyhedron {
             dv[i].setToZero()
         }
     } while (!ok)
-    println("Done in $interactions iterations")
+    println("Done in $iterations iterations")
+    totalIterations += iterations
     // copy faces with new vertices
     val fs = fs.map { f ->
         MutableFace(f.id, f.fvs.map { vs[it.id] }, f.kind)
