@@ -15,7 +15,7 @@ fun Polyhedron.exportGeometryToScad(name: String): String = buildString {
     appendLine("//    3 - face kinds")
     appendLine("$name = [[")
     for ((i, v) in vs.withIndex()) {
-        append("  ${v.pt.toPreciseString()}")
+        append("  ${v.toPreciseString()}")
         appendSeparator(i, vs.size)
         appendLine(" // ${v.id} ${v.kind} vertex")
     }

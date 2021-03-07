@@ -15,7 +15,7 @@ enum class Scale(override val tag: String, val denominator: (Polyhedron) -> Doub
 val Scales: List<Scale> by lazy { Scale.values().toList() }
 
 fun Polyhedron.scaled(factor: Double): Polyhedron = polyhedron {
-    for (v in vs) vertex(factor * v.pt, v.kind)
+    for (v in vs) vertex(factor * v, v.kind)
     for (f in fs) face(f)
 }
 

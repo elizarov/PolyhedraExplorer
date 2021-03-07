@@ -34,7 +34,7 @@ class PolyBuffers(val gl: GL) {
 
 private fun PolyBuffers.initBuffers(poly: Polyhedron) {
     poly.faceVerticesData(positionBuffer) { _, v, a, i ->
-        a[i] = v.pt
+        a[i] = v
     }
     positionBuffer.bindBufferData(gl)
 

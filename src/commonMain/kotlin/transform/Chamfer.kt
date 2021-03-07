@@ -59,7 +59,7 @@ class ChamferGeometry(val poly: Polyhedron, angle: ChamferAngle) {
     val directedEdgeFaceDir = poly.directedEdges.associateWith { e ->
         val de = edgeDir[e.normalizedDirection()]!!
         // normal to the edge in the R face
-        val fn = (e.r.plane cross (e.a.pt - e.b.pt)).unit
+        val fn = (e.r.plane cross (e.a - e.b)).unit
         // project de onto fn to get edge movement vector on the face
         fn * ((de * de) / (fn * de))
     }
@@ -103,7 +103,7 @@ fun ChamferGeometry.chamferingRatio(edgeKind: EdgeKind? = null, limit: ChamferLi
             val eu = ev / el // A -> B unit vector
             val dl = eu * fvd[f]!![e.a]!! - eu * fvd[f]!![e.b]!! // edge length reduction ratio
             // resulting reduced edge length = el - f * dl
-            val dv = (e.a.pt + fvd[f]!![e.a]!!).norm
+            val dv = (e.a + fvd[f]!![e.a]!!).norm
             // result new edge length = f * dv
             el / (dl + dv)
         }
@@ -113,7 +113,7 @@ fun ChamferGeometry.chamferingRatio(edgeKind: EdgeKind? = null, limit: ChamferLi
             // direction of edge chamfering
             val dir = edgeDir[e.normalizedDirection()]!!
             // cur distance (a zero chamfering fraction)
-            val cur = -(dir.unit * e.a.pt)
+            val cur = -(dir.unit * e.a)
             (cur - target) / dir.norm
         }
     }
@@ -129,12 +129,12 @@ fun ChamferGeometry.chamfered(vr: Double = chamferingRatio()): Polyhedron = with
     polyhedron {
         // shifted original vertices
         for (v in vs) {
-            vertex((1 - vr) * v.pt, v.kind)
+            vertex((1 - vr) * v, v.kind)
         }
         // vertices from the directed edges
         val vertexKindOfs = vertexKinds.size
         val ev = directedEdges.associateWith { e ->
-            vertex(e.a.pt + vr * fvd[e.r]!![e.a]!!, VertexKind(vertexKindOfs + directedEdgeKindsIndex[e.kind]!!))
+            vertex(e.a + vr * fvd[e.r]!![e.a]!!, VertexKind(vertexKindOfs + directedEdgeKindsIndex[e.kind]!!))
         }
         val fvv = ev.directedEdgeToFaceVertexMap()
         // faces from the original faces

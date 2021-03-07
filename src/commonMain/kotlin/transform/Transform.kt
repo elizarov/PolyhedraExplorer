@@ -143,7 +143,7 @@ fun Polyhedron.truncated(tr: Double = regularTruncationRatio()): Polyhedron = po
     // vertices from the original directed edges
     val ev = directedEdges.associateWith { e ->
         val t = tr * e.midPointFraction(edgesMidPointDefault)
-        vertex(t.atSegment(e.a.pt, e.b.pt), VertexKind(directedEdgeKindsIndex[e.kind]!!))
+        vertex(t.atSegment(e.a, e.b), VertexKind(directedEdgeKindsIndex[e.kind]!!))
     }
     // faces from the original faces
     for (f in fs) {
@@ -187,7 +187,7 @@ fun Polyhedron.cantellated(cr: Double = regularCantellationRatio()): Polyhedron 
         val a = e.a // vertex for cantellation
         val f = e.r // primary face for cantellation
         val c = f.plane.dualPoint(rr) // for regular polygons -- face center
-        vertex(cr.atSegment(a.pt, c), VertexKind(directedEdgeKindsIndex[e.kind]!!))
+        vertex(cr.atSegment(a, c), VertexKind(directedEdgeKindsIndex[e.kind]!!))
     }
     val fvv = ev.directedEdgeToFaceVertexMap()
     // faces from the original faces
@@ -247,8 +247,8 @@ fun Polyhedron.bevelled(br: BevellingRatio = regularBevellingRatio()): Polyhedro
             val kind = directedEdgeKindsIndex[e.kind]!!
             val a = e.a
             val b = e.b
-            val ac = cr.atSegment(a.pt, c)
-            val bc = cr.atSegment(b.pt, c)
+            val ac = cr.atSegment(a, c)
+            val bc = cr.atSegment(b, c)
             val mf = e.midPointFraction(edgesMidPointDefault)
             val t1 = tr * mf
             val t2 = tr * (1 - mf)
@@ -357,7 +357,7 @@ fun Polyhedron.snub(sr: SnubbingRatio = regularSnubbingRatio()) = polyhedron {
         val c = f.plane.dualPoint(rr) // for regular polygons -- face center
         val r = f.plane.toRotationAroundQuat(-sa)
         faceDirectedEdges[f]!!.associateBy({ it.a }, { e ->
-            vertex(c + ((1 - cr) * (e.a.pt - c)).rotated(r), VertexKind(directedEdgeKindsIndex[e.kind]!!))
+            vertex(c + ((1 - cr) * (e.a - c)).rotated(r), VertexKind(directedEdgeKindsIndex[e.kind]!!))
         })
     }
     // faces from the original faces

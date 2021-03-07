@@ -14,6 +14,7 @@ open class MutableVec3(
     override var y: Double = 0.0,
     override var z: Double = 0.0
 ) : Vec3 {
+    constructor(v: Vec3) : this(v.x, v.y, v.z)
     override fun toString(): String = "[${x.fmt}, ${y.fmt}, ${z.fmt}]"
 }
 

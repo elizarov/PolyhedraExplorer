@@ -10,7 +10,7 @@ fun Polyhedron.validate() {
 fun Polyhedron.validateGeometry() {
     // Validate edges
     for (e in es) {
-        require((e.a.pt - e.b.pt).norm > EPS) {
+        require((e.a - e.b).norm > EPS) {
             "$e non-degenerate"
         }
     }
@@ -20,13 +20,13 @@ fun Polyhedron.validateGeometry() {
             "Face normal does not point outwards: $f ${f.plane} "
         }
         for (v in f.fvs)
-            require(v.pt in f.plane) {
+            require(v in f.plane) {
                 "Face is not planar: $f, $v !in ${f.plane}"
             }
         for (i in 0 until f.size) {
-            val a = f[i].pt
-            val b = f[(i + 1) % f.size].pt
-            val c = f[(i + 2) % f.size].pt
+            val a = f[i]
+            val b = f[(i + 1) % f.size]
+            val c = f[(i + 2) % f.size]
             val rot = (c - a) cross (b - a)
             require(rot * f.plane > -EPS) {
                 "Face is not clockwise: $f, vertices $a $b $c"

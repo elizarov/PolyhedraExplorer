@@ -85,7 +85,7 @@ class Polyhedron(
 
     val inradius: Double by lazy { fs.minOf { f -> f.plane.d } }
     val midradius: Double by lazy { es.avgOf { e -> e.midPoint(MidPoint.Closest).norm } }
-    val circumradius: Double by lazy { vs.maxOf { v -> v.pt.norm } }
+    val circumradius: Double by lazy { vs.maxOf { v -> v.norm } }
 
     // Radius that is used for for polar reciprocation to compute dual,
     // the key requirement is that dual points of regular polygon's faces must be in the centers of those faces
@@ -153,14 +153,18 @@ inline class VertexKind(override val id: Int) : Id, Comparable<VertexKind> {
     override fun toString(): String = idString(id, 'A', 'Z')
 }
 
-class Vertex(
+interface Vertex : Id, Vec3 {
+    val kind: VertexKind
+}
+
+class MutableVertex(
     override val id: Int,
-    val pt: Vec3,
-    val kind: VertexKind,
-) : Id {
+    pt: Vec3,
+    override val kind: VertexKind,
+) : MutableVec3(pt), Vertex {
     override fun equals(other: Any?): Boolean = other is Vertex && id == other.id
     override fun hashCode(): Int = id
-    override fun toString(): String = "$kind vertex(id=$id, $pt)"
+    override fun toString(): String = "$kind vertex(id=$id, ${super.toString()})"
 }
 
 inline class FaceKind(override val id: Int) : Id, Comparable<FaceKind> {
@@ -174,7 +178,7 @@ class Face(
     val kind: FaceKind,
     val dualKind: FaceKind = kind // used only for by cantellation
 ) : Id {
-    val plane: Plane = plane3(fvs[0].pt, fvs[1].pt, fvs[2].pt)
+    val plane: Plane = plane3(fvs[0], fvs[1], fvs[2])
 
     val size: Int
         get() = fvs.size
@@ -223,47 +227,38 @@ fun Edge.normalizedDirection(): Edge {
 }
 
 val Edge.vec: Vec3
-    get() = b.pt - a.pt
+    get() = b - a
 
 val Edge.len: Double
     get() = vec.norm
 
 fun Edge.distanceTo(p: Vec3): Double =
-    p.distanceToLine(a.pt, b.pt)
+    p.distanceToLine(a, b)
 
 class PolyhedronBuilder {
-    private val vs = ArrayList<Vertex?>()
+    private val vs = ArrayList<Vertex>()
     private val fs = ArrayList<Face>()
 
     fun vertex(p: Vec3, kind: VertexKind = VertexKind(0)): Vertex =
-        Vertex(vs.size, p, kind).also { vs.add(it) }
-
-    // force vertex id (reserve or fill a gap)
-    fun vertex(id: Int, p: Vec3, kind: VertexKind): Vertex {
-        val v = Vertex(id, p, kind)
-        while (vs.size <= id) vs.add(null)
-        vs[id] = v
-        return v
-    }
+        MutableVertex(vs.size, p, kind).also { vs.add(it) }
 
     fun vertex(x: Double, y: Double, z: Double, kind: VertexKind = VertexKind(0)): Vertex =
         vertex(Vec3(x, y, z), kind)
 
     fun face(vararg fvIds: Int, kind: FaceKind = FaceKind(0)) {
-        val a = List(fvIds.size) { vs[fvIds[it]]!! }
+        val a = List(fvIds.size) { vs[fvIds[it]] }
         fs.add(Face(fs.size, a, kind))
     }
 
     fun face(fvs: Collection<Vertex>, kind: FaceKind, dualKind: FaceKind = kind) {
-        fs.add(Face(fs.size, fvs.map { vs[it.id]!! }, kind, dualKind))
+        fs.add(Face(fs.size, fvs.map { vs[it.id] }, kind, dualKind))
     }
 
     fun face(f: Face) {
         face(f.fvs, f.kind, f.dualKind)
     }
 
-    @Suppress("UNCHECKED_CAST")
-    fun build() = Polyhedron(vs as List<Vertex>, fs)
+    fun build() = Polyhedron(vs, fs)
 
     fun debugDump() {
         for (v in vs) println(v)

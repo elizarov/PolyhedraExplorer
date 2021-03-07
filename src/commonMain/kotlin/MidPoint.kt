@@ -23,16 +23,16 @@ fun midPointFraction(a: Vec3, b: Vec3, midPoint: MidPoint): Double {
 }
 
 fun Edge.isTangentInSegment(): Boolean =
-    isTangentInSegment(a.pt, b.pt)
+    isTangentInSegment(a, b)
 
 fun Edge.midPointFraction(midPoint: MidPoint): Double =
-    midPointFraction(a.pt, b.pt, midPoint)
+    midPointFraction(a, b, midPoint)
 
 fun Edge.midPoint(midPoint: MidPoint): Vec3 =
-    midPointFraction(midPoint).atSegment(a.pt, b.pt)
+    midPointFraction(midPoint).atSegment(a, b)
 
 fun Edge.tangentPoint(): Vec3 =
-    tangentFraction(a.pt, b.pt).atSegment(a.pt, b.pt)
+    tangentFraction(a, b).atSegment(a, b)
 
 
 
