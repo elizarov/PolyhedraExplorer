@@ -4,10 +4,15 @@ import polyhedra.common.util.*
 
 enum class MidPoint { Tangent, Center, Closest }
 
+// returns 0.0 when tangent point is a, 1.0 -- when it is b, or a fraction in between
 fun tangentFraction(a: Vec3, b: Vec3): Double {
     val vec = b - a
     return  -(a * vec) / (vec * vec)
 }
+
+// distance from origin to line A-B
+fun tangentDistance(a: Vec3, b: Vec3): Double =
+    tangentFraction(a, b).distanceAtSegment(a, b)
 
 fun isTangentInSegment(a: Vec3, b: Vec3): Boolean =
     tangentFraction(a, b) in EPS..1 - EPS

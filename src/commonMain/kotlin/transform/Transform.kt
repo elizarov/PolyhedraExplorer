@@ -27,11 +27,7 @@ enum class Transform(
         truncationRatio = { 0.0 },
         cantellationRatio = { 0.0 },
         chamferingRatio = { 0.0 },
-        fev = TransformFEV(
-            1, 0, 0,
-            0, 1, 0,
-            0, 0, 1
-        )
+        fev = TransformFEV.ID
     ),
     Truncated(
         "t",
@@ -102,6 +98,11 @@ enum class Transform(
             0, 4, 0,
             0, 1, 1
         )
+    ),
+    Canonical(
+        "o",
+        Polyhedron::canonical,
+        fev = TransformFEV.ID
     )
 }
 

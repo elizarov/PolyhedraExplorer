@@ -2,7 +2,7 @@ package polyhedra.common.util
 
 import kotlin.math.*
 
-const val EPS = 1e-12
+const val EPS = 1e-10
 
 infix fun Double.approx(x: Double): Boolean = abs(this - x) < EPS
 

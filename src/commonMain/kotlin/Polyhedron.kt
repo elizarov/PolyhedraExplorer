@@ -167,6 +167,8 @@ class MutableVertex(
     override fun toString(): String = "$kind vertex(id=$id, ${super.toString()})"
 }
 
+fun Vertex.toMutableVertex() = MutableVertex(id, this, kind)
+
 inline class FaceKind(override val id: Int) : Id, Comparable<FaceKind> {
     override fun compareTo(other: FaceKind): Int = id.compareTo(other.id)
     override fun toString(): String = idString(id, 'α', 'ω')

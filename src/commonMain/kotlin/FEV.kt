@@ -15,7 +15,15 @@ class TransformFEV(
     val ff: Int, val fe: Int, val fv: Int,
     val ef: Int, val ee: Int, val ev: Int,
     val vf: Int, val ve: Int, val vv: Int
-)
+) {
+    companion object {
+        val ID = TransformFEV(
+            1, 0, 0,
+            0, 1, 0,
+            0, 0, 1
+        )
+    }
+}
 
 operator fun TransformFEV.times(p: FEV): FEV = with(p) {
     FEV(

@@ -4,6 +4,8 @@ import polyhedra.common.transform.*
 import kotlin.test.*
 
 class ValidatePolyhedra {
+    private val expandingTransforms = Transforms.filter { it.fev != TransformFEV.ID }
+
     @Test
     fun validateSeeds() {
         testParameter("seed", Seeds) { seed ->
@@ -27,7 +29,7 @@ class ValidatePolyhedra {
     @Test
     fun validatePlatonicTransform() {
         testParameter("seed", Seeds.filter { it.type == SeedType.Platonic} ) { seed ->
-            testParameter("transform", Transforms.filter { it != Transform.None }) { transform ->
+            testParameter("transform", expandingTransforms) { transform ->
                 seed.poly.transformed(transform).validate()
             }
         }
@@ -46,8 +48,8 @@ class ValidatePolyhedra {
     @Test
     fun validatePlatonic2Transforms() {
         testParameter("seed", Seeds.filter { it.type == SeedType.Platonic}) { seed ->
-            testParameter("transform1", Transforms.filter { it != Transform.None }) { transform1 ->
-                testParameter("transform2", Transforms.filter { it != Transform.None }) { transform2 ->
+            testParameter("transform1", expandingTransforms) { transform1 ->
+                testParameter("transform2", expandingTransforms) { transform2 ->
                     if (isOkSequence(transform1, transform2)) {
                         seed.poly.transformed(transform1, transform2).validate()
                     }
@@ -59,14 +61,25 @@ class ValidatePolyhedra {
     @Test
     fun validatePlatonic3Transforms() {
         testParameter("seed", Seeds.filter { it.type == SeedType.Platonic}) { seed ->
-            testParameter("transform1", Transforms.filter { it != Transform.None }) { transform1 ->
-                testParameter("transform2", Transforms.filter { it != Transform.None }) { transform2 ->
-                    testParameter("transform3", Transforms.filter { it != Transform.None }) { transform3 ->
+            testParameter("transform1", expandingTransforms) { transform1 ->
+                testParameter("transform2", expandingTransforms) { transform2 ->
+                    testParameter("transform3", expandingTransforms) { transform3 ->
                         if (isOkSequence(transform1, transform2, transform3)) {
                             seed.poly.transformed(transform1, transform2, transform3).validate()
                         }
                     }
                 }
+            }
+        }
+    }
+
+    @Test
+    fun validateTransformedCanonical() {
+        testParameter("seed", Seeds) { seed ->
+            seed.poly.canonical().validate()
+            testParameter("transform", expandingTransforms) { transform ->
+                println("Checking $transform $seed")
+                seed.poly.transformed(transform).canonical().validate()
             }
         }
     }
