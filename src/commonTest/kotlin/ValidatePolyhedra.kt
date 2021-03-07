@@ -78,8 +78,15 @@ class ValidatePolyhedra {
         testParameter("seed", Seeds) { seed ->
             seed.poly.canonical().validate()
             testParameter("transform", expandingTransforms) { transform ->
-                println("Checking $transform $seed")
-                seed.poly.transformed(transform).canonical().validate()
+                val transformed = seed.poly.transformed(transform)
+                val isValid = try {
+                    transformed.validate()
+                    true
+                } catch (e: Exception) { false }
+                if (isValid) {
+                    println("Checking Canonical $transform $seed")
+                    transformed.canonical().validate()
+                }
             }
         }
     }

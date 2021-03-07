@@ -20,7 +20,7 @@ enum class ChamferLimit {
     FaceDistanceAverage
 }
 
-val defaultChamferAngle = ChamferAngle.FaceRegular
+val defaultChamferAngle = ChamferAngle.Bisector
 val defaultChamferLimit = ChamferLimit.EdgeRegular
 
 class ChamferGeometry(val poly: Polyhedron, angle: ChamferAngle) {
