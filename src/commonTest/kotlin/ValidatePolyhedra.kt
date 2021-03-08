@@ -84,7 +84,7 @@ class ValidatePolyhedra {
                     true
                 } catch (e: Exception) { false }
                 if (isValid) {
-                    println("Checking Canonical $transform $seed")
+                    println("Checking Canonical $transform $seed, ${transformed.fev()}")
                     transformed.canonical().validate()
                 }
             }
