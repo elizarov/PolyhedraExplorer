@@ -16,14 +16,14 @@ fun Polyhedron.canonical(): Polyhedron {
     val preScale = 1 / midradius
     for (v in vs) v *= preScale
     // canonicalize
+    val vMul = DoubleArray(vs.size) { i -> 1.0 / vertexFaces[vs[i]]!!.size }
     val dv = vs.map { MutableVec3() }
     val center = MutableVec3()
     val normSum = MutableVec3()
     val h = MutableVec3()
     var iterations = 0
     do {
-        iterations++
-        var ok = true
+        var maxError = 0.0
         // check all edges
         for (f in fs) {
             for (i in 0 until f.size) {
@@ -33,8 +33,7 @@ fun Polyhedron.canonical(): Polyhedron {
                 check(!tf.isNaN())
                 tf.atSegmentTo(h, a, b)
                 val err = 1.0 - h.norm
-                if (abs(err) < TARGET_TOLERANCE) continue // ok
-                ok = false
+                maxError = max(maxError, abs(err))
                 val factor = 0.95 * err
                 dv[a.id].plusAssignMul(h, factor)
                 dv[b.id].plusAssignMul(h, factor)
@@ -42,7 +41,7 @@ fun Polyhedron.canonical(): Polyhedron {
         }
         // apply average of edge adjustments
         for (i in vs.indices) {
-            vs[i].plusAssignMul(dv[i], 1.0 / vertexFaces[vs[i]]!!.size)
+            vs[i].plusAssignMul(dv[i], vMul[i])
             dv[i].setToZero()
         }
         // compute current center of gravity
@@ -50,6 +49,7 @@ fun Polyhedron.canonical(): Polyhedron {
             center += vs[i]
         }
         center /= vs.size.toDouble()
+        maxError = max(maxError, center.norm)
         // recenter all vertices
         for (i in vs.indices) {
             vs[i] -= center
@@ -71,10 +71,9 @@ fun Polyhedron.canonical(): Polyhedron {
             val pd = normSum * center // plane distance
             for (v in f) {
                 val a = vs[v.id]
-                val vd = pd - normSum * a // vertex distance from plane
-                if (abs(vd) < TARGET_TOLERANCE) continue
-                ok = false
-                dv[v.id].plusAssignMul(normSum, vd)
+                val dist = pd - normSum * a // vertex distance from plane
+                maxError = max(maxError, abs(dist))
+                dv[v.id].plusAssignMul(normSum, dist)
             }
             // clear temp vars
             center.setToZero()
@@ -82,10 +81,12 @@ fun Polyhedron.canonical(): Polyhedron {
         }
         // apply average of projecting adjustments
         for (i in vs.indices) {
-            vs[i].plusAssignMul(dv[i], 1.0 / vertexFaces[vs[i]]!!.size)
+            vs[i].plusAssignMul(dv[i], vMul[i])
             dv[i].setToZero()
         }
-    } while (!ok)
+        iterations++
+        if (iterations % 1000 == 0) println("At $iterations iterations, log error = ${log10(maxError).fmt}")
+    } while (maxError > TARGET_TOLERANCE)
     println("Done in $iterations iterations")
     totalIterations += iterations
     // copy faces with new vertices
