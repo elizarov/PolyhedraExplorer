@@ -4,7 +4,7 @@ import polyhedra.common.*
 import polyhedra.common.util.*
 import kotlin.math.*
 
-private const val TARGET_TOLERANCE = 1e-13
+private const val TARGET_TOLERANCE = 1e-12
 
 var totalIterations = 0
 
@@ -19,6 +19,7 @@ fun Polyhedron.canonical(): Polyhedron {
     val dv = vs.map { MutableVec3() }
     val center = MutableVec3()
     val normSum = MutableVec3()
+    val h = MutableVec3()
     var iterations = 0
     do {
         iterations++
@@ -30,18 +31,18 @@ fun Polyhedron.canonical(): Polyhedron {
                 val b = vs[f[(i + 1) % f.size].id]
                 val tf = tangentFraction(a, b)
                 check(!tf.isNaN())
-                val d = tf.distanceAtSegment(a, b)
-                val err = 1.0 - d
+                tf.atSegmentTo(h, a, b)
+                val err = 1.0 - h.norm
                 if (abs(err) < TARGET_TOLERANCE) continue // ok
                 ok = false
-                val adj = 0.95 * err * tf.atSegment(a, b)
-                dv[a.id] += adj
-                dv[b.id] += adj
+                val factor = 0.95 * err
+                dv[a.id].plusAssignMul(h, factor)
+                dv[b.id].plusAssignMul(h, factor)
             }
         }
         // apply average of edge adjustments
         for (i in vs.indices) {
-            vs[i] += dv[i] / vertexFaces[vs[i]]!!.size.toDouble()
+            vs[i].plusAssignMul(dv[i], 1.0 / vertexFaces[vs[i]]!!.size)
             dv[i].setToZero()
         }
         // compute current center of gravity
@@ -63,7 +64,7 @@ fun Polyhedron.canonical(): Polyhedron {
             for (i in 0 until f.size) {
                 val a = vs[f[i].id]
                 val b = vs[f[(i + 1) % f.size].id]
-                normSum += (a - center) cross (b - center)
+                crossCenteredAddTo(normSum, a, b, center)
             }
             normSum /= normSum.norm // normalize to unit vector
             // project vertices onto the resulting plane (if needed)
@@ -73,7 +74,7 @@ fun Polyhedron.canonical(): Polyhedron {
                 val vd = pd - normSum * a // vertex distance from plane
                 if (abs(vd) < TARGET_TOLERANCE) continue
                 ok = false
-                dv[v.id] += vd * normSum
+                dv[v.id].plusAssignMul(normSum, vd)
             }
             // clear temp vars
             center.setToZero()
@@ -81,7 +82,7 @@ fun Polyhedron.canonical(): Polyhedron {
         }
         // apply average of projecting adjustments
         for (i in vs.indices) {
-            vs[i] += dv[i] / vertexFaces[vs[i]]!!.size.toDouble()
+            vs[i].plusAssignMul(dv[i], 1.0 / vertexFaces[vs[i]]!!.size)
             dv[i].setToZero()
         }
     } while (!ok)

@@ -6,8 +6,10 @@ enum class MidPoint { Tangent, Center, Closest }
 
 // returns 0.0 when tangent point is a, 1.0 -- when it is b, or a fraction in between
 fun tangentFraction(a: Vec3, b: Vec3): Double {
-    val vec = b - a
-    return  -(a * vec) / (vec * vec)
+    val dx = b.x - a.x
+    val dy = b.y - a.y
+    val dz = b.z - a.z
+    return  -(a.x * dx + a.y * dy + a.z * dz) / (sqr(dx) + sqr(dy) + sqr(dz))
 }
 
 // distance from origin to line A-B

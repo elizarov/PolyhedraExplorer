@@ -16,7 +16,18 @@ open class MutableVec3(
 ) : Vec3 {
     constructor(v: Vec3) : this(v.x, v.y, v.z)
     override fun toString(): String = "[${x.fmt}, ${y.fmt}, ${z.fmt}]"
-    fun setToZero() { x = 0.0; y = 0.0; z = 0.0 }
+}
+
+fun MutableVec3.setToZero() {
+    x = 0.0
+    y = 0.0
+    z = 0.0
+}
+
+fun MutableVec3.set(x: Double, y: Double, z: Double) {
+    this.x = x
+    this.y = y
+    this.z = z
 }
 
 fun Vec3.toPreciseString(): String =
@@ -56,6 +67,12 @@ operator fun MutableVec3.plusAssign(u: Vec3) {
     z += u.z
 }
 
+fun MutableVec3.plusAssignMul(u: Vec3, a: Double) {
+    x += u.x * a
+    y += u.y * a
+    z += u.z * a
+}
+
 operator fun MutableVec3.minusAssign(u: Vec3) {
     x -= u.x
     y -= u.y
@@ -78,15 +95,39 @@ infix fun Vec3.cross(u: Vec3) = Vec3(
      x * u.y - y * u.x
 )
 
+// dest += (a - c) cross (b - c)
+fun crossCenteredAddTo(dest: MutableVec3, a: Vec3, b: Vec3, c: Vec3): Vec3 {
+    val ax = a.x - c.x
+    val ay = a.y - c.y
+    val az = a.z - c.z
+    val bx = b.x - c.x
+    val by = b.y - c.y
+    val bz = b.z - c.z
+    dest.x += ay * bz - az * by
+    dest.y += -ax * bz + az * bx
+    dest.z += ax * by - ay * bx
+    return dest
+}
+
+// when this == 0.0 -> result is a
+// when this == 1.0 -> result is b
+fun Double.atSegmentTo(dest: MutableVec3, a: Vec3, b: Vec3): Vec3 { // a + this * (b - a)
+    val f = this
+    dest.set(a.x + f * (b.x - a.x), a.y + f * (b.y - a.y), a.z + f * (b.z - a.z))
+    return dest
+}
+
 // when this == 0.0 -> result is a
 // when this == 1.0 -> result is b
 fun Double.atSegment(a: Vec3, b: Vec3): Vec3 = // a + this * (b - a)
-    Vec3(a.x + this * (b.x - a.x), a.y + this * (b.y - a.y), a.z + this * (b.z - a.z))
+    atSegmentTo(MutableVec3(), a, b)
 
 // when this == 0.0 -> result is a.norm
 // when this == 1.0 -> result is b.norm
-fun Double.distanceAtSegment(a: Vec3, b: Vec3): Double = // norm(a + this * (b - a))
-    norm(a.x + this * (b.x - a.x), a.y + this * (b.y - a.y), a.z + this * (b.z - a.z))
+fun Double.distanceAtSegment(a: Vec3, b: Vec3): Double { // norm(a + this * (b - a))
+    val f = this
+    return norm(a.x + f * (b.x - a.x), a.y + f * (b.y - a.y), a.z + f * (b.z - a.z))
+}
 
 infix fun Vec3.approx(u: Vec3): Boolean =
     x approx u.x && y approx u.y && z approx u.z
