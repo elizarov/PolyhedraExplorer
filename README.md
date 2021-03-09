@@ -13,12 +13,19 @@ gradlew jsBrowserDevelopmentRun
 * Animations
   * [x] Animate all param changes
   * [x] Animate polyhedra transformations
+  * [ ] Animate topology-preserving transitions (e.g. canonicalization)
   * [ ] Animate multi-step transfromations
+* Asynchrony 
+  * [ ] Move canonicalization algo to a WebWorker, display progress
 * Export 
   * [ ] Solid to STL
   * [x] Geometry to OpenSCAD  
 * Polyhedra
   * [ ] Bigger library of seeds
+      * [x] Platonic solids
+      * [x] Archimedean solids
+      * [ ] Catalan solids
+      * [ ] Johnson solids
   * [ ] Identify names of well-know polyhedra
 * Rendering
   * [ ] Render nicer edges and vertices
@@ -33,9 +40,10 @@ gradlew jsBrowserDevelopmentRun
   * [ ] Show edge dihedral angles
 * Transformations
   * [ ] Merge face kind when possible
+  * [ ] Redesign truncation algorithm so that it always works
   * [ ] Rectification solution for non-regular polyhedra  
   * [ ] Stellation
-  * [ ] Chamfering
+  * [x] Chamfering
 * Custom transformations
   * [ ] Truncate specific vertices
   * [ ] Cantellate specific edges
