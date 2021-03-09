@@ -4,13 +4,16 @@ import polyhedra.common.*
 import polyhedra.common.util.*
 import kotlin.coroutines.cancellation.*
 import kotlin.math.*
+import kotlin.time.*
 
 private const val TARGET_TOLERANCE = 1e-12
 
 var totalIterations = 0
 
 // Algorithm from https://www.georgehart.com/virtual-polyhedra/canonical.html
+@OptIn(ExperimentalTime::class)
 fun Polyhedron.canonical(progress: OperationProgressContext? = null): Polyhedron {
+    val startTime = TimeSource.Monotonic.markNow()
     // copy vertices to mutate them
     val vs = vs.map { it.toMutableVertex() }
     // pre-scale to an average midRadius of 1
@@ -25,6 +28,7 @@ fun Polyhedron.canonical(progress: OperationProgressContext? = null): Polyhedron
     var iterations = 0
     var initialLogError = 0.0
     var prevDone = 0
+    var lastTime = startTime
     while(true) {
         if (progress?.isActive == false) throw CancellationException("Operation was cancelled")
         var maxError = 0.0
@@ -95,14 +99,15 @@ fun Polyhedron.canonical(progress: OperationProgressContext? = null): Polyhedron
             initialLogError = logError
         } else {
             val done = (100 * (initialLogError - logError) / (initialLogError - log10(TARGET_TOLERANCE))).toInt()
-            if (done > prevDone) {
+            if (done > prevDone && lastTime.elapsedNow() >= 0.5.seconds) {
                 println("Canonical: at $iterations iterations, log error = ${logError.fmt}, done = $done%")
                 prevDone = done
+                lastTime = TimeSource.Monotonic.markNow()
                 progress?.reportProgress(done)
             }
         }
     }
-    println("Canonical: done in $iterations iterations")
+    println("Canonical: done $iterations iterations in ${startTime.elapsedNow().inSeconds.fmtFix(3)} sec")
     totalIterations += iterations
     // copy faces with new vertices
     val fs = fs.map { f ->

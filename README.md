@@ -18,6 +18,7 @@ gradlew jsBrowserDevelopmentRun
 * Asynchrony 
   * [x] Move canonicalization algo to a WebWorker
   * [ ] Better progress bar display
+  * [ ] Cancellation
 * Export 
   * [ ] Solid to STL
   * [x] Geometry to OpenSCAD  
