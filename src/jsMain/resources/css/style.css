@@ -155,3 +155,39 @@ tr.info {
 *:hover > .tooltip-text {
     visibility: visible;
 }
+
+/* --------- spinner --------- */
+
+.spinner {
+    position: relative;
+    opacity: 1;
+    transition: opacity linear 0.1s;
+    margin-left: 1em;
+}
+
+.spinner::before {
+    border: solid 3px #eee;
+    border-radius: 50%;
+    content: "";
+    height: 1.3em;
+    left: 50%;
+    position: absolute;
+    top: 50%;
+    transform: translate3d(-50%, -50%, 0);
+    width: 1.3em;
+    animation: 2s linear infinite spinner;
+    border-bottom-color: #EF6565;
+    opacity: inherit;
+    transform-origin: center;
+    will-change: transform;
+}
+
+@keyframes spinner {
+    0% {
+        transform: translate3d(-50%, -50%, 0) rotate(0deg);
+    }
+    100% {
+        transform: translate3d(-50%, -50%, 0) rotate(360deg);
+    }
+}
+

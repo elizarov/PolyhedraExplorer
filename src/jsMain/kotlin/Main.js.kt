@@ -6,10 +6,12 @@ import kotlinx.browser.window
 import polyhedra.js.params.*
 import polyhedra.js.poly.*
 import polyhedra.js.util.*
+import polyhedra.js.worker.*
 
 private const val historyPushThrottle = 500
 
 fun main() {
+    if (runWorkerMain()) return
 //    kotlinext.js.require("./css/style.css")
     window.onload = { onLoad() }
 }

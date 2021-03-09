@@ -1,7 +1,9 @@
 package polyhedra.common
 
+import kotlinx.serialization.Serializable
 import polyhedra.common.util.*
 
+@Serializable(with = PolyhedronSerializer::class)
 class Polyhedron(
     val vs: List<Vertex>,
     val fs: List<Face>
@@ -148,6 +150,7 @@ private fun idString(id: Int, first: Char, last: Char): String {
     return idString(rem - 1, first, last) + ch
 }
 
+@Serializable
 inline class VertexKind(override val id: Int) : Id, Comparable<VertexKind> {
     override fun compareTo(other: VertexKind): Int = id.compareTo(other.id)
     override fun toString(): String = idString(id, 'A', 'Z')
@@ -169,6 +172,7 @@ class MutableVertex(
 
 fun Vertex.toMutableVertex() = MutableVertex(id, this, kind)
 
+@Serializable
 inline class FaceKind(override val id: Int) : Id, Comparable<FaceKind> {
     override fun compareTo(other: FaceKind): Int = id.compareTo(other.id)
     override fun toString(): String = idString(id, 'α', 'ω')
@@ -251,6 +255,11 @@ class PolyhedronBuilder {
         vertex(Vec3(x, y, z), kind)
 
     fun face(vararg fvIds: Int, kind: FaceKind = FaceKind(0)) {
+        val a = List(fvIds.size) { vs[fvIds[it]] }
+        fs.add(MutableFace(fs.size, a, kind))
+    }
+
+    fun face(fvIds: List<Int>, kind: FaceKind = FaceKind(0)) {
         val a = List(fvIds.size) { vs[fvIds[it]] }
         fs.add(MutableFace(fs.size, a, kind))
     }

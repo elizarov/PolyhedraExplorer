@@ -14,16 +14,17 @@ gradlew jsBrowserDevelopmentRun
   * [x] Animate all param changes
   * [x] Animate polyhedra transformations
   * [ ] Animate topology-preserving transitions (e.g. canonicalization)
-  * [ ] Animate multi-step transfromations
+  * [ ] Animate multi-step transformations
 * Asynchrony 
-  * [ ] Move canonicalization algo to a WebWorker, display progress
+  * [x] Move canonicalization algo to a WebWorker
+  * [ ] Better progress bar display
 * Export 
   * [ ] Solid to STL
   * [x] Geometry to OpenSCAD  
 * Polyhedra
   * [ ] Bigger library of seeds
       * [x] Platonic solids
-      * [x] Archimedean solids
+      * [x] Arhimedean solids
       * [ ] Catalan solids
       * [ ] Johnson solids
   * [ ] Identify names of well-know polyhedra

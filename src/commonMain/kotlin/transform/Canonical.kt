@@ -2,6 +2,7 @@ package polyhedra.common.transform
 
 import polyhedra.common.*
 import polyhedra.common.util.*
+import kotlin.coroutines.cancellation.*
 import kotlin.math.*
 
 private const val TARGET_TOLERANCE = 1e-12
@@ -9,7 +10,7 @@ private const val TARGET_TOLERANCE = 1e-12
 var totalIterations = 0
 
 // Algorithm from https://www.georgehart.com/virtual-polyhedra/canonical.html
-fun Polyhedron.canonical(): Polyhedron {
+fun Polyhedron.canonical(progress: OperationProgressContext? = null): Polyhedron {
     // copy vertices to mutate them
     val vs = vs.map { it.toMutableVertex() }
     // pre-scale to an average midRadius of 1
@@ -22,7 +23,10 @@ fun Polyhedron.canonical(): Polyhedron {
     val normSum = MutableVec3()
     val h = MutableVec3()
     var iterations = 0
-    do {
+    var initialLogError = 0.0
+    var prevDone = 0
+    while(true) {
+        if (progress?.isActive == false) throw CancellationException("Operation was cancelled")
         var maxError = 0.0
         // check all edges
         for (f in fs) {
@@ -85,9 +89,20 @@ fun Polyhedron.canonical(): Polyhedron {
             dv[i].setToZero()
         }
         iterations++
-        if (iterations % 1000 == 0) println("At $iterations iterations, log error = ${log10(maxError).fmt}")
-    } while (maxError > TARGET_TOLERANCE)
-    println("Done in $iterations iterations")
+        if (maxError <= TARGET_TOLERANCE) break // success
+        val logError = log10(maxError)
+        if (initialLogError == 0.0) {
+            initialLogError = logError
+        } else {
+            val done = (100 * (initialLogError - logError) / (initialLogError - log10(TARGET_TOLERANCE))).toInt()
+            if (done > prevDone) {
+                println("Canonical: at $iterations iterations, log error = ${logError.fmt}, done = $done%")
+                prevDone = done
+                progress?.reportProgress(done)
+            }
+        }
+    }
+    println("Canonical: done in $iterations iterations")
     totalIterations += iterations
     // copy faces with new vertices
     val fs = fs.map { f ->

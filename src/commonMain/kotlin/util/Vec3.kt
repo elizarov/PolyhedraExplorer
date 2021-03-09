@@ -1,5 +1,6 @@
 package polyhedra.common.util
 
+import kotlinx.serialization.Serializable
 import polyhedra.common.*
 import kotlin.math.*
 
@@ -9,6 +10,7 @@ interface Vec3 {
     val z: Double
 }
 
+@Serializable
 open class MutableVec3(
     override var x: Double = 0.0,
     override var y: Double = 0.0,

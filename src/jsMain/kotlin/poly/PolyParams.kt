@@ -5,6 +5,8 @@ import polyhedra.common.transform.*
 import polyhedra.common.util.*
 import polyhedra.js.*
 import polyhedra.js.params.*
+import polyhedra.js.worker.*
+import kotlin.js.*
 import kotlin.math.*
 
 private const val MAX_DISPLAY_EDGES = (1 shl 15) - 1
@@ -15,17 +17,23 @@ class RenderParams(tag: String, val animationParams: ViewAnimationParams?) : Par
     val lighting = using(LightingParams("l", animationParams))
 }
 
+private val defaultSeed = Seed.Tetrahedron
+private val defaultScale = Scale.Circumradius
+
 class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param.Composite(tag, UpdateType.TargetValue) {
-    val seed = using(EnumParam("s", Seed.Tetrahedron, Seeds))
+    val seed = using(EnumParam("s", defaultSeed, Seeds))
     val transforms = using(EnumListParam("t", emptyList(), Transforms))
-    val baseScale = using(EnumParam("bs", Scale.Circumradius, Scales))
+    val baseScale = using(EnumParam("bs", defaultScale, Scales))
 
     // computed value of the currently shown polyhedron
-    var poly: Polyhedron = Seed.Tetrahedron.poly
+    var poly: Polyhedron = defaultSeed.poly
         private set
     var polyName: String = ""
         private set
     var transformError: TransformError? = null
+        private set
+
+    var transformProgress: Int = 0
         private set
 
     // polyhedra transformation animation
@@ -37,19 +45,33 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         get() = transformAnimation?.targetPoly ?: poly
 
     // previous state stored to compute animated transformations
-    private var prevSeed: Seed = Seed.Tetrahedron
+    private var prevSeed: Seed = defaultSeed
     private var prevTransforms: List<Transform> = emptyList()
-    private var prevScale: Scale = Scale.Circumradius
+    private var prevPolys: List<Polyhedron> = emptyList() // after each transform
+    private var prevScale: Scale = defaultScale
     private var prevValidTransforms: List<Transform> = emptyList()
+
+    // last asynchronous transformation
+    private var asyncTransform: AsyncTransform? = null
+
+    private val progress = object : OperationProgressContext {
+        override val isActive: Boolean
+            get() = true // todo: cancellation support
+        override fun reportProgress(done: Int) {
+            transformProgress = done
+            notifyUpdate(UpdateType.Value)
+        }
+    }
 
     override fun update() {
         val curSeed = seed.value
         val curTransforms = transforms.value
+        val curPolys = ArrayList<Polyhedron>()
         val curScale = baseScale.value
-        if (prevSeed == curSeed && prevTransforms == curTransforms && prevScale == curScale) {
+        if (prevSeed == curSeed && prevTransforms == curTransforms && prevScale == curScale && asyncTransform == null) {
             return // nothing to do
         }
-        val validTransforms = recomputeTransforms(curSeed, curTransforms, curScale)
+        val validTransforms = recomputeTransforms(curSeed, curTransforms, curScale, curPolys)
         // compute transformation animation
         val animationDuration = animationParams?.animateValueUpdatesDuration
         if (animationDuration != null) when {
@@ -62,7 +84,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
                 }
                 if (validTransforms.size <= commonSize + 1 && prevValidTransforms.size <= commonSize + 1) {
                     val prefix = curTransforms.subList(0, commonSize)
-                    val basePoly = curSeed.poly.transformed(prefix).scaled(curScale)
+                    val basePoly = if (prefix.isEmpty()) curSeed.poly else curPolys[prefix.size - 1]
                     val prevTransform = prevValidTransforms.getOrNull(commonSize) ?: Transform.None
                     val curTransform = validTransforms.getOrNull(commonSize) ?: Transform.None
                     updateAnimation(transformUpdateAnimation(this, basePoly, curScale, prevTransform, curTransform, animationDuration))
@@ -76,44 +98,115 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         // save to optimize future updates
         prevSeed = curSeed
         prevTransforms = curTransforms
+        prevPolys = curPolys
         prevScale = curScale
         prevValidTransforms = validTransforms
     }
 
     // updates poly, polyName, transformError
     // returns valid transforms
-    private fun recomputeTransforms(curSeed: Seed, curTransforms: List<Transform>, curScale: Scale): List<Transform> {
+    private fun recomputeTransforms(
+        curSeed: Seed,
+        curTransforms: List<Transform>,
+        curScale: Scale,
+        curPolys: ArrayList<Polyhedron>
+    ): List<Transform> {
         var curPoly = curSeed.poly
         var curPolyName = curSeed.toString()
         var curIndex = 0
-        var curMessage: String? = null
+        var equalsToPrev = curSeed == prevSeed
+        transformError = null // will set if fail in process
         try {
-            for (transform in curTransforms) {
+            loop@ for (transform in curTransforms) {
                 val applicable = transform.isApplicable(curPoly)
                 if (applicable != null) {
-                    curMessage = applicable
+                    transformError = TransformError(curIndex, applicable)
                     break
                 }
                 // compute FEV before doing an actual transform
                 val fev = transform.fev * curPoly.fev()
                 if (fev.e > MAX_DISPLAY_EDGES) {
-                    curMessage = "Polyhedron is too large to display ($fev)"
-                    break
+                    transformError = TransformError(curIndex, "Polyhedron is too large to display ($fev)")
+                    break@loop
                 }
-                val newPoly = curPoly.transformed(transform)
-                newPoly.validateGeometry()
+                // Reuse previously transformed polyhedron if possible
+                val prevPoly = prevPolys.getOrNull(curIndex)
+                val newPoly = if (equalsToPrev && prevTransforms.getOrNull(curIndex) == transform && prevPoly != null) {
+                    prevPoly
+                } else {
+                    // transform from scratch
+                    equalsToPrev = false
+                    // check if requested transformation is slow
+                    val twp = transform.transformWithProgress
+                    if (twp != null) {
+                        // see if this transform is already running
+                        val at = asyncTransform
+                        if (at?.poly == curPoly && at.transform == transform) {
+                            val result = at.result
+                            val exception = at.exception
+                            when {
+                                // it is already done -- use the result
+                                result != null -> {
+                                    asyncTransform = null
+                                    result
+                                }
+                                // it is done with error (transform failed)
+                                exception != null -> throw Exception(exception)
+                                // it is still running
+                                else -> {
+                                    transformError = TransformError(curIndex, isAsync = true)
+                                    break@loop // continue to wait
+                                }
+                            }
+                        } else {
+                            // perform transformation asynchronously
+                            startAsyncTransform(curIndex, curPoly, transform)
+                            break@loop // skip further transforms while transform is running
+                        }
+                    } else {
+                        // transformation is fast -- just do it immediately
+                        curPoly.transformed(transform).also {
+                            it.validateGeometry()
+                        }
+                    }
+                }
                 curPolyName = "$transform $curPolyName"
                 curPoly = newPoly
+                curPolys.add(newPoly)
                 curIndex++
             }
         } catch (e: Exception) {
-            curMessage = "Transform produces invalid polyhedron geometry"
+            transformError = TransformError(curIndex, "Transform produces invalid polyhedron geometry")
             e.printStackTrace() // print exception onto console
         }
         poly = curPoly.scaled(curScale)
         polyName = curPolyName
-        transformError = if (curMessage != null) TransformError(curIndex, curMessage) else null
         return curTransforms.subList(0, curIndex)
+    }
+
+    private fun startAsyncTransform(
+        curIndex: Int,
+        curPoly: Polyhedron,
+        transform: Transform
+    ) {
+        val promise = sendWorkerTask(TransformTask(curPoly, transform), progress)
+        val async = AsyncTransform(curPoly, transform)
+        transformProgress = 0
+        transformError = TransformError(curIndex, isAsync = true)
+        asyncTransform = async
+        promise.then { result ->
+            async.result = result
+            asyncTransformDone()
+        }
+        promise.catch { exception ->
+            async.exception = exception
+            asyncTransformDone()
+        }
+    }
+
+    private fun asyncTransformDone() {
+        update()
+        notifyUpdate(UpdateType.Value)
     }
 
     private fun updateAnimation(transformAnimation: TransformAnimation?) {
@@ -130,6 +223,14 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         super.visitActiveAnimations(visitor)
         transformAnimation?.let { visitor(it) }
     }
+}
+
+private class AsyncTransform(
+    val poly: Polyhedron,
+    val transform: Transform,
+) {
+    var result: Polyhedron? = null
+    var exception: Throwable? = null
 }
 
 private fun transformUpdateAnimation(
@@ -223,9 +324,10 @@ private fun transformUpdateAnimation(
 private fun BevellingRatio.coerceIn(range: ClosedFloatingPointRange<Double>): BevellingRatio =
     BevellingRatio(cr.coerceIn(range), tr.coerceIn(range))
 
-data class TransformError(
+data class TransformError (
     val index: Int,
-    val message: String
+    val message: String = "",
+    val isAsync: Boolean = false
 )
 
 // Optionally passed from the outside (not needed in the backend)

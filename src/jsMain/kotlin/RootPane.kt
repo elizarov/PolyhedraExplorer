@@ -7,6 +7,7 @@ import polyhedra.common.transform.*
 import polyhedra.common.util.*
 import polyhedra.js.components.*
 import polyhedra.js.poly.*
+import polyhedra.js.worker.*
 import react.*
 import react.dom.*
 
@@ -18,6 +19,7 @@ external interface RootPaneState : RState {
     var poly: Polyhedron
     var polyName: String
     var transformError: TransformError?
+    var transformProgress: Int
 
     var display: Display
     var animateUpdates: Boolean
@@ -37,6 +39,7 @@ class RootPane(props: PComponentProps<RootParams>) :
         poly = props.param.render.poly.poly
         polyName = props.param.render.poly.polyName
         transformError = props.param.render.poly.transformError
+        transformProgress = props.param.render.poly.transformProgress
 
         display = props.param.render.view.display.value
         animateUpdates = props.param.animationParams.animateValueUpdates.value
@@ -136,9 +139,20 @@ class RootPane(props: PComponentProps<RootParams>) :
                     }
                 }
                 if (i == errorIndex) {
+                    val isInProcess = state.transformError?.isAsync == true
                     span {
-                        +"⚠️"
-                        span("tooltip-text") { +"${state.transformError?.message}" }
+                        if (isInProcess) {
+                            span("spinner") {}
+                        } else {
+                            +"⚠️"
+                        }
+                        span("tooltip-text") {
+                            if (isInProcess) {
+                                +"Transformation is running, done ${state.transformProgress}%"
+                            } else {
+                                +"${state.transformError?.message}"
+                            }
+                        }
                     }
                 }
             }

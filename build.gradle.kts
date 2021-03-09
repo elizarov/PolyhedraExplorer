@@ -1,5 +1,6 @@
 plugins {
-    kotlin("multiplatform") version "1.4.30"
+    kotlin("multiplatform") version "1.4.31"
+    kotlin("plugin.serialization") version "1.4.31"
     application
 }
 
@@ -12,6 +13,7 @@ repositories {
     maven { url = uri("https://dl.bintray.com/kotlin/kotlin-js-wrappers") }
 }
 
+val `kotlin-serialization-version`: String by project
 val `kotlin-react-version`: String by project
 val `react-version`: String by project
 val `gl-matrix-version`: String by project
@@ -21,6 +23,7 @@ kotlin {
     jvm {
         compilations.all {
             kotlinOptions.jvmTarget = "1.8"
+            kotlinOptions.freeCompilerArgs += "-Xuse-ir"
         }
         testRuns["test"].executionTask.configure {
             useJUnit()
@@ -41,7 +44,12 @@ kotlin {
         }
     }
     sourceSets {
-        val commonMain by getting
+        val commonMain by getting {
+            dependencies {
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:${`kotlin-serialization-version`}")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:${`kotlin-serialization-version`}")
+            }
+        }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test-common"))

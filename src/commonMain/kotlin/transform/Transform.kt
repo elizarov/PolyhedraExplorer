@@ -19,6 +19,7 @@ enum class Transform(
         cantellationRatio(it)?.let { cr -> SnubbingRatio(cr, 0.0) }
     },
     val chamferingRatio: (Polyhedron) -> Double? = { null },
+    val transformWithProgress: ((Polyhedron, OperationProgressContext) -> Polyhedron)? = null,
     val fev: TransformFEV
 ) : Tagged {
     None(
@@ -102,6 +103,7 @@ enum class Transform(
     Canonical(
         "o",
         Polyhedron::canonical,
+        transformWithProgress = Polyhedron::canonical,
         fev = TransformFEV.ID
     )
 }
