@@ -139,29 +139,39 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
                     // check if requested transformation is slow
                     val twp = transform.transformWithProgress
                     if (twp != null) {
-                        // see if this transform is already running
                         val at = asyncTransform
-                        if (at?.poly == curPoly && at.transform == transform) {
-                            val result = at.result
-                            val exception = at.exception
-                            when {
-                                // it is already done -- use the result
-                                result != null -> {
-                                    asyncTransform = null
-                                    result
-                                }
-                                // it is done with error (transform failed)
-                                exception != null -> throw Exception(exception)
-                                // it is still running
-                                else -> {
-                                    transformError = TransformError(curIndex, isAsync = true)
-                                    break@loop // continue to wait
+                        val cached = TransformCache[curPoly, transform]
+                        when {
+                            // see if this transform is already running
+                            at?.poly == curPoly && at.transform == transform -> {
+                                val result = at.result
+                                val exception = at.exception
+                                when {
+                                    // it is already done -- use the result
+                                    result != null -> {
+                                        asyncTransform = null
+                                        TransformCache[curPoly, transform] = Result.success(result)
+                                        result
+                                    }
+                                    // it is done with error (transform failed)
+                                    exception != null -> {
+                                        TransformCache[curPoly, transform] = Result.failure(exception)
+                                        throw Exception(exception)
+                                    }
+                                    // it is still running
+                                    else -> {
+                                        transformError = TransformError(curIndex, isAsync = true)
+                                        break@loop // continue to wait
+                                    }
                                 }
                             }
-                        } else {
-                            // perform transformation asynchronously
-                            startAsyncTransform(curIndex, curPoly, transform)
-                            break@loop // skip further transforms while transform is running
+                            // see if this transform is cached
+                            cached != null -> cached
+                            else -> {
+                                // perform transformation asynchronously
+                                startAsyncTransform(curIndex, curPoly, transform)
+                                break@loop // skip further transforms while transform is running
+                            }
                         }
                     } else {
                         // transformation is fast -- just do it immediately

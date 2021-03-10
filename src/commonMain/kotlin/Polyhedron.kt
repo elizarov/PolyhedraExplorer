@@ -98,24 +98,6 @@ class Polyhedron(
         if (es.all { e -> e.isTangentInSegment() }) MidPoint.Tangent else MidPoint.Center
     }
 
-    private inner class TransformMemo(
-        val transform: (Polyhedron) -> Polyhedron,
-        private val result: Result<Polyhedron>
-    ) {
-        fun getOrThrow(): Polyhedron = result.getOrThrow()
-    }
-
-    private var memo: TransformMemo? = null
-
-    fun memoTransform(transform: (Polyhedron) -> Polyhedron): Polyhedron {
-        memo?.takeIf { it.transform === transform }?.let { return it.getOrThrow() }
-        val result = runCatching { transform(this) }
-        // log the failure once and memoize
-        result.exceptionOrNull()?.printStackTrace()
-        memo = TransformMemo(transform, result)
-        return result.getOrThrow()
-    }
-
     override fun toString(): String =
         "Polyhedron(vs=${vs.size}, es=${es.size}, fs=${fs.size})"
 }

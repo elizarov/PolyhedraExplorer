@@ -119,14 +119,16 @@ fun ChamferGeometry.chamferingRatio(edgeKind: EdgeKind? = null, limit: ChamferLi
     }
 }
 
-fun Polyhedron.chamfered(): Polyhedron =
-    chamferGeometry().chamfered()
+fun Polyhedron.chamfered(): Polyhedron = transformedPolyhedron(Transform.Chamfered) {
+    chamferGeometry().chamferedTo(this)
+}
 
-fun Polyhedron.chamfered(vr: Double): Polyhedron =
-    chamferGeometry().chamfered(vr)
+fun Polyhedron.chamfered(vr: Double): Polyhedron = transformedPolyhedron(Transform.Chamfered, vr) {
+    chamferGeometry().chamferedTo(this, vr)
+}
 
-fun ChamferGeometry.chamfered(vr: Double = chamferingRatio()): Polyhedron = with(poly) {
-    polyhedron {
+private fun ChamferGeometry.chamferedTo(builder: PolyhedronBuilder, vr: Double = chamferingRatio()) = with(poly) {
+    with(builder) {
         // shifted original vertices
         for (v in vs) {
             vertex((1 - vr) * v, v.kind)

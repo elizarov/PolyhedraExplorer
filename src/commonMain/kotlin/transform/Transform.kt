@@ -110,7 +110,7 @@ enum class Transform(
 
 val Transforms: List<Transform> by lazy { Transform.values().toList() }
 
-fun Polyhedron.transformed(transform: Transform) = memoTransform(transform.transform)
+fun Polyhedron.transformed(transform: Transform) = transform.transform(this)
 
 fun Polyhedron.transformed(transforms: List<Transform>) =
     transforms.fold(this) { poly, transform -> poly.transformed(transform) }
@@ -118,7 +118,7 @@ fun Polyhedron.transformed(transforms: List<Transform>) =
 fun Polyhedron.transformed(vararg transforms: Transform) =
     transformed(transforms.toList())
 
-fun Polyhedron.rectified(): Polyhedron = polyhedron {
+fun Polyhedron.rectified(): Polyhedron = transformedPolyhedron(Transform.Rectified) {
     // vertices from the original edges
     val ev = es.associateWith { e ->
         vertex(e.midPoint(edgesMidPointDefault), VertexKind(edgeKindsIndex[e.kind]!!))
@@ -142,7 +142,7 @@ fun Polyhedron.regularTruncationRatio(faceKind: FaceKind = FaceKind(0)): Double 
     return regularTruncationRatio(PI / f.size)
 }
 
-fun Polyhedron.truncated(tr: Double = regularTruncationRatio()): Polyhedron = polyhedron {
+fun Polyhedron.truncated(tr: Double = regularTruncationRatio()): Polyhedron = transformedPolyhedron(Transform.Truncated, tr) {
     // vertices from the original directed edges
     val ev = directedEdges.associateWith { e ->
         val t = tr * e.midPointFraction(edgesMidPointDefault)
@@ -183,7 +183,7 @@ fun Polyhedron.regularCantellationRatio(edgeKind: EdgeKind? = null): Double {
     return 1 / (1 + sin(da / 2) / tan(ea))
 }
 
-fun Polyhedron.cantellated(cr: Double = regularCantellationRatio()): Polyhedron = polyhedron {
+fun Polyhedron.cantellated(cr: Double = regularCantellationRatio()): Polyhedron = transformedPolyhedron(Transform.Cantellated, cr) {
     val rr = dualReciprocationRadius
     // vertices from the directed edges
     val ev = directedEdges.associateWith { e ->
@@ -219,7 +219,7 @@ fun Polyhedron.cantellated(cr: Double = regularCantellationRatio()): Polyhedron 
     }
 }
 
-fun Polyhedron.dual(): Polyhedron = polyhedron {
+fun Polyhedron.dual(): Polyhedron = transformedPolyhedron(Transform.Dual) {
     val rr = dualReciprocationRadius
     // vertices from the original faces
     val fv = fs.associateWith { f ->
@@ -240,7 +240,7 @@ fun Polyhedron.regularBevellingRatio(edgeKind: EdgeKind? = null): BevellingRatio
     return BevellingRatio(cr, tr)
 }
 
-fun Polyhedron.bevelled(br: BevellingRatio = regularBevellingRatio()): Polyhedron = polyhedron {
+fun Polyhedron.bevelled(br: BevellingRatio = regularBevellingRatio()): Polyhedron = transformedPolyhedron(Transform.Bevelled, br) {
     val (cr, tr) = br
     val rr = dualReciprocationRadius
     // vertices from the face-directed edges
@@ -352,7 +352,7 @@ fun Polyhedron.regularSnubbingRatio(edgeKind: EdgeKind? = null): SnubbingRatio {
     return SnubbingRatio(cr, sa)
 }
 
-fun Polyhedron.snub(sr: SnubbingRatio = regularSnubbingRatio()) = polyhedron {
+fun Polyhedron.snub(sr: SnubbingRatio = regularSnubbingRatio()) = transformedPolyhedron(Transform.Snub, sr) {
     val (cr, sa) = sr
     val rr = dualReciprocationRadius
     // vertices from the face-vertices (directed edges)
