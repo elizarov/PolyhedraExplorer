@@ -10,6 +10,9 @@ private const val TARGET_TOLERANCE = 1e-12
 
 var totalIterations = 0
 
+// https://youtrack.jetbrains.com/issue/KT-40689 workaround
+private fun max(a: Double, b: Double) = if (a > b) a else b
+
 // Algorithm from https://www.georgehart.com/virtual-polyhedra/canonical.html
 @OptIn(ExperimentalTime::class)
 fun Polyhedron.canonical(progress: OperationProgressContext? = null): Polyhedron {
