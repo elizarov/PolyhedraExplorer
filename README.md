@@ -45,7 +45,8 @@ gradlew jsBrowserDevelopmentRun
   * [ ] Custom faces coloring: by orbit with reflections, by geometry, by size
   * [ ] Nicer-looking transparent views (only transparent front)
 * Interaction
-  * [ ] Two-finger Z-rotate and zoom gestures
+  * [x] Pinch-to-zoom gesture
+  * [ ] Two-finger Z-rotate gesture (does not seem to be supported on macOS Chrome)
   * [ ] Select/show/hide faces by kind with point and click
 * Polyhedron info
   * [ ] Show face and vertex geometry

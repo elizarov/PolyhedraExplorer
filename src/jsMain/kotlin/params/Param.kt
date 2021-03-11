@@ -146,7 +146,7 @@ abstract class ValueParam<T : Any>(tag: String, value: T) : Param(tag) {
     abstract var targetValue: T
         protected set
 
-    abstract fun updateValue(value: T)
+    abstract fun updateValue(value: T, updateType: UpdateType? = null)
 
     override fun isDefault(): Boolean = value == defaultValue
 
@@ -164,10 +164,10 @@ abstract class ValueParam<T : Any>(tag: String, value: T) : Param(tag) {
 abstract class ImmutableValueParam<T : Any>(tag: String, value: T) : ValueParam<T>(tag, value) {
     override var targetValue: T = value
 
-    override fun updateValue(value: T) {
+    override fun updateValue(value: T, updateType: UpdateType?) {
         if (targetValue == value) return
         targetValue = value
-        notifyUpdate(UpdateType.TargetValue)
+        notifyUpdate(updateType ?: UpdateType.TargetValue)
     }
 }
 
@@ -197,10 +197,16 @@ abstract class AnimatedValueParam<T : Any, P : AnimatedValueParam<T, P>>(
         }
     }
 
-    override fun updateValue(value: T) {
+    override fun updateValue(value: T, updateType: UpdateType?) {
         if (targetValue == value) return
         val oldValue = this.value
         targetValue = value
+        if (updateType != null) {
+            // explicit update type turns off animation
+            resetValueUpdateAnimation()
+            notifyUpdate(updateType)
+            return
+        }
         val newAnimation = valueAnimationParams?.animateValueUpdatesDuration
             ?.let { createValueUpdateAnimation(it, oldValue) }
             ?.also { valueUpdateAnimation = it }

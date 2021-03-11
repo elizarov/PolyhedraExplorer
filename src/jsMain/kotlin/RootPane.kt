@@ -11,7 +11,6 @@ import polyhedra.common.transform.*
 import polyhedra.common.util.*
 import polyhedra.js.components.*
 import polyhedra.js.poly.*
-import polyhedra.js.worker.*
 import react.*
 import react.dom.*
 

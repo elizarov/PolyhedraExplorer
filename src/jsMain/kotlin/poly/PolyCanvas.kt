@@ -63,6 +63,7 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
         canvas = canvasRef.current
         canvas.onmousedown = this::handleMouseDown
         canvas.onmousemove = this::handleMouseMove
+        canvas.onwheel = this::handleWheel
         drawContext = DrawContext(canvas, props.params, drawFun)
         ResizeTracker.add(drawFun)
         draw()
@@ -114,6 +115,14 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
             )
             savePrevMouseEvent(e)
         }
+    }
+
+    private fun handleWheel(e: WheelEvent) {
+        if (!e.ctrlKey) return
+        e.preventDefault()
+        val dScale = e.deltaY / 100
+        val scale = props.params.view.scale
+        scale.updateValue(scale.value - dScale, Param.UpdateType.TargetValue)
     }
 
     private fun requestFpsTimeout() {
