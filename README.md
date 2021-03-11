@@ -1,6 +1,14 @@
 # Polyhedra Explorer
 
 **🚧 Work in process.**
+
+Interactive polyhedra explorer with animated transformations. This project is focused on regular convex 
+polyhedra and derivation of larger polyhedra via 
+[Conway polyhedron notation](https://en.wikipedia.org/wiki/Conway_polyhedron_notation).
+All transformations are symmetry-preserving and all resulting elements (faces, edges, vertices) 
+are grouped into rotation orbits and are colored by default with respect to them.  
+
+**👷🏽 It is an engineering prototype. There is no nice UI yet.**
                                               
 ## Building & running
 
@@ -22,6 +30,7 @@ gradlew jsBrowserDevelopmentRun
 * Export 
   * [ ] Solid to STL
   * [x] Geometry to OpenSCAD  
+  * [ ] Picture to SVG
 * Polyhedra
   * [ ] Bigger library of seeds
       * [x] Platonic solids
@@ -32,11 +41,12 @@ gradlew jsBrowserDevelopmentRun
 * Rendering
   * [ ] Render nicer edges and vertices
   * [ ] Render better-looking (physical) materials 
-  * [ ] Color faces by geometry
-  * [ ] Hollow models with select faces
+  * [ ] Render hollow models with select faces
+  * [ ] Custom faces coloring: by orbit with reflections, by geometry, by size
+  * [ ] Nicer-looking transparent views (only transparent front)
 * Interaction
   * [ ] Two-finger Z-rotate and zoom gestures
-  * [ ] Select/show/hide faces by kind
+  * [ ] Select/show/hide faces by kind with point and click
 * Polyhedron info
   * [ ] Show face and vertex geometry
   * [ ] Show edge dihedral angles
@@ -49,17 +59,18 @@ gradlew jsBrowserDevelopmentRun
 * Custom transformations
   * [ ] Truncate specific vertices
   * [ ] Cantellate specific edges
-  * [ ] Augment specific faces 
+  * [ ] Augment specific faces
+  * [ ] Drop selected vertices
 * Infrastructure    
   * [ ] Embed CSS into WebPack
   * [ ] `jsBrowserProductionRun` shall work
 * Overall style / layout
   * [ ] Move inessential params to popup
   * [ ] Flip left-right through seeds and transforms
-  * [ ] Design and implement a full-screen modern style
+  * [ ] Design and implement a full-screen UI
 * Backend
   * [ ] Render polyhedra picture by params
         
-### License
+## License
 
 Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
