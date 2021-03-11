@@ -1,3 +1,7 @@
+/*
+ * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
+ */
+
 fun <T> testParameter(name: String, list: Iterable<T>, block: (T) -> Unit) {
     for (value in list) {
         try {

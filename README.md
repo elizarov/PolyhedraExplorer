@@ -59,4 +59,7 @@ gradlew jsBrowserDevelopmentRun
   * [ ] Design and implement a full-screen modern style
 * Backend
   * [ ] Render polyhedra picture by params
+        
+### License
 
+Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
