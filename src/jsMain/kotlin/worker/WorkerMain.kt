@@ -5,6 +5,8 @@
 package polyhedra.js.worker
 
 import kotlinx.browser.*
+import kotlinx.coroutines.*
+import kotlin.coroutines.*
 import kotlinx.serialization.*
 import org.w3c.dom.*
 import polyhedra.common.*
@@ -28,14 +30,15 @@ private var lastTaskId = 0L
 private sealed class MessageToWorker {
     @Serializable
     data class Task<T, R : WorkerResult<T>>(val id: Long, val task: WorkerTask<T, R>) : MessageToWorker() {
-        fun invoke(progress: OperationProgressContext): MessageToMain =
+        suspend fun invoke(progress: OperationProgressContext): MessageToMain =
             try {
                 MessageToMain.Result(id, task.invoke(progress))
             } catch (e: Throwable) {
-                e.printStackTrace()
+                if (e !is CancellationException) e.printStackTrace()
                 MessageToMain.Failure(id, e.toString())
             }
     }
+
     @Serializable
     data class Cancel(val id: Long) : MessageToWorker()
 }
@@ -44,8 +47,10 @@ private sealed class MessageToWorker {
 private sealed class MessageToMain {
     @Serializable
     data class Progress(val id: Long, val done: Int) : MessageToMain()
+
     @Serializable
     data class Result<T>(val id: Long, val result: WorkerResult<T>) : MessageToMain()
+
     @Serializable
     data class Failure(val id: Long, val message: String) : MessageToMain()
 }
@@ -63,43 +68,56 @@ private fun serializeAndPostMessageToMain(msg: MessageToMain) {
 }
 
 private class ActiveTaskInMain(
-    val progress: OperationProgressContext,
-    val resolve: (Any?) -> Unit,
-    val reject: (Throwable) -> Unit
+    val progress: OperationProgressContext?,
+    val cont: CancellableContinuation<Any?>
 )
 
 private val activeTasksInMain = HashMap<Long, ActiveTaskInMain>()
 
-fun <T, R : WorkerResult<T>> sendWorkerTask(task: WorkerTask<T, R>, progress: OperationProgressContext): Promise<T> =
-    Promise { resolve, reject ->
+suspend fun <T, R : WorkerResult<T>> performWorkerTask(
+    task: WorkerTask<T, R>,
+    progress: OperationProgressContext? = null
+): T =
+    suspendCancellableCoroutine { cont ->
         val id = ++lastTaskId
         @Suppress("UNCHECKED_CAST")
-        activeTasksInMain[id] = ActiveTaskInMain(progress, resolve as (Any?) -> Unit, reject)
+        activeTasksInMain[id] = ActiveTaskInMain(progress, cont as CancellableContinuation<Any?>)
         serializeAndPostMessageToWorker(MessageToWorker.Task(id, task))
+        cont.invokeOnCancellation {
+            serializeAndPostMessageToWorker(MessageToWorker.Cancel(id))
+        }
     }
 
-
-private var activeTaskInWorker: ActiveTaskInWorker? = null
-
 private class ActiveTaskInWorker(val id: Long) : OperationProgressContext {
-    override var isActive = true
-    override fun reportProgress(done: Int)=
+    lateinit var job: Job
+    override fun reportProgress(done: Int) =
         serializeAndPostMessageToMain(MessageToMain.Progress(id, done))
 }
+
+private var activeTaskInWorker: ActiveTaskInWorker? = null
 
 @OptIn(ExperimentalSerializationApi::class)
 private fun onMessageInWorker(e: MessageEvent) {
     val msg = json.decodeFromDynamic(MessageToWorker.serializer(), e.data)
     when (msg) {
-        is MessageToWorker.Task<*, *> ->
-            try {
-                activeTaskInWorker = ActiveTaskInWorker(msg.id).also {
-                    serializeAndPostMessageToMain(msg.invoke(it))
-                }
-            } finally {
+        is MessageToWorker.Task<*, *> -> {
+            activeTaskInWorker?.job?.cancel() // cancel ongoing task (if any) on a new task
+            val at = ActiveTaskInWorker(msg.id)
+            activeTaskInWorker = at
+            at.job = GlobalScope.launch {
+                val resultMessage = msg.invoke(at)
                 activeTaskInWorker = null
+                serializeAndPostMessageToMain(resultMessage)
             }
-        is MessageToWorker.Cancel -> activeTaskInWorker?.isActive = false
+        }
+        is MessageToWorker.Cancel -> {
+            activeTaskInWorker?.let { at ->
+                if (at.id == msg.id) {
+                    activeTaskInWorker = null
+                    at.job.cancel()
+                }
+            }
+        }
     }
 }
 
@@ -108,14 +126,14 @@ private fun onMessageInMain(e: MessageEvent) {
     val msg = json.decodeFromDynamic(MessageToMain.serializer(), e.data)
     when (msg) {
         is MessageToMain.Progress -> activeTasksInMain[msg.id]?.progress?.reportProgress(msg.done)
-        is MessageToMain.Result<*> -> activeTasksInMain.remove(msg.id)?.resolve?.invoke(msg.result.value)
-        is MessageToMain.Failure -> activeTasksInMain.remove(msg.id)?.reject?.invoke(Exception(msg.message))
+        is MessageToMain.Result<*> -> activeTasksInMain.remove(msg.id)?.cont?.resume(msg.result.value)
+        is MessageToMain.Failure -> activeTasksInMain.remove(msg.id)?.cont?.resumeWithException(Exception(msg.message))
     }
 }
 
 private fun createWorker(): Worker {
-    val script = document.body?.firstElementChild as? HTMLScriptElement ?:
-        error("The first element in <body> must be <script>")
+    val script =
+        document.body?.firstElementChild as? HTMLScriptElement ?: error("The first element in <body> must be <script>")
     return Worker(script.src).apply {
         onmessage = ::onMessageInMain
     }

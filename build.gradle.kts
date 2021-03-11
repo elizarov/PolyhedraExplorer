@@ -14,6 +14,7 @@ repositories {
 }
 
 val `kotlin-serialization-version`: String by project
+val `kotlin-coroutines-version`: String by project
 val `kotlin-react-version`: String by project
 val `react-version`: String by project
 val `gl-matrix-version`: String by project
@@ -48,6 +49,7 @@ kotlin {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:${`kotlin-serialization-version`}")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:${`kotlin-serialization-version`}")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${`kotlin-coroutines-version`}")
             }
         }
         val commonTest by getting {

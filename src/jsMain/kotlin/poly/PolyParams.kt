@@ -4,6 +4,7 @@
 
 package polyhedra.js.poly
 
+import kotlinx.coroutines.*
 import polyhedra.common.*
 import polyhedra.common.transform.*
 import polyhedra.common.util.*
@@ -55,16 +56,12 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
     private var prevScale: Scale = defaultScale
     private var prevValidTransforms: List<Transform> = emptyList()
 
-    // last asynchronous transformation
+    // ongoing asynchronous transformation
     private var asyncTransform: AsyncTransform? = null
 
-    private val progress = object : OperationProgressContext {
-        override val isActive: Boolean
-            get() = true // todo: cancellation support
-        override fun reportProgress(done: Int) {
-            transformProgress = done
-            notifyUpdate(UpdateType.Value)
-        }
+    private val progress = OperationProgressContext { done ->
+        transformProgress = done
+        notifyUpdate(UpdateType.Value)
     }
 
     override fun update() {
@@ -109,6 +106,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
 
     // updates poly, polyName, transformError
     // returns valid transforms
+    @OptIn(ExperimentalCoroutinesApi::class)
     private fun recomputeTransforms(
         curSeed: Seed,
         curTransforms: List<Transform>,
@@ -148,28 +146,19 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
                         when {
                             // see if this transform is already running
                             at?.poly == curPoly && at.transform == transform -> {
-                                val result = at.result
-                                val exception = at.exception
-                                when {
-                                    // it is already done -- use the result
-                                    result != null -> {
-                                        asyncTransform = null
-                                        TransformCache[curPoly, transform] = Result.success(result)
-                                        result
-                                    }
-                                    // it is done with error (transform failed)
-                                    exception != null -> {
-                                        TransformCache[curPoly, transform] = Result.failure(exception)
-                                        throw Exception(exception)
-                                    }
+                                if (at.job.isCompleted) {
+                                    // it is already done -- use the result and store it to cache
+                                    asyncTransform = null
+                                    val result = runCatching { at.job.getCompleted() }
+                                    TransformCache[curPoly, transform] = result
+                                    result.getOrThrow()
+                                } else {
                                     // it is still running
-                                    else -> {
-                                        transformError = TransformError(curIndex, isAsync = true)
-                                        break@loop // continue to wait
-                                    }
+                                    transformError = TransformError(curIndex, isAsync = true)
+                                    break@loop // continue to wait
                                 }
                             }
-                            // see if this transform is cached
+                            // see if this transform was cached
                             cached != null -> cached
                             else -> {
                                 // perform transformation asynchronously
@@ -193,6 +182,13 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
             transformError = TransformError(curIndex, "Transform produces invalid polyhedron geometry")
             e.printStackTrace() // print exception onto console
         }
+        // If we are not waiting for an async transform anymore, then cancel any ongoing async operation (if any)
+        asyncTransform?.let { at ->
+            if (transformError?.isAsync != true) {
+                at.job.cancel()
+                asyncTransform = null
+            }
+        }
         poly = curPoly.scaled(curScale)
         polyName = curPolyName
         return curTransforms.subList(0, curIndex)
@@ -203,24 +199,17 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         curPoly: Polyhedron,
         transform: Transform
     ) {
-        val promise = sendWorkerTask(TransformTask(curPoly, transform), progress)
-        val async = AsyncTransform(curPoly, transform)
+        asyncTransform?.job?.cancel() // cancel the previous one (if any)
+        val job = GlobalScope.async {
+            performWorkerTask(TransformTask(curPoly, transform), progress)
+        }
+        job.invokeOnCompletion {
+            update()
+            notifyUpdate(UpdateType.Value)
+        }
+        asyncTransform = AsyncTransform(curPoly, transform, job)
         transformProgress = 0
         transformError = TransformError(curIndex, isAsync = true)
-        asyncTransform = async
-        promise.then { result ->
-            async.result = result
-            asyncTransformDone()
-        }
-        promise.catch { exception ->
-            async.exception = exception
-            asyncTransformDone()
-        }
-    }
-
-    private fun asyncTransformDone() {
-        update()
-        notifyUpdate(UpdateType.Value)
     }
 
     private fun updateAnimation(transformAnimation: TransformAnimation?) {
@@ -242,10 +231,8 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
 private class AsyncTransform(
     val poly: Polyhedron,
     val transform: Transform,
-) {
-    var result: Polyhedron? = null
-    var exception: Throwable? = null
-}
+    val job: Deferred<Polyhedron>
+)
 
 private fun transformUpdateAnimation(
     params: PolyParams,

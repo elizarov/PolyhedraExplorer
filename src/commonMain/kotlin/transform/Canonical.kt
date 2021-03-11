@@ -4,9 +4,9 @@
 
 package polyhedra.common.transform
 
+import kotlinx.coroutines.*
 import polyhedra.common.*
 import polyhedra.common.util.*
-import kotlin.coroutines.cancellation.*
 import kotlin.math.*
 import kotlin.time.*
 
@@ -17,10 +17,15 @@ var totalIterations = 0
 // https://youtrack.jetbrains.com/issue/KT-40689 workaround
 private fun max(a: Double, b: Double) = if (a > b) a else b
 
+fun Polyhedron.canonical(): Polyhedron =
+    runNonCancellable { canonical(null) }
+
 // Algorithm from https://www.georgehart.com/virtual-polyhedra/canonical.html
 @OptIn(ExperimentalTime::class)
-fun Polyhedron.canonical(progress: OperationProgressContext? = null): Polyhedron {
-    val startTime = TimeSource.Monotonic.markNow()
+suspend fun Polyhedron.canonical(progress: OperationProgressContext?): Polyhedron {
+    // https://youtrack.jetbrains.com/issue/KT-42625 workaround
+    val monotonic = kotlin.time.TimeSource.Monotonic
+    val startTime = monotonic.markNow()
     // copy vertices to mutate them
     val vs = vs.map { it.toMutableVertex() }
     // pre-scale to an average midRadius of 1
@@ -37,7 +42,6 @@ fun Polyhedron.canonical(progress: OperationProgressContext? = null): Polyhedron
     var prevDone = 0
     var lastTime = startTime
     while(true) {
-        if (progress?.isActive == false) throw CancellationException("Operation was cancelled")
         var maxError = 0.0
         // check all edges
         for (f in fs) {
@@ -106,11 +110,14 @@ fun Polyhedron.canonical(progress: OperationProgressContext? = null): Polyhedron
             initialLogError = logError
         } else {
             val done = (100 * (initialLogError - logError) / (initialLogError - log10(TARGET_TOLERANCE))).toInt()
-            if (done > prevDone && lastTime.elapsedNow() >= 0.5.seconds) {
-                println("Canonical: at $iterations iterations, log error = ${logError.fmt}, done = $done%")
-                prevDone = done
-                lastTime = TimeSource.Monotonic.markNow()
-                progress?.reportProgress(done)
+            if (lastTime.elapsedNow() >= 100.milliseconds) {
+                lastTime = monotonic.markNow()
+                yield() // cancellation point (checked every 100 ms)
+                if (done > prevDone) {
+                    println("Canonical: at $iterations iterations, log error = ${logError.fmt}, done = $done%")
+                    prevDone = done
+                    progress?.reportProgress(done)
+                }
             }
         }
     }
