@@ -6,9 +6,9 @@
 
 package polyhedra.common.util
 
-actual fun <T> runNonCancellable(block: suspend () -> T): T {
-    throw UnsupportedOperationException("Not supported on JS")
-}
+import kotlinx.coroutines.*
 
-
-
+actual fun <T> runSynchronously(block: suspend () -> T): T =
+    runBlocking {
+        block()
+    }

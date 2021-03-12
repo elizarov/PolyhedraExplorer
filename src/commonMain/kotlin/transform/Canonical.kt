@@ -18,7 +18,7 @@ var totalIterations = 0
 private fun max(a: Double, b: Double) = if (a > b) a else b
 
 fun Polyhedron.canonical(): Polyhedron =
-    runNonCancellable { canonical(null) }
+    runSynchronously { canonical(null) }
 
 // Algorithm from https://www.georgehart.com/virtual-polyhedra/canonical.html
 @OptIn(ExperimentalTime::class)

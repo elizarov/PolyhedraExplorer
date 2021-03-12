@@ -4,4 +4,4 @@
 
 package polyhedra.common.util
 
-expect fun <T> runNonCancellable(block: suspend () -> T): T
+expect fun <T> runSynchronously(block: suspend () -> T): T
