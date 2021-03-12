@@ -4,7 +4,7 @@
 
 package polyhedra.common.transform
 
-import polyhedra.common.*
+import polyhedra.common.poly.*
 
 private const val POW2 = 7
 private const val SHIFT = 32 - POW2

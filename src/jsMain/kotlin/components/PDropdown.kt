@@ -4,7 +4,7 @@
 
 package polyhedra.js.components
 
-import polyhedra.common.*
+import polyhedra.common.util.*
 import polyhedra.js.params.*
 import react.*
 

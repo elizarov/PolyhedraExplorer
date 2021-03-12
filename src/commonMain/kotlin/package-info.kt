@@ -2,9 +2,5 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
+// A workaround to tag a package for IDE
 package polyhedra.common
-
-fun interface OperationProgressContext {
-    // done percent from 0 to 100
-    fun reportProgress(done: Int)
-}

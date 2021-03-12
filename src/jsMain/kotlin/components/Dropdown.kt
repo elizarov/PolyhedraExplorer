@@ -4,12 +4,10 @@
 
 package polyhedra.js.components
 
-import kotlinx.html.*
 import kotlinx.html.js.*
 import org.w3c.dom.*
 import react.*
 import react.dom.*
-import react.dom.dialog
 
 external interface DropdownProps<T> : RProps {
     var disabled: Boolean

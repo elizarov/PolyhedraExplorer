@@ -5,7 +5,6 @@
 package polyhedra.js.glsl
 
 import polyhedra.common.util.*
-import kotlin.reflect.*
 
 class GLBlockBuilder<T : GLType<T>>(
     private val resultType: T,

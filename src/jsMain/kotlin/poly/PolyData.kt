@@ -5,7 +5,7 @@
 package polyhedra.js.poly
 
 import org.khronos.webgl.*
-import polyhedra.common.*
+import polyhedra.common.poly.*
 import polyhedra.js.glsl.*
 
 fun <T : GLType<T>> Polyhedron.faceVerticesData(

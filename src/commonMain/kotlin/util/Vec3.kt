@@ -4,8 +4,8 @@
 
 package polyhedra.common.util
 
-import kotlinx.serialization.Serializable
-import polyhedra.common.*
+import kotlinx.serialization.*
+import polyhedra.common.poly.*
 import kotlin.math.*
 
 interface Vec3 {

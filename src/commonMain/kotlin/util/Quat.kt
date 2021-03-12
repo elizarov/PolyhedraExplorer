@@ -4,7 +4,6 @@
 
 package polyhedra.common.util
 
-import polyhedra.common.*
 import kotlin.js.*
 import kotlin.math.*
 

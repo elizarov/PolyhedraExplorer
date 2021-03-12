@@ -6,9 +6,11 @@ package polyhedra.js.poly
 
 import kotlinx.coroutines.*
 import polyhedra.common.*
+import polyhedra.common.poly.*
 import polyhedra.common.transform.*
 import polyhedra.common.util.*
 import polyhedra.js.*
+import polyhedra.js.main.*
 import polyhedra.js.params.*
 import polyhedra.js.worker.*
 import kotlin.js.*

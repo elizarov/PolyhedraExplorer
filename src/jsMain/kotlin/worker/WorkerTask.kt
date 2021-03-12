@@ -5,8 +5,9 @@
 package polyhedra.js.worker
 
 import kotlinx.serialization.*
-import polyhedra.common.*
+import polyhedra.common.poly.*
 import polyhedra.common.transform.*
+import polyhedra.common.util.*
 
 @Serializable
 sealed class WorkerTask<T, R : WorkerResult<T>> {

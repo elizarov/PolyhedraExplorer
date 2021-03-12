@@ -6,12 +6,13 @@ package polyhedra.js.worker
 
 import kotlinx.browser.*
 import kotlinx.coroutines.*
-import kotlin.coroutines.*
 import kotlinx.serialization.*
-import org.w3c.dom.*
-import polyhedra.common.*
-import kotlin.js.*
 import kotlinx.serialization.json.*
+import org.w3c.dom.*
+import polyhedra.common.util.*
+import kotlin.collections.HashMap
+import kotlin.collections.set
+import kotlin.coroutines.*
 
 private external val self: DedicatedWorkerGlobalScope
 private external var onmessage: (MessageEvent) -> Unit

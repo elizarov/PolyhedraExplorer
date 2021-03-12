@@ -5,7 +5,6 @@
 package polyhedra.js.util
 
 import org.khronos.webgl.*
-import polyhedra.common.*
 import polyhedra.common.util.*
 import polyhedra.js.glsl.*
 import kotlin.math.*

@@ -4,7 +4,7 @@
 
 package polyhedra.js.poly
 
-import polyhedra.common.*
+import polyhedra.common.poly.*
 import polyhedra.common.transform.*
 import polyhedra.js.params.*
 

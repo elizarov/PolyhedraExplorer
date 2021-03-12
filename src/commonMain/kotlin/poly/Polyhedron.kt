@@ -2,9 +2,9 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.common
+package polyhedra.common.poly
 
-import kotlinx.serialization.Serializable
+import kotlinx.serialization.*
 import polyhedra.common.util.*
 
 @Serializable(with = PolyhedronSerializer::class)

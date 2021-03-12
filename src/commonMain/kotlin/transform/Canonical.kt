@@ -5,7 +5,7 @@
 package polyhedra.common.transform
 
 import kotlinx.coroutines.*
-import polyhedra.common.*
+import polyhedra.common.poly.*
 import polyhedra.common.util.*
 import kotlin.math.*
 import kotlin.time.*

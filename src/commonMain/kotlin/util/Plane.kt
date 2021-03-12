@@ -4,8 +4,6 @@
 
 package polyhedra.common.util
 
-import polyhedra.common.*
-
 interface Plane : Vec3 {
     val d: Double
 }

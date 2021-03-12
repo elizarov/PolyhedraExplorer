@@ -7,7 +7,7 @@ package polyhedra.js.components
 import kotlinx.html.*
 import kotlinx.html.js.*
 import org.w3c.dom.*
-import polyhedra.common.*
+import polyhedra.common.util.*
 import polyhedra.js.params.*
 import react.*
 import react.dom.*

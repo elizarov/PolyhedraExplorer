@@ -4,11 +4,9 @@
 
 package polyhedra.js.poly
 
-import org.khronos.webgl.*
-import org.w3c.dom.*
-import polyhedra.common.*
-import polyhedra.js.*
+import polyhedra.common.poly.*
 import polyhedra.js.glsl.*
+import polyhedra.js.main.*
 import polyhedra.js.params.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 

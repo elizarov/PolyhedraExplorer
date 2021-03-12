@@ -2,11 +2,11 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.js
+package polyhedra.js.main
 
 import kotlinx.html.*
 import kotlinx.html.js.*
-import polyhedra.common.*
+import polyhedra.common.poly.*
 import polyhedra.common.transform.*
 import polyhedra.common.util.*
 import polyhedra.js.components.*

@@ -2,15 +2,14 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.js
+package polyhedra.js.main
 
-import react.dom.render
-import kotlinx.browser.document
-import kotlinx.browser.window
+import kotlinx.browser.*
 import polyhedra.js.params.*
 import polyhedra.js.poly.*
 import polyhedra.js.util.*
 import polyhedra.js.worker.*
+import react.dom.*
 
 private const val historyPushThrottle = 500
 

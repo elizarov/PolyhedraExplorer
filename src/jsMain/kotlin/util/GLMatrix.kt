@@ -6,7 +6,6 @@
 @file:JsNonModule
 package polyhedra.js.util
 
-import kotlin.js.*
 import org.khronos.webgl.*
 
 external object quat {

@@ -2,7 +2,9 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-import polyhedra.common.*
+package polyhedra.jvm
+
+import polyhedra.common.poly.*
 import polyhedra.common.transform.*
 
 fun main() {
