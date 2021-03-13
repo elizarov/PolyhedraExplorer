@@ -15,9 +15,7 @@ class LightningContext(override val params: LightingParams) : Param.Context() {
     var specularLightPower = 0.0
         private set
 
-    init {
-        setupAndUpdate()
-    }
+    init { setup() }
 
     override fun update() {
         ambientLightColor.fill(params.ambientLight.value)

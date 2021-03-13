@@ -27,7 +27,7 @@ class RenderParams(tag: String, val animationParams: ViewAnimationParams?) : Par
 private val defaultSeed = Seed.Tetrahedron
 private val defaultScale = Scale.Circumradius
 
-class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param.Composite(tag, UpdateType.TargetValue) {
+class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param.Composite(tag) {
     val seed = using(EnumParam("s", defaultSeed, Seeds))
     val transforms = using(EnumListParam("t", emptyList(), Transforms))
     val baseScale = using(EnumParam("bs", defaultScale, Scales))
@@ -63,10 +63,25 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
 
     private val progress = OperationProgressContext { done ->
         transformProgress = done
-        notifyUpdate(UpdateType.Value)
+        notifyUpdated(Progress)
     }
 
-    override fun update() {
+    override fun update(update: UpdateType, dt: Double) {
+        transformAnimation?.let {  animation ->
+            animation.update(dt)
+            if (animation.isOver) {
+                transformAnimation = null
+                notifyUpdated(AnimatedValue)
+            } else {
+                notifyUpdated(AnimatedValue + ActiveAnimation)
+            }
+        }
+    }
+
+    override fun computeDerivedParamValues(update: UpdateType) {
+        // don't react on ongoing animations and on progress changes)
+        if (update.intersect(TargetValue + LoadedValue) == None) return
+        // do the actual computation
         val curSeed = seed.value
         val curTransforms = transforms.value
         val curPolys = ArrayList<Polyhedron>()
@@ -78,11 +93,14 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         // compute transformation animation
         val animationDuration = animationParams?.animateValueUpdatesDuration
         if (animationDuration != null) when {
-            curSeed != prevSeed -> updateAnimation(null)
+            curSeed != prevSeed -> {
+                updateAnimation(null)
+            }
             validTransforms != prevValidTransforms -> {
                 var commonSize = 0
                 while (commonSize < validTransforms.size && commonSize < prevValidTransforms.size &&
-                        validTransforms[commonSize] == prevValidTransforms[commonSize]) {
+                    validTransforms[commonSize] == prevValidTransforms[commonSize]
+                ) {
                     commonSize++
                 }
                 if (validTransforms.size <= commonSize + 1 && prevValidTransforms.size <= commonSize + 1) {
@@ -206,27 +224,17 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
             performWorkerTask(TransformTask(curPoly, transform), progress)
         }
         job.invokeOnCompletion {
-            update()
-            notifyUpdate(UpdateType.Value)
+            notifyUpdated(TargetValue)
         }
         asyncTransform = AsyncTransform(curPoly, transform, job)
         transformProgress = 0
         transformError = TransformError(curIndex, isAsync = true)
     }
 
-    private fun updateAnimation(transformAnimation: TransformAnimation?) {
+    fun updateAnimation(transformAnimation: TransformAnimation?) {
         if (this.transformAnimation == transformAnimation) return
         this.transformAnimation = transformAnimation
-        notifyUpdate(UpdateType.AnimationsList)
-    }
-
-    fun resetTransformAnimation() {
-        updateAnimation(null)
-    }
-
-    override fun visitActiveAnimations(visitor: (Animation) -> Unit) {
-        super.visitActiveAnimations(visitor)
-        transformAnimation?.let { visitor(it) }
+        if (transformAnimation != null) notifyUpdated(ActiveAnimation)
     }
 }
 

@@ -33,9 +33,7 @@ class ViewContext(override val params: ViewParams) : Param.Context() {
         mat4.translate(projectionMatrix, projectionMatrix, tmpVec3)
     }
 
-    init {
-        setupAndUpdate()
-    }
+    init { setup() }
 
     override fun update() {
         modelScale.fill(2.0.pow(params.scale.value))

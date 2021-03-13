@@ -6,16 +6,10 @@ package polyhedra.js.params
 
 import polyhedra.common.util.*
 
-abstract class Animation {
-    abstract val param: Param
-    abstract val isOver: Boolean
-    abstract fun update(dt: Double)
-}
-
 abstract class ValueUpdateAnimation<T : Any, P : AnimatedValueParam<T, P>>(
-    override val param: P,
+    protected val param: P,
     private val duration: Double
-) : Animation() {
+) {
     init { require(duration > 0) }
 
     abstract val value: T
@@ -25,10 +19,10 @@ abstract class ValueUpdateAnimation<T : Any, P : AnimatedValueParam<T, P>>(
     protected val fraction: Double
         get() = (position / duration).coerceIn(0.0, 1.0)
 
-    override val isOver: Boolean
+    val isOver: Boolean
         get() = position >= duration
 
-    override fun update(dt: Double) {
+    fun update(dt: Double) {
         position += dt
         if (isOver) param.resetValueUpdateAnimation()
     }
@@ -57,13 +51,10 @@ class RotationUpdateAnimation(
 }
 
 class RotationAnimation(
-    override val param: RotationParam,
+    private val param: RotationParam,
     private val animation: RotationAnimationParams
-) : Animation() {
-    override var isOver: Boolean = false
-
-    override fun update(dt: Double) {
-        if (isOver) return
-        param.rotate((dt * animation.animatedRotationAngles).anglesToQuat(), Param.UpdateType.None)
+) {
+    fun update(dt: Double) {
+        param.rotate((dt * animation.animatedRotationAngles).anglesToQuat(), Param.None)
     }
 }

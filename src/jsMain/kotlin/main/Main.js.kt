@@ -42,7 +42,7 @@ private fun loadAndAutoSaveRootParams(): RootParams {
     val history = createHashHistory()
     var historyPushTimeout = 0
     rootParams.loadFromString(history.location.pathname.substringAfter('/', ""))
-    rootParams.onUpdate(Param.UpdateType.TargetValue) {
+    rootParams.onNotifyUpdated(Param.TargetValue) {
         // throttle updates
         if (historyPushTimeout == 0) {
             historyPushTimeout = window.setTimeout({

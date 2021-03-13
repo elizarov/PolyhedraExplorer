@@ -6,24 +6,25 @@ package polyhedra.js.poly
 
 import polyhedra.common.poly.*
 import polyhedra.common.transform.*
-import polyhedra.js.params.*
 
 class TransformAnimation(
-    override val param: PolyParams,
+    private val param: PolyParams,
     private val duration: Double,
     val prev: TransformKeyframe,
     val target: TransformKeyframe,
-) : Animation() {
+) {
     init { require(duration > 0) }
 
     private var position = 0.0
 
-    override val isOver: Boolean
+    val isOver: Boolean
         get() = position >= duration
 
-    override fun update(dt: Double) {
+    fun update(dt: Double) {
         position += dt
-        if (isOver) param.resetTransformAnimation()
+        if (isOver) {
+            param.updateAnimation(null)
+        }
     }
 
     private val fraction: Double

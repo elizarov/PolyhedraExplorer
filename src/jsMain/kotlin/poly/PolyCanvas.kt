@@ -57,27 +57,24 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
         }
     }
 
-    private val drawFun = { draw() }
-
     override fun componentDidMount() {
         canvas = canvasRef.current
         canvas.onmousedown = this::handleMouseDown
         canvas.onmousemove = this::handleMouseMove
         canvas.onwheel = this::handleWheel
-        drawContext = DrawContext(canvas, props.params, drawFun)
-        ResizeTracker.add(drawFun)
-        draw()
+        drawContext = DrawContext(canvas, props.params, ::draw)
+        ResizeTracker.add(requestRedrawFun)
         requestFpsTimeout()
     }
 
     override fun componentWillUnmount() {
         cancelFpsTimeout()
-        ResizeTracker.remove(drawFun)
+        ResizeTracker.remove(requestRedrawFun)
         drawContext.destroy()
     }
 
-    override fun componentDidUpdate(prevProps: PolyCanvasProps, prevState: RState, snapshot: Any) {
-        draw()
+    private val requestRedrawFun: () -> Unit = {
+        props.params.notifyUpdated(Param.TargetValue)
     }
 
     private fun draw() {
@@ -111,7 +108,7 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
         if (e.isLeftButtonPressed()) {
             val scale = 2 * PI / minOf(canvas.height, canvas.width)
             props.params.view.rotate.rotate(
-                (e.offsetY - prevY) * scale, (e.offsetX - prevX) * scale, 0.0, Param.UpdateType.TargetValue
+                (e.offsetY - prevY) * scale, (e.offsetX - prevX) * scale, 0.0, Param.TargetValue
             )
             savePrevMouseEvent(e)
         }
@@ -122,7 +119,7 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
         e.preventDefault()
         val dScale = e.deltaY / 100
         val scale = props.params.view.scale
-        scale.updateValue(scale.value - dScale, Param.UpdateType.TargetValue)
+        scale.updateValue(scale.value - dScale, Param.TargetValue)
     }
 
     private fun requestFpsTimeout() {

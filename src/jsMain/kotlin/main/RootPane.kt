@@ -10,6 +10,7 @@ import polyhedra.common.poly.*
 import polyhedra.common.transform.*
 import polyhedra.common.util.*
 import polyhedra.js.components.*
+import polyhedra.js.params.*
 import polyhedra.js.poly.*
 import react.*
 import react.dom.*
@@ -32,7 +33,7 @@ external interface RootPaneState : RState {
 @Suppress("NON_EXPORTABLE_TYPE")
 @JsExport
 class RootPane(props: PComponentProps<RootParams>) :
-    PComponent<RootParams, PComponentProps<RootParams>, RootPaneState>(props)
+    PComponent<RootParams, PComponentProps<RootParams>, RootPaneState>(props, Param.TargetValue + Param.Progress)
 {
     override fun RootPaneState.init(props: PComponentProps<RootParams>) {
         seed = props.param.render.poly.seed.value

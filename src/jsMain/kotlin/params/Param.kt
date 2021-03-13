@@ -4,12 +4,14 @@
 
 package polyhedra.js.params
 
-import polyhedra.common.*
 import polyhedra.common.util.*
 import kotlin.math.*
 
+private const val DEBUG_PARAMS = false
+
 abstract class Param(val tag: String) {
     private val dependencies = ArrayList<Dependency>(2)
+    private var updated: UpdateType = TargetValue
 
     abstract fun loadFrom(parsed: ParsedParam, update: (Param) -> Unit)
     abstract fun isDefault(): Boolean
@@ -22,63 +24,114 @@ abstract class Param(val tag: String) {
             else -> "$tag(${valueToString()})"
         }
 
-    open fun visitActiveAnimations(visitor: (Animation) -> Unit) {}
-
-    open fun visitAffectedDependencies(update: UpdateType, visitor: (Dependency) -> Unit) {
-        // Notify dependencies in the reverse order.
-        // This is important for composites: local context will get notified & updated first, and the
-        // outer (containing) context will be notified last, when all local ones were already updated.
-        for (i in dependencies.size - 1 downTo 0) {
-            dependencies[i].visitAffectedDependencies(update, visitor)
+    fun notifyUpdated(update: UpdateType) {
+        val newUpdated = updated + update
+        val delta = newUpdated - updated
+        if (delta == None) return
+        if (DEBUG_PARAMS) {
+            println("${this::class.simpleName}[$tag].notifyUpdated: $updated + $delta -> $newUpdated")
+        }
+        updated = newUpdated
+        computeDerivedParamValues(delta)
+        for (dependency in dependencies) {
+            dependency.notifyUpdated(delta)
         }
     }
 
-    protected fun notifyUpdate(update: UpdateType) {
-        visitAffectedDependencies(update) {
-            it.update()
+    // params can perform additional computation on update notification
+    protected open fun computeDerivedParamValues(update: UpdateType) {}
+
+    open fun performUpdate(source: Any?, dt: Double) {
+        // Update itself (if needed)
+        val curUpdated = updated
+        if (curUpdated == None) return
+        if (DEBUG_PARAMS) {
+            println("${this::class.simpleName}[$tag].performUpdate(dt=${dt.fmt}): $curUpdated -> None")
+        }
+        updated = None
+        update(curUpdated, dt)
+        // Update dependencies
+        for (d in dependencies) if (d != source) {
+            d.performUpdate(this, dt)
         }
     }
 
-    fun onUpdate(type: UpdateType, listener: () -> Unit): Dependency =
-        object : Context(type) {
-            override val params: Param get() = this@Param
-            override fun update() { listener() }
-            init { setup() }
+    protected open fun update(update: UpdateType, dt: Double) {}
+
+    // Adds ad-hock listener to immediately react to update notification
+    fun onNotifyUpdated(type: UpdateType, listener: () -> Unit): Dependency =
+        object : Dependency {
+            override fun notifyUpdated(update: UpdateType) {
+                if (type.intersect(update) != None) listener()
+            }
+
+            override fun performUpdate(source: Any?, dt: Double) {}
+            
+            init {
+                dependencies += this
+            }
+
+            override fun destroy() {
+                dependencies -= this
+            }
         }
 
-    // todo: does not really work for params
+    // todo: does not really work for params yet
     open fun destroy() {}
 
     // ----------- Nested classes and interfaces -----------
 
-    enum class UpdateType(private val mask: Int) {
-        None(0),
-        TargetValue(1), // target value changed, save state, update controls, redraw
-        AnimatedValue(2), // value changed due to animation, redraw
-        Value(3), // any value change (target changed or animated)
-        AnimationsList(4), // a list of active animations changed (for animation tracker's notice)
-        TargetValueAndAnimationsList(5); // target value change + new animation is in effect
+    inline class UpdateType(private val mask: Int) {
+        fun intersect(other: UpdateType) = UpdateType(mask and other.mask)
+        operator fun plus(other: UpdateType) = UpdateType(mask or other.mask)
+        operator fun minus(other: UpdateType) = UpdateType(mask and other.mask.inv())
+        override fun toString(): String = buildList {
+            if (intersect(TargetValue) != None) add("TargetValue")
+            if (intersect(AnimatedValue) != None) add("AnimatedValue")
+            if (intersect(ActiveAnimation) != None) add("ActiveAnimation")
+        }.joinToString("+")
+    }
 
-        fun intersects(other: UpdateType) = mask and other.mask != 0
+    companion object {
+        val None = UpdateType(0)
+
+        val TargetValue = UpdateType(1) // param target value changed, save state, update controls, update deps, redraw
+        val LoadedValue = UpdateType(2) // param was (re)loaded, need to recompute everything
+        val AnimatedValue = UpdateType(4) // param value changed due to animation, update deps, redraw
+        val ActiveAnimation = UpdateType(8) // param has an active animation, keep updating it
+        val Progress = UpdateType(16) // computation progress was updated
+
+        val AnyUpdate = UpdateType(31)
     }
 
     interface Dependency {
-        fun visitAffectedDependencies(update: UpdateType, visitor: (Dependency) -> Unit)
-        fun update()
+        fun notifyUpdated(update: UpdateType)
+        fun performUpdate(source: Any?, dt: Double)
         fun destroy()
     }
 
-    abstract class Context(private val tracksUpdateType: UpdateType = UpdateType.Value) : Dependency {
+    abstract class Context(private val tracksUpdateType: UpdateType = TargetValue + AnimatedValue) : Dependency {
         abstract val params: Param
+        private var updated: UpdateType = tracksUpdateType // needs update on the first opportunity
 
-        override fun visitAffectedDependencies(update: UpdateType, visitor: (Dependency) -> Unit) {
-            if (tracksUpdateType.intersects(update)) visitor(this)
+        override fun notifyUpdated(update: UpdateType) {
+            val newUpdated = (updated + update).intersect(tracksUpdateType)
+            if (DEBUG_PARAMS) {
+                println("${this::class.simpleName}.notifyUpdated: $updated -> $newUpdated")
+            }
+            updated = newUpdated
         }
 
-        protected fun setupAndUpdate() {
-            setup()
+        override fun performUpdate(source: Any?, dt: Double) {
+            if (updated == None) return
+            if (DEBUG_PARAMS) {
+                println("${this::class.simpleName}.performUpdate: $updated -> None")
+            }
+            updated = None
             update()
         }
+
+        abstract fun update()
 
         protected fun setup() {
             params.dependencies += this
@@ -87,23 +140,22 @@ abstract class Param(val tag: String) {
         override fun destroy() {
             params.dependencies -= this
         }
-
-        override fun update() {}
     }
 
     abstract class Composite(
         tag: String,
-        private val tracksUpdateType: UpdateType = UpdateType.None
     ) : Param(tag), Dependency {
         private val params = ArrayList<Param>(2)
         private val tagMap by lazy { params.associateBy { it.tag } }
 
-        override fun visitAffectedDependencies(update: UpdateType, visitor: (Dependency) -> Unit) {
-            if (tracksUpdateType.intersects(update)) visitor(this)
-            super.visitAffectedDependencies(update, visitor)
+        override fun performUpdate(source: Any?, dt: Double) {
+            // update all children params first
+            for (p in params) if (p != source) {
+                p.performUpdate(this, dt)
+            }
+            // then update self and other dependencies
+            super.performUpdate(source, dt)
         }
-
-        override fun update() {}
 
         override fun destroy() {
             for (param in params) param.dependencies -= this
@@ -113,10 +165,6 @@ abstract class Param(val tag: String) {
             params += param
             param.dependencies += this
             return param
-        }
-
-        override fun visitActiveAnimations(visitor: (Animation) -> Unit) {
-            params.forEach { it.visitActiveAnimations(visitor) }
         }
 
         override fun loadFrom(parsed: ParsedParam, update: (Param) -> Unit) {
@@ -167,7 +215,7 @@ abstract class ImmutableValueParam<T : Any>(tag: String, value: T) : ValueParam<
     override fun updateValue(value: T, updateType: UpdateType?) {
         if (targetValue == value) return
         targetValue = value
-        notifyUpdate(updateType ?: UpdateType.TargetValue)
+        notifyUpdated(updateType ?: TargetValue)
     }
 }
 
@@ -189,14 +237,6 @@ abstract class AnimatedValueParam<T : Any, P : AnimatedValueParam<T, P>>(
         valueUpdateAnimation = null
     }
 
-    override fun visitActiveAnimations(visitor: (Animation) -> Unit) {
-        valueUpdateAnimation?.let {
-            if (it.isOver)
-                valueUpdateAnimation = null else    
-                visitor(it)
-        }
-    }
-
     override fun updateValue(value: T, updateType: UpdateType?) {
         if (targetValue == value) return
         val oldValue = this.value
@@ -204,17 +244,25 @@ abstract class AnimatedValueParam<T : Any, P : AnimatedValueParam<T, P>>(
         if (updateType != null) {
             // explicit update type turns off animation
             resetValueUpdateAnimation()
-            notifyUpdate(updateType)
+            notifyUpdated(updateType)
             return
         }
         val newAnimation = valueAnimationParams?.animateValueUpdatesDuration
             ?.let { createValueUpdateAnimation(it, oldValue) }
             ?.also { valueUpdateAnimation = it }
-        notifyUpdate(
-            if (newAnimation != null)
-                UpdateType.TargetValueAndAnimationsList else
-                UpdateType.TargetValue
-        )
+        notifyUpdated(if (newAnimation != null) TargetValue + ActiveAnimation else TargetValue)
+    }
+
+    override fun update(update: UpdateType, dt: Double) {
+        valueUpdateAnimation?.let {  animation ->
+            animation.update(dt)
+            if (animation.isOver) {
+                valueUpdateAnimation = null
+                notifyUpdated(AnimatedValue)
+            } else {
+                notifyUpdated(AnimatedValue + ActiveAnimation)
+            }
+        }
     }
 
     abstract fun createValueUpdateAnimation(duration: Double, oldValue: T): ValueUpdateAnimation<T, P>
@@ -288,9 +336,9 @@ class RotationParam(
     private val _quat = MutableQuat()
     private var rotationAnimation: RotationAnimation? = null
 
-    private val rotationDep = rotationAnimationParams?.animatedRotation?.onUpdate(type = UpdateType.TargetValue) {
+    private val rotationDep = rotationAnimationParams?.animatedRotation?.onNotifyUpdated(TargetValue) {
         if (updateAnimation(rotationAnimationParams)) {
-            notifyUpdate(UpdateType.AnimationsList)
+            notifyUpdated(ActiveAnimation)
         }
     }
 
@@ -308,11 +356,18 @@ class RotationParam(
                 true
             }
             !rotate && rotationAnimation != null -> {
-                rotationAnimation.isOver = true
                 this.rotationAnimation = null
                 false
             }
             else -> false
+        }
+    }
+
+    override fun update(update: UpdateType, dt: Double) {
+        super.update(update, dt)
+        rotationAnimation?.let { animation ->
+            animation.update(dt)
+            notifyUpdated(AnimatedValue + ActiveAnimation)
         }
     }
 
@@ -326,13 +381,7 @@ class RotationParam(
 
     fun rotate(q: Quat, updateType: UpdateType) {
         _quat.multiplyFront(q)
-        if (updateType != UpdateType.None) notifyUpdate(updateType)
-    }
-
-    override fun visitActiveAnimations(visitor: (Animation) -> Unit) {
-        rotationAnimationParams?.let { updateAnimation(it) }
-        super.visitActiveAnimations(visitor)
-        rotationAnimation?.let { visitor(it) }
+        notifyUpdated(updateType)
     }
 
     override fun createValueUpdateAnimation(duration: Double, oldValue: Quat): RotationUpdateAnimation =

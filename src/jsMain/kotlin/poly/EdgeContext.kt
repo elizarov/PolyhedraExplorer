@@ -12,15 +12,13 @@ import polyhedra.js.params.*
 import polyhedra.js.util.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
-class EdgeContext(val gl: GL, val polyContext: PolyContext, override val params: PolyParams) : Param.Context(Param.UpdateType.TargetValueAndAnimationsList) {
+class EdgeContext(val gl: GL, val polyContext: PolyContext, override val params: PolyParams) : Param.Context() {
     val program = EdgeProgram(gl)
     val indexBuffer = program.createUint16Buffer()
     var nIndices = 0
     lateinit var color: Float32Array
 
-    init {
-        setupAndUpdate()
-    }
+    init { setup() }
 
     override fun update() {
         val poly = params.targetPoly
