@@ -314,6 +314,11 @@ class DoubleParam(
     valueAnimationParams: ValueAnimationParams? = null
 ) : AnimatedValueParam<Double, DoubleParam>(tag, value, valueAnimationParams) {
     override var targetValue: Double = value
+    override fun updateValue(value: Double, updateType: UpdateType?) {
+        // round the value to step and then coerce into range
+        val r = floor(value / step + 0.5) * step
+        super.updateValue(r.coerceIn(min, max), updateType)
+    }
     override fun createValueUpdateAnimation(duration: Double, oldValue: Double): DoubleUpdateAnimation =
         DoubleUpdateAnimation(this, duration, oldValue)
     override fun valueToString(): String =
