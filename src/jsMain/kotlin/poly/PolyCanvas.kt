@@ -115,6 +115,7 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
     }
 
     private fun handleWheel(e: WheelEvent) {
+        if (!e.ctrlKey) return
         e.preventDefault()
         val dScale = e.deltaY / 50
         val scale = props.params.view.scale
