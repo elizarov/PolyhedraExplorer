@@ -33,3 +33,6 @@ fun det(
     m11 * det(m22, m23, m32, m33) -
     m21 * det(m12, m13, m32, m33) +
     m31 * det(m12, m13, m22, m23)
+
+fun Double.toDegrees() =
+    this * 180 / PI

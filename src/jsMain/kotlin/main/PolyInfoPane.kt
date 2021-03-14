@@ -26,7 +26,7 @@ class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
             td { +cnt.toString() }
             td { +distValue.fmtFix }
             td {
-                attrs { colSpan = "3" }
+                attrs { colSpan = "4" }
                 +distName
             }
         }
@@ -41,12 +41,15 @@ class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
                 for ((fk, fs) in poly.faceKinds) {
                     val fe = poly.faceEssence(fs[0])
                     tr("info") {
-                        td("rt") { +"$fk faces" }
+                        td("rt") { +fk.toString() }
                         td { +fs.size.toString() }
                         td { +fe.dist.fmtFix }
                         td("rt") { +"adj" }
                         td { +fe.vfs.size.toString() }
-                        td { +fe.vfs.joinToString(" ", "[", "]") }
+                        td {
+                            attrs { colSpan = "2" }
+                            +fe.vfs.joinToString(" ", "[", "]")
+                        }
                     }
                 }
                 // Vertices
@@ -54,25 +57,29 @@ class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
                 for ((vk, vs) in poly.vertexKinds) {
                     val ve = poly.vertexEssence(vs[0])
                     tr("info") {
-                        td("rt") { +"$vk vertices" }
+                        td("rt") { +vk.toString() }
                         td { +vs.size.toString() }
                         td { +ve.dist.fmtFix }
                         td("rt") { +"adj" }
                         td { +ve.vfs.size.toString() }
-                        td { +ve.vfs.joinToString(" ", "[", "]") }
+                        td {
+                            attrs { colSpan = "2" }
+                            +ve.vfs.joinToString(" ", "[", "]")
+                        }
                     }
                 }
                 // Edges
                 infoHeader("Edges", poly.es.size, poly.midradius, "midradius")
                 for ((ek, es) in poly.edgeKinds) {
-                    val e = es[0]
+                    val ee = poly.edgeEssence(es[0])
                     tr("info") {
-                        td("rt") { +"$ek edges" }
+                        td("rt") { +ek.toString() }
                         td { +es.size.toString() }
-                        td { +e.midPoint(MidPoint.Closest).norm.fmtFix }
+                        td { +ee.dist.fmtFix }
                         td {}
                         td {}
-                        td { +"len ${e.len.fmtFix}" }
+                        td { +"len ${ee.len.fmtFix}" }
+                        td { +"⦦ ${ee.dihedralAngle.toDegrees().fmtFix(2)}°"}
                     }
                 }
             }

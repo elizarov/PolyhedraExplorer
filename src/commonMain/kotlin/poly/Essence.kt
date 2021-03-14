@@ -5,6 +5,7 @@
 package polyhedra.common.poly
 
 import polyhedra.common.util.*
+import kotlin.math.*
 
 data class VertexFaceKind(
     val vk: VertexKind,
@@ -60,6 +61,19 @@ fun Polyhedron.vertexEssence(v: Vertex): VertexKindEssence {
     val size = es.size
     val vfs = List(size) { VertexFaceKind(es[it].b.kind, es[it].r.kind) }
     return VertexKindEssence(v.kind, v.norm, vfs.minCycle())
+}
+
+class EdgeKindEssense(
+    val kind: EdgeKind,
+    val dist: Double,
+    val len: Double,
+    val dihedralAngle: Double
+)
+
+fun Polyhedron.edgeEssence(e: Edge): EdgeKindEssense {
+    val dist = e.midPoint(MidPoint.Closest).norm
+    val dihedralAngle = PI - acos(e.l * e.r)
+    return EdgeKindEssense(e.kind, dist, e.len, dihedralAngle)
 }
 
 fun <T : Comparable<T>> List<T>.minCycle(): List<T> {

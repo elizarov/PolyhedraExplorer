@@ -51,7 +51,7 @@ gradlew jsBrowserDevelopmentRun
   * [ ] Select/show/hide faces by kind with point and click
 * Polyhedron info
   * [ ] Show face and vertex geometry
-  * [ ] Show edge dihedral angles
+  * [x] Show edge dihedral angles
 * Transformations
   * [ ] Merge face kind when possible
   * [ ] Redesign truncation algorithm so that it always works
