@@ -21,7 +21,7 @@ gradlew jsBrowserDevelopmentRun
 * Animations
   * [x] Animate all param changes
   * [x] Animate polyhedra transformations
-  * [ ] Animate topology-preserving transitions (e.g. canonicalization)
+  * [x] Animate topology-preserving transformations (canonicalization)
   * [ ] Animate multi-step transformations
 * Asynchrony 
   * [x] Move canonicalization algo to a WebWorker

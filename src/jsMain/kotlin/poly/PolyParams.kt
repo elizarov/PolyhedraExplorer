@@ -56,6 +56,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
     private var prevTransforms: List<Transform> = emptyList()
     private var prevPolys: List<Polyhedron> = emptyList() // after each transform
     private var prevScale: Scale = defaultScale
+    private var prevPoly: Polyhedron = defaultSeed.poly.scaled(defaultScale)
     private var prevValidTransforms: List<Transform> = emptyList()
 
     // ongoing asynchronous transformation
@@ -89,10 +90,25 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         val validTransforms = recomputeTransforms(curSeed, curTransforms, curScale, curPolys)
         // compute transformation animation
         val animationDuration = animationParams?.animateValueUpdatesDuration
-        if (animationDuration != null) when {
+        // only animate when animation is turned on and when polyhedron had changed
+        if (animationDuration != null && poly != prevPoly) when {
+            // no animation on seed changes
             curSeed != prevSeed -> {
+                // todo: animate via left/right fly in/out
                 updateAnimation(null)
             }
+            // polyhedron is the same topologically but with a different geometry -- animate smooth transition
+            poly.hasSameTopology(prevPoly) -> {
+                updateAnimation(
+                    TransformAnimation(
+                        this,
+                        animationDuration,
+                        TransformKeyframe(prevPoly, 0.0),
+                        TransformKeyframe(poly, 1.0)
+                    )
+                )
+            }
+            // otherwise try to animate update of the last applied transform
             validTransforms != prevValidTransforms -> {
                 var commonSize = 0
                 while (commonSize < validTransforms.size && commonSize < prevValidTransforms.size &&
@@ -118,6 +134,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         prevTransforms = curTransforms
         prevPolys = curPolys
         prevScale = curScale
+        prevPoly = poly
         prevValidTransforms = validTransforms
     }
 
