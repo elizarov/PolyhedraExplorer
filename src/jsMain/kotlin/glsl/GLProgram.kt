@@ -66,6 +66,12 @@ abstract class GLProgram(val gl: GL) {
         val location by lazy { gl.getAttribLocation(program, name) }
     }
 
+    infix fun <T : GLType.Floats<T>> Attribute<T>.by(buffer: Uint8Buffer) {
+        gl.bindBuffer(GL.ARRAY_BUFFER, buffer.glBuffer)
+        gl.vertexAttribPointer(location, type.bufferSize, GL.UNSIGNED_BYTE, false, 0, 0)
+        gl.enableVertexAttribArray(location)
+    }
+
     infix fun <T : GLType.Floats<T>> Attribute<T>.by(buffer: Float32Buffer<T>) {
         gl.bindBuffer(GL.ARRAY_BUFFER, buffer.glBuffer)
         gl.vertexAttribPointer(location, type.bufferSize, GL.FLOAT, false, 0, 0)
@@ -99,7 +105,8 @@ abstract class GLProgram(val gl: GL) {
     fun <T : GLType<T>> uniform(type: T, precision: GLPrecision? = null): DelegateProvider<Uniform<T>> =
         DelegateProvider { Uniform(precision, type, it) }
 
-    fun <T : GLType<T>> attribute(type: T, precision: GLPrecision? = null): DelegateProvider<Attribute<T>> =
+    // GLSL: The attribute qualifier can be used only with the data types float, vec2, vec3, vec4, mat2, mat3, and mat4.
+    fun <T : GLType.Floats<T>> attribute(type: T, precision: GLPrecision? = null): DelegateProvider<Attribute<T>> =
         DelegateProvider { Attribute(precision, type, it) }
 
     fun <T : GLType<T>> varying(type: T, precision: GLPrecision? = null): DelegateProvider<Varying<T>> =

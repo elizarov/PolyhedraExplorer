@@ -56,7 +56,7 @@ fun DrawContext.drawScene() {
     val display = params.view.display.value
     val hasFaces = display.hasFaces() && transparentFaces < 1.0
     val hasEdges = display.hasEdges()
-    val transparent = transparentFaces != 0.0 && hasFaces
+    val transparent = hasFaces && (transparentFaces != 0.0 || faceContext.hasHiddenFaces)
     gl[GL.DEPTH_TEST] = !transparent
     gl[GL.BLEND] = transparent
     if (transparent) {

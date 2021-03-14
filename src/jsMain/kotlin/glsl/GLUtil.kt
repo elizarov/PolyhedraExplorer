@@ -21,6 +21,10 @@ fun uint16Of(vararg a: Int) = Uint16Array(a.size).apply {
     for (i in a.indices) this[i] = a[i].toShort()
 }
 
+inline operator fun Uint8Array.set(i: Int, x: Int) {
+    set(i, x.toByte())
+}
+
 inline operator fun Float32Array.set(i: Int, x: Double) {
     set(i, x.toFloat())
 }

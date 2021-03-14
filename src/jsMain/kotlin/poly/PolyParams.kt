@@ -37,6 +37,8 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         private set
     var polyName: String = ""
         private set
+    var transformWarnings: List<String?> = emptyList()
+        private set
     var transformError: TransformError? = null
         private set
 
@@ -68,7 +70,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
     }
 
     override fun update(update: UpdateType, dt: Double) {
-        transformAnimation?.let {  animation ->
+        transformAnimation?.let { animation ->
             animation.update(dt)
             if (animation.isOver) {
                 transformAnimation = null
@@ -121,7 +123,16 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
                     val basePoly = if (prefix.isEmpty()) curSeed.poly else curPolys[prefix.size - 1]
                     val prevTransform = prevValidTransforms.getOrNull(commonSize) ?: Transform.None
                     val curTransform = validTransforms.getOrNull(commonSize) ?: Transform.None
-                    updateAnimation(transformUpdateAnimation(this, basePoly, curScale, prevTransform, curTransform, animationDuration))
+                    updateAnimation(
+                        transformUpdateAnimation(
+                            this,
+                            basePoly,
+                            curScale,
+                            prevTransform,
+                            curTransform,
+                            animationDuration
+                        )
+                    )
                 } else {
                     updateAnimation(null)
                 }
@@ -151,9 +162,10 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         var curPolyName = curSeed.toString()
         var curIndex = 0
         var equalsToPrev = curSeed == prevSeed
+        val curTransformWarnings = ArrayList<String?>()
         transformError = null // will set if fail in process
-        try {
-            loop@ for (transform in curTransforms) {
+        loop@ for (transform in curTransforms) {
+            try {
                 val applicable = transform.isApplicable(curPoly)
                 if (applicable != null) {
                     transformError = TransformError(curIndex, applicable)
@@ -209,20 +221,24 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
                             }
                         } else {
                             // transformation is fast -- just do it immediately
-                            curPoly.transformed(transform).also {
-                                it.validateGeometry()
-                            }
+                            curPoly.transformed(transform)
                         }
                     }
+                }
+                var curWarning: String? = null
+                if (newPoly.fs.any { !it.isPlanar }) {
+                    curWarning = "Some faces are not planar and are not shown"
                 }
                 curPolyName = "$transform $curPolyName"
                 curPoly = newPoly
                 curPolys.add(newPoly)
+                curTransformWarnings.add(curWarning)
                 curIndex++
+            } catch (e: Exception) {
+                transformError = TransformError(curIndex, "$transform transformation has failed")
+                e.printStackTrace() // print exception onto console
+                break@loop
             }
-        } catch (e: Exception) {
-            transformError = TransformError(curIndex, "Transform produces invalid polyhedron geometry")
-            e.printStackTrace() // print exception onto console
         }
         // If we are not waiting for an async transform anymore, then cancel any ongoing async operation (if any)
         asyncTransform?.let { at ->
@@ -233,6 +249,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         }
         poly = curPoly.scaled(curScale)
         polyName = curPolyName
+        transformWarnings = curTransformWarnings
         return curTransforms.subList(0, curIndex)
     }
 
@@ -357,14 +374,14 @@ private fun transformUpdateAnimation(
 private fun BevellingRatio.coerceIn(range: ClosedFloatingPointRange<Double>): BevellingRatio =
     BevellingRatio(cr.coerceIn(range), tr.coerceIn(range))
 
-data class TransformError (
+data class TransformError(
     val index: Int,
     val message: String = "",
     val isAsync: Boolean = false
 )
 
 // Optionally passed from the outside (not needed in the backend)
-class ViewAnimationParams(tag: String) : Param.Composite(tag), ValueAnimationParams, RotationAnimationParams  {
+class ViewAnimationParams(tag: String) : Param.Composite(tag), ValueAnimationParams, RotationAnimationParams {
     val animateValueUpdates = using(BooleanParam("u", true))
     val animationDuration = using(DoubleParam("d", 0.5, 0.0, 2.0, 0.1))
 

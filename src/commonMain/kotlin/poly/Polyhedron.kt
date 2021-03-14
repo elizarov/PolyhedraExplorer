@@ -164,18 +164,13 @@ inline class FaceKind(override val id: Int) : Id, Comparable<FaceKind> {
     override fun toString(): String = idString(id, 'α', 'ω')
 }
 
-interface Face : Id, Plane {
-    val fvs: List<Vertex>
-    val kind: FaceKind
-    val dualKind: FaceKind
-}
-
-class MutableFace(
+class Face(
     override val id: Int,
-    override val fvs: List<Vertex>,
-    override val kind: FaceKind,
-    override val dualKind: FaceKind = kind // used only for by cantellation
-) : Face, MutablePlane(fvs.averagePlane()) {
+    val fvs: List<Vertex>,
+    val kind: FaceKind,
+    val dualKind: FaceKind = kind // used only for by cantellation
+) : Id, MutablePlane(fvs.averagePlane()) {
+    val isPlanar = fvs.all { it in this }
     override fun equals(other: Any?): Boolean = other is Face && id == other.id
     override fun hashCode(): Int = id
     override fun toString(): String =
@@ -185,9 +180,6 @@ class MutableFace(
 val Face.size: Int get() = fvs.size
 operator fun Face.get(index: Int): Vertex = fvs[index]
 operator fun Face.iterator(): Iterator<Vertex> = fvs.iterator()
-
-fun Face.isPlanar() =
-    fvs.all { it in this }
 
 data class EdgeKind(val a: VertexKind, val b: VertexKind, val l: FaceKind, val r: FaceKind) : Comparable<EdgeKind> {
     override fun compareTo(other: EdgeKind): Int {
@@ -245,16 +237,16 @@ class PolyhedronBuilder {
 
     fun face(vararg fvIds: Int, kind: FaceKind = FaceKind(0)) {
         val a = List(fvIds.size) { vs[fvIds[it]] }
-        fs.add(MutableFace(fs.size, a, kind))
+        fs.add(Face(fs.size, a, kind))
     }
 
     fun face(fvIds: List<Int>, kind: FaceKind = FaceKind(0)) {
         val a = List(fvIds.size) { vs[fvIds[it]] }
-        fs.add(MutableFace(fs.size, a, kind))
+        fs.add(Face(fs.size, a, kind))
     }
 
     fun face(fvs: Collection<Vertex>, kind: FaceKind, dualKind: FaceKind = kind) {
-        fs.add(MutableFace(fs.size, fvs.map { vs[it.id] }, kind, dualKind))
+        fs.add(Face(fs.size, fvs.map { vs[it.id] }, kind, dualKind))
     }
 
     fun face(f: Face) {

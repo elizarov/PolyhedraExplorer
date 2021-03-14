@@ -17,10 +17,13 @@ class FaceProgram(gl: GL) : PolyProgram(gl) {
     val aVertexColor by attribute(GLType.vec3)
     val aPrevVertexColor by attribute(GLType.vec3)
 
+    val aFaceMode by attribute(GLType.float)
+
     private val vNormal by varying(GLType.vec3)
     private val vToCamera by varying(GLType.vec3)
     private val vToLight by varying(GLType.vec3)
     private val vColor by varying(GLType.vec3, GLPrecision.lowp)
+    private val vColorAlpha by varying(GLType.float, GLPrecision.lowp)
 
     val fInterpolatedColor by function(GLType.vec3) {
         aVertexColor * uTargetFraction + aPrevVertexColor * uPrevFraction
@@ -35,6 +38,7 @@ class FaceProgram(gl: GL) : PolyProgram(gl) {
         vToCamera by uCameraPosition - position.xyz
         vToLight by uLightPosition - position.xyz
         vColor by fInterpolatedColor()
+        vColorAlpha by aFaceMode * uColorAlpha
     }
 
     override val fragmentShader = shader(ShaderType.Fragment) {
@@ -43,6 +47,9 @@ class FaceProgram(gl: GL) : PolyProgram(gl) {
         val halfVector by normalize(normToCamera + normToLight)
         val light by uAmbientLightColor + uDiffuseLightColor * max(dot(vNormal, normToLight), 0.0)
         val specular by uSpecularLightColor * pow(max(dot(vNormal, halfVector), 0.0), uSpecularLightPower)
-        gl_FragColor by vec4(vColor * light + specular, uColorAlpha)
+        gl_FragColor by vec4(vColor * light + specular, vColorAlpha)
     }
 }
+
+const val FACE_HIDDEN = 0
+const val FACE_SHOWN = 1

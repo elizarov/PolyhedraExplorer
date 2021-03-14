@@ -125,7 +125,7 @@ suspend fun Polyhedron.canonical(progress: OperationProgressContext?): Polyhedro
     totalIterations += iterations
     // copy faces with new vertices
     val fs = fs.map { f ->
-        MutableFace(f.id, f.fvs.map { vs[it.id] }, f.kind)
+        Face(f.id, f.fvs.map { vs[it.id] }, f.kind)
     }
     // rebuild polyhedron with new vertices and faces
     return Polyhedron(vs, fs)
@@ -140,7 +140,7 @@ fun Polyhedron.isCanonical(): Boolean {
     center /= vs.size
     if (!(center approx Vec3.ZERO)) return false
     // 2. All faces must be planar
-    if (fs.any { !it.isPlanar() }) return false
+    if (fs.any { !it.isPlanar }) return false
     // 3. All edges must be tangent to the sphere of the same radius
     var minD = Double.POSITIVE_INFINITY
     var maxD = 0.0

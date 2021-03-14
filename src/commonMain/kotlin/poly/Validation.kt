@@ -24,8 +24,8 @@ fun Polyhedron.validateGeometry() {
             "Face normal does not point outwards: $f $f "
         }
         for (v in f.fvs)
-            require(v in f) {
-                "Face is not planar: $f, $v !in $f"
+            require(f.isPlanar) {
+                "Face is not planar: $f"
             }
         for (i in 0 until f.size) {
             val a = f[i]

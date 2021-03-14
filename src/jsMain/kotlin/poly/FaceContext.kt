@@ -14,8 +14,10 @@ class FaceContext(val gl: GL, val polyContext: PolyContext, override val params:
     val program = FaceProgram(gl)
     val colorBuffer = program.aVertexColor.createBuffer()
     val prevColorBuffer = program.aPrevVertexColor.createBuffer()
+    val faceModeBuffer = program.createUint8Buffer()
     val indexBuffer = program.createUint16Buffer()
-    var nIndices = 0                 
+    var nIndices = 0
+    var hasHiddenFaces = false
 
     init { setup() }
 
@@ -29,6 +31,22 @@ class FaceContext(val gl: GL, val polyContext: PolyContext, override val params:
             // simple case without animation
             updateColor(gl, poly, colorBuffer)
         }
+        // face mode
+        hasHiddenFaces = false
+        poly.faceVerticesData(faceModeBuffer) { f, _, a, i ->
+            a[i] = FACE_SHOWN
+            if (!f.isPlanar) {
+                a[i] = FACE_HIDDEN
+                hasHiddenFaces = true
+            }
+        }
+        animation?.prevPoly?.faceVerticesData(faceModeBuffer) { f, _, a, i ->
+            if (!f.isPlanar) {
+                a[i] = FACE_HIDDEN
+                hasHiddenFaces = true
+            }
+        }
+        faceModeBuffer.bindBufferData(gl)
         // indices
         nIndices = poly.fs.sumOf { 3 * (it.size - 2) }
         val indices = indexBuffer.takeData(nIndices)
@@ -69,6 +87,8 @@ fun FaceContext.draw(view: ViewContext, lightning: LightningContext) {
 
         aVertexColor by colorBuffer
         aPrevVertexColor by if (params.transformAnimation != null) prevColorBuffer else colorBuffer
+
+        aFaceMode by faceModeBuffer
     }
     
     gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, indexBuffer.glBuffer)

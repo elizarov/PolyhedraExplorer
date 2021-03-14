@@ -22,6 +22,7 @@ external interface RootPaneState : RState {
 
     var poly: Polyhedron
     var polyName: String
+    var transformWarnings: List<String?>
     var transformError: TransformError?
     var transformProgress: Int
 
@@ -42,6 +43,7 @@ class RootPane(props: PComponentProps<RootParams>) :
 
         poly = props.param.render.poly.poly
         polyName = props.param.render.poly.polyName
+        transformWarnings = props.param.render.poly.transformWarnings
         transformError = props.param.render.poly.transformError
         transformProgress = props.param.render.poly.transformProgress
 
@@ -148,7 +150,7 @@ class RootPane(props: PComponentProps<RootParams>) :
                         if (isInProcess) {
                             span("spinner") {}
                         } else {
-                            +"⚠️"
+                            +"❌"
                         }
                         span("tooltip-text") {
                             if (isInProcess) {
@@ -157,6 +159,12 @@ class RootPane(props: PComponentProps<RootParams>) :
                                 +"${state.transformError?.message}"
                             }
                         }
+                    }
+                } else {
+                    val warning = state.transformWarnings.getOrNull(i)
+                    if (warning != null) {
+                        span { +"⚠️" }
+                        span("tooltip-text") { +warning }
                     }
                 }
             }

@@ -29,7 +29,6 @@ data class TransformTask(
             null -> poly.transformed(transform)
             else -> atx(poly, progress)
         }
-        value.validateGeometry()
         return PolyhedronResult(value)
     }
 }
