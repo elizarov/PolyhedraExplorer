@@ -25,9 +25,9 @@ data class TransformTask(
     val transform: Transform
 ) : WorkerTask<Polyhedron, PolyhedronResult>() {
     override suspend fun invoke(progress: OperationProgressContext): PolyhedronResult {
-        val value = when(val twp = transform.transformWithProgress) {
+        val value = when(val atx = transform.asyncTransform) {
             null -> poly.transformed(transform)
-            else -> twp(poly, progress)
+            else -> atx(poly, progress)
         }
         value.validateGeometry()
         return PolyhedronResult(value)

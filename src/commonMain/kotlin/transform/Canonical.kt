@@ -67,7 +67,7 @@ suspend fun Polyhedron.canonical(progress: OperationProgressContext?): Polyhedro
         for (i in vs.indices) {
             center += vs[i]
         }
-        center /= vs.size.toDouble()
+        center /= vs.size
         maxError = max(maxError, center.norm)
         // recenter all vertices
         for (i in vs.indices) {
@@ -78,7 +78,7 @@ suspend fun Polyhedron.canonical(progress: OperationProgressContext?): Polyhedro
         for (f in fs) {
             // find centroid of face vertices
             for (i in 0 until f.size) center += vs[f[i].id]
-            center /= f.size.toDouble()
+            center /= f.size
             // find sum cross-product of all face angles -> normal of the "average" plane
             for (i in 0 until f.size) {
                 val a = vs[f[i].id]
@@ -129,4 +129,25 @@ suspend fun Polyhedron.canonical(progress: OperationProgressContext?): Polyhedro
     }
     // rebuild polyhedron with new vertices and faces
     return Polyhedron(vs, fs)
+}
+
+fun Polyhedron.isCanonical(): Boolean {
+    // 1. Polyhedron must be centered at origin
+    val center = MutableVec3()
+    for (i in vs.indices) {
+        center += vs[i]
+    }
+    center /= vs.size
+    if (!(center approx Vec3.ZERO)) return false
+    // 2. All faces must be planar
+    if (fs.any { !it.isPlanar() }) return false
+    // 3. All edges must be tangent to the sphere of the same radius
+    var minD = Double.POSITIVE_INFINITY
+    var maxD = 0.0
+    for (e in es) {
+        val d = e.tangentDistance()
+        if (d < minD) minD = d
+        if (d > maxD) maxD = d
+    }
+    return maxD approx minD
 }

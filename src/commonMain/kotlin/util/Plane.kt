@@ -4,6 +4,8 @@
 
 package polyhedra.common.util
 
+import polyhedra.common.poly.*
+
 interface Plane : Vec3 {
     val d: Double
 }
@@ -19,6 +21,7 @@ open class MutablePlane(
         "Plane(n=${super.toString()}, d=${d.fmt})"
 }
 
+// Note: n must be a unit vector
 fun Plane(n: Vec3, d: Double): Plane =
     MutablePlane(n.x, n.y, n.z, d)
 
@@ -68,3 +71,20 @@ val Plane.tangentPoint: Vec3
 // Resulting vector is in the plane
 fun Plane.intersection(v: Vec3) =
     v * (d / (this * v))
+
+// Average plane via given points, outside pointing normal
+fun List<Vec3>.averagePlane(): Plane {
+    require(size >= 3) { "Needs at least 3 points, found $size" }
+    val center = MutableVec3()
+    // find centroid of points
+    for (i in 0 until size) center += this[i]
+    center /= size
+    // find sum cross-product of all angles -> normal of the "average" plane
+    val normSum = MutableVec3()
+    for (i in 0 until size) {
+        val a = this[i]
+        val b = this[(i + 1) % size]
+        crossCenteredAddTo(normSum, b, a, center)
+    }
+    return planeByNormalAndPoint(normSum, center)
+}

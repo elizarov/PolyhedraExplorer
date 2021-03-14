@@ -175,7 +175,7 @@ class MutableFace(
     override val fvs: List<Vertex>,
     override val kind: FaceKind,
     override val dualKind: FaceKind = kind // used only for by cantellation
-) : Face, MutablePlane(plane3(fvs[0], fvs[1], fvs[2])) {
+) : Face, MutablePlane(fvs.averagePlane()) {
     override fun equals(other: Any?): Boolean = other is Face && id == other.id
     override fun hashCode(): Int = id
     override fun toString(): String =
@@ -185,6 +185,9 @@ class MutableFace(
 val Face.size: Int get() = fvs.size
 operator fun Face.get(index: Int): Vertex = fvs[index]
 operator fun Face.iterator(): Iterator<Vertex> = fvs.iterator()
+
+fun Face.isPlanar() =
+    fvs.all { it in this }
 
 data class EdgeKind(val a: VertexKind, val b: VertexKind, val l: FaceKind, val r: FaceKind) : Comparable<EdgeKind> {
     override fun compareTo(other: EdgeKind): Int {

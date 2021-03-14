@@ -12,6 +12,10 @@ interface Vec3 {
     val x: Double
     val y: Double
     val z: Double
+
+    companion object {
+        val ZERO = MutableVec3()
+    }
 }
 
 @Serializable
@@ -62,6 +66,12 @@ operator fun MutableVec3.timesAssign(a: Double) {
 }
 
 operator fun MutableVec3.divAssign(a: Double) {
+    x /= a
+    y /= a
+    z /= a
+}
+
+operator fun MutableVec3.divAssign(a: Int) {
     x /= a
     y /= a
     z /= a

@@ -23,7 +23,8 @@ enum class Transform(
         cantellationRatio(it)?.let { cr -> SnubbingRatio(cr, 0.0) }
     },
     val chamferingRatio: (Polyhedron) -> Double? = { null },
-    val transformWithProgress: (suspend (Polyhedron, OperationProgressContext) -> Polyhedron)? = null,
+    val asyncTransform: (suspend (Polyhedron, OperationProgressContext) -> Polyhedron)? = null,
+    val isIdentityTransform: (Polyhedron) -> Boolean = { false },
     val fev: TransformFEV
 ) : Tagged {
     None(
@@ -32,6 +33,7 @@ enum class Transform(
         truncationRatio = { 0.0 },
         cantellationRatio = { 0.0 },
         chamferingRatio = { 0.0 },
+        isIdentityTransform = { true },
         fev = TransformFEV.ID
     ),
     Truncated(
@@ -107,7 +109,8 @@ enum class Transform(
     Canonical(
         "o",
         Polyhedron::canonical,
-        transformWithProgress = Polyhedron::canonical,
+        asyncTransform = Polyhedron::canonical,
+        isIdentityTransform = { it.isCanonical() },
         fev = TransformFEV.ID
     )
 }

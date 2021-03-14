@@ -167,43 +167,51 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
                 }
                 // Reuse previously transformed polyhedron if possible
                 val prevPoly = prevPolys.getOrNull(curIndex)
-                val newPoly = if (equalsToPrev && prevTransforms.getOrNull(curIndex) == transform && prevPoly != null) {
-                    prevPoly
-                } else {
-                    // transform from scratch
-                    equalsToPrev = false
-                    // check if requested transformation is slow
-                    val twp = transform.transformWithProgress
-                    if (twp != null) {
-                        val at = asyncTransform
-                        val cached = TransformCache[curPoly, transform]
-                        when {
-                            // see if this transform is already running
-                            at?.poly == curPoly && at.transform == transform -> {
-                                if (at.job.isCompleted) {
-                                    // it is already done -- use the result and store it to cache
-                                    asyncTransform = null
-                                    val result = runCatching { at.job.getCompleted() }
-                                    TransformCache[curPoly, transform] = result
-                                    result.getOrThrow()
-                                } else {
-                                    // it is still running
-                                    transformError = TransformError(curIndex, isAsync = true)
-                                    break@loop // continue to wait
+                val newPoly = when {
+                    equalsToPrev && prevTransforms.getOrNull(curIndex) == transform && prevPoly != null -> {
+                        // reuse previous transform result is available and transform is the same
+                        prevPoly
+                    }
+                    transform.isIdentityTransform(curPoly) -> {
+                        // keep poly if this transform is an identity transform for this polyhedron
+                        curPoly
+                    }
+                    else -> {
+                        // transform from scratch
+                        equalsToPrev = false
+                        // check if requested transformation is slow
+                        val atx = transform.asyncTransform
+                        if (atx != null) {
+                            val at = asyncTransform
+                            val cached = TransformCache[curPoly, transform]
+                            when {
+                                // see if this transform is already running
+                                at?.poly == curPoly && at.transform == transform -> {
+                                    if (at.job.isCompleted) {
+                                        // it is already done -- use the result and store it to cache
+                                        asyncTransform = null
+                                        val result = runCatching { at.job.getCompleted() }
+                                        TransformCache[curPoly, transform] = result
+                                        result.getOrThrow()
+                                    } else {
+                                        // it is still running
+                                        transformError = TransformError(curIndex, isAsync = true)
+                                        break@loop // continue to wait
+                                    }
+                                }
+                                // see if this transform was cached
+                                cached != null -> cached
+                                else -> {
+                                    // perform transformation asynchronously
+                                    startAsyncTransform(curIndex, curPoly, transform)
+                                    break@loop // skip further transforms while transform is running
                                 }
                             }
-                            // see if this transform was cached
-                            cached != null -> cached
-                            else -> {
-                                // perform transformation asynchronously
-                                startAsyncTransform(curIndex, curPoly, transform)
-                                break@loop // skip further transforms while transform is running
+                        } else {
+                            // transformation is fast -- just do it immediately
+                            curPoly.transformed(transform).also {
+                                it.validateGeometry()
                             }
-                        }
-                    } else {
-                        // transformation is fast -- just do it immediately
-                        curPoly.transformed(transform).also {
-                            it.validateGeometry()
                         }
                     }
                 }
