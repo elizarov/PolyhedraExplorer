@@ -13,6 +13,9 @@ abstract class Param(val tag: String) {
     private val dependencies = ArrayList<Dependency>(2)
     private var updated: UpdateType = TargetValue
 
+    /**
+     * Loads params. [update] is called from leaf to the root of all affected params.
+     */
     abstract fun loadFrom(parsed: ParsedParam, update: (Param) -> Unit)
     abstract fun isDefault(): Boolean
     abstract fun valueToString(): String
@@ -24,22 +27,32 @@ abstract class Param(val tag: String) {
             else -> "$tag(${valueToString()})"
         }
 
+    /**
+     * Notifies about update:
+     * * [TargetValue] update is propagated to all dependencies, recomputes derived values.
+     * * All other updates are noted, will recompute all dependencies during the next animation frame
+     *   from [performUpdate] call.
+     */
     fun notifyUpdated(update: UpdateType) {
         val newUpdated = updated + update
-        val delta = newUpdated - updated
+        // Always propagate TargetValue updates to all dependencies
+        val targetValueUpdate = update.intersect(TargetValue)
+        val delta = (newUpdated - updated) + targetValueUpdate
         if (delta == None) return
         if (DEBUG_PARAMS) {
             println("${this::class.simpleName}[$tag].notifyUpdated: $updated + $delta -> $newUpdated")
         }
         updated = newUpdated
-        computeDerivedParamValues(delta)
+        if (targetValueUpdate != None) {
+            computeDerivedTargetValues()
+        }
         for (dependency in dependencies) {
             dependency.notifyUpdated(delta)
         }
     }
 
-    // params can perform additional computation on update notification
-    protected open fun computeDerivedParamValues(update: UpdateType) {}
+    // params can perform additional computation on TargetValue updates
+    open fun computeDerivedTargetValues() {}
 
     open fun performUpdate(source: Any?, dt: Double) {
         // Update itself (if needed)
@@ -95,6 +108,13 @@ abstract class Param(val tag: String) {
     companion object {
         val None = UpdateType(0)
 
+        /**
+         * IMPORTANT:
+         * * Updates for [TargetValue] are distributed EAGERLY to all dependencies, derived values are
+         *   computed immediately during [Param.notifyUpdated] processing.
+         * * All other kinds of updates are conflated during propagation. Derived values are computed during the
+         *   next animation frame.
+         */
         val TargetValue = UpdateType(1) // param target value changed, save state, update controls, update deps, redraw
         val LoadedValue = UpdateType(2) // param was (re)loaded, need to recompute everything
         val AnimatedValue = UpdateType(4) // param value changed due to animation, update deps, redraw
@@ -178,6 +198,7 @@ abstract class Param(val tag: String) {
                 }
                 param.loadFrom(v, update)
             }
+            update(this)
         }
 
         override fun isDefault(): Boolean = params.all { it.isDefault() }

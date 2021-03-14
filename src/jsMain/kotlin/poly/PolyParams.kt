@@ -78,10 +78,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         }
     }
 
-    override fun computeDerivedParamValues(update: UpdateType) {
-        // don't react on ongoing animations and on progress changes)
-        if (update.intersect(TargetValue + LoadedValue) == None) return
-        // do the actual computation
+    override fun computeDerivedTargetValues() {
         val curSeed = seed.value
         val curTransforms = transforms.value
         val curPolys = ArrayList<Polyhedron>()

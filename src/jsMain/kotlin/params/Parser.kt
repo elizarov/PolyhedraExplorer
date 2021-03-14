@@ -13,7 +13,12 @@ fun Param.loadFromString(str: String) {
     val parsed = ParamParser(str).parse()
     val updated = ArrayList<Param>()
     loadFrom(parsed) { updated += it }
-    updated.forEach { it.notifyUpdated(Param.LoadedValue) }
+    updated.forEach {
+        // mark loaded values for repaint in the next animation frame
+        it.notifyUpdated(Param.LoadedValue)
+        // eagerly recompute derived values just like on TargetValue change
+        it.computeDerivedTargetValues()
+    }
 }
 
 private class ParamParser(private val str: String) {
