@@ -8,6 +8,7 @@ import kotlinx.browser.*
 import org.w3c.dom.*
 import org.w3c.dom.events.*
 import polyhedra.common.poly.*
+import polyhedra.common.util.*
 import polyhedra.js.params.*
 import polyhedra.js.util.*
 import react.*
@@ -105,13 +106,41 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
     }
 
     private fun handleMouseMove(e: MouseEvent) {
-        if (e.isLeftButtonPressed()) {
-            val scale = 2 * PI / minOf(canvas.height, canvas.width)
-            props.params.view.rotate.rotate(
-                (e.offsetY - prevY) * scale, (e.offsetX - prevX) * scale, 0.0, Param.TargetValue
-            )
-            savePrevMouseEvent(e)
+        if (!e.isLeftButtonPressed()) return
+        val h = canvas.clientHeight
+        val w = canvas.clientWidth
+        // prev pos
+        val x1 = prevX
+        val y1 = prevY
+        // new pos
+        val x2 = e.offsetX
+        val y2 = e.offsetY
+        if (e.shiftKey) {
+            // z-rotation
+            // center pos
+            val x0 = 0.5 * w
+            val y0 = 0.5 * h
+            // prev pos from center
+            val x10 = x1 - x0
+            val y10 = y1 - y0
+            val n10 = norm(x10, y10)
+            // new pos from center
+            val x20 = x2 - x0
+            val y20 = y2 - y0
+            val n20 = norm(x20, y20)
+            // compute rotation angle
+            val sin = (x10 * y20 - y10 * x20) / n10 / n20
+            val cos = (x10 * x20 + y10 * y20) / n10 / n20
+            val a = atan2(sin, cos)
+            props.params.view.rotate.rotate(0.0, 0.0, -a, Param.TargetValue)
+        } else {
+            // x-y rotation
+            val scale = 2 * PI / minOf(h, w)
+            val dx = x2 - x1
+            val dy = y2 - y1
+            props.params.view.rotate.rotate(dy * scale, dx * scale, 0.0, Param.TargetValue)
         }
+        savePrevMouseEvent(e)
     }
 
     private fun handleWheel(e: WheelEvent) {
