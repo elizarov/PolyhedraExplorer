@@ -20,6 +20,10 @@ private fun max(a: Double, b: Double) = if (a > b) a else b
 fun Polyhedron.canonical(): Polyhedron =
     runSynchronously { canonical(null) }
 
+// Tuning parameters for algorithm's convergence
+private const val speedFactorEdges = 1.0 // diverges when larger
+private const val speedFactorFaces = 2.0 // diverges when larger
+
 // Algorithm from https://www.georgehart.com/virtual-polyhedra/canonical.html
 @OptIn(ExperimentalTime::class)
 suspend fun Polyhedron.canonical(progress: OperationProgressContext?): Polyhedron {
@@ -32,15 +36,15 @@ suspend fun Polyhedron.canonical(progress: OperationProgressContext?): Polyhedro
     val preScale = 1 / midradius
     for (v in vs) v *= preScale
     // canonicalize
-    val vMul = DoubleArray(vs.size) { i -> 1.0 / vertexFaces[vs[i]]!!.size }
+    val vAvgFactor = DoubleArray(vs.size) { i -> 1.0 / vertexFaces[vs[i]]!!.size }
     val dv = vs.map { MutableVec3() }
     val center = MutableVec3()
     val normSum = MutableVec3()
     val h = MutableVec3()
     var iterations = 0
-    var initialLogError = 0.0
+    var initialError = 0.0
     var prevDone = 0
-    var lastTime = startTime
+    var lastTime = 0
     while(true) {
         var maxError = 0.0
         // check all edges
@@ -53,14 +57,13 @@ suspend fun Polyhedron.canonical(progress: OperationProgressContext?): Polyhedro
                 tf.atSegmentTo(h, a, b)
                 val err = 1.0 - h.norm
                 maxError = max(maxError, abs(err))
-                val factor = 0.95 * err
-                dv[a.id].plusAssignMul(h, factor)
-                dv[b.id].plusAssignMul(h, factor)
+                dv[a.id].plusAssignMul(h, err)
+                dv[b.id].plusAssignMul(h, err)
             }
         }
         // apply average of edge adjustments
         for (i in vs.indices) {
-            vs[i].plusAssignMul(dv[i], vMul[i])
+            vs[i].plusAssignMul(dv[i], speedFactorEdges * vAvgFactor[i])
             dv[i].setToZero()
         }
         // compute current center of gravity
@@ -98,28 +101,33 @@ suspend fun Polyhedron.canonical(progress: OperationProgressContext?): Polyhedro
             center.setToZero()
             normSum.setToZero()
         }
-        // apply average of projecting adjustments
+        // apply average of face-projecting adjustments
         for (i in vs.indices) {
-            vs[i].plusAssignMul(dv[i], vMul[i])
+            vs[i].plusAssignMul(dv[i], speedFactorFaces * vAvgFactor[i])
             dv[i].setToZero()
         }
         iterations++
         if (maxError <= TARGET_TOLERANCE) break // success
-        val logError = log10(maxError)
-        if (initialLogError == 0.0) {
-            initialLogError = logError
-        } else {
-            val done = (100 * (initialLogError - logError) / (initialLogError - log10(TARGET_TOLERANCE))).toInt()
-            if (lastTime.elapsedNow() >= 100.milliseconds) {
-                lastTime = monotonic.markNow()
-                yield() // cancellation point (checked every 100 ms)
-                if (done > prevDone) {
-                    println("Canonical: at $iterations iterations, log error = ${logError.fmt}, done = $done%")
-                    prevDone = done
-                    progress?.reportProgress(done)
-                }
-            }
+        // Record initial error
+        if (initialError == 0.0) {
+            initialError = maxError
+            continue
         }
+        // cancellation/log point (checked every 100 ms)
+        val curTime = (startTime.elapsedNow().inMilliseconds / 100).roundToInt()
+        if (curTime <= lastTime) continue
+        lastTime = curTime
+        val done = (100 * log10(initialError / maxError) / log10(initialError / TARGET_TOLERANCE)).toInt()
+        // log every second
+        if (curTime % 10 == 0) {
+            println("Canonical: at $iterations iterations, log error = ${log10(maxError).fmt}, done = $done%")
+        }
+        // report progress when it changes
+        if (done > prevDone) {
+            prevDone = done
+            progress?.reportProgress(done)
+        }
+        yield()
     }
     println("Canonical: done $iterations iterations in ${startTime.elapsedNow().inSeconds.fmtFix(3)} sec")
     totalIterations += iterations
