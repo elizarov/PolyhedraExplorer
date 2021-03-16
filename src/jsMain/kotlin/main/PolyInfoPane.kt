@@ -6,6 +6,7 @@ package polyhedra.js.main
 
 import polyhedra.common.poly.*
 import polyhedra.common.util.*
+import polyhedra.js.poly.*
 import react.*
 import react.dom.*
 
@@ -22,7 +23,10 @@ fun RBuilder.polyInfoPane(builder: PolyInfoPaneProps.() -> Unit) {
 class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
     private fun RBuilder.infoHeader(name: String, cnt: Int, distValue: Double, distName: String) {
         tr("header") {
-            td { +name }
+            td {
+                attrs { colSpan = "2" }
+                +name
+            }
             td { +cnt.toString() }
             td { +distValue.fmtFix }
             td {
@@ -41,6 +45,9 @@ class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
                 for ((fk, fs) in poly.faceKinds) {
                     val fe = poly.faceEssence(fs[0])
                     tr("info") {
+                        td {
+                            if (!fe.isPlanar) messageSpan(FaceNotPlanar())
+                        }
                         td("rt") { +fk.toString() }
                         td { +fs.size.toString() }
                         td { +fe.dist.fmtFix }
@@ -57,7 +64,10 @@ class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
                 for ((vk, vs) in poly.vertexKinds) {
                     val ve = poly.vertexEssence(vs[0])
                     tr("info") {
-                        td("rt") { +vk.toString() }
+                        td("rt") {
+                            attrs { colSpan = "2" }
+                            +vk.toString()
+                        }
                         td { +vs.size.toString() }
                         td { +ve.dist.fmtFix }
                         td("rt") { +"adj" }
@@ -73,7 +83,10 @@ class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
                 for ((ek, es) in poly.edgeKinds) {
                     val ee = poly.edgeEssence(es[0])
                     tr("info") {
-                        td("rt") { +ek.toString() }
+                        td("rt") {
+                            attrs { colSpan = "2" }
+                            +ek.toString()
+                        }
                         td { +es.size.toString() }
                         td { +ee.dist.fmtFix }
                         td {}

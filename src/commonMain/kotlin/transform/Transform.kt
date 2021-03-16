@@ -11,7 +11,7 @@ import kotlin.math.*
 enum class Transform(
     override val tag: String,
     val transform: (Polyhedron) -> Polyhedron,
-    val isApplicable: (Polyhedron) -> String? = { null }, // todo: not defined usefully now
+    val isApplicable: (Polyhedron) -> Boolean = { true }, // todo: not defined usefully now
     val truncationRatio: (Polyhedron) -> Double? = { null },
     val cantellationRatio: (Polyhedron) -> Double? = { null },
     val bevellingRatio: (Polyhedron) -> BevellingRatio? = {

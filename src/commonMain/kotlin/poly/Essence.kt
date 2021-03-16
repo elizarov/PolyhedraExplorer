@@ -22,6 +22,7 @@ data class VertexFaceKind(
 class FaceKindEssence(
     val kind: FaceKind,
     val dist: Double,
+    val isPlanar: Boolean,
     val vfs: List<VertexFaceKind>,
 ) {
     fun approx(other: FaceKindEssence): Boolean =
@@ -38,7 +39,7 @@ fun Polyhedron.faceEssence(f: Face): FaceKindEssence {
     val es = faceDirectedEdges[f]!!
     val size = es.size
     val vfs = List(size) { VertexFaceKind(es[it].a.kind, es[it].l.kind) }
-    return FaceKindEssence(f.kind, f.d, vfs.minCycle())
+    return FaceKindEssence(f.kind, f.d, f.isPlanar, vfs.minCycle())
 }
 
 class VertexKindEssence(

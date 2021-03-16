@@ -37,7 +37,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         private set
     var polyName: String = ""
         private set
-    var transformWarnings: List<String?> = emptyList()
+    var transformWarnings: List<IndicatorMessage<*>?> = emptyList()
         private set
     var transformError: TransformError? = null
         private set
@@ -162,23 +162,23 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         var curPolyName = curSeed.toString()
         var curIndex = 0
         var equalsToPrev = curSeed == prevSeed
-        val curTransformWarnings = ArrayList<String?>()
+        val curTransformWarnings = ArrayList<IndicatorMessage<*>?>()
         transformError = null // will set if fail in process
         loop@ for (transform in curTransforms) {
             try {
-                val applicable = transform.isApplicable(curPoly)
-                if (applicable != null) {
-                    transformError = TransformError(curIndex, applicable)
+                if (!transform.isApplicable(curPoly)) {
+                    transformError = TransformError(curIndex, TransformNotApplicable(transform))
                     break
                 }
                 // compute FEV before doing an actual transform
                 val fev = transform.fev * curPoly.fev()
                 if (fev.e > MAX_DISPLAY_EDGES) {
-                    transformError = TransformError(curIndex, "Polyhedron is too large to display ($fev)")
+                    transformError = TransformError(curIndex, TooLarge(fev))
                     break@loop
                 }
                 // Reuse previously transformed polyhedron if possible
                 val prevPoly = prevPolys.getOrNull(curIndex)
+                var curWarning: IndicatorMessage<*>? = null
                 val newPoly = when {
                     equalsToPrev && prevTransforms.getOrNull(curIndex) == transform && prevPoly != null -> {
                         // reuse previous transform result is available and transform is the same
@@ -186,6 +186,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
                     }
                     transform.isIdentityTransform(curPoly) -> {
                         // keep poly if this transform is an identity transform for this polyhedron
+                        curWarning = TransformIsId(transform)
                         curPoly
                     }
                     else -> {
@@ -225,9 +226,8 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
                         }
                     }
                 }
-                var curWarning: String? = null
                 if (newPoly.fs.any { !it.isPlanar }) {
-                    curWarning = "Some faces are not planar and are not shown"
+                    curWarning = SomeFacesNotPlanar()
                 }
                 curPolyName = "$transform $curPolyName"
                 curPoly = newPoly
@@ -235,7 +235,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
                 curTransformWarnings.add(curWarning)
                 curIndex++
             } catch (e: Exception) {
-                transformError = TransformError(curIndex, "$transform transformation has failed")
+                transformError = TransformError(curIndex, TransformFailed(transform))
                 e.printStackTrace() // print exception onto console
                 break@loop
             }
@@ -376,7 +376,7 @@ private fun BevellingRatio.coerceIn(range: ClosedFloatingPointRange<Double>): Be
 
 data class TransformError(
     val index: Int,
-    val message: String = "",
+    val msg: IndicatorMessage<*>? = null,
     val isAsync: Boolean = false
 )
 

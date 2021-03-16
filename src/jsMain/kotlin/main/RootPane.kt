@@ -22,7 +22,7 @@ external interface RootPaneState : RState {
 
     var poly: Polyhedron
     var polyName: String
-    var transformWarnings: List<String?>
+    var transformWarnings: List<IndicatorMessage<*>?>
     var transformError: TransformError?
     var transformProgress: Int
 
@@ -129,7 +129,8 @@ class RootPane(props: PComponentProps<RootParams>) :
     }
 
     private fun RDOMBuilder<TBODY>.renderTransformsRows() {
-        val errorIndex = state.transformError?.index ?: Int.MAX_VALUE
+        val transformError = state.transformError
+        val errorIndex = transformError?.index ?: Int.MAX_VALUE
         for ((i, transform) in state.transforms.withIndex()) {
             controlRow("${i + 1}:") {
                 dropdown<Transform> {
@@ -145,27 +146,19 @@ class RootPane(props: PComponentProps<RootParams>) :
                     }
                 }
                 if (i == errorIndex) {
-                    val isInProcess = state.transformError?.isAsync == true
-                    span {
-                        if (isInProcess) {
+                    val isInProcess = transformError?.isAsync == true
+                    if (isInProcess) {
+                        span {
                             span("spinner") {}
-                        } else {
-                            +"❌"
+                            +"${state.transformProgress}%"
+                            span("tooltip-text") { +"Transformation is running" }
                         }
-                        span("tooltip-text") {
-                            if (isInProcess) {
-                                +"Transformation is running, done ${state.transformProgress}%"
-                            } else {
-                                +"${state.transformError?.message}"
-                            }
-                        }
+                    } else {
+                        transformError?.msg?.let { messageSpan(it) }
                     }
                 } else {
                     val warning = state.transformWarnings.getOrNull(i)
-                    if (warning != null) {
-                        span { +"⚠️" }
-                        span("tooltip-text") { +warning }
-                    }
+                    if (warning != null) messageSpan(warning)
                 }
             }
         }
@@ -199,20 +192,20 @@ private fun RDOMBuilder<DIV>.header(text: String) {
     }
 }
 
-fun RBuilder.tableBody(block: RDOMBuilder<TBODY>.() -> Unit) {
+private fun RBuilder.tableBody(block: RDOMBuilder<TBODY>.() -> Unit) {
     table {
         tbody(block = block)
     }
 }
 
-fun RDOMBuilder<TBODY>.controlRow(label: String, block: RDOMBuilder<TD>.() -> Unit) {
+private fun RDOMBuilder<TBODY>.controlRow(label: String, block: RDOMBuilder<TD>.() -> Unit) {
     tr("control") {
         td { +label }
         td(block = block)
     }
 }
 
-fun RDOMBuilder<TBODY>.controlRow2(
+private fun RDOMBuilder<TBODY>.controlRow2(
     label: String,
     block1: RDOMBuilder<TD>.() -> Unit,
     block2: RDOMBuilder<TD>.() -> Unit

@@ -160,6 +160,13 @@ tr.info {
     visibility: visible;
 }
 
+/* --------- emoji --------- */
+
+span.emoji {
+    vertical-align: middle;
+    line-height: 1;
+}
+
 /* --------- spinner --------- */
 
 .spinner {
@@ -167,6 +174,7 @@ tr.info {
     opacity: 1;
     transition: opacity linear 0.1s;
     margin-left: 1em;
+    margin-right: 1em;
 }
 
 .spinner::before {
