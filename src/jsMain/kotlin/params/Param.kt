@@ -19,7 +19,7 @@ abstract class Param(val tag: String) {
     abstract fun loadFrom(parsed: ParsedParam, update: (Param) -> Unit)
     abstract fun isDefault(): Boolean
     abstract fun valueToString(): String
-    
+
     override fun toString(): String =
         when {
             isDefault() -> ""
@@ -79,7 +79,7 @@ abstract class Param(val tag: String) {
             }
 
             override fun performUpdate(source: Any?, dt: Double) {}
-            
+
             init {
                 dependencies += this
             }
@@ -211,7 +211,7 @@ abstract class ValueParam<T : Any>(tag: String, value: T) : Param(tag) {
 
     open val value: T
         get() = targetValue
-    
+
     abstract var targetValue: T
         protected set
 
@@ -275,7 +275,7 @@ abstract class AnimatedValueParam<T : Any, P : AnimatedValueParam<T, P>>(
     }
 
     override fun update(update: UpdateType, dt: Double) {
-        valueUpdateAnimation?.let {  animation ->
+        valueUpdateAnimation?.let { animation ->
             animation.update(dt)
             if (animation.isOver) {
                 valueUpdateAnimation = null
@@ -299,7 +299,7 @@ class BooleanParam(
 
     override fun valueToString(): String = if (value) "y" else "n"
 
-    override fun parseValue(value: String): Boolean? = when(value) {
+    override fun parseValue(value: String): Boolean? = when (value) {
         "y" -> true
         "n" -> false
         else -> null
@@ -340,10 +340,13 @@ class DoubleParam(
         val r = floor(value / step + 0.5) * step
         super.updateValue(r.coerceIn(min, max), updateType)
     }
+
     override fun createValueUpdateAnimation(duration: Double, oldValue: Double): DoubleUpdateAnimation =
         DoubleUpdateAnimation(this, duration, oldValue)
+
     override fun valueToString(): String =
         value.fmt
+
     override fun parseValue(value: String): Double? =
         value.toDoubleOrNull()
 }
@@ -362,9 +365,10 @@ class RotationParam(
     private val _quat = MutableQuat()
     private var rotationAnimation: RotationAnimation? = null
 
-    private val rotationDep = rotationAnimationParams?.animatedRotation?.onNotifyUpdated(TargetValue) {
-        if (updateAnimation(rotationAnimationParams)) {
-            notifyUpdated(ActiveAnimation)
+    private val rotationDep = rotationAnimationParams?.animatedRotation?.apply {
+        updateAnimation(rotationAnimationParams)
+        onNotifyUpdated(TargetValue + LoadedValue) {
+            updateAnimation(rotationAnimationParams)
         }
     }
 
@@ -372,20 +376,18 @@ class RotationParam(
         rotationDep?.destroy()
     }
 
-    private fun updateAnimation(rotationAnimationParams: RotationAnimationParams): Boolean {
+    private fun updateAnimation(rotationAnimationParams: RotationAnimationParams) {
         val rotate = rotationAnimationParams.animatedRotation.value
         val rotationAnimation = rotationAnimation
-        return when {
+        when {
             rotate && rotationAnimation == null -> {
                 this.rotationAnimation = RotationAnimation(this, rotationAnimationParams)
                 resetValueUpdateAnimation()
-                true
+                notifyUpdated(ActiveAnimation)
             }
             !rotate && rotationAnimation != null -> {
                 this.rotationAnimation = null
-                false
             }
-            else -> false
         }
     }
 
@@ -417,6 +419,7 @@ class RotationParam(
         value.toAngles().toList().joinToString(",") {
             (180 * it / PI).fmt(1)
         }
+
     override fun parseValue(value: String): Quat? =
         value.split(",").mapNotNull { s ->
             s.toDoubleOrNull()?.let { (PI * it) / 180 }
