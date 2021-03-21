@@ -158,7 +158,7 @@ fun Polyhedron.truncated(tr: Double = regularTruncationRatio()): Polyhedron = tr
     // faces from the original faces
     for (f in fs) {
         val fvs = faceDirectedEdges[f]!!.flatMap {
-            listOf(ev[it]!!, ev[it.reversed()]!!)
+            listOf(ev[it]!!, ev[it.reversed]!!)
         }
         face(fvs, f.kind)
     }
@@ -264,7 +264,7 @@ fun Polyhedron.bevelled(br: BevellingRatio = regularBevellingRatio()): Polyhedro
             val t2 = tr * (1 - mf)
             listOf(
                 e to vertex(t1.atSegment(ac, bc), VertexKind(2 * kind)),
-                e.reversed() to vertex(t2.atSegment(bc, ac), VertexKind(2 * kind + 1))
+                e.reversed to vertex(t2.atSegment(bc, ac), VertexKind(2 * kind + 1))
             )
         }.associate { it }
     }
@@ -286,7 +286,7 @@ fun Polyhedron.bevelled(br: BevellingRatio = regularBevellingRatio()): Polyhedro
     // 4-faces from the original edges
     kindOfs += vertexKinds.size
     for (e in es) {
-        val er = e.reversed()
+        val er = e.reversed
         val fvs = listOf(
             fev[e.r]!![e]!!,
             fev[e.l]!![e]!!,

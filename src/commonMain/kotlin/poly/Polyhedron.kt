@@ -12,7 +12,13 @@ class Polyhedron(
     val vs: List<Vertex>,
     val fs: List<Face>
 ) {
-    val es: List<Edge> = buildList {
+    val es: List<Edge>
+    val directedEdges: List<Edge>
+
+    // `build edges (unidirectional & directed)
+    init {
+        val es = ArrayList<Edge>()
+        val directedEdges = ArrayList<Edge>()
         val lFaces = ArrayIdMap<Vertex, HashMap<Vertex, Face>>()
         for (f in fs) {
             for (i in 0 until f.size) {
@@ -33,19 +39,23 @@ class Polyhedron(
                     require(lf != null) {
                         "Edge $a to $b on face $f does not have an adjacent face"
                     }
-                    add(Edge(a, b, lf, f).normalizedDirection())
+                    val e1 = Edge(a, b, lf, f)
+                    val e2 = Edge(b, a, f, lf)
+                    e1.reversed = e2
+                    e2.reversed = e1
+                    directedEdges += e1
+                    directedEdges += e2
+                    es += e1.normalizedDirection()
                 }
             }
         }
+        this.es = es
+        this.directedEdges = directedEdges
     }
 
     val vertexKinds: IdMap<VertexKind, List<Vertex>> by lazy { vs.groupById { it.kind } }
     val faceKinds: IdMap<FaceKind, List<Face>> by lazy { fs.groupById { it.kind } }
     val edgeKinds: Map<EdgeKind, List<Edge>> by lazy { es.groupBy { it.kind } }
-
-    val directedEdges: List<Edge> by lazy {
-        es.flatMap { listOf(it, it.reversed()) }
-    }
 
     // adjacent edges are properly ordered
     val vertexDirectedEdges: IdMap<Vertex, List<Edge>> by lazy {
@@ -201,17 +211,16 @@ data class Edge(
     val r: Face,
 ) {
     val kind: EdgeKind = EdgeKind(a.kind, b.kind, l.kind, r.kind)
+    lateinit var reversed: Edge
     override fun toString(): String = "$kind edge(${a.id}-${l.id}/${r.id}-${b.id})"
 }
-
-fun Edge.reversed(): Edge = Edge(b, a, r, l)
 
 fun Edge.normalizedDirection(): Edge {
     val rk = kind.reversed().compareTo(kind)
     return when {
-        rk < 0 -> reversed()
+        rk < 0 -> reversed
         rk > 0 -> this
-        b.id < a.id -> reversed()
+        b.id < a.id -> reversed
         else -> this
     }
 }
