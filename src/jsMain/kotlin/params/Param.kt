@@ -46,8 +46,9 @@ abstract class Param(val tag: String) {
         if (targetValueUpdate != None) {
             computeDerivedTargetValues()
         }
-        for (dependency in dependencies) {
-            dependency.notifyUpdated(delta)
+        // KLUDGE: For JS do iterator-free loop
+        for (i in 0 until dependencies.size) {
+            dependencies[i].notifyUpdated(delta)
         }
     }
 
@@ -64,8 +65,10 @@ abstract class Param(val tag: String) {
         updated = None
         update(curUpdated, dt)
         // Update dependencies
-        for (d in dependencies) if (d != source) {
-            d.performUpdate(this, dt)
+        // KLUDGE: For JS do iterator-free loop
+        for (i in 0 until dependencies.size) {
+            val d = dependencies[i]
+            if (d != source) d.performUpdate(this, dt)
         }
     }
 
@@ -170,8 +173,10 @@ abstract class Param(val tag: String) {
 
         override fun performUpdate(source: Any?, dt: Double) {
             // update all children params first
-            for (p in params) if (p != source) {
-                p.performUpdate(this, dt)
+            // KLUDGE: For JS do iterator-free loop
+            for (i in 0 until params.size) {
+                val p = params[i]
+                if (p != source) p.performUpdate(this, dt)
             }
             // then update self and other dependencies
             super.performUpdate(source, dt)
