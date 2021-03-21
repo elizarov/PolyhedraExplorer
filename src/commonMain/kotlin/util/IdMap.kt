@@ -17,7 +17,7 @@ inline fun <T, K : Id, V : Any> Iterable<T>.associateById(keyTransform: (T) -> K
 inline fun <T : Any, K : Id> Iterable<T>.associateById(keyTransform: (T) -> K): IdMap<K, T> =
     associateById(keyTransform, { it })
 
-inline fun <T, K : Id, V> Iterable<T>.groupById(keyTransform: (T) -> K, valueTransform: (T) -> V): IdMap<K, List<V>> {
+inline fun <T, K : Id, V> Iterable<T>.groupById(keyTransform: (T) -> K, valueTransform: (T) -> V): IdMap<K, ArrayList<V>> {
     val result = ArrayIdMap<K, ArrayList<V>>()
     for (e in this) {
         val k = keyTransform(e)
@@ -27,7 +27,7 @@ inline fun <T, K : Id, V> Iterable<T>.groupById(keyTransform: (T) -> K, valueTra
     return result
 }
 
-inline fun <T, K : Id> Iterable<T>.groupById(keyTransform: (T) -> K): IdMap<K, List<T>> =
+inline fun <T, K : Id> Iterable<T>.groupById(keyTransform: (T) -> K): IdMap<K, ArrayList<T>> =
     groupById(keyTransform, { it })
 
 public inline fun <K : Id, V : Any, R : Any> IdMap<out K, V>.mapValues(transform: (Map.Entry<K, V>) -> R): IdMap<K, R> {

@@ -14,43 +14,55 @@ class Polyhedron(
 ) {
     val es: List<Edge>
     val directedEdges: List<Edge>
+    val faceDirectedEdges: IdMap<Face, List<Edge>> // edges are properly ordered clockwise
 
     // `build edges (unidirectional & directed)
     init {
         val es = ArrayList<Edge>()
         val directedEdges = ArrayList<Edge>()
+        val faceDirectedEdges = ArrayIdMap<Face, ArrayList<Edge>>()
         val lFaces = ArrayIdMap<Vertex, HashMap<Vertex, Face>>()
         for (f in fs) {
             for (i in 0 until f.size) {
                 val a = f[i]
                 val b = f[(i + 1) % f.size]
                 require(a.id != b.id) { "Duplicate vertices at face $f" }
-                if (a.id > b.id) {
-                    lFaces.getOrPut(b) { HashMap() }[a] = f
-                }
+                if (a.id <= b.id) continue
+                lFaces.getOrPut(b) { HashMap() }[a] = f
             }
         }
-        for (f in fs) {
-            for (i in 0 until f.size) {
-                val a = f[i]
-                val b = f[(i + 1) % f.size]
-                if (a.id < b.id) {
-                    val lf = lFaces[a]?.get(b)
-                    require(lf != null) {
-                        "Edge $a to $b on face $f does not have an adjacent face"
-                    }
-                    val e1 = Edge(a, b, lf, f)
-                    val e2 = Edge(b, a, f, lf)
-                    e1.reversed = e2
-                    e2.reversed = e1
-                    directedEdges += e1
-                    directedEdges += e2
-                    es += e1.normalizedDirection()
+        for (rf in fs) {
+            for (i in 0 until rf.size) {
+                val a = rf[i]
+                val b = rf[(i + 1) % rf.size]
+                if (a.id >= b.id) continue
+                val lf = lFaces[a]?.get(b)
+                require(lf != null) {
+                    "Edge $a to $b on face $rf does not have an adjacent face"
                 }
+                val ea = Edge(a, b, lf, rf)
+                val eb = Edge(b, a, rf, lf) 
+                ea.reversed = eb
+                eb.reversed = ea
+                es += ea.normalizedDirection()
+                directedEdges += ea
+                directedEdges += eb
+                faceDirectedEdges.getOrPut(rf) { ArrayList() }.add(ea)
+                faceDirectedEdges.getOrPut(lf) { ArrayList() }.add(eb)
+            }
+        }
+        for ((f, fes) in faceDirectedEdges) {
+            fes.sortFaceAdjacentEdges(f)
+            for (i in 0 until fes.size) {
+                val e0 = fes[i]
+                val e1 = fes[(i + 1) % fes.size]
+                e0.rNext = e1
+                e1.reversed.lNext = e0.reversed
             }
         }
         this.es = es
         this.directedEdges = directedEdges
+        this.faceDirectedEdges = faceDirectedEdges
     }
 
     val vertexKinds: IdMap<VertexKind, List<Vertex>> by lazy { vs.groupById { it.kind } }
@@ -61,16 +73,10 @@ class Polyhedron(
     val vertexDirectedEdges: IdMap<Vertex, List<Edge>> by lazy {
         directedEdges
             .groupById { it.a }
-            .mapValues { entry ->
-                entry.value.sortedVertexAdjacentEdges(entry.key)
-            }
-    }
-
-    // adjacent vertex-edges are properly ordered
-    val vertexVertexDirectedEdge: IdMap<Vertex, Map<Vertex, Edge>> by lazy {
-        vertexDirectedEdges
-            .mapValues { entry ->
-                entry.value.associateBy { it.b }
+            .also {
+                it.entries.forEach { (v, ves) ->
+                    ves.sortVertexAdjacentEdges(v)
+                }
             }
     }
 
@@ -79,14 +85,7 @@ class Polyhedron(
         vertexDirectedEdges
             .mapValues { e -> e.value.map { it.r } }
     }
-
-    // edges are properly ordered
-    val faceDirectedEdges: IdMap<Face, List<Edge>> by lazy {
-        directedEdges
-            .groupById { it.r }
-            .mapValues { it.value.sortedFaceAdjacentEdges(it.key) }
-    }
-
+    
     val edgeKindsIndex: Map<EdgeKind, Int> by lazy {
         es.asSequence()
             .map { it.kind }
@@ -116,26 +115,22 @@ class Polyhedron(
         "Polyhedron(vs=${vs.size}, es=${es.size}, fs=${fs.size})"
 }
 
-fun List<Edge>.sortedVertexAdjacentEdges(a: Vertex): List<Edge> {
-    require(all { it.a == a })
-    val result = toMutableList()
+private fun ArrayList<Edge>.sortVertexAdjacentEdges(v: Vertex) {
+    require(all { it.a == v })
     for (i in 1 until size) {
-        val prev = result[i - 1].r
-        val j = (i until size).first { result[it].l == prev }
-        result.swap(i, j)
+        val prev = this[i - 1].r
+        val j = (i until size).first { this[it].l == prev }
+        swap(i, j)
     }
-    return result
 }
 
-fun List<Edge>.sortedFaceAdjacentEdges(f: Face): List<Edge> {
+private fun ArrayList<Edge>.sortFaceAdjacentEdges(f: Face) {
     require(all { it.r == f })
-    val result = toMutableList()
     for (i in 1 until size) {
-        val prev = result[i - 1].b
-        val j = (i until size).first { result[it].a == prev }
-        result.swap(i, j)
+        val prev = this[i - 1].b
+        val j = (i until size).first { this[it].a == prev }
+        swap(i, j)
     }
-    return result
 }
 
 private fun idString(id: Int, first: Char, last: Char): String {
@@ -207,11 +202,13 @@ fun EdgeKind.reversed(): EdgeKind = EdgeKind(b, a, r, l)
 data class Edge(
     val a: Vertex,
     val b: Vertex,
-    val l: Face,
-    val r: Face,
+    val l: Face, // face to the left of the edge
+    val r: Face, // face to the right of the edge
 ) {
     val kind: EdgeKind = EdgeKind(a.kind, b.kind, l.kind, r.kind)
     lateinit var reversed: Edge
+    lateinit var rNext: Edge // next clockwise edge on the right face
+    lateinit var lNext: Edge // next clockwise edge on the left face
     override fun toString(): String = "$kind edge(${a.id}-${l.id}/${r.id}-${b.id})"
 }
 
