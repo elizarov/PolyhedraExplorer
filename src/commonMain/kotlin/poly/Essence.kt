@@ -36,9 +36,9 @@ class FaceKindEssence(
 }
 
 fun Polyhedron.faceEssence(f: Face): FaceKindEssence {
-    val es = faceDirectedEdges[f]!!
-    val size = es.size
-    val vfs = List(size) { VertexFaceKind(es[it].a.kind, es[it].l.kind) }
+    val fes = f.directedEdges
+    val size = fes.size
+    val vfs = List(size) { VertexFaceKind(fes[it].a.kind, fes[it].l.kind) }
     return FaceKindEssence(f.kind, f.d, f.isPlanar, vfs.minCycle())
 }
 

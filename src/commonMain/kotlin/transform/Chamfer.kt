@@ -69,7 +69,8 @@ class ChamferGeometry(val poly: Polyhedron, angle: ChamferAngle) {
     }
 
     // Face vertex movement direction
-    val fvd = poly.faceDirectedEdges.mapValues { (_, fes) ->
+    val fvd = poly.fs.associateWith { f ->
+        val fes = f.directedEdges
         fes.indices.associate { i ->
             val e = fes[i]
             val g = fes[(i + 1) % fes.size]
@@ -145,7 +146,7 @@ private fun ChamferGeometry.chamferedTo(builder: PolyhedronBuilder, vr: Double =
         val fvv = ev.directedEdgeToFaceVertexMap()
         // faces from the original faces
         for (f in fs) {
-            val fvs = faceDirectedEdges[f]!!.map { ev[it]!! }
+            val fvs = f.directedEdges.map { ev[it]!! }
             face(fvs, f.kind)
         }
         // 6-faces from the original edges

@@ -132,7 +132,7 @@ fun Polyhedron.rectified(): Polyhedron = transformedPolyhedron(Transform.Rectifi
     }
     // faces from the original faces
     for (f in fs) {
-        face(faceDirectedEdges[f]!!.map { ev[it.normalizedDirection()]!! }, f.kind)
+        face(f.directedEdges.map { ev[it.normalizedDirection()]!! }, f.kind)
     }
     // faces from the original vertices
     val kindOfs = faceKinds.size
@@ -157,7 +157,7 @@ fun Polyhedron.truncated(tr: Double = regularTruncationRatio()): Polyhedron = tr
     }
     // faces from the original faces
     for (f in fs) {
-        val fvs = faceDirectedEdges[f]!!.flatMap {
+        val fvs = f.directedEdges.flatMap {
             listOf(ev[it]!!, ev[it.reversed]!!)
         }
         face(fvs, f.kind)
@@ -202,7 +202,7 @@ fun Polyhedron.cantellated(cr: Double = regularCantellationRatio()): Polyhedron 
     val fvv = ev.directedEdgeToFaceVertexMap()
     // faces from the original faces
     for (f in fs) {
-        val fvs = faceDirectedEdges[f]!!.map { ev[it]!! }
+        val fvs = f.directedEdges.map { ev[it]!! }
         face(fvs, f.kind)
     }
     // faces from the original vertices
@@ -253,7 +253,7 @@ fun Polyhedron.bevelled(br: BevellingRatio = regularBevellingRatio()): Polyhedro
     // vertices from the face-directed edges
     val fev = fs.associateWith { f ->
         val c = f.dualPoint(rr) // for regular polygons -- face center
-        faceDirectedEdges[f]!!.flatMap { e ->
+        f.directedEdges.flatMap { e ->
             val kind = directedEdgeKindsIndex[e.kind]!!
             val a = e.a
             val b = e.b
@@ -366,7 +366,7 @@ fun Polyhedron.snub(sr: SnubbingRatio = regularSnubbingRatio()) = transformedPol
     val fvv = fs.associateWith { f ->
         val c = f.dualPoint(rr) // for regular polygons -- face center
         val r = f.toRotationAroundQuat(-sa)
-        faceDirectedEdges[f]!!.associateBy({ it.a }, { e ->
+        f.directedEdges.associateBy({ it.a }, { e ->
             vertex(c + ((1 - cr) * (e.a - c)).rotated(r), VertexKind(directedEdgeKindsIndex[e.kind]!!))
         })
     }

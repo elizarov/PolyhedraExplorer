@@ -14,7 +14,6 @@ class Polyhedron(
 ) {
     val es: List<Edge>
     val directedEdges: List<Edge>
-    val faceDirectedEdges: IdMap<Face, List<Edge>> // edges are properly ordered clockwise
 
     // `build edges (unidirectional & directed)
     init {
@@ -59,10 +58,10 @@ class Polyhedron(
                 e0.rNext = e1
                 e1.reversed.lNext = e0.reversed
             }
+            f.directedEdges = fes
         }
         this.es = es
         this.directedEdges = directedEdges
-        this.faceDirectedEdges = faceDirectedEdges
     }
 
     val vertexKinds: IdMap<VertexKind, List<Vertex>> by lazy { vs.groupById { it.kind } }
@@ -176,6 +175,8 @@ class Face(
     val dualKind: FaceKind = kind // used only for by cantellation
 ) : Id, MutablePlane(fvs.averagePlane()) {
     val isPlanar = fvs.all { it in this }
+    lateinit var directedEdges: List<Edge> // edges are properly ordered clockwise
+
     override fun equals(other: Any?): Boolean = other is Face && id == other.id
     override fun hashCode(): Int = id
     override fun toString(): String =
