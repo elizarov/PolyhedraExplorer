@@ -162,5 +162,6 @@ private fun ChamferGeometry.chamferedTo(builder: PolyhedronBuilder, vr: Double =
             )
             face(fvs, FaceKind(faceKindOfs + edgeKindsIndex[e.kind]!!))
         }
+        mergeIndistinguishableKinds()
     }
 }

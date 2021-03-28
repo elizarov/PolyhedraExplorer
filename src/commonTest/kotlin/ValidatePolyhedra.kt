@@ -11,6 +11,42 @@ class ValidatePolyhedra {
     private val expandingTransforms = Transforms.filter { it.fev != TransformFEV.ID }
 
     @Test
+    fun testRectifiedTetrahedronIsOctahedron() {
+        val poly = Seed.Tetrahedron.poly.rectified()
+        poly.validate()
+        check(poly.faceKinds.size == 1)
+        check(poly.edgeKinds.size == 1)
+        check(poly.vertexKinds.size == 1)
+    }
+
+    @Test
+    fun testSnubTetrahedronIsIcosahedron() {
+        val poly = Seed.Tetrahedron.poly.snub()
+        poly.validate()
+        check(poly.faceKinds.size == 1)
+        check(poly.edgeKinds.size == 1)
+        check(poly.vertexKinds.size == 1)
+    }
+
+    @Test
+    fun testCantellatedTetrahedronSymmetry() {
+        val poly = Seed.Tetrahedron.poly.cantellated()
+        poly.validate()
+        check(poly.faceKinds.size == 2)
+        check(poly.edgeKinds.size == 1)
+        check(poly.vertexKinds.size == 1)
+    }
+
+    @Test
+    fun testBevelledTetrahedronSymmetry() {
+        val poly = Seed.Tetrahedron.poly.bevelled()
+        poly.validate()
+        check(poly.faceKinds.size == 2)
+        check(poly.edgeKinds.size == 2)
+        check(poly.vertexKinds.size == 1)
+    }
+
+    @Test
     fun validateSeeds() {
         testParameter("seed", Seeds) { seed ->
             val poly = seed.poly
@@ -34,6 +70,7 @@ class ValidatePolyhedra {
     fun validatePlatonicTransform() {
         testParameter("seed", Seeds.filter { it.type == SeedType.Platonic} ) { seed ->
             testParameter("transform", expandingTransforms) { transform ->
+                println("Checking $transform $seed")
                 seed.poly.transformed(transform).validate()
             }
         }
@@ -44,6 +81,7 @@ class ValidatePolyhedra {
     fun validatePlatonicCantellationSequence() {
         testParameter("seed", Seeds.filter { it.type == SeedType.Platonic}) { seed ->
             testParameter("n", 1..5) { n ->
+                println("Checking Cantellated^$n $seed")
                 seed.poly.transformed(List(n) { Transform.Cantellated }).validate()
             }
         }
@@ -55,6 +93,7 @@ class ValidatePolyhedra {
             testParameter("transform1", expandingTransforms) { transform1 ->
                 testParameter("transform2", expandingTransforms) { transform2 ->
                     if (isOkSequence(transform1, transform2)) {
+                        println("Checking $transform2 $transform1 $seed")
                         seed.poly.transformed(transform1, transform2).validate()
                     }
                 }
@@ -69,6 +108,7 @@ class ValidatePolyhedra {
                 testParameter("transform2", expandingTransforms) { transform2 ->
                     testParameter("transform3", expandingTransforms) { transform3 ->
                         if (isOkSequence(transform1, transform2, transform3)) {
+                            println("Checking $transform3 $transform2 $transform1 $seed")
                             seed.poly.transformed(transform1, transform2, transform3).validate()
                         }
                     }

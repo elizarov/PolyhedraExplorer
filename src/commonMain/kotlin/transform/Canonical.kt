@@ -31,7 +31,7 @@ suspend fun Polyhedron.canonical(progress: OperationProgressContext?): Polyhedro
     val monotonic = kotlin.time.TimeSource.Monotonic
     val startTime = monotonic.markNow()
     // copy vertices to mutate them
-    val vs = vs.map { it.toMutableVertex() }
+    val vs = vs.mapTo(ArrayList()) { it.toMutableVertex() }
     // pre-scale to an average midRadius of 1
     val preScale = 1 / midradius
     for (v in vs) v *= preScale
@@ -74,7 +74,7 @@ suspend fun Polyhedron.canonical(progress: OperationProgressContext?): Polyhedro
         maxError = max(maxError, center.norm)
         // recenter all vertices
         for (i in vs.indices) {
-            vs[i] -= center
+            vs[i].minusAssign(center)
         }
         center.setToZero()
         // check all faces & project vertices
@@ -132,11 +132,14 @@ suspend fun Polyhedron.canonical(progress: OperationProgressContext?): Polyhedro
     println("Canonical: done $iterations iterations in ${startTime.elapsedNow().inSeconds.fmtFix(3)} sec")
     totalIterations += iterations
     // copy faces with new vertices
-    val fs = fs.map { f ->
+    val fs = fs.mapTo(ArrayList()) { f ->
         MutableFace(f.id, f.fvs.map { vs[it.id] }, f.kind)
     }
     // rebuild polyhedron with new vertices and faces
-    return Polyhedron(vs, fs)
+    return PolyhedronBuilder(vs, fs).run {
+        mergeIndistinguishableKinds()
+        build()
+    }
 }
 
 fun Polyhedron.isCanonical(): Boolean {

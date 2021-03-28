@@ -139,6 +139,7 @@ fun Polyhedron.rectified(): Polyhedron = transformedPolyhedron(Transform.Rectifi
     for (v in vs) {
         face(v.directedEdges.map { ev[it.normalizedDirection()]!! }, FaceKind(kindOfs + v.kind.id))
     }
+    mergeIndistinguishableKinds()
 }
 
 // ea == PI / face_size
@@ -167,6 +168,7 @@ fun Polyhedron.truncated(tr: Double = regularTruncationRatio()): Polyhedron = tr
     for (v in vs) {
         face(v.directedEdges.map { ev[it]!! }, FaceKind(kindOfs + v.kind.id))
     }
+    mergeIndistinguishableKinds()
 }
 
 data class RegularFaceGeometry(
@@ -224,6 +226,7 @@ fun Polyhedron.cantellated(cr: Double = regularCantellationRatio()): Polyhedron 
         )
         face(fvs, FaceKind(kindOfs + edgeKindsIndex[e.kind]!!))
     }
+    mergeIndistinguishableKinds()
 }
 
 fun Polyhedron.dual(): Polyhedron = transformedPolyhedron(Transform.Dual) {
@@ -295,6 +298,7 @@ fun Polyhedron.bevelled(br: BevellingRatio = regularBevellingRatio()): Polyhedro
         )
         face(fvs, FaceKind(kindOfs + edgeKindsIndex[e.kind]!!))
     }
+    mergeIndistinguishableKinds()
 }
 
 // a * x^2 + b * x + c = 0
@@ -390,5 +394,6 @@ fun Polyhedron.snub(sr: SnubbingRatio = regularSnubbingRatio()) = transformedPol
         )
         face(fvs, FaceKind(kindOfs + directedEdgeKindsIndex[e.kind]!!))
     }
+    mergeIndistinguishableKinds()
 }
 
