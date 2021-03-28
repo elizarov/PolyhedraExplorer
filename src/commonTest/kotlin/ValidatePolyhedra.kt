@@ -11,6 +11,15 @@ class ValidatePolyhedra {
     private val expandingTransforms = Transforms.filter { it.fev != TransformFEV.ID }
 
     @Test
+    fun testSnubTetrahedronIsIcosahedron() {
+        val poly = Seed.Tetrahedron.poly.snub()
+        poly.validate()
+        check(poly.faceKinds.size == 1)
+        check(poly.edgeKinds.size == 1)
+        check(poly.vertexKinds.size == 1)
+    }
+
+    @Test
     fun validateSeeds() {
         testParameter("seed", Seeds) { seed ->
             val poly = seed.poly

@@ -41,29 +41,7 @@ fun Face.essence(): FaceKindEssence {
     val fes = directedEdges
     val size = fes.size
     val vfs = List(size) { VertexFaceKind(fes[it].a.kind, fes[it].l.kind) }
-    val figure = computeFigure(this, fvs)
-    return FaceKindEssence(kind, d, isPlanar, vfs.minCycle(), figure)
-}
-
-private fun computeFigure(plane: Plane, vs: List<Vec3>): PolygonProjection {
-    // project face vertices using all possible starting vertices
-    val c = plane.tangentPoint
-    val n = vs.size
-    val pvs = vs.withIndex().mapNotNull { (i0, v0) ->
-        if (v0 approx c) return@mapNotNull null
-        val ux = (v0 - c).unit
-        val list = ArrayList<Vec3>(n)
-        for (j in 0 until n) {
-            val v = vs[(i0 + j) % n] - c
-            val x = ux * v
-            val y = (ux cross v) * plane
-            val z = ux * plane
-            list += Vec3(x, y, z)
-        }
-        list
-    }
-    // select the maximum among them
-    return PolygonProjection(pvs.maxWithOrNull(VertexListApproxComparator)!!)
+    return FaceKindEssence(kind, d, isPlanar, vfs.minCycle(), computeProjectionFigure())
 }
 
 class VertexKindEssence(
@@ -87,9 +65,7 @@ fun Vertex.essence(): VertexKindEssence {
     val ves = directedEdges
     val size = ves.size
     val vfs = List(size) { VertexFaceKind(ves[it].b.kind, ves[it].r.kind) }
-    // use dual to compute figure 
-    val figure = computeFigure(dualPlane(1.0), directedEdges.map { it.r.dualPoint(1.0) })
-    return VertexKindEssence(kind, norm, vfs.minCycle(), figure)
+    return VertexKindEssence(kind, norm, vfs.minCycle(), computeProjectFigure())
 }
 
 class EdgeKindEssence(

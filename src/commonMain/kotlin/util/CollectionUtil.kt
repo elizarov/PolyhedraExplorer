@@ -35,3 +35,12 @@ inline fun <T, R> Sequence<T>.distinctIndexed(transform: (Int) -> R): Map<T, R> 
     return result
 }
 
+inline fun <T, R> Iterable<T>.distinctIndexed(transform: (Int) -> R): Map<T, R> {
+    val result = mutableMapOf<T, R>()
+    var index = 0
+    for (e in this) {
+        if (e !in result) result[e] = transform(index++)
+    }
+    return result
+}
+

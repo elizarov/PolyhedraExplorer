@@ -390,5 +390,6 @@ fun Polyhedron.snub(sr: SnubbingRatio = regularSnubbingRatio()) = transformedPol
         )
         face(fvs, FaceKind(kindOfs + directedEdgeKindsIndex[e.kind]!!))
     }
+    mergeIndistinguishableKinds()
 }
 
