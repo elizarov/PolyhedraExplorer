@@ -129,6 +129,11 @@ tr.info {
     vertical-align: top;
 }
 
+svg.figure {
+    width: 1em;
+    height: 1em;
+}
+
 /* --------- canvas fps --------- */
 
 .fps-container {

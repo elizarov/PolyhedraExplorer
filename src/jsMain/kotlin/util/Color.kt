@@ -38,3 +38,9 @@ fun hsvColor(h: Double, s: Double, v: Double, a: Double = 1.0): Color {
 }
 
 fun Color.toFloat32Array(): Float32Array = float32Of(r, g, b, a)
+
+fun Color.toRgbString() =
+    "rgb(${r.intColor},${g.intColor},${b.intColor})"
+
+private val Float.intColor
+    get() = (this * 255).roundToInt()

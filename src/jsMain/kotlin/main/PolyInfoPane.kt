@@ -30,7 +30,7 @@ class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
             td { +cnt.toString() }
             td { +distValue.fmtFix }
             td {
-                attrs { colSpan = "4" }
+                attrs { colSpan = "5" }
                 +distName
             }
         }
@@ -43,7 +43,8 @@ class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
                 // Faces
                 infoHeader("Faces", poly.fs.size, poly.inradius, "inradius")
                 for ((fk, fs) in poly.faceKinds) {
-                    val fe = fs[0].essence()
+                    val f0 = fs[0]
+                    val fe = f0.essence()
                     tr("info") {
                         td {
                             if (!fe.isPlanar) messageSpan(FaceNotPlanar())
@@ -51,6 +52,14 @@ class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
                         td("rt") { +fk.toString() }
                         td { +fs.size.toString() }
                         td { +fe.dist.fmtFix }
+                        td {
+                            svgPolygon(
+                                classes = "figure",
+                                figure = fe.figure,
+                                stroke = PolyStyle.edgeColor,
+                                fill = PolyStyle.faceColor(f0)
+                            )
+                        }
                         td("rt") { +"adj" }
                         td { +fe.vfs.size.toString() }
                         td {
@@ -70,6 +79,7 @@ class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
                         }
                         td { +vs.size.toString() }
                         td { +ve.dist.fmtFix }
+                        td {}
                         td("rt") { +"adj" }
                         td { +ve.vfs.size.toString() }
                         td {
@@ -89,6 +99,7 @@ class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
                         }
                         td { +es.size.toString() }
                         td { +ee.dist.fmtFix }
+                        td {}
                         td {}
                         td {}
                         td { +"len ${ee.len.fmtFix}" }

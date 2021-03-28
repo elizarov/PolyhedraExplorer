@@ -51,14 +51,14 @@ fun Face.essence(): FaceKindEssence {
         for (j in 0 until n) {
             val v = fvs[(i0 + j) % n] - c
             val x = ux * v
-            val y = (ux cross v).norm
+            val y = (ux cross v) * this
             val z = ux * this
-            Vec3(x, y, z)
+            list += Vec3(x, y, z)
         }
         list
     }
-    // select the minimum among them
-    val projectedVs = pvs.minWithOrNull(VertexListApproxComparator)!!
+    // select the maximum among them
+    val projectedVs = pvs.maxWithOrNull(VertexListApproxComparator)!!
     return FaceKindEssence(kind, d, isPlanar, vfs.minCycle(), PolygonProjection(projectedVs))
 }
 

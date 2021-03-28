@@ -25,7 +25,7 @@ private fun paletteColor(id: Int): Color {
 
 object PolyStyle {
     val edgeColor = hsvColor(0.0, 0.0, 0.1)
-    fun faceColor(f: Face, dual: Boolean): Color =
+    fun faceColor(f: Face, dual: Boolean = false): Color =
         paletteColor(if (dual) f.dualKind.id else f.kind.id)
 }
 
