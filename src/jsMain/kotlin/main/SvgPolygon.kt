@@ -14,12 +14,12 @@ import react.dom.*
 fun RBuilder.svgPolygon(classes: String, figure: PolygonProjection, stroke: Color, fill: Color) {
     val x0 = figure.vs.minOf { it.x }
     val y0 = figure.vs.minOf { it.y }
-    val vw = figure.vs.maxOf { it.x } - x0
-    val vh = figure.vs.maxOf { it.y } - y0
-    val sw = maxOf(vw, vh) / 20
+    val w0 = figure.vs.maxOf { it.x } - x0
+    val h0 = figure.vs.maxOf { it.y } - y0
+    val sw = maxOf(w0, h0) / 20
     svg(
         classes = classes,
-        viewBox = "${x0.fmt} ${y0.fmt} ${vw.fmt} ${vh.fmt}",
+        viewBox = "${(x0 - sw).fmt} ${(y0 - sw).fmt} ${(w0 + 2 * sw).fmt} ${(h0 + 2 * sw).fmt}",
         stroke = stroke.toRgbString(),
         strokeWidth = sw.fmt,
         fill = fill.toRgbString()
