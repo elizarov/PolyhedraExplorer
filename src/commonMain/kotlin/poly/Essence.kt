@@ -24,7 +24,7 @@ class FaceKindEssence(
     val dist: Double,
     val isPlanar: Boolean,
     val vfs: List<VertexFaceKind>,
-    val figure: PolygonProjection,
+    val figure: PolygonProjection
 ) {
     fun approx(other: FaceKindEssence): Boolean =
         kind == other.kind &&
@@ -41,36 +41,42 @@ fun Face.essence(): FaceKindEssence {
     val fes = directedEdges
     val size = fes.size
     val vfs = List(size) { VertexFaceKind(fes[it].a.kind, fes[it].l.kind) }
+    val figure = computeFigure(this, fvs)
+    return FaceKindEssence(kind, d, isPlanar, vfs.minCycle(), figure)
+}
+
+private fun computeFigure(plane: Plane, vs: List<Vec3>): PolygonProjection {
     // project face vertices using all possible starting vertices
-    val c = tangentPoint
-    val n = fvs.size
-    val pvs = fvs.withIndex().mapNotNull { (i0, v0) ->
+    val c = plane.tangentPoint
+    val n = vs.size
+    val pvs = vs.withIndex().mapNotNull { (i0, v0) ->
         if (v0 approx c) return@mapNotNull null
         val ux = (v0 - c).unit
         val list = ArrayList<Vec3>(n)
         for (j in 0 until n) {
-            val v = fvs[(i0 + j) % n] - c
+            val v = vs[(i0 + j) % n] - c
             val x = ux * v
-            val y = (ux cross v) * this
-            val z = ux * this
+            val y = (ux cross v) * plane
+            val z = ux * plane
             list += Vec3(x, y, z)
         }
         list
     }
     // select the maximum among them
-    val projectedVs = pvs.maxWithOrNull(VertexListApproxComparator)!!
-    return FaceKindEssence(kind, d, isPlanar, vfs.minCycle(), PolygonProjection(projectedVs))
+    return PolygonProjection(pvs.maxWithOrNull(VertexListApproxComparator)!!)
 }
 
 class VertexKindEssence(
     val kind: VertexKind,
     val dist: Double,
-    val vfs: List<VertexFaceKind>
+    val vfs: List<VertexFaceKind>,
+    val figure: PolygonProjection
 ) {
     fun approx(other: VertexKindEssence): Boolean =
         kind == other.kind &&
         dist approx other.dist &&
-        vfs == other.vfs
+        vfs == other.vfs &&
+        figure approx other.figure
 
     override fun toString() =
         "distance ${dist.fmt}, " +
@@ -81,7 +87,9 @@ fun Vertex.essence(): VertexKindEssence {
     val ves = directedEdges
     val size = ves.size
     val vfs = List(size) { VertexFaceKind(ves[it].b.kind, ves[it].r.kind) }
-    return VertexKindEssence(kind, norm, vfs.minCycle())
+    // use dual to compute figure 
+    val figure = computeFigure(dualPlane(1.0), directedEdges.map { it.r.dualPoint(1.0) })
+    return VertexKindEssence(kind, norm, vfs.minCycle(), figure)
 }
 
 class EdgeKindEssence(

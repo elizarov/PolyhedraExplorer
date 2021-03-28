@@ -27,6 +27,8 @@ object PolyStyle {
     val edgeColor = hsvColor(0.0, 0.0, 0.1)
     fun faceColor(f: Face, dual: Boolean = false): Color =
         paletteColor(if (dual) f.dualKind.id else f.kind.id)
+    fun vertexColor(v: Vertex): Color =
+        paletteColor(v.kind.id)
 }
 
 enum class Display(override val tag: String) : Tagged {

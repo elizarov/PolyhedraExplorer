@@ -71,7 +71,8 @@ class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
                 // Vertices
                 infoHeader("Vertices", poly.vs.size, poly.circumradius, "circumradius")
                 for ((vk, vs) in poly.vertexKinds) {
-                    val ve = vs[0].essence()
+                    val v0 = vs[0]
+                    val ve = v0.essence()
                     tr("info") {
                         td("rt") {
                             attrs { colSpan = "2" }
@@ -79,7 +80,14 @@ class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
                         }
                         td { +vs.size.toString() }
                         td { +ve.dist.fmtFix }
-                        td {}
+                        td {
+                            svgPolygon(
+                                classes = "figure",
+                                figure = ve.figure,
+                                stroke = PolyStyle.edgeColor,
+                                fill = PolyStyle.vertexColor(v0)
+                            )
+                        }
                         td("rt") { +"adj" }
                         td { +ve.vfs.size.toString() }
                         td {
