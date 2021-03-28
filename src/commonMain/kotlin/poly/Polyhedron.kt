@@ -9,17 +9,28 @@ import polyhedra.common.util.*
 
 @Serializable(with = PolyhedronSerializer::class)
 class Polyhedron(
-    val vs: List<Vertex>,
-    val fs: List<Face>
+    vs: List<MutableVertex>,
+    fs: List<Face>
 ) {
+    val vs: List<Vertex> = vs
+    val fs: List<Face> = fs
     val es: List<Edge>
     val directedEdges: List<Edge>
 
-    // `build edges (unidirectional & directed)
+    // `build edges (unidirectional & directed) and link them with vertices and faces
     init {
         val es = ArrayList<Edge>()
         val directedEdges = ArrayList<Edge>()
-        val faceDirectedEdges = ArrayIdMap<Face, ArrayList<Edge>>()
+        val vertexDirectedEdges = ArrayIdMap<MutableVertex, ArrayList<Edge>>(
+            vs.size,
+            keyFactory = { i -> vs[i] },
+            valueFactory = { ArrayList() }
+        )
+        val faceDirectedEdges = ArrayIdMap<Face, ArrayList<Edge>>(
+            fs.size,
+            keyFactory = { i -> fs[i] },
+            valueFactory = { ArrayList() }
+        )
         val lFaces = ArrayIdMap<Vertex, HashMap<Vertex, Face>>()
         for (f in fs) {
             for (i in 0 until f.size) {
@@ -46,9 +57,15 @@ class Polyhedron(
                 es += ea.normalizedDirection()
                 directedEdges += ea
                 directedEdges += eb
-                faceDirectedEdges.getOrPut(rf) { ArrayList() }.add(ea)
-                faceDirectedEdges.getOrPut(lf) { ArrayList() }.add(eb)
+                vertexDirectedEdges[a]!!.add(ea)
+                vertexDirectedEdges[b]!!.add(eb)
+                faceDirectedEdges[rf]!!.add(ea)
+                faceDirectedEdges[lf]!!.add(eb)
             }
+        }
+        for ((v, ves) in vertexDirectedEdges) {
+            ves.sortVertexAdjacentEdges(v)
+            v.directedEdges = ves
         }
         for ((f, fes) in faceDirectedEdges) {
             fes.sortFaceAdjacentEdges(f)
@@ -68,23 +85,6 @@ class Polyhedron(
     val faceKinds: IdMap<FaceKind, List<Face>> by lazy { fs.groupById { it.kind } }
     val edgeKinds: Map<EdgeKind, List<Edge>> by lazy { es.groupBy { it.kind } }
 
-    // adjacent edges are properly ordered
-    val vertexDirectedEdges: IdMap<Vertex, List<Edge>> by lazy {
-        directedEdges
-            .groupById { it.a }
-            .also {
-                it.entries.forEach { (v, ves) ->
-                    ves.sortVertexAdjacentEdges(v)
-                }
-            }
-    }
-
-    // adjacent faces are properly ordered
-    val vertexFaces: IdMap<Vertex, List<Face>> by lazy {
-        vertexDirectedEdges
-            .mapValues { e -> e.value.map { it.r } }
-    }
-    
     val edgeKindsIndex: Map<EdgeKind, Int> by lazy {
         es.asSequence()
             .map { it.kind }
@@ -148,6 +148,7 @@ inline class VertexKind(override val id: Int) : Id, Comparable<VertexKind> {
 
 interface Vertex : Id, Vec3 {
     val kind: VertexKind
+    val directedEdges: List<Edge> // edges are properly ordered clockwise
 }
 
 class MutableVertex(
@@ -155,12 +156,17 @@ class MutableVertex(
     pt: Vec3,
     override val kind: VertexKind,
 ) : Vertex, MutableVec3(pt) {
+    override lateinit var directedEdges: List<Edge> // edges are properly ordered clockwise
+
     override fun equals(other: Any?): Boolean = other is Vertex && id == other.id
     override fun hashCode(): Int = id
     override fun toString(): String = "$kind vertex(id=$id, ${super.toString()})"
 }
 
-fun Vertex.toMutableVertex() = MutableVertex(id, this, kind)
+fun Vertex.toMutableVertex(): MutableVertex =
+    MutableVertex(id, this, kind).apply {
+        directedEdges = this@toMutableVertex.directedEdges
+    }
 
 @Serializable
 inline class FaceKind(override val id: Int) : Id, Comparable<FaceKind> {
@@ -233,7 +239,7 @@ fun Edge.distanceTo(p: Vec3): Double =
     p.distanceToLine(a, b)
 
 class PolyhedronBuilder {
-    private val vs = ArrayList<Vertex>()
+    private val vs = ArrayList<MutableVertex>()
     private val fs = ArrayList<Face>()
 
     fun vertex(p: Vec3, kind: VertexKind = VertexKind(0)): Vertex =

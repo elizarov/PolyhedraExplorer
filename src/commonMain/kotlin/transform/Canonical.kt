@@ -36,7 +36,7 @@ suspend fun Polyhedron.canonical(progress: OperationProgressContext?): Polyhedro
     val preScale = 1 / midradius
     for (v in vs) v *= preScale
     // canonicalize
-    val vAvgFactor = DoubleArray(vs.size) { i -> 1.0 / vertexFaces[vs[i]]!!.size }
+    val vAvgFactor = DoubleArray(vs.size) { i -> 1.0 / vs[i].directedEdges.size }
     val dv = vs.map { MutableVec3() }
     val center = MutableVec3()
     val normSum = MutableVec3()

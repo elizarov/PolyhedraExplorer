@@ -114,3 +114,10 @@ class ArrayIdMap<K : Id, V : Any>(capacity: Int = 8) : AbstractMutableMap<K, V>(
     }
 }
 
+fun <K : Id, V : Any> ArrayIdMap(n: Int, keyFactory: (Int) -> K, valueFactory: (Int) -> V): ArrayIdMap<K, V> =
+    ArrayIdMap<K, V>(n).apply {
+        for (i in 0 until n) {
+            put(keyFactory(i), valueFactory(i))
+        }
+    }
+

@@ -137,7 +137,7 @@ fun Polyhedron.rectified(): Polyhedron = transformedPolyhedron(Transform.Rectifi
     // faces from the original vertices
     val kindOfs = faceKinds.size
     for (v in vs) {
-        face(vertexDirectedEdges[v]!!.map { ev[it.normalizedDirection()]!! }, FaceKind(kindOfs + v.kind.id))
+        face(v.directedEdges.map { ev[it.normalizedDirection()]!! }, FaceKind(kindOfs + v.kind.id))
     }
 }
 
@@ -165,7 +165,7 @@ fun Polyhedron.truncated(tr: Double = regularTruncationRatio()): Polyhedron = tr
     // faces from the original vertices
     val kindOfs = faceKinds.size
     for (v in vs) {
-        face(vertexDirectedEdges[v]!!.map { ev[it]!! }, FaceKind(kindOfs + v.kind.id))
+        face(v.directedEdges.map { ev[it]!! }, FaceKind(kindOfs + v.kind.id))
     }
 }
 
@@ -208,7 +208,7 @@ fun Polyhedron.cantellated(cr: Double = regularCantellationRatio()): Polyhedron 
     // faces from the original vertices
     var kindOfs = faceKinds.size
     for (v in vs) {
-        face(vertexDirectedEdges[v]!!.map { ev[it]!! },
+        face(v.directedEdges.map { ev[it]!! },
             FaceKind(kindOfs + v.kind.id), // cantellated kind
             FaceKind(v.kind.id) // dual kind
         )
@@ -233,8 +233,8 @@ fun Polyhedron.dual(): Polyhedron = transformedPolyhedron(Transform.Dual) {
         vertex(f.dualPoint(rr), VertexKind(f.kind.id))
     }
     // faces from the original vertices
-    for ((v, fl) in vertexFaces) {
-        face(fl.map { fv[it]!! }, FaceKind(v.kind.id))
+    for (v in vs) {
+        face(v.directedEdges.map { fv[it.r]!! }, FaceKind(v.kind.id))
     }
 }
 
@@ -275,7 +275,7 @@ fun Polyhedron.bevelled(br: BevellingRatio = regularBevellingRatio()): Polyhedro
     // faces from the original vertices
     var kindOfs = faceKinds.size
     for (v in vs) {
-        val fvs = vertexDirectedEdges[v]!!.flatMap { e ->
+        val fvs = v.directedEdges.flatMap { e ->
             listOf(fev[e.l]!![e]!!, fev[e.r]!![e]!!)
         }
         face(fvs,
@@ -377,7 +377,7 @@ fun Polyhedron.snub(sr: SnubbingRatio = regularSnubbingRatio()) = transformedPol
     // faces from the original vertices
     var kindOfs = faceKinds.size
     for (v in vs) {
-        val fvs = vertexFaces[v]!!.map { f -> fvv[f]!![v]!! }
+        val fvs = v.directedEdges.map { fvv[it.r]!![v]!! }
         face(fvs, FaceKind(kindOfs + v.kind.id))
     }
     // 3-faces from the directed edges

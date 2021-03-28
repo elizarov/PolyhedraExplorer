@@ -58,9 +58,9 @@ class VertexKindEssence(
 }
 
 fun Polyhedron.vertexEssence(v: Vertex): VertexKindEssence {
-    val es = vertexDirectedEdges[v]!!
-    val size = es.size
-    val vfs = List(size) { VertexFaceKind(es[it].b.kind, es[it].r.kind) }
+    val ves = v.directedEdges
+    val size = ves.size
+    val vfs = List(size) { VertexFaceKind(ves[it].b.kind, ves[it].r.kind) }
     return VertexKindEssence(v.kind, v.norm, vfs.minCycle())
 }
 
