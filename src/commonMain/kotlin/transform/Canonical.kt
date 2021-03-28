@@ -133,7 +133,7 @@ suspend fun Polyhedron.canonical(progress: OperationProgressContext?): Polyhedro
     totalIterations += iterations
     // copy faces with new vertices
     val fs = fs.map { f ->
-        Face(f.id, f.fvs.map { vs[it.id] }, f.kind)
+        MutableFace(f.id, f.fvs.map { vs[it.id] }, f.kind)
     }
     // rebuild polyhedron with new vertices and faces
     return Polyhedron(vs, fs)

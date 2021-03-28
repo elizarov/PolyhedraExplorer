@@ -10,7 +10,7 @@ import polyhedra.common.util.*
 @Serializable(with = PolyhedronSerializer::class)
 class Polyhedron(
     vs: List<MutableVertex>,
-    fs: List<Face>
+    fs: List<MutableFace>
 ) {
     val vs: List<Vertex> = vs
     val fs: List<Face> = fs
@@ -26,7 +26,7 @@ class Polyhedron(
             keyFactory = { i -> vs[i] },
             valueFactory = { ArrayList() }
         )
-        val faceDirectedEdges = ArrayIdMap<Face, ArrayList<Edge>>(
+        val faceDirectedEdges = ArrayIdMap<MutableFace, ArrayList<Edge>>(
             fs.size,
             keyFactory = { i -> fs[i] },
             valueFactory = { ArrayList() }
@@ -174,14 +174,22 @@ inline class FaceKind(override val id: Int) : Id, Comparable<FaceKind> {
     override fun toString(): String = idString(id, 'α', 'ω')
 }
 
-class Face(
+interface Face : Id, Plane {
+    val fvs: List<Vertex>
+    val kind: FaceKind
+    val dualKind: FaceKind // used only for by cantellation
+    val isPlanar: Boolean
+    val directedEdges: List<Edge> // edges are properly ordered clockwise
+}
+
+class MutableFace(
     override val id: Int,
-    val fvs: List<Vertex>,
-    val kind: FaceKind,
-    val dualKind: FaceKind = kind // used only for by cantellation
-) : Id, MutablePlane(fvs.averagePlane()) {
-    val isPlanar = fvs.all { it in this }
-    lateinit var directedEdges: List<Edge> // edges are properly ordered clockwise
+    override val fvs: List<Vertex>,
+    override val kind: FaceKind,
+    override val dualKind: FaceKind = kind // used only for by cantellation
+) : Face, MutablePlane(fvs.averagePlane()) {
+    override val isPlanar = fvs.all { it in this }
+    override lateinit var directedEdges: List<Edge> // edges are properly ordered clockwise
 
     override fun equals(other: Any?): Boolean = other is Face && id == other.id
     override fun hashCode(): Int = id
@@ -240,7 +248,7 @@ fun Edge.distanceTo(p: Vec3): Double =
 
 class PolyhedronBuilder {
     private val vs = ArrayList<MutableVertex>()
-    private val fs = ArrayList<Face>()
+    private val fs = ArrayList<MutableFace>()
 
     fun vertex(p: Vec3, kind: VertexKind = VertexKind(0)): Vertex =
         MutableVertex(vs.size, p, kind).also { vs.add(it) }
@@ -250,16 +258,16 @@ class PolyhedronBuilder {
 
     fun face(vararg fvIds: Int, kind: FaceKind = FaceKind(0)) {
         val a = List(fvIds.size) { vs[fvIds[it]] }
-        fs.add(Face(fs.size, a, kind))
+        fs.add(MutableFace(fs.size, a, kind))
     }
 
     fun face(fvIds: List<Int>, kind: FaceKind = FaceKind(0)) {
         val a = List(fvIds.size) { vs[fvIds[it]] }
-        fs.add(Face(fs.size, a, kind))
+        fs.add(MutableFace(fs.size, a, kind))
     }
 
     fun face(fvs: Collection<Vertex>, kind: FaceKind, dualKind: FaceKind = kind) {
-        fs.add(Face(fs.size, fvs.map { vs[it.id] }, kind, dualKind))
+        fs.add(MutableFace(fs.size, fvs.map { vs[it.id] }, kind, dualKind))
     }
 
     fun face(f: Face) {
