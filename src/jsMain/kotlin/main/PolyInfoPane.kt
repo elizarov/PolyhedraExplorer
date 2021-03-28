@@ -43,7 +43,7 @@ class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
                 // Faces
                 infoHeader("Faces", poly.fs.size, poly.inradius, "inradius")
                 for ((fk, fs) in poly.faceKinds) {
-                    val fe = poly.faceEssence(fs[0])
+                    val fe = fs[0].essence()
                     tr("info") {
                         td {
                             if (!fe.isPlanar) messageSpan(FaceNotPlanar())
@@ -62,7 +62,7 @@ class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
                 // Vertices
                 infoHeader("Vertices", poly.vs.size, poly.circumradius, "circumradius")
                 for ((vk, vs) in poly.vertexKinds) {
-                    val ve = poly.vertexEssence(vs[0])
+                    val ve = vs[0].essence()
                     tr("info") {
                         td("rt") {
                             attrs { colSpan = "2" }
@@ -81,7 +81,7 @@ class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
                 // Edges
                 infoHeader("Edges", poly.es.size, poly.midradius, "midradius")
                 for ((ek, es) in poly.edgeKinds) {
-                    val ee = poly.edgeEssence(es[0])
+                    val ee = es[0].essence()
                     tr("info") {
                         td("rt") {
                             attrs { colSpan = "2" }

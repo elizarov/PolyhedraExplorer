@@ -10,6 +10,17 @@ const val EPS = 1e-10
 
 infix fun Double.approx(x: Double): Boolean = abs(this - x) < EPS
 
+object DoubleApproxComparator : Comparator<Double> {
+    override fun compare(a: Double, b: Double): Int {
+        val d = a - b
+        return when {
+            abs(d) < EPS -> 0
+            d < 0 -> -1
+            else -> 1
+        }
+    }
+}
+
 fun sqr(x: Double): Double = x * x
 
 fun frac(x: Double) = x - floor(x)

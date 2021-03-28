@@ -24,22 +24,42 @@ class FaceKindEssence(
     val dist: Double,
     val isPlanar: Boolean,
     val vfs: List<VertexFaceKind>,
+    val figure: PolygonProjection,
 ) {
     fun approx(other: FaceKindEssence): Boolean =
         kind == other.kind &&
         dist approx other.dist &&
-        vfs == other.vfs
+        vfs == other.vfs &&
+        figure approx other.figure
     
     override fun toString() =
         "distance ${dist.fmt}, " +
         "adj ${vfs.size} [${vfs.joinToString(" ")}]"
 }
 
-fun Polyhedron.faceEssence(f: Face): FaceKindEssence {
-    val fes = f.directedEdges
+fun Face.essence(): FaceKindEssence {
+    val fes = directedEdges
     val size = fes.size
     val vfs = List(size) { VertexFaceKind(fes[it].a.kind, fes[it].l.kind) }
-    return FaceKindEssence(f.kind, f.d, f.isPlanar, vfs.minCycle())
+    // project face vertices using all possible starting vertices
+    val c = tangentPoint
+    val n = fvs.size
+    val pvs = fvs.withIndex().mapNotNull { (i0, v0) ->
+        if (v0 approx c) return@mapNotNull null
+        val ux = (v0 - c).unit
+        val list = ArrayList<Vec3>(n)
+        for (j in 0 until n) {
+            val v = fvs[(i0 + j) % n] - c
+            val x = ux * v
+            val y = (ux cross v).norm
+            val z = ux * this
+            Vec3(x, y, z)
+        }
+        list
+    }
+    // select the minimum among them
+    val projectedVs = pvs.minWithOrNull(VertexListApproxComparator)!!
+    return FaceKindEssence(kind, d, isPlanar, vfs.minCycle(), PolygonProjection(projectedVs))
 }
 
 class VertexKindEssence(
@@ -57,24 +77,30 @@ class VertexKindEssence(
         "adj ${vfs.size} [${vfs.joinToString(" ")}]"
 }
 
-fun Polyhedron.vertexEssence(v: Vertex): VertexKindEssence {
-    val ves = v.directedEdges
+fun Vertex.essence(): VertexKindEssence {
+    val ves = directedEdges
     val size = ves.size
     val vfs = List(size) { VertexFaceKind(ves[it].b.kind, ves[it].r.kind) }
-    return VertexKindEssence(v.kind, v.norm, vfs.minCycle())
+    return VertexKindEssence(kind, norm, vfs.minCycle())
 }
 
-class EdgeKindEssense(
+class EdgeKindEssence(
     val kind: EdgeKind,
     val dist: Double,
     val len: Double,
     val dihedralAngle: Double
-)
+) {
+    fun approx(other: EdgeKindEssence): Boolean =
+        kind == other.kind &&
+        dist approx other.dist &&
+        len approx other.len &&
+        dihedralAngle approx other.dihedralAngle
+}
 
-fun Polyhedron.edgeEssence(e: Edge): EdgeKindEssense {
-    val dist = e.midPoint(MidPoint.Closest).norm
-    val dihedralAngle = PI - acos(e.l * e.r)
-    return EdgeKindEssense(e.kind, dist, e.len, dihedralAngle)
+fun Edge.essence(): EdgeKindEssence {
+    val dist = midPoint(MidPoint.Closest).norm
+    val dihedralAngle = PI - acos(l * r)
+    return EdgeKindEssence(kind, dist, len, dihedralAngle)
 }
 
 fun <T : Comparable<T>> List<T>.minCycle(): List<T> {

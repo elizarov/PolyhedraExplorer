@@ -148,6 +148,16 @@ fun Double.distanceAtSegment(a: Vec3, b: Vec3): Double { // norm(a + this * (b -
 infix fun Vec3.approx(u: Vec3): Boolean =
     x approx u.x && y approx u.y && z approx u.z
 
+object Vec3ApproxComparator : Comparator<Vec3> {
+    override fun compare(a: Vec3, b: Vec3): Int {
+        val x = DoubleApproxComparator.compare(a.x, b.x)
+        if (x != 0) return x
+        val y = DoubleApproxComparator.compare(a.y, b.y)
+        if (y != 0) return y
+        return DoubleApproxComparator.compare(a.z, b.z)
+    }
+}
+
 // distance from this point to a line A-B
 fun Vec3.distanceToLine(a: Vec3, b: Vec3): Double {
     val a0 = a - this
