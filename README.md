@@ -50,10 +50,10 @@ gradlew jsBrowserDevelopmentRun
   * [ ] Two-finger Z-rotate gesture (does not seem to be supported on macOS Chrome)
   * [ ] Select/show/hide faces by kind with point and click
 * Polyhedron info
-  * [ ] Show face and vertex geometry
+  * [x] Show face and vertex geometry
   * [x] Show edge dihedral angles
 * Transformations
-  * [ ] Merge face kind when possible
+  * [x] Merge face kind when possible
   * [ ] Redesign truncation algorithm so that it always works
   * [ ] Rectification solution for non-regular polyhedra  
   * [ ] Stellation
