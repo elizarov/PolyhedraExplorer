@@ -9,71 +9,76 @@ import polyhedra.common.poly.*
 private const val POW2 = 7
 private const val SHIFT = 32 - POW2
 private const val HASH_CAPACITY = 1 shl POW2
+private const val CACHE_SIZE_LIMIT = HASH_CAPACITY / 2
 private const val HASH_MASK = (1 shl POW2) - 1
-private const val LRU_CAPACITY = 1 shl (POW2 - 1) // 64
 private const val MAGIC = 2654435769L.toInt() // golden ratio
 
 @Suppress("RESULT_CLASS_IN_RETURN_TYPE")
 object TransformCache {
-    // first and last elements in the array are sentinels
-    private val lru = arrayOfNulls<Entry>(LRU_CAPACITY + 2)
-    private val hash = IntArray(HASH_CAPACITY)
-    private var lruSize = 0 // numbered from 1 (sic!)
+    private val hash = arrayOfNulls<Entry?>(HASH_CAPACITY)
+    private var hashSize = 0
+    private var lruFirst: Entry? = null
+    private var lruLast: Entry? = null
 
     private class Entry(
-        var lruIndex: Int,
         var hashIndex: Int,
         val poly: Polyhedron,
         val key: Any,
         val param: Any?,
         var result: Result<Polyhedron>
-    )
+    ) {
+        var lruPrev: Entry? = null
+        var lruNext: Entry? = null
+    }
 
     private fun hashIndex0(poly: Polyhedron, key: Any, param: Any?): Int =
         (((poly.hashCode() * 31 + key.hashCode()) * 31 + param.hashCode()) * MAGIC) ushr SHIFT
 
-    private fun putAtLruIndex(entry: Entry, lruIndex: Int) {
-        lru[lruIndex] = entry
-        entry.lruIndex = lruIndex
-        hash[entry.hashIndex] = lruIndex
-    }
-
     private fun pullUpLru(entry: Entry) {
-        val lruIndex = entry.lruIndex
-        val next = lru[lruIndex + 1] ?: return // already last
-        putAtLruIndex(entry, lruIndex + 1)
-        putAtLruIndex(next, lruIndex)
+        if (entry.lruPrev == null) return // already first
+        removeLru(entry)
+        addLruFirst(entry)
     }
 
-    private fun dropOldest(k: Int) {
-        // remove from LRU
-        for (i in 1..k) {
-            hashRemove(lru[i]!!.hashIndex)
-        }
-        for (i in k + 1..lruSize) {
-            putAtLruIndex(lru[i]!!, i - k)
-        }
-        for (i in lruSize - k + 1..lruSize) {
-            lru[i] = null
-        }
-        lruSize -= k
+    private fun removeLru(entry: Entry) {
+        val prev = entry.lruPrev
+        val next = entry.lruNext
+        if (prev == null) lruFirst = next else prev.lruNext = next
+        if (next == null) lruLast = prev else next.lruPrev = prev
     }
 
-    private fun hashRemove(removeAt: Int) {
-        hash[removeAt] = 0
-        var hole = removeAt
+    private fun addLruFirst(entry: Entry) {
+        val first = lruFirst
+        lruFirst = entry
+        entry.lruPrev = null
+        entry.lruNext = first
+        if (first == null) lruLast = entry else first.lruPrev = entry
+    }
+
+    private fun dropOldest() {
+        val last = lruLast ?: return
+        val prev = last.lruPrev
+        lruLast = prev
+        prev?.lruNext = null
+        hashRemove(last)
+    }
+
+    private fun hashRemove(entry: Entry) {
+        hash[entry.hashIndex] = null
+        hashSize--
+        var hole = entry.hashIndex
         var i = hole
         while (true) {
             if (i == 0) i = hash.size
             i--
-            val e = lru[hash[i]] ?: return
+            val e = hash[i] ?: return
             val j = hashIndex0(e.poly, e.key, e.param)
             val entryDist = (j - i) and HASH_MASK
             val holeDist = (hole - i) and HASH_MASK
             if (holeDist <= entryDist) {
                 e.hashIndex = hole
-                hash[hole] = e.lruIndex
-                hash[i] = 0
+                hash[hole] = e
+                hash[i] = null
                 hole = i
             }
         }
@@ -82,7 +87,7 @@ object TransformCache {
     operator fun get(poly: Polyhedron, key: Any, param: Any? = null): Polyhedron? {
         var i = hashIndex0(poly, key, param)
         while(true) {
-            val e = lru[hash[i]] ?: return null
+            val e = hash[i] ?: return null
             if (e.poly == poly && e.key == key && e.param == param) {
                 pullUpLru(e)
                 return e.result.getOrThrow()
@@ -95,7 +100,7 @@ object TransformCache {
     operator fun set(poly: Polyhedron, key: Any, param: Any? = null, result: Result<Polyhedron>) {
         var i = hashIndex0(poly, key, param)
         while(true) {
-            val e = lru[hash[i]] ?: break
+            val e = hash[i] ?: break
             if (e.poly == poly && e.key == key && e.param == param) {
                 e.result = result
                 pullUpLru(e)
@@ -104,11 +109,11 @@ object TransformCache {
             if (i == 0) i = hash.size
             i--
         }
-        if (lruSize >= LRU_CAPACITY) dropOldest(lruSize / 4) // drop a quarter
-        lruSize++
-        val e = Entry(lruSize, i, poly, key, param, result)
-        lru[lruSize] = e
-        hash[i] = lruSize
+        if (hashSize >= CACHE_SIZE_LIMIT) dropOldest()
+        val e = Entry(i, poly, key, param, result)
+        hash[i] = e
+        hashSize++
+        addLruFirst(e)
     }
 }
 
