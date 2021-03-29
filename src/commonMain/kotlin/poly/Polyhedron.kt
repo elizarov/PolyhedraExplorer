@@ -69,12 +69,6 @@ class Polyhedron(
         }
         for ((f, fes) in faceDirectedEdges) {
             fes.sortFaceAdjacentEdges(f)
-            for (i in 0 until fes.size) {
-                val e0 = fes[i]
-                val e1 = fes[(i + 1) % fes.size]
-                e0.rNext = e1
-                e1.reversed.lNext = e0.reversed
-            }
             f.directedEdges = fes
         }
         this.es = es
@@ -106,8 +100,8 @@ class Polyhedron(
             }
         )
         for (ie in ki.values) {
-            ie.lNext = ki[ke[ie.kind]!!.lNext.kind]!!
-            ie.rNext = ki[ke[ie.kind]!!.rNext.kind]!!
+            ie.lNext = ki[ke[ie.kind]!!.next(IsoDir.L).kind]!!
+            ie.rNext = ki[ke[ie.kind]!!.next(IsoDir.R).kind]!!
         }
         ki.values.toList()
     }
@@ -241,9 +235,13 @@ data class Edge(
 ) {
     val kind: EdgeKind = EdgeKind(a.kind, b.kind, l.kind, r.kind)
     lateinit var reversed: Edge
-    lateinit var rNext: Edge // next clockwise edge on the right face
-    lateinit var lNext: Edge // next clockwise edge on the left face
     override fun toString(): String = "$kind edge(${a.id}-${l.id}/${r.id}-${b.id})"
+
+    // next clockwise edge on right/left face
+    fun next(dir: IsoDir): Edge = when (dir) {
+        IsoDir.R -> r.directedEdges.find { it.a == b }!!
+        IsoDir.L -> l.directedEdges.find { it.b == b }!!.reversed
+    }
 }
 
 fun Edge.normalizedDirection(): Edge {
