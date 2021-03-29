@@ -97,6 +97,21 @@ class Polyhedron(
             .distinctIndexed { it }
     }
 
+    val isoEdges: List<IsoEdge> by lazy {
+        val ke = directedEdges.associateBy({ it.kind }, { it })
+        val ki = ke.entries.associateBy(
+            keySelector = { (ek, _) -> ek },
+            valueTransform = { (ek, e) ->
+                IsoEdge(ek, EdgeEquivalenceClass(e))
+            }
+        )
+        for (ie in ki.values) {
+            ie.lNext = ki[ke[ie.kind]!!.lNext.kind]!!
+            ie.rNext = ki[ke[ie.kind]!!.rNext.kind]!!
+        }
+        ki.values.toList()
+    }
+
     val inradius: Double by lazy { fs.minOf { f -> f.d } }
     val midradius: Double by lazy { es.avgOf { e -> e.midPoint(MidPoint.Closest).norm } }
     val circumradius: Double by lazy { vs.maxOf { v -> v.norm } }
@@ -285,10 +300,10 @@ class PolyhedronBuilder(
     fun build(): Polyhedron {
         val poly = Polyhedron(vs, fs)
         if (!mergeIndistinguishableKinds) return poly
-        val ge = poly.directedEdges.groupIndistinguishable()
+        val ge = poly.isoEdges.groupIndistinguishable()
         val gk = ge.mapTo(HashSet()) { list ->
-            val vks = list.mapTo(HashSet()) { it.a.kind }
-            val fks = list.mapTo(HashSet()) { it.r.kind }
+            val vks = list.mapTo(HashSet()) { it.kind.a }
+            val fks = list.mapTo(HashSet()) { it.kind.r }
             vks to fks
         }
         val (vkg, fkg) = gk.filterIndistinguishableKinds()
