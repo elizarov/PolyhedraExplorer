@@ -1,6 +1,6 @@
 plugins {
-    kotlin("multiplatform") version "1.4.31"
-    kotlin("plugin.serialization") version "1.4.31"
+    kotlin("multiplatform") version "1.5.0-M2"
+    kotlin("plugin.serialization") version "1.5.0-M2"
     application
 }
 
@@ -24,7 +24,6 @@ kotlin {
     jvm {
         compilations.all {
             kotlinOptions.jvmTarget = "1.8"
-            kotlinOptions.freeCompilerArgs += "-Xuse-ir"
         }
         testRuns["test"].executionTask.configure {
             useJUnit()
