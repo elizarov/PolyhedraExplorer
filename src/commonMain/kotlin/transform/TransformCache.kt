@@ -119,7 +119,11 @@ object TransformCache {
 
 fun Polyhedron.transformedPolyhedron(key: Any, param: Any? = null, block: PolyhedronBuilder.() -> Unit): Polyhedron {
     TransformCache[this, key, param]?.let { return it }
-    val result = runCatching { polyhedron(block) }
+    val result = runCatching {
+        polyhedron {
+            block()
+        }
+    }
     TransformCache[this, key, param] = result
     return result.getOrThrow()
 }

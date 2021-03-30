@@ -27,16 +27,17 @@ private const val speedFactorFaces = 2.0 // diverges when larger
 // Algorithm from https://www.georgehart.com/virtual-polyhedra/canonical.html
 @OptIn(ExperimentalTime::class)
 suspend fun Polyhedron.canonical(progress: OperationProgressContext?): Polyhedron {
+    val poly = this
     // https://youtrack.jetbrains.com/issue/KT-42625 workaround
     val monotonic = kotlin.time.TimeSource.Monotonic
     val startTime = monotonic.markNow()
-    // copy vertices to mutate them
-    val vs = vs.mapTo(ArrayList()) { it.toMutableVertex() }
+    // copy vertices coordinates to mutate them
+    val vs = vs.mapTo(ArrayList()) { it.toMutableVec3() }
     // pre-scale to an average midRadius of 1
     val preScale = 1 / midradius
     for (v in vs) v *= preScale
     // canonicalize
-    val vAvgFactor = DoubleArray(vs.size) { i -> 1.0 / vs[i].directedEdges.size }
+    val vAvgFactor = DoubleArray(vs.size) { i -> 1.0 / poly.vs[i].directedEdges.size }
     val dv = vs.map { MutableVec3() }
     val center = MutableVec3()
     val normSum = MutableVec3()
@@ -50,15 +51,17 @@ suspend fun Polyhedron.canonical(progress: OperationProgressContext?): Polyhedro
         // check all edges
         for (f in fs) {
             for (i in 0 until f.size) {
-                val a = vs[f[i].id]
-                val b = vs[f[(i + 1) % f.size].id]
+                val aid = f[i].id
+                val bid = f[(i + 1) % f.size].id
+                val a = vs[aid]
+                val b = vs[bid]
                 val tf = tangentFraction(a, b)
                 check(!tf.isNaN())
                 tf.atSegmentTo(h, a, b)
                 val err = 1.0 - h.norm
                 maxError = max(maxError, abs(err))
-                dv[a.id].plusAssignMul(h, err)
-                dv[b.id].plusAssignMul(h, err)
+                dv[aid].plusAssignMul(h, err)
+                dv[bid].plusAssignMul(h, err)
             }
         }
         // apply average of edge adjustments
@@ -131,14 +134,10 @@ suspend fun Polyhedron.canonical(progress: OperationProgressContext?): Polyhedro
     }
     println("Canonical: done $iterations iterations in ${startTime.elapsedNow().inSeconds.fmtFix(3)} sec")
     totalIterations += iterations
-    // copy faces with new vertices
-    val fs = fs.mapTo(ArrayList()) { f ->
-        MutableFace(f.id, f.fvs.map { vs[it.id] }, f.kind)
-    }
-    // rebuild polyhedron with new vertices and faces
-    return PolyhedronBuilder(vs, fs).run {
-        mergeIndistinguishableKinds()
-        build()
+    // rebuild polyhedron with new vertices and old faces
+    return polyhedron(mergeIndistinguishableKinds = true) {
+        for (i in vs.indices) vertex(vs[i], poly.vs[i].kind)
+        faces(fs)
     }
 }
 

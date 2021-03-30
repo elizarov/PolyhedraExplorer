@@ -21,17 +21,7 @@ class Polyhedron(
     init {
         val es = ArrayList<Edge>()
         val directedEdges = ArrayList<Edge>()
-        val vertexDirectedEdges = ArrayIdMap<MutableVertex, ArrayList<Edge>>(
-            vs.size,
-            keyFactory = { i -> vs[i] },
-            valueFactory = { ArrayList() }
-        )
-        val faceDirectedEdges = ArrayIdMap<MutableFace, ArrayList<Edge>>(
-            fs.size,
-            keyFactory = { i -> fs[i] },
-            valueFactory = { ArrayList() }
-        )
-        val lFaces = ArrayIdMap<Vertex, HashMap<Vertex, Face>>()
+        val lFaces = ArrayIdMap<Vertex, HashMap<Vertex, MutableFace>>()
         for (f in fs) {
             for (i in 0 until f.size) {
                 val a = f[i]
@@ -43,8 +33,8 @@ class Polyhedron(
         }
         for (rf in fs) {
             for (i in 0 until rf.size) {
-                val a = rf[i]
-                val b = rf[(i + 1) % rf.size]
+                val a = rf.fvs[i]
+                val b = rf.fvs[(i + 1) % rf.size]
                 if (a.id >= b.id) continue
                 val lf = lFaces[a]?.get(b)
                 require(lf != null) {
@@ -57,20 +47,14 @@ class Polyhedron(
                 es += ea.normalizedDirection()
                 directedEdges += ea
                 directedEdges += eb
-                vertexDirectedEdges[a]!!.add(ea)
-                vertexDirectedEdges[b]!!.add(eb)
-                faceDirectedEdges[rf]!!.add(ea)
-                faceDirectedEdges[lf]!!.add(eb)
+                a.directedEdges.add(ea)
+                b.directedEdges.add(eb)
+                rf.directedEdges.add(ea)
+                lf.directedEdges.add(eb)
             }
         }
-        for ((v, ves) in vertexDirectedEdges) {
-            ves.sortVertexAdjacentEdges(v)
-            v.directedEdges = ves
-        }
-        for ((f, fes) in faceDirectedEdges) {
-            fes.sortFaceAdjacentEdges(f)
-            f.directedEdges = fes
-        }
+        for (v in vs) v.directedEdges.sortVertexAdjacentEdges(v)
+        for (f in fs) f.directedEdges.sortFaceAdjacentEdges(f)
         this.es = es
         this.directedEdges = directedEdges
     }
@@ -123,7 +107,7 @@ class Polyhedron(
         "Polyhedron(vs=${vs.size}, es=${es.size}, fs=${fs.size})"
 }
 
-private fun ArrayList<Edge>.sortVertexAdjacentEdges(v: Vertex) {
+private fun MutableList<Edge>.sortVertexAdjacentEdges(v: Vertex) {
     require(all { it.a == v })
     for (i in 1 until size) {
         val prev = this[i - 1].r
@@ -132,7 +116,7 @@ private fun ArrayList<Edge>.sortVertexAdjacentEdges(v: Vertex) {
     }
 }
 
-private fun ArrayList<Edge>.sortFaceAdjacentEdges(f: Face) {
+private fun MutableList<Edge>.sortFaceAdjacentEdges(f: Face) {
     require(all { it.r == f })
     for (i in 1 until size) {
         val prev = this[i - 1].b
@@ -168,18 +152,15 @@ class MutableVertex(
     override val id: Int,
     pt: Vec3,
     override var kind: VertexKind,
+    override val directedEdges: MutableList<Edge> = ArrayList() // edges are properly ordered clockwise
 ) : Vertex, MutableVec3(pt), MutableKind<VertexKind> {
-    override lateinit var directedEdges: List<Edge> // edges are properly ordered clockwise
-
     override fun equals(other: Any?): Boolean = other is Vertex && id == other.id
     override fun hashCode(): Int = id
     override fun toString(): String = "$kind vertex(id=$id, ${super.toString()})"
 }
 
 fun Vertex.toMutableVertex(): MutableVertex =
-    MutableVertex(id, this, kind).apply {
-        directedEdges = this@toMutableVertex.directedEdges
-    }
+    MutableVertex(id, this, kind, directedEdges.toMutableList())
 
 @Serializable
 inline class FaceKind(override val id: Int) : Id, Comparable<FaceKind> {
@@ -197,12 +178,12 @@ interface Face : Id, Plane {
 
 class MutableFace(
     override val id: Int,
-    override val fvs: List<Vertex>,
+    override val fvs: List<MutableVertex>,
     override var kind: FaceKind,
-    override val dualKind: FaceKind = kind // used only for by cantellation
+    override val dualKind: FaceKind = kind, // used only for by cantellation
+    override val directedEdges: MutableList<Edge> = ArrayList() // edges are properly ordered clockwise
 ) : Face, MutablePlane(fvs.averagePlane()), MutableKind<FaceKind> {
     override val isPlanar = fvs.all { it in this }
-    override lateinit var directedEdges: List<Edge> // edges are properly ordered clockwise
 
     override fun equals(other: Any?): Boolean = other is Face && id == other.id
     override fun hashCode(): Int = id
@@ -266,16 +247,23 @@ fun Edge.distanceTo(p: Vec3): Double =
 private const val DEBUG_MERGE_KINDS = false
 
 class PolyhedronBuilder(
-    private val vs: ArrayList<MutableVertex> = ArrayList(),
-    private val fs: ArrayList<MutableFace> = ArrayList()
+    private var mergeIndistinguishableKinds: Boolean = false
 ) {
-    private var mergeIndistinguishableKinds = false
+    private val vs: ArrayList<MutableVertex> = ArrayList()
+    private val fs: ArrayList<MutableFace> = ArrayList()
 
     fun vertex(p: Vec3, kind: VertexKind = VertexKind(0)): Vertex =
         MutableVertex(vs.size, p, kind).also { vs.add(it) }
 
     fun vertex(x: Double, y: Double, z: Double, kind: VertexKind = VertexKind(0)): Vertex =
         vertex(Vec3(x, y, z), kind)
+
+    fun vertex(v: Vertex): Vertex =
+        vertex(v, v.kind)
+
+    fun vertices(vs: List<Vertex>) {
+        for (v in vs) vertex(v)
+    }
 
     fun face(vararg fvIds: Int, kind: FaceKind = FaceKind(0)) {
         val a = List(fvIds.size) { vs[fvIds[it]] }
@@ -293,6 +281,10 @@ class PolyhedronBuilder(
 
     fun face(f: Face) {
         face(f.fvs, f.kind, f.dualKind)
+    }
+
+    fun faces(fs: List<Face>) {
+        for (f in fs) face(f)
     }
 
     fun build(): Polyhedron {
@@ -313,9 +305,11 @@ class PolyhedronBuilder(
             println("Resulting vkg = $vkg")
             println("Resulting fkg = $fkg")
         }
+        // Renumber kinds
         vs.renumberKinds(vkg) { VertexKind(it) }
         fs.renumberKinds(fkg) { FaceKind(it) }
-        return Polyhedron(vs, fs)
+        // Rebuild polyhedron with renumbered kinds
+        return polyhedronCopy(vs, fs)
     }
 
     fun debugDump() {
@@ -328,10 +322,16 @@ class PolyhedronBuilder(
     }
 }
 
-fun polyhedron(block: PolyhedronBuilder.() -> Unit): Polyhedron =
-    PolyhedronBuilder().run {
+fun polyhedron(mergeIndistinguishableKinds: Boolean = false, block: PolyhedronBuilder.() -> Unit): Polyhedron =
+    PolyhedronBuilder(mergeIndistinguishableKinds).run {
         block()
         build()
+    }
+
+fun polyhedronCopy(vs: List<Vertex>, fs: List<Face>, mergeIndistinguishableKinds: Boolean = false) =
+    polyhedron(mergeIndistinguishableKinds) {
+        vertices(vs)
+        faces(fs)
     }
 
 private fun <T> MutableList<T>.swap(i: Int, j: Int) {
