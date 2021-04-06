@@ -7,6 +7,8 @@ package polyhedra.js.params
 import kotlinx.browser.*
 import polyhedra.js.util.*
 
+private const val MAX_DT = 0.05 // 20 fps min
+
 class AnimationTracker(private val rootParams: Param) {
     private var prevTime = Double.NaN
     private var animationHandle = 0
@@ -25,7 +27,7 @@ class AnimationTracker(private val rootParams: Param) {
         animationHandle = 0
         val dt = if (prevTime.isNaN()) 0.0 else (nowTime - prevTime) / 1000 // in seconds
         prevTime = nowTime
-        rootParams.performUpdate(null, dt)
+        rootParams.performUpdate(null, dt.coerceAtMost(MAX_DT))
         if (animationHandle == 0) {
             // no further request
             prevTime = Double.NaN
