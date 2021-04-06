@@ -128,7 +128,11 @@ fun Polyhedron.chamfered(): Polyhedron = transformedPolyhedron(Transform.Chamfer
     chamferGeometry().chamferedTo(this)
 }
 
-fun Polyhedron.chamfered(vr: Double): Polyhedron = transformedPolyhedron(Transform.Chamfered, vr) {
+fun Polyhedron.chamfered(
+    vr: Double,
+    scale: Scale? = null,
+    forceFaceKinds: List<FaceKindSource>? = null
+): Polyhedron = transformedPolyhedron(Transform.Chamfered, vr, scale, forceFaceKinds) {
     chamferGeometry().chamferedTo(this, vr)
 }
 
@@ -162,6 +166,7 @@ private fun ChamferGeometry.chamferedTo(builder: PolyhedronBuilder, vr: Double =
             )
             face(fvs, FaceKind(faceKindOfs + edgeKindsIndex[e.kind]!!))
         }
+        for ((ek, id) in edgeKindsIndex) faceKindSource(FaceKind(faceKindOfs + id), ek)
         mergeIndistinguishableKinds()
     }
 }

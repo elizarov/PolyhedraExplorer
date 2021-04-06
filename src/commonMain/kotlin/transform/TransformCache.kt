@@ -5,6 +5,7 @@
 package polyhedra.common.transform
 
 import polyhedra.common.poly.*
+import polyhedra.common.util.*
 
 private const val POW2 = 7
 private const val SHIFT = 32 - POW2
@@ -117,13 +118,36 @@ object TransformCache {
     }
 }
 
-fun Polyhedron.transformedPolyhedron(key: Any, param: Any? = null, block: PolyhedronBuilder.() -> Unit): Polyhedron {
-    TransformCache[this, key, param]?.let { return it }
-    val result = runCatching {
+fun Polyhedron.transformedPolyhedron(
+    key: Any,
+    param: Any? = null,
+    scale: Scale? = null,
+    forceFaceKinds: List<FaceKindSource>? = null,
+    block: PolyhedronBuilder.() -> Unit
+): Polyhedron {
+    TransformCache[this, key, param]?.let { cached ->
+        // update cached copy as needed
+        return cached.scaled(scale).forceFaceKinds(forceFaceKinds)
+    }
+    // Optimization: store polyhedron with the requested scale in cache
+    val cache = runCatching {
         polyhedron {
             block()
+            scale(scale)
         }
     }
-    TransformCache[this, key, param] = result
-    return result.getOrThrow()
+    TransformCache[this, key, param] = cache
+    return cache.getOrThrow().forceFaceKinds(forceFaceKinds)
+}
+
+private object ForceFaceKindsKey
+
+private fun Polyhedron.forceFaceKinds(forceFaceKinds: List<FaceKindSource>?): Polyhedron {
+    if (forceFaceKinds == null) return this
+    return transformedPolyhedron(ForceFaceKindsKey, forceFaceKinds) {
+        vertices(vs)
+        faces(fs)
+        faceKindSources(faceKindSources)
+        forceFaceKinds(forceFaceKinds)
+    }
 }

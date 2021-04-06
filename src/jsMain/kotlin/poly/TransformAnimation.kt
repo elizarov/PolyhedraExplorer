@@ -6,6 +6,7 @@ package polyhedra.js.poly
 
 import polyhedra.common.poly.*
 import polyhedra.common.transform.*
+import polyhedra.common.util.*
 
 class TransformAnimation(
     private val param: PolyParams,
@@ -37,15 +38,23 @@ class TransformAnimation(
     val targetPoly: Polyhedron = target.poly
     val targetFraction: Double
         get() = (fraction - prev.fraction) / (target.fraction - prev.fraction)
+
+    override fun toString(): String = buildString {
+        println("\t  prevPoly = $prevPoly")
+        println("\ttargetPoly = $targetPoly")
+        for ((fk, fl) in prevPoly.faceKinds) {
+            val f = fl[0]
+            println("\t$fk -> ${targetPoly.fs[f.id].kind} (${fl.size} faces)")
+        }
+    }
 }
 
 data class TransformKeyframe(
     val poly: Polyhedron,
-    val fraction: Double,
-    val dual: Boolean = false
+    val fraction: Double
 )
 
-private const val GAP = 0.01
+private const val GAP = 1e-4
 
 fun prevFractionGap(ratio: Double): Double =
     if (ratio <= 0 || ratio >= 1) GAP else 0.0

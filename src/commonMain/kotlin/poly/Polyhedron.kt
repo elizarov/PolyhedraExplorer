@@ -10,8 +10,9 @@ import polyhedra.common.util.*
 @Serializable(with = PolyhedronSerializer::class)
 class Polyhedron(
     vs: List<MutableVertex>,
-    fs: List<MutableFace>
-) {
+    fs: List<MutableFace>,
+    val faceKindSources: List<FaceKindSource>? // non-null when polyhedron was transformed
+)  {
     val vs: List<Vertex> = vs
     val fs: List<Face> = fs
     val es: List<Edge>
@@ -94,6 +95,12 @@ class Polyhedron(
     val midradius: Double by lazy { es.avgOf { e -> e.midPoint(MidPoint.Closest).norm } }
     val circumradius: Double by lazy { vs.maxOf { v -> v.norm } }
 
+    fun scaleDenominator(scale: Scale): Double = when(scale) {
+        Scale.Inradius -> inradius
+        Scale.Midradius -> midradius
+        Scale.Circumradius -> circumradius
+    }
+    
     // Radius that is used for for polar reciprocation to compute dual,
     // the key requirement is that dual points of regular polygon's faces must be in the centers of those faces
     val dualReciprocationRadius: Double
@@ -137,8 +144,22 @@ interface MutableKind<K : Id> {
     var kind: K
 }
 
+interface AnyKind
+
+interface FaceKindSource {
+    val kind: FaceKind
+    val source: AnyKind
+}
+
+data class MutableFaceKindSource(
+    override var kind: FaceKind,
+    override val source: AnyKind
+) : MutableKind<FaceKind>, FaceKindSource {
+    override fun toString(): String = "$kind<-$source"
+}
+
 @Serializable
-inline class VertexKind(override val id: Int) : Id, Comparable<VertexKind> {
+inline class VertexKind(override val id: Int) : Id, AnyKind, Comparable<VertexKind> {
     override fun compareTo(other: VertexKind): Int = id.compareTo(other.id)
     override fun toString(): String = idString(id, 'A', 'Z')
 }
@@ -163,7 +184,7 @@ fun Vertex.toMutableVertex(): MutableVertex =
     MutableVertex(id, this, kind, directedEdges.toMutableList())
 
 @Serializable
-inline class FaceKind(override val id: Int) : Id, Comparable<FaceKind> {
+inline class FaceKind(override val id: Int) : Id, AnyKind, Comparable<FaceKind> {
     override fun compareTo(other: FaceKind): Int = id.compareTo(other.id)
     override fun toString(): String = idString(id, 'α', 'ω')
 }
@@ -171,7 +192,6 @@ inline class FaceKind(override val id: Int) : Id, Comparable<FaceKind> {
 interface Face : Id, Plane {
     val fvs: List<Vertex>
     val kind: FaceKind
-    val dualKind: FaceKind // used only for by cantellation
     val isPlanar: Boolean
     val directedEdges: List<Edge> // edges are properly ordered clockwise
 }
@@ -180,7 +200,6 @@ class MutableFace(
     override val id: Int,
     override val fvs: List<MutableVertex>,
     override var kind: FaceKind,
-    override val dualKind: FaceKind = kind, // used only for by cantellation
     override val directedEdges: MutableList<Edge> = ArrayList() // edges are properly ordered clockwise
 ) : Face, MutablePlane(fvs.averagePlane()), MutableKind<FaceKind> {
     override val isPlanar = fvs.all { it in this }
@@ -195,7 +214,7 @@ val Face.size: Int get() = fvs.size
 operator fun Face.get(index: Int): Vertex = fvs[index]
 operator fun Face.iterator(): Iterator<Vertex> = fvs.iterator()
 
-data class EdgeKind(val a: VertexKind, val b: VertexKind, val l: FaceKind, val r: FaceKind) : Comparable<EdgeKind> {
+data class EdgeKind(val a: VertexKind, val b: VertexKind, val l: FaceKind, val r: FaceKind) : AnyKind, Comparable<EdgeKind> {
     override fun compareTo(other: EdgeKind): Int {
         if (a != other.a) return a.compareTo(other.a)
         if (b != other.b) return b.compareTo(other.b)
@@ -244,167 +263,10 @@ val Edge.len: Double
 fun Edge.distanceTo(p: Vec3): Double =
     p.distanceToLine(a, b)
 
-private const val DEBUG_MERGE_KINDS = false
-
-class PolyhedronBuilder(
-    private var mergeIndistinguishableKinds: Boolean = false
-) {
-    private val vs: ArrayList<MutableVertex> = ArrayList()
-    private val fs: ArrayList<MutableFace> = ArrayList()
-
-    fun vertex(p: Vec3, kind: VertexKind = VertexKind(0)): Vertex =
-        MutableVertex(vs.size, p, kind).also { vs.add(it) }
-
-    fun vertex(x: Double, y: Double, z: Double, kind: VertexKind = VertexKind(0)): Vertex =
-        vertex(Vec3(x, y, z), kind)
-
-    fun vertex(v: Vertex): Vertex =
-        vertex(v, v.kind)
-
-    fun vertices(vs: List<Vertex>) {
-        for (v in vs) vertex(v)
-    }
-
-    fun face(vararg fvIds: Int, kind: FaceKind = FaceKind(0)) {
-        val a = List(fvIds.size) { vs[fvIds[it]] }
-        fs.add(MutableFace(fs.size, a, kind))
-    }
-
-    fun face(fvIds: List<Int>, kind: FaceKind = FaceKind(0)) {
-        val a = List(fvIds.size) { vs[fvIds[it]] }
-        fs.add(MutableFace(fs.size, a, kind))
-    }
-
-    fun face(fvs: Collection<Vertex>, kind: FaceKind, dualKind: FaceKind = kind) {
-        fs.add(MutableFace(fs.size, fvs.map { vs[it.id] }, kind, dualKind))
-    }
-
-    fun face(f: Face) {
-        face(f.fvs, f.kind, f.dualKind)
-    }
-
-    fun faces(fs: List<Face>) {
-        for (f in fs) face(f)
-    }
-
-    fun build(): Polyhedron {
-        val poly = Polyhedron(vs, fs)
-        if (!mergeIndistinguishableKinds) return poly
-        val ge = poly.isoEdges.groupIndistinguishable()
-        val gk = ge.mapTo(HashSet()) { list ->
-            val vks = list.mapTo(HashSet()) { it.kind.a }
-            val fks = list.mapTo(HashSet()) { it.kind.r }
-            vks to fks
-        }
-        val (vkg, fkg) = gk.filterIndistinguishableKinds()
-        if (vkg.isEmpty() && fkg.isEmpty()) return poly
-        if (DEBUG_MERGE_KINDS) {
-            println("--- mergeIndistinguishableKinds")
-            ge.forEachIndexed { i, g -> println("Edge group #$i: $g") }
-            gk.forEachIndexed { i, g -> println("Kind group #$i: $g") }
-            println("Resulting vkg = $vkg")
-            println("Resulting fkg = $fkg")
-        }
-        // Renumber kinds
-        vs.renumberKinds(vkg) { VertexKind(it) }
-        fs.renumberKinds(fkg) { FaceKind(it) }
-        // Rebuild polyhedron with renumbered kinds
-        return polyhedronCopy(vs, fs)
-    }
-
-    fun debugDump() {
-        for (v in vs) println(v)
-        for (f in fs) println(f)
-    }
-
-    fun mergeIndistinguishableKinds() {
-        mergeIndistinguishableKinds = true
-    }
-}
-
-fun polyhedron(mergeIndistinguishableKinds: Boolean = false, block: PolyhedronBuilder.() -> Unit): Polyhedron =
-    PolyhedronBuilder(mergeIndistinguishableKinds).run {
-        block()
-        build()
-    }
-
-fun polyhedronCopy(vs: List<Vertex>, fs: List<Face>, mergeIndistinguishableKinds: Boolean = false) =
-    polyhedron(mergeIndistinguishableKinds) {
-        vertices(vs)
-        faces(fs)
-    }
-
 private fun <T> MutableList<T>.swap(i: Int, j: Int) {
     val t = this[i]
     this[i] = this[j]
     this[j] = t
 }
 
-private fun <K : Id> Set<Set<K>>.countGroupOccurrences(): IdMap<K, Int> {
-    val c = ArrayIdMap<K, Int>()
-    for (g in this) for (k in g) {
-        c[k] = c.getOrElse(k) { 0 } + 1
-    }
-    return c
-}
-
-private fun Set<Pair<Set<VertexKind>, Set<FaceKind>>>.filterIndistinguishableKinds(): Pair<List<Set<VertexKind>>, List<Set<FaceKind>>> {
-    // count mentions
-    val vgs = mapTo(HashSet()) { it.first }
-    val fgs = mapTo(HashSet()) { it.second }
-    val vc = vgs.countGroupOccurrences()
-    val fc = fgs.countGroupOccurrences()
-    // drop all ambiguous groups that come in different combos
-    fun <K : Id> isGood(g: Set<K>, c: IdMap<K, Int>): Boolean = g.all { c[it] == 1 }
-    forEach { (vg, fg) ->
-        // it should be non-singleton group with a unique renumber groups
-        if (!isGood(vg, vc) ||  !isGood(fg, fc)) {
-            vgs -= vg
-            fgs -= fg
-        }
-    }
-    // recursively drop groups with bad pair
-    do {
-        var changes = false
-        forEach { (vg, fg) ->
-            // if one is bad, drop the other too
-            if (vg in vgs) {
-                if (fg !in fgs) {
-                    vgs -= vg
-                    changes = true
-                }
-            } else {
-                // vg !in vgs
-                if (fg in fgs) {
-                    fgs -= fg
-                    changes = true
-                }
-            }
-        }
-    } while (changes)
-    return vgs.filter { it.size > 1 } to fgs.filter { it.size > 1 }
-}
-
-private fun <K, T : MutableKind<K>> List<T>.renumberKinds(
-    gs: Collection<Collection<K>>,
-    factory: (Int) -> K
-) where K : Id, K : Comparable<K> {
-    if (gs.isEmpty()) return
-    val map = ArrayIdMap<K, K>()
-    for (g in gs) {
-        val k0 = g.minOrNull()!!
-        for (k in g) map[k] = k0
-    }
-    for (item in this) {
-        val k = item.kind
-        if (map[k] == null) map[k] = k
-    }
-    val reindex = map.values.distinctIndexed { factory(it) }
-    for ((src, dst) in map) {
-        map[src] = reindex[dst]!!
-    }
-    for (item in this) {
-        item.kind = map[item.kind]!!
-    }
-}
 

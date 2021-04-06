@@ -25,8 +25,8 @@ class FaceContext(val gl: GL, val polyContext: PolyContext, override val params:
         val poly = params.targetPoly
         val animation = params.transformAnimation
         if (animation != null) {
-            updateColor(gl, animation.targetPoly, colorBuffer, animation.target.dual)
-            updateColor(gl, animation.prevPoly, prevColorBuffer, animation.prev.dual)
+            updateColor(gl, animation.targetPoly, colorBuffer)
+            updateColor(gl, animation.prevPoly, prevColorBuffer)
         } else {
             // simple case without animation
             updateColor(gl, poly, colorBuffer)
@@ -67,9 +67,9 @@ class FaceContext(val gl: GL, val polyContext: PolyContext, override val params:
 
 }
 
-private fun updateColor(gl: GL, poly: Polyhedron, buffer: Float32Buffer<GLType.vec3>, dual: Boolean = false) {
+private fun updateColor(gl: GL, poly: Polyhedron, buffer: Float32Buffer<GLType.vec3>) {
     poly.faceVerticesData(buffer) { f, _, a, i ->
-        a.setRGB(i, PolyStyle.faceColor(f, dual))
+        a.setRGB(i, PolyStyle.faceColor(f))
     }
     buffer.bindBufferData(gl)
 }

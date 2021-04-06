@@ -139,6 +139,7 @@ fun Polyhedron.rectified(): Polyhedron = transformedPolyhedron(Transform.Rectifi
     for (v in vs) {
         face(v.directedEdges.map { ev[it.normalizedDirection()]!! }, FaceKind(kindOfs + v.kind.id))
     }
+    for (vk in vertexKinds.keys) faceKindSource(FaceKind(kindOfs + vk.id), vk)
     mergeIndistinguishableKinds()
 }
 
@@ -150,7 +151,11 @@ fun Polyhedron.regularTruncationRatio(faceKind: FaceKind = FaceKind(0)): Double 
     return regularTruncationRatio(PI / f.size)
 }
 
-fun Polyhedron.truncated(tr: Double = regularTruncationRatio()): Polyhedron = transformedPolyhedron(Transform.Truncated, tr) {
+fun Polyhedron.truncated(
+    tr: Double = regularTruncationRatio(),
+    scale: Scale? = null,
+    forceFaceKinds: List<FaceKindSource>? = null
+): Polyhedron = transformedPolyhedron(Transform.Truncated, tr, scale, forceFaceKinds) {
     // vertices from the original directed edges
     val ev = directedEdges.associateWith { e ->
         val t = tr * e.midPointFraction(edgesMidPointDefault)
@@ -168,6 +173,7 @@ fun Polyhedron.truncated(tr: Double = regularTruncationRatio()): Polyhedron = tr
     for (v in vs) {
         face(v.directedEdges.map { ev[it]!! }, FaceKind(kindOfs + v.kind.id))
     }
+    for (vk in vertexKinds.keys) faceKindSource(FaceKind(kindOfs + vk.id), vk)
     mergeIndistinguishableKinds()
 }
 
@@ -192,7 +198,11 @@ fun Polyhedron.regularCantellationRatio(edgeKind: EdgeKind? = null): Double {
     return 1 / (1 + sin(da / 2) / tan(ea))
 }
 
-fun Polyhedron.cantellated(cr: Double = regularCantellationRatio()): Polyhedron = transformedPolyhedron(Transform.Cantellated, cr) {
+fun Polyhedron.cantellated(
+    cr: Double = regularCantellationRatio(),
+    scale: Scale? = null,
+    forceFaceKinds: List<FaceKindSource>? = null
+): Polyhedron = transformedPolyhedron(Transform.Cantellated, cr, scale, forceFaceKinds) {
     val rr = dualReciprocationRadius
     // vertices from the directed edges
     val ev = directedEdges.associateWith { e ->
@@ -210,11 +220,9 @@ fun Polyhedron.cantellated(cr: Double = regularCantellationRatio()): Polyhedron 
     // faces from the original vertices
     var kindOfs = faceKinds.size
     for (v in vs) {
-        face(v.directedEdges.map { ev[it]!! },
-            FaceKind(kindOfs + v.kind.id), // cantellated kind
-            FaceKind(v.kind.id) // dual kind
-        )
+        face(v.directedEdges.map { ev[it]!! }, FaceKind(kindOfs + v.kind.id))
     }
+    for (vk in vertexKinds.keys) faceKindSource(FaceKind(kindOfs + vk.id), vk)
     // 4-faces from the original edges
     kindOfs += vertexKinds.size
     for (e in es) {
@@ -226,6 +234,7 @@ fun Polyhedron.cantellated(cr: Double = regularCantellationRatio()): Polyhedron 
         )
         face(fvs, FaceKind(kindOfs + edgeKindsIndex[e.kind]!!))
     }
+    for ((ek, id) in edgeKindsIndex) faceKindSource(FaceKind(kindOfs + id), ek)
     mergeIndistinguishableKinds()
 }
 
@@ -239,9 +248,12 @@ fun Polyhedron.dual(): Polyhedron = transformedPolyhedron(Transform.Dual) {
     for (v in vs) {
         face(v.directedEdges.map { fv[it.r]!! }, FaceKind(v.kind.id))
     }
+    for (vk in vertexKinds.keys) faceKindSource(FaceKind(vk.id), vk)
 }
 
-data class BevellingRatio(val cr: Double, val tr: Double)
+data class BevellingRatio(val cr: Double, val tr: Double) {
+    override fun toString(): String = "(cr=${cr.fmt}, tr=${tr.fmt})"
+}
 
 fun Polyhedron.regularBevellingRatio(edgeKind: EdgeKind? = null): BevellingRatio {
     val (ea, da) = regularFaceGeometry(edgeKind)
@@ -250,7 +262,11 @@ fun Polyhedron.regularBevellingRatio(edgeKind: EdgeKind? = null): BevellingRatio
     return BevellingRatio(cr, tr)
 }
 
-fun Polyhedron.bevelled(br: BevellingRatio = regularBevellingRatio()): Polyhedron = transformedPolyhedron(Transform.Bevelled, br) {
+fun Polyhedron.bevelled(
+    br: BevellingRatio = regularBevellingRatio(),
+    scale: Scale? = null,
+    forceFaceKinds: List<FaceKindSource>? = null
+): Polyhedron = transformedPolyhedron(Transform.Bevelled, br, scale, forceFaceKinds) {
     val (cr, tr) = br
     val rr = dualReciprocationRadius
     // vertices from the face-directed edges
@@ -281,11 +297,9 @@ fun Polyhedron.bevelled(br: BevellingRatio = regularBevellingRatio()): Polyhedro
         val fvs = v.directedEdges.flatMap { e ->
             listOf(fev[e.l]!![e]!!, fev[e.r]!![e]!!)
         }
-        face(fvs,
-            FaceKind(kindOfs + v.kind.id),
-            FaceKind(v.kind.id) // dual kind
-        )
+        face(fvs, FaceKind(kindOfs + v.kind.id))
     }
+    for (vk in vertexKinds.keys) faceKindSource(FaceKind(kindOfs + vk.id), vk)
     // 4-faces from the original edges
     kindOfs += vertexKinds.size
     for (e in es) {
@@ -298,6 +312,7 @@ fun Polyhedron.bevelled(br: BevellingRatio = regularBevellingRatio()): Polyhedro
         )
         face(fvs, FaceKind(kindOfs + edgeKindsIndex[e.kind]!!))
     }
+    for ((ek, id) in edgeKindsIndex) faceKindSource(FaceKind(kindOfs + id), ek)
     mergeIndistinguishableKinds()
 }
 
@@ -354,7 +369,9 @@ private fun snubComputeCR(ea: Double, da: Double): Double {
     }
 }
 
-data class SnubbingRatio(val cr: Double, val sa: Double)
+data class SnubbingRatio(val cr: Double, val sa: Double) {
+    override fun toString(): String = "(cr=${cr.fmt}, sa=${sa.fmt})"
+}
 
 fun Polyhedron.regularSnubbingRatio(edgeKind: EdgeKind? = null): SnubbingRatio {
     val (ea, da) = regularFaceGeometry(edgeKind)
@@ -363,7 +380,11 @@ fun Polyhedron.regularSnubbingRatio(edgeKind: EdgeKind? = null): SnubbingRatio {
     return SnubbingRatio(cr, sa)
 }
 
-fun Polyhedron.snub(sr: SnubbingRatio = regularSnubbingRatio()) = transformedPolyhedron(Transform.Snub, sr) {
+fun Polyhedron.snub(
+    sr: SnubbingRatio = regularSnubbingRatio(),
+    scale: Scale? = null,
+    forceFaceKinds: List<FaceKindSource>? = null
+) = transformedPolyhedron(Transform.Snub, sr, scale, forceFaceKinds) {
     val (cr, sa) = sr
     val rr = dualReciprocationRadius
     // vertices from the face-vertices (directed edges)
@@ -384,6 +405,7 @@ fun Polyhedron.snub(sr: SnubbingRatio = regularSnubbingRatio()) = transformedPol
         val fvs = v.directedEdges.map { fvv[it.r]!![v]!! }
         face(fvs, FaceKind(kindOfs + v.kind.id))
     }
+    for (vk in vertexKinds.keys) faceKindSource(FaceKind(kindOfs + vk.id), vk)
     // 3-faces from the directed edges
     kindOfs += vertexKinds.size
     for (e in directedEdges) {
@@ -394,6 +416,7 @@ fun Polyhedron.snub(sr: SnubbingRatio = regularSnubbingRatio()) = transformedPol
         )
         face(fvs, FaceKind(kindOfs + directedEdgeKindsIndex[e.kind]!!))
     }
+    for ((ek, id) in directedEdgeKindsIndex) faceKindSource(FaceKind(kindOfs + id), ek)
     mergeIndistinguishableKinds()
 }
 

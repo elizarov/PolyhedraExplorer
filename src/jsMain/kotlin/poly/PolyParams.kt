@@ -18,6 +18,8 @@ import kotlin.math.*
 
 private const val MAX_DISPLAY_EDGES = (1 shl 15) - 1
 
+private const val DEBUG_ANIMATION = false
+
 class RenderParams(tag: String, val animationParams: ViewAnimationParams?) : Param.Composite(tag) {
     val poly = using(PolyParams("", animationParams))
     val view = using(ViewParams("v", animationParams))
@@ -119,17 +121,17 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
                     commonSize++
                 }
                 if (validTransforms.size <= commonSize + 1 && prevValidTransforms.size <= commonSize + 1) {
-                    val prefix = curTransforms.subList(0, commonSize)
-                    val basePoly = if (prefix.isEmpty()) curSeed.poly else curPolys[prefix.size - 1]
+                    val basePoly = if (commonSize == 0) curSeed.poly else curPolys[commonSize - 1]
+                    val prevPoly = prevPolys.getOrNull(commonSize) ?: basePoly
+                    val curPoly = curPolys.getOrNull(commonSize) ?: basePoly
                     val prevTransform = prevValidTransforms.getOrNull(commonSize) ?: Transform.None
                     val curTransform = validTransforms.getOrNull(commonSize) ?: Transform.None
                     updateAnimation(
                         transformUpdateAnimation(
                             this,
-                            basePoly,
-                            curScale,
-                            prevTransform,
-                            curTransform,
+                            basePoly, curScale,
+                            prevPoly, curPoly,
+                            prevTransform, curTransform,
                             animationDuration
                         )
                     )
@@ -285,22 +287,24 @@ private class AsyncTransform(
 
 private fun transformUpdateAnimation(
     params: PolyParams,
-    poly: Polyhedron,
+    basePoly: Polyhedron,
     scale: Scale,
+    prevPoly: Polyhedron,
+    curPoly: Polyhedron,
     prevTransform: Transform,
     curTransform: Transform,
     animationDuration: Double
 ): TransformAnimation? {
-    val prevTruncationRatio = prevTransform.truncationRatio(poly)
-    val curTruncationRatio = curTransform.truncationRatio(poly)
-    val prevCantellationRatio = prevTransform.cantellationRatio(poly)
-    val curCantellationRatio = curTransform.cantellationRatio(poly)
-    val prevBevellingRatio = prevTransform.bevellingRatio(poly)
-    val curBevellingRatio = curTransform.bevellingRatio(poly)
-    val prevSnubbingRatio = prevTransform.snubbingRatio(poly)
-    val curSnubbingRatio = curTransform.snubbingRatio(poly)
-    val prevChamferingRatio = prevTransform.chamferingRatio(poly)
-    val curChamferingRatio = curTransform.chamferingRatio(poly)
+    val prevTruncationRatio = prevTransform.truncationRatio(basePoly)
+    val curTruncationRatio = curTransform.truncationRatio(basePoly)
+    val prevCantellationRatio = prevTransform.cantellationRatio(basePoly)
+    val curCantellationRatio = curTransform.cantellationRatio(basePoly)
+    val prevBevellingRatio = prevTransform.bevellingRatio(basePoly)
+    val curBevellingRatio = curTransform.bevellingRatio(basePoly)
+    val prevSnubbingRatio = prevTransform.snubbingRatio(basePoly)
+    val curSnubbingRatio = curTransform.snubbingRatio(basePoly)
+    val prevChamferingRatio = prevTransform.chamferingRatio(basePoly)
+    val curChamferingRatio = curTransform.chamferingRatio(basePoly)
     return when {
         // Truncation animation
         prevTruncationRatio != null && curTruncationRatio != null -> {
@@ -311,9 +315,14 @@ private fun transformUpdateAnimation(
             TransformAnimation(
                 params,
                 animationDuration,
-                TransformKeyframe(poly.truncated(prevR).scaled(scale), prevF),
-                TransformKeyframe(poly.truncated(curR).scaled(scale), curF)
-            )
+                TransformKeyframe(basePoly.truncated(prevR, scale, prevPoly.faceKindSources), prevF),
+                TransformKeyframe(basePoly.truncated(curR, scale, curPoly.faceKindSources), curF)
+            ).also {
+                if (DEBUG_ANIMATION) {
+                    println("Truncation animation: tr=${prevTruncationRatio.fmt} -> tr=${curTruncationRatio.fmt}")
+                    println(it)
+                }
+            }
         }
         // Cantellation animation
         prevCantellationRatio != null && curCantellationRatio != null -> {
@@ -324,9 +333,14 @@ private fun transformUpdateAnimation(
             TransformAnimation(
                 params,
                 animationDuration,
-                TransformKeyframe(poly.cantellated(prevR).scaled(scale), prevF, prevCantellationRatio == 1.0),
-                TransformKeyframe(poly.cantellated(curR).scaled(scale), curF, curCantellationRatio == 1.0)
-            )
+                TransformKeyframe(basePoly.cantellated(prevR, scale, prevPoly.faceKindSources), prevF),
+                TransformKeyframe(basePoly.cantellated(curR, scale, curPoly.faceKindSources), curF)
+            ).also {
+                if (DEBUG_ANIMATION) {
+                    println("Cantellation animation: cr=${prevCantellationRatio.fmt} -> cr=${curCantellationRatio.fmt}")
+                    println(it)
+                }
+            }
         }
         // Bevelling animation
         prevBevellingRatio != null && curBevellingRatio != null -> {
@@ -337,9 +351,14 @@ private fun transformUpdateAnimation(
             TransformAnimation(
                 params,
                 animationDuration,
-                TransformKeyframe(poly.bevelled(prevR).scaled(scale), prevF, prevBevellingRatio.cr == 1.0),
-                TransformKeyframe(poly.bevelled(curR).scaled(scale), curF, curBevellingRatio.cr == 1.0)
-            )
+                TransformKeyframe(basePoly.bevelled(prevR, scale, prevPoly.faceKindSources), prevF),
+                TransformKeyframe(basePoly.bevelled(curR, scale, curPoly.faceKindSources), curF)
+            ).also {
+                if (DEBUG_ANIMATION) {
+                    println("Bevelling animation: $prevBevellingRatio -> $curBevellingRatio")
+                    println(it)
+                }
+            }
         }
         // Snubbing animation
         prevSnubbingRatio != null && curSnubbingRatio != null -> {
@@ -350,9 +369,14 @@ private fun transformUpdateAnimation(
             TransformAnimation(
                 params,
                 animationDuration,
-                TransformKeyframe(poly.snub(prevR).scaled(scale), prevF, prevSnubbingRatio.cr == 1.0),
-                TransformKeyframe(poly.snub(curR).scaled(scale), curF, curSnubbingRatio.cr == 1.0)
-            )
+                TransformKeyframe(basePoly.snub(prevR, scale, prevPoly.faceKindSources), prevF),
+                TransformKeyframe(basePoly.snub(curR, scale, curPoly.faceKindSources), curF)
+            ).also {
+                if (DEBUG_ANIMATION) {
+                    println("Snubbing animation: $prevSnubbingRatio -> $curSnubbingRatio")
+                    println(it)
+                }
+            }
         }
         // Chamfering animation
         prevChamferingRatio != null && curChamferingRatio != null -> {
@@ -363,9 +387,14 @@ private fun transformUpdateAnimation(
             TransformAnimation(
                 params,
                 animationDuration,
-                TransformKeyframe(poly.chamfered(prevR).scaled(scale), prevF),
-                TransformKeyframe(poly.chamfered(curR).scaled(scale), curF)
-            )
+                TransformKeyframe(basePoly.chamfered(prevR, scale, prevPoly.faceKindSources), prevF),
+                TransformKeyframe(basePoly.chamfered(curR, scale, curPoly.faceKindSources), curF)
+            ).also {
+                if (DEBUG_ANIMATION) {
+                    println("Chamfering animation: vr=${prevChamferingRatio.fmt} -> vr=${curChamferingRatio.fmt}")
+                    println(it)
+                }
+            }
         }
         else -> null
     }
