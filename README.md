@@ -22,7 +22,9 @@ gradlew jsBrowserDevelopmentRun
   * [x] Animate all param changes
   * [x] Animate polyhedra transformations
   * [x] Animate topology-preserving transformations (canonicalization)
-  * [ ] Animate multi-step transformations
+  * [x] Animate two-step transition between very different transforms
+  * [ ] Animate seed changes with fly in/out
+  * [ ] Optimize rendering during transform animation (do not update geometry on every frame)
 * Asynchrony 
   * [x] Move canonicalization algo to a WebWorker
   * [ ] Better progress bar display
@@ -58,11 +60,13 @@ gradlew jsBrowserDevelopmentRun
   * [ ] Rectification solution for non-regular polyhedra  
   * [ ] Stellation
   * [x] Chamfering
+  * [ ] Redesign chamfering artefacts on non-canonical polyhedra 
 * Custom transformations
   * [ ] Truncate specific vertices
   * [ ] Cantellate specific edges
   * [ ] Augment specific faces
   * [ ] Drop selected vertices
+  * [ ] Drop selected edges
 * Infrastructure    
   * [ ] Embed CSS into WebPack
   * [ ] `jsBrowserProductionRun` shall work

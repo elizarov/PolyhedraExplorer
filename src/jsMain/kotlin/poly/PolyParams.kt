@@ -95,53 +95,42 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         // compute transformation animation
         val animationDuration = animationParams?.animateValueUpdatesDuration
         // only animate when animation is turned on and when polyhedron had changed
-        if (animationDuration != null && poly != prevPoly) when {
-            // no animation on seed changes
-            curSeed != prevSeed -> {
-                // todo: animate via left/right fly in/out
-                updateAnimation(null)
-            }
-            // polyhedron is the same topologically but with a different geometry -- animate smooth transition
-            poly.hasSameTopology(prevPoly) -> {
-                updateAnimation(
-                    TransformAnimation(
-                        this,
+        val animation: TransformAnimation? = if (animationDuration != null && poly != prevPoly) {
+            // compute common size between prev/new transforms
+            val commonSize = computeCommonSize(prevValidTransforms, validTransforms)
+            when {
+                // no animation on seed changes
+                curSeed != prevSeed -> {
+                    // todo: animate via left/right fly in/out
+                    null
+                }
+                // animate update of the last applied transform if there is one transform difference
+                validTransforms != prevValidTransforms && validTransforms.size <= commonSize + 1 && prevValidTransforms.size <= commonSize + 1 -> {
+                    val basePoly = if (commonSize == 0) curSeed.poly else curPolys[commonSize - 1]
+                    val prevPoly = prevPolys.getOrNull(commonSize) ?: basePoly
+                    val curPoly = curPolys.getOrNull(commonSize) ?: basePoly
+                    val prevTransform = prevValidTransforms.getOrNull(commonSize)
+                        ?.takeIf { !it.isIdentityTransform(basePoly) } ?: Transform.None
+                    val curTransform = validTransforms.getOrNull(commonSize)
+                        ?.takeIf { !it.isIdentityTransform(basePoly) } ?: Transform.None
+                    transformUpdateAnimation(
+                        this, basePoly, curScale,
+                        prevPoly, curPoly,
+                        prevTransform, curTransform,
+                        animationDuration
+                    )
+                }
+                // polyhedron is the same topologically but with a different geometry -- animate smooth transition
+                poly.hasSameTopology(prevPoly) ->
+                    TransformAnimationStep(
                         animationDuration,
                         TransformKeyframe(prevPoly, 0.0),
                         TransformKeyframe(poly, 1.0)
                     )
-                )
+                else -> null
             }
-            // otherwise try to animate update of the last applied transform
-            validTransforms != prevValidTransforms -> {
-                var commonSize = 0
-                while (commonSize < validTransforms.size && commonSize < prevValidTransforms.size &&
-                    validTransforms[commonSize] == prevValidTransforms[commonSize]
-                ) {
-                    commonSize++
-                }
-                if (validTransforms.size <= commonSize + 1 && prevValidTransforms.size <= commonSize + 1) {
-                    val basePoly = if (commonSize == 0) curSeed.poly else curPolys[commonSize - 1]
-                    val prevPoly = prevPolys.getOrNull(commonSize) ?: basePoly
-                    val curPoly = curPolys.getOrNull(commonSize) ?: basePoly
-                    val prevTransform = prevValidTransforms.getOrNull(commonSize) ?: Transform.None
-                    val curTransform = validTransforms.getOrNull(commonSize) ?: Transform.None
-                    updateAnimation(
-                        transformUpdateAnimation(
-                            this,
-                            basePoly, curScale,
-                            prevPoly, curPoly,
-                            prevTransform, curTransform,
-                            animationDuration
-                        )
-                    )
-                } else {
-                    updateAnimation(null)
-                }
-            }
-        } else {
-            updateAnimation(null)
-        }
+        } else null
+        updateAnimation(animation)
         // save to optimize future updates
         prevSeed = curSeed
         prevTransforms = curTransforms
@@ -149,6 +138,16 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         prevScale = curScale
         prevPoly = poly
         prevValidTransforms = validTransforms
+    }
+
+    private fun computeCommonSize(prevValidTransforms: List<Transform>, validTransforms: List<Transform>): Int {
+        var commonSize = 0
+        while (commonSize < validTransforms.size && commonSize < prevValidTransforms.size &&
+            validTransforms[commonSize] == prevValidTransforms[commonSize]
+        ) {
+            commonSize++
+        }
+        return commonSize
     }
 
     // updates poly, polyName, transformError
@@ -295,6 +294,17 @@ private fun transformUpdateAnimation(
     curTransform: Transform,
     animationDuration: Double
 ): TransformAnimation? {
+    // no transforms -- no animation
+    if (prevTransform == Transform.None && curTransform == Transform.None) return null
+    // same topology animation is trivial
+    if (curPoly.hasSameTopology(prevPoly)) {
+        return TransformAnimationStep(
+            animationDuration,
+            TransformKeyframe(prevPoly.scaled(scale), 0.0),
+            TransformKeyframe(curPoly.scaled(scale), 1.0)
+        )
+    }
+    // figure out the type of transform to do
     val prevTruncationRatio = prevTransform.truncationRatio(basePoly)
     val curTruncationRatio = curTransform.truncationRatio(basePoly)
     val prevCantellationRatio = prevTransform.cantellationRatio(basePoly)
@@ -312,8 +322,7 @@ private fun transformUpdateAnimation(
             val curF = curFractionGap(curTruncationRatio)
             val prevR = prevF.interpolate(prevTruncationRatio, curTruncationRatio)
             val curR = curF.interpolate(prevTruncationRatio, curTruncationRatio)
-            TransformAnimation(
-                params,
+            TransformAnimationStep(
                 animationDuration,
                 TransformKeyframe(basePoly.truncated(prevR, scale, prevPoly.faceKindSources), prevF),
                 TransformKeyframe(basePoly.truncated(curR, scale, curPoly.faceKindSources), curF)
@@ -330,8 +339,7 @@ private fun transformUpdateAnimation(
             val curF = curFractionGap(curCantellationRatio)
             val prevR = prevF.interpolate(prevCantellationRatio, curCantellationRatio)
             val curR = curF.interpolate(prevCantellationRatio, curCantellationRatio)
-            TransformAnimation(
-                params,
+            TransformAnimationStep(
                 animationDuration,
                 TransformKeyframe(basePoly.cantellated(prevR, scale, prevPoly.faceKindSources), prevF),
                 TransformKeyframe(basePoly.cantellated(curR, scale, curPoly.faceKindSources), curF)
@@ -348,8 +356,7 @@ private fun transformUpdateAnimation(
             val curF = curFractionGap(curBevellingRatio)
             val prevR = prevF.interpolate(prevBevellingRatio, curBevellingRatio)
             val curR = curF.interpolate(prevBevellingRatio, curBevellingRatio)
-            TransformAnimation(
-                params,
+            TransformAnimationStep(
                 animationDuration,
                 TransformKeyframe(basePoly.bevelled(prevR, scale, prevPoly.faceKindSources), prevF),
                 TransformKeyframe(basePoly.bevelled(curR, scale, curPoly.faceKindSources), curF)
@@ -366,8 +373,7 @@ private fun transformUpdateAnimation(
             val curF = curFractionGap(curSnubbingRatio)
             val prevR = prevF.interpolate(prevSnubbingRatio, curSnubbingRatio)
             val curR = curF.interpolate(prevSnubbingRatio, curSnubbingRatio)
-            TransformAnimation(
-                params,
+            TransformAnimationStep(
                 animationDuration,
                 TransformKeyframe(basePoly.snub(prevR, scale, prevPoly.faceKindSources), prevF),
                 TransformKeyframe(basePoly.snub(curR, scale, curPoly.faceKindSources), curF)
@@ -384,8 +390,7 @@ private fun transformUpdateAnimation(
             val curF = curFractionGap(curChamferingRatio)
             val prevR = prevF.interpolate(prevChamferingRatio, curChamferingRatio)
             val curR = curF.interpolate(prevChamferingRatio, curChamferingRatio)
-            TransformAnimation(
-                params,
+            TransformAnimationStep(
                 animationDuration,
                 TransformKeyframe(basePoly.chamfered(prevR, scale, prevPoly.faceKindSources), prevF),
                 TransformKeyframe(basePoly.chamfered(curR, scale, curPoly.faceKindSources), curF)
@@ -395,6 +400,24 @@ private fun transformUpdateAnimation(
                     println(it)
                 }
             }
+        }
+        prevTransform != Transform.None && curTransform != Transform.None -> {
+            // two-step animation
+            val step1 = transformUpdateAnimation(
+                params, basePoly, scale,
+                prevPoly, basePoly,
+                prevTransform, Transform.None,
+                animationDuration / 2
+            )
+            val step2 = transformUpdateAnimation(
+                params, basePoly, scale,
+                basePoly, curPoly,
+                Transform.None, curTransform,
+                animationDuration / 2
+            )
+            if (step1 != null && step2 != null) {
+                TransformAnimationList(step1, step2)
+            } else null
         }
         else -> null
     }
