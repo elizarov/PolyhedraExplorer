@@ -228,7 +228,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
                         }
                     }
                 }
-                if (newPoly.fs.any { !it.isPlanar }) {
+                if (newPoly.fs.any { !it.isPlanar } && curIndex == curTransforms.lastIndex) {
                     curWarning = SomeFacesNotPlanar()
                 }
                 curPolyName = "$transform $curPolyName"
