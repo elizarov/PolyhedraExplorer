@@ -9,23 +9,19 @@ import polyhedra.js.glsl.*
 import polyhedra.js.params.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
-class PolyContext(val gl: GL, override val params: PolyParams) : Param.Context() {
+class PolyContext(val gl: GL, params: PolyParams) : Param.Context(params) {
+    val poly by { params.targetPoly }
+    val animation by { params.transformAnimation }
+
     val target = PolyBuffers(gl)
     val prev = PolyBuffers(gl) // only filled when animation != null
-    var animation: TransformAnimation? = null
-        private set
 
     init { setup() }
 
     override fun update() {
-        val animation = params.transformAnimation
-        this.animation = animation
-        if (animation != null) {
-            target.initBuffers(animation.targetPoly)
-            prev.initBuffers(animation.prevPoly)
-        } else {
-            target.initBuffers(params.poly)
-        }
+        val animation = animation
+        target.initBuffers(poly)
+        if (animation != null) prev.initBuffers(animation.prevPoly)
     }
 }
 

@@ -58,10 +58,8 @@ abstract class PolyProgram(gl: GL) : GLProgram(gl) {
             uProjectionMatrix by projectionMatrix
             uModelMatrix by modelMatrix
             uNormalMatrix by normalMatrix
-            with(params) {
-                uExpand by expandFaces.value
-                uColorAlpha by 1.0 - transparentFaces.value
-            }
+            uExpand by expandFaces
+            uColorAlpha by 1.0 - transparentFaces
         }
     }
 }

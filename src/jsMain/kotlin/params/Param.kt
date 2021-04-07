@@ -6,6 +6,7 @@ package polyhedra.js.params
 
 import polyhedra.common.util.*
 import kotlin.math.*
+import kotlin.reflect.*
 
 private const val DEBUG_PARAMS = false
 
@@ -133,8 +134,11 @@ abstract class Param(val tag: String) {
         fun destroy()
     }
 
-    abstract class Context(private val tracksUpdateType: UpdateType = TargetValue + AnimatedValue) : Dependency {
-        abstract val params: Param
+    abstract class Context(
+        private val params: Param,
+        private val tracksUpdateType: UpdateType = TargetValue + AnimatedValue,
+    ) : Dependency {
+        private val delegates = ArrayList<Delegate<*>>()
         private var updated: UpdateType = tracksUpdateType // needs update on the first opportunity
 
         override fun notifyUpdated(update: UpdateType) {
@@ -151,10 +155,17 @@ abstract class Param(val tag: String) {
                 println("${this::class.simpleName}.performUpdate: $updated -> None")
             }
             updated = None
-            update()
+            var changed = false
+            for (delegate in delegates) {
+                if (delegate.update()) changed = true
+            }
+            updateAlways()
+            if (changed) update()
         }
 
-        abstract fun update()
+        open fun updateAlways() {}
+
+        open fun update() {}
 
         protected fun setup() {
             params.dependencies += this
@@ -162,6 +173,37 @@ abstract class Param(val tag: String) {
 
         override fun destroy() {
             params.dependencies -= this
+        }
+
+        fun <T> addDelegate(provider: () -> T): Delegate<T> =
+            Delegate(provider).also {
+                delegates += it
+            }
+
+        @Suppress("NOTHING_TO_INLINE")
+        inline operator fun <T> (() -> T).provideDelegate(thisRef: Context, prop: KProperty<*>): Delegate<T> =
+            addDelegate(this)
+
+        private object UNINITIALIZED
+
+        class Delegate<T>(private val provider: () -> T) {
+            private var value: Any? = UNINITIALIZED
+            
+            fun update(): Boolean {
+                val newValue = provider()
+                val changed = newValue != value
+                value = newValue
+                return changed
+            }
+
+            @Suppress("UNCHECKED_CAST")
+            fun checkedValue(): T {
+                check(value !== UNINITIALIZED)
+                return value as T
+            }
+
+            @Suppress("NOTHING_TO_INLINE")
+            inline operator fun getValue(thisRef: Context, prop: KProperty<*>): T = checkedValue()
         }
     }
 

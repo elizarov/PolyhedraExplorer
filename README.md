@@ -24,7 +24,7 @@ gradlew jsBrowserDevelopmentRun
   * [x] Animate topology-preserving transformations (canonicalization)
   * [x] Animate two-step transition between very different transforms
   * [ ] Animate seed changes with fly in/out
-  * [ ] Optimize rendering during transform animation (do not update geometry on every frame)
+  * [x] Optimize rendering during transform animation (do not update geometry on every frame)
 * Asynchrony 
   * [x] Move canonicalization algo to a WebWorker
   * [ ] Better progress bar display

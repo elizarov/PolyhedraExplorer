@@ -13,9 +13,11 @@ import org.khronos.webgl.WebGLRenderingContext as GL
 
 class DrawContext(
     canvas: HTMLCanvasElement,
-    override val params: RenderParams,
+    params: RenderParams,
     private val onUpdate: () -> Unit,
-) : Param.Context() {
+) : Param.Context(params) {
+    val display by { params.view.display.value }
+
     val gl: GL = canvas.getContext("webgl", js {
         premultipliedAlpha = false  // Ask for non-premultiplied alpha
     } as Any) as GL
@@ -32,7 +34,7 @@ class DrawContext(
         initGL()
     }
 
-    override fun update() {
+    override fun updateAlways() {
         onUpdate()
     }
 }
@@ -52,11 +54,9 @@ fun DrawContext.drawScene() {
     gl.viewport(0, 0, width, height)
     gl.clear(GL.COLOR_BUFFER_BIT or GL.DEPTH_BUFFER_BIT)
 
-    val transparentFaces = params.view.transparentFaces.value
-    val display = params.view.display.value
-    val hasFaces = display.hasFaces() && transparentFaces < 1.0
+    val hasFaces = display.hasFaces() && view.transparentFaces < 1.0
     val hasEdges = display.hasEdges()
-    val transparent = hasFaces && (transparentFaces != 0.0 || faceContext.hasHiddenFaces)
+    val transparent = hasFaces && (view.transparentFaces != 0.0 || faceContext.hasHiddenFaces)
     gl[GL.DEPTH_TEST] = !transparent
     gl[GL.BLEND] = transparent
     if (transparent) {
@@ -71,7 +71,7 @@ fun DrawContext.drawScene() {
     } else {
         if (hasFaces) {
             // regular draw faces
-            val solid = params.view.expandFaces.value == 0.0
+            val solid = view.expandFaces == 0.0
             gl[GL.CULL_FACE] = solid // can cull faces when drawing solid
             faceContext.draw(view, lightning)
         }

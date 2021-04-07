@@ -10,7 +10,13 @@ import polyhedra.js.params.*
 import polyhedra.js.util.*
 import kotlin.math.*
 
-class ViewContext(override val params: ViewParams) : Param.Context() {
+class ViewContext(params: ViewParams) : Param.Context(params) {
+    private val scale by { params.scale.value }
+    private val rotate by { params.rotate.value }
+
+    val expandFaces by { params.expandFaces.value }
+    val transparentFaces by { params.transparentFaces.value }
+
     val cameraPosition = float32Of(0.0, 0.0, 3.0)
     val projectionMatrix = mat4.create()
     val modelMatrix = mat4.create()
@@ -36,8 +42,8 @@ class ViewContext(override val params: ViewParams) : Param.Context() {
     init { setup() }
 
     override fun update() {
-        modelScale.fill(2.0.pow(params.scale.value))
-        val r = params.rotate.value
+        modelScale.fill(2.0.pow(scale))
+        val r = rotate
         tmpQuat[0] = r.x
         tmpQuat[1] = r.y
         tmpQuat[2] = r.z

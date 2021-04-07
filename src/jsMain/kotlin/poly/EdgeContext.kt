@@ -12,7 +12,9 @@ import polyhedra.js.params.*
 import polyhedra.js.util.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
-class EdgeContext(val gl: GL, val polyContext: PolyContext, override val params: PolyParams) : Param.Context() {
+class EdgeContext(val gl: GL, val polyContext: PolyContext, params: PolyParams) : Param.Context(params) {
+    val poly by { params.targetPoly }
+
     val program = EdgeProgram(gl)
     val indexBuffer = program.createUint16Buffer()
     var nIndices = 0
@@ -21,7 +23,6 @@ class EdgeContext(val gl: GL, val polyContext: PolyContext, override val params:
     init { setup() }
 
     override fun update() {
-        val poly = params.targetPoly
         color = PolyStyle.edgeColor.toFloat32Array()
         program.use()
         // indices

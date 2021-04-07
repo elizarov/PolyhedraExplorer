@@ -10,7 +10,10 @@ import polyhedra.js.main.*
 import polyhedra.js.params.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
-class FaceContext(val gl: GL, val polyContext: PolyContext, override val params: PolyParams) : Param.Context()  {
+class FaceContext(val gl: GL, val polyContext: PolyContext, params: PolyParams) : Param.Context(params)  {
+    val poly by { params.targetPoly }
+    val animation by { params.transformAnimation }
+
     val program = FaceProgram(gl)
     val colorBuffer = program.aVertexColor.createBuffer()
     val prevColorBuffer = program.aPrevVertexColor.createBuffer()
@@ -22,17 +25,12 @@ class FaceContext(val gl: GL, val polyContext: PolyContext, override val params:
     init { setup() }
 
     override fun update() {
-        val poly = params.targetPoly
-        val animation = params.transformAnimation
-        if (animation != null) {
-            updateColor(gl, animation.targetPoly, colorBuffer)
-            updateColor(gl, animation.prevPoly, prevColorBuffer)
-        } else {
-            // simple case without animation
-            updateColor(gl, poly, colorBuffer)
-        }
-        // face mode
-        hasHiddenFaces = false
+        val animation = animation
+        // colors
+        updateColor(gl, poly, colorBuffer)
+        if (animation != null) updateColor(gl, animation.prevPoly, prevColorBuffer)
+        // geometry
+        hasHiddenFaces = false // face mode
         poly.faceVerticesData(faceModeBuffer) { f, _, a, i ->
             a[i] = FACE_SHOWN
             if (!f.isPlanar) {
@@ -86,7 +84,7 @@ fun FaceContext.draw(view: ViewContext, lightning: LightningContext) {
         uLightPosition by lightning.lightPosition
 
         aVertexColor by colorBuffer
-        aPrevVertexColor by if (params.transformAnimation != null) prevColorBuffer else colorBuffer
+        aPrevVertexColor by if (animation != null) prevColorBuffer else colorBuffer
 
         aFaceMode by faceModeBuffer
     }
