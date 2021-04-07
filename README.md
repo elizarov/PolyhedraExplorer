@@ -50,7 +50,9 @@ gradlew jsBrowserDevelopmentRun
   * [x] Pinch-to-zoom gesture (or Ctrl+Wheel)
   * [x] Z-rotate with Shift+Mouse 
   * [ ] Two-finger Z-rotate gesture (does not seem to be supported on macOS Chrome)
-  * [ ] Select/show/hide faces by kind with point and click
+  * [ ] Highlight faces by hovering over them in the list
+  * [x] Show/hide faces by kind
+  * [ ] Show/kind faces by kind with point and click on the polyhedron
 * Polyhedron info
   * [x] Show face and vertex geometry
   * [x] Show edge dihedral angles

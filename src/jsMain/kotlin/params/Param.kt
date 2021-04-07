@@ -373,6 +373,17 @@ class EnumListParam<T : Tagged>(
     }
 }
 
+class SetParam<T : Tagged>(
+    tag: String,
+    value: Set<T>,
+    private val factory: (String) -> T?
+) : ImmutableValueParam<Set<T>>(tag, value) {
+    override fun valueToString(): String = value.joinToString(",") { it.tag }
+    override fun parseValue(value: String): Set<T> = value.split(",").mapNotNullTo(LinkedHashSet()) { element ->
+        factory(element)
+    }
+}
+
 class DoubleParam(
     tag: String,
     value: Double,

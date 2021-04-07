@@ -13,6 +13,7 @@ import org.khronos.webgl.WebGLRenderingContext as GL
 class FaceContext(val gl: GL, val polyContext: PolyContext, params: PolyParams) : Param.Context(params)  {
     val poly by { params.targetPoly }
     val animation by { params.transformAnimation }
+    val hideFaces by { params.hideFaces.value }
 
     val program = FaceProgram(gl)
     val colorBuffer = program.aVertexColor.createBuffer()
@@ -33,13 +34,13 @@ class FaceContext(val gl: GL, val polyContext: PolyContext, params: PolyParams) 
         hasHiddenFaces = false // face mode
         poly.faceVerticesData(faceModeBuffer) { f, _, a, i ->
             a[i] = FACE_SHOWN
-            if (!f.isPlanar) {
+            if (!f.isPlanar || f.kind in hideFaces) {
                 a[i] = FACE_HIDDEN
                 hasHiddenFaces = true
             }
         }
         animation?.prevPoly?.faceVerticesData(faceModeBuffer) { f, _, a, i ->
-            if (!f.isPlanar) {
+            if (!f.isPlanar || f.kind in hideFaces) {
                 a[i] = FACE_HIDDEN
                 hasHiddenFaces = true
             }

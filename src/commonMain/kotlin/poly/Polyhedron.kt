@@ -132,12 +132,25 @@ private fun MutableList<Edge>.sortFaceAdjacentEdges(f: Face) {
     }
 }
 
-private fun idString(id: Int, first: Char, last: Char): String {
-    val n = last - first + 1
-    val ch = first + (id % n)
+private fun idString(id: Int, from: Char, to: Char): String {
+    val n = to - from + 1
+    val ch = from + (id % n)
     val rem = id / n
     if (rem == 0) return ch.toString()
-    return idString(rem - 1, first, last) + ch
+    return idString(rem - 1, from, to) + ch
+}
+
+private fun String.toIdOrNull(from: Char, to: Char): Int? {
+    return when(length) {
+        0 -> null
+        1 -> if (first() in from..to) first() - from else null
+        else -> {
+            val ch = last()
+            if (ch !in from..to) return null
+            val prefix = dropLast(1).toIdOrNull(from, to) ?: return null
+            (prefix + 1) * (to - from + 1) + (ch - from)
+        }
+    }
 }
 
 interface MutableKind<K : Id> {
@@ -184,10 +197,14 @@ fun Vertex.toMutableVertex(): MutableVertex =
     MutableVertex(id, this, kind, directedEdges.toMutableList())
 
 @Serializable
-inline class FaceKind(override val id: Int) : Id, AnyKind, Comparable<FaceKind> {
+inline class FaceKind(override val id: Int) : Id, AnyKind, Tagged, Comparable<FaceKind> {
     override fun compareTo(other: FaceKind): Int = id.compareTo(other.id)
     override fun toString(): String = idString(id, 'α', 'ω')
+    override val tag: String get() = toString()
 }
+
+fun String.toFaceKindOrNull() =
+    toIdOrNull('α', 'ω')?.let { FaceKind(it) }
 
 interface Face : Id, Plane {
     val fvs: List<Vertex>

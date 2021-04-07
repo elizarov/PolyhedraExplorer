@@ -41,7 +41,8 @@ private fun loadAndAutoSaveRootParams(): RootParams {
     val rootParams = RootParams()
     val history = createHashHistory()
     var historyPushTimeout = 0
-    rootParams.loadFromString(history.location.pathname.substringAfter('/', ""))
+    val path = decodeURI(history.location.pathname)
+    rootParams.loadFromString(path.substringAfter('/', ""))
     rootParams.onNotifyUpdated(Param.TargetValue) {
         // throttle updates
         if (historyPushTimeout == 0) {
@@ -54,4 +55,5 @@ private fun loadAndAutoSaveRootParams(): RootParams {
     return rootParams
 }
 
+external fun decodeURI(s: String): String
 

@@ -65,7 +65,7 @@ class RootPane(props: PComponentProps<RootParams>) :
                     poly = state.poly
                 }
                 polyInfoPane {
-                    poly = state.poly
+                    param = props.param.render.poly
                 }
             }
         }

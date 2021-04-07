@@ -4,23 +4,29 @@
 
 package polyhedra.js.main
 
+import kotlinx.html.js.*
 import polyhedra.common.poly.*
 import polyhedra.common.util.*
+import polyhedra.js.components.*
 import polyhedra.js.poly.*
 import react.*
 import react.dom.*
 
-external interface PolyInfoPaneProps : RProps {
+external interface PolyInfoState : RState {
     var poly: Polyhedron
 }
 
-fun RBuilder.polyInfoPane(builder: PolyInfoPaneProps.() -> Unit) {
+fun RBuilder.polyInfoPane(builder: PComponentProps<PolyParams>.() -> Unit) {
     child(PolyInfoPane::class) {
         attrs(builder)
     }
 }
 
-class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
+class PolyInfoPane(params: PComponentProps<PolyParams>) : PComponent<PolyParams, PComponentProps<PolyParams>, PolyInfoState>(params) {
+    override fun PolyInfoState.init(props: PComponentProps<PolyParams>) {
+        poly = props.param.poly
+    }
+
     private fun RBuilder.infoHeader(name: String, cnt: Int, distValue: Double, distName: String) {
         tr("header") {
             td {
@@ -37,7 +43,8 @@ class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
     }
 
     override fun RBuilder.render() {
-        val poly = props.poly
+        val poly = state.poly
+        val hideFaces = props.param.hideFaces.value
         table {
             tbody {
                 // Faces
@@ -47,7 +54,21 @@ class PolyInfoPane : RPureComponent<PolyInfoPaneProps, RState>() {
                     val fe = f0.essence()
                     tr("info") {
                         td {
-                            if (!fe.isPlanar) messageSpan(FaceNotPlanar())
+                            if (!fe.isPlanar) {
+                                messageSpan(FaceNotPlanar())
+                            } else {
+                                val hidden = fk in hideFaces
+                                val icon = if (hidden) "fa-eye-slash" else "fa-eye"
+                                i("far $icon") {
+                                    attrs {
+                                        onClickFunction = {
+                                            props.param.hideFaces.updateValue(
+                                                if (hidden) hideFaces - fk else hideFaces + fk
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
                         td("rt") { +fk.toString() }
                         td { +fs.size.toString() }

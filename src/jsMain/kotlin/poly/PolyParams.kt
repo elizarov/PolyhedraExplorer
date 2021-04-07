@@ -33,6 +33,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
     val seed = using(EnumParam("s", defaultSeed, Seeds))
     val transforms = using(EnumListParam("t", emptyList(), Transforms))
     val baseScale = using(EnumParam("bs", defaultScale, Scales))
+    val hideFaces = using(SetParam("hf", emptySet()) { it.toFaceKindOrNull() })
 
     // computed value of the currently shown polyhedron
     var poly: Polyhedron = defaultSeed.poly
