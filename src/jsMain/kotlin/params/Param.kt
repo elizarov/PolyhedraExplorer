@@ -253,7 +253,7 @@ abstract class Param(val tag: String) {
     }
 }
 
-abstract class ValueParam<T : Any>(tag: String, value: T) : Param(tag) {
+abstract class ValueParam<T>(tag: String, value: T) : Param(tag) {
     private val defaultValue: T = value
 
     open val value: T
@@ -277,7 +277,7 @@ abstract class ValueParam<T : Any>(tag: String, value: T) : Param(tag) {
     abstract fun parseValue(value: String): T?
 }
 
-abstract class ImmutableValueParam<T : Any>(tag: String, value: T) : ValueParam<T>(tag, value) {
+abstract class ImmutableValueParam<T>(tag: String, value: T) : ValueParam<T>(tag, value) {
     override var targetValue: T = value
 
     override fun updateValue(value: T, updateType: UpdateType?) {
@@ -285,6 +285,12 @@ abstract class ImmutableValueParam<T : Any>(tag: String, value: T) : ValueParam<
         targetValue = value
         notifyUpdated(updateType ?: TargetValue)
     }
+}
+
+class TransientParam<T>(value: T) : ImmutableValueParam<T>("", value) {
+    override fun isDefault(): Boolean = true
+    override fun loadFrom(parsed: ParsedParam, update: (Param) -> Unit) {}
+    override fun parseValue(value: String): T? = null
 }
 
 interface ValueAnimationParams {

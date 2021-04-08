@@ -20,11 +20,11 @@ private fun paletteColor(id: Int): Color {
         if (phase > 0) count *= 2
         phase += 0.5 / count
     }
-    return hsvColor(hue0 + phase + rem.toDouble() / count, 0.8, 0.95)
+    return hslColor(hue0 + phase + rem.toDouble() / count, 0.8, 0.5)
 }
 
 object PolyStyle {
-    val edgeColor = hsvColor(0.0, 0.0, 0.1)
+    val edgeColor = hslColor(0.0, 0.0, 0.1)
     fun faceColor(f: Face): Color =
         paletteColor(f.kind.id)
     fun vertexColor(v: Vertex): Color =

@@ -134,6 +134,10 @@ svg.figure {
     height: 1em;
 }
 
+tr.info:hover {
+    background: hsl(70, 90%, 50%);
+}
+
 /* --------- canvas fps --------- */
 
 .fps-container {

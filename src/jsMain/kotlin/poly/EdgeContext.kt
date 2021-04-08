@@ -23,17 +23,16 @@ class EdgeContext(val gl: GL, val polyContext: PolyContext, params: PolyParams) 
     init { setup() }
 
     override fun update() {
-        color = PolyStyle.edgeColor.toFloat32Array()
+        color = PolyStyle.edgeColor.toFloat32Array4()
         program.use()
         // indices
-        nIndices = poly.es.size * 4
-        val indices = indexBuffer.takeData(nIndices)
+        val indices = indexBuffer.takeData(poly.es.size * 4)
+        nIndices = 0
         var i = 0
-        var j = 0
         for (f in poly.fs) {
             for (k in 0 until f.size) {
-                indices[j++] = i + k
-                indices[j++] = i + (k + 1) % f.size
+                indices[nIndices++] = i + k
+                indices[nIndices++] = i + (k + 1) % f.size
             }
             i += f.size
         }

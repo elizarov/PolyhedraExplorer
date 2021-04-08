@@ -53,6 +53,10 @@ class PolyInfoPane(params: PComponentProps<PolyParams>) : PComponent<PolyParams,
                     val f0 = fs[0]
                     val fe = f0.essence()
                     tr("info") {
+                        attrs {
+                            onMouseOverFunction = { props.param.selectedFace.updateValue(fk) }
+                            onMouseOutFunction = { props.param.selectedFace.updateValue(null) }
+                        }
                         td {
                             if (!fe.isPlanar) {
                                 messageSpan(FaceNotPlanar())

@@ -4,16 +4,19 @@
 
 package polyhedra.js.poly
 
+import org.khronos.webgl.*
 import polyhedra.common.poly.*
 import polyhedra.js.glsl.*
 import polyhedra.js.main.*
 import polyhedra.js.params.*
+import polyhedra.js.util.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
 class FaceContext(val gl: GL, val polyContext: PolyContext, params: PolyParams) : Param.Context(params)  {
     val poly by { params.targetPoly }
     val animation by { params.transformAnimation }
     val hideFaces by { params.hideFaces.value }
+    val selectedFace by { params.selectedFace.value }
 
     val program = FaceProgram(gl)
     val colorBuffer = program.aVertexColor.createBuffer()
@@ -31,32 +34,28 @@ class FaceContext(val gl: GL, val polyContext: PolyContext, params: PolyParams) 
         updateColor(gl, poly, colorBuffer)
         if (animation != null) updateColor(gl, animation.prevPoly, prevColorBuffer)
         // geometry
-        hasHiddenFaces = false // face mode
         poly.faceVerticesData(faceModeBuffer) { f, _, a, i ->
-            a[i] = FACE_SHOWN
-            if (!f.isPlanar || f.kind in hideFaces) {
-                a[i] = FACE_HIDDEN
-                hasHiddenFaces = true
-            }
+            a[i] = if (f.kind == selectedFace) FACE_SELECTED else FACE_NORMAL
         }
         animation?.prevPoly?.faceVerticesData(faceModeBuffer) { f, _, a, i ->
-            if (!f.isPlanar || f.kind in hideFaces) {
-                a[i] = FACE_HIDDEN
-                hasHiddenFaces = true
-            }
+            a[i] = if (f.kind == selectedFace) FACE_SELECTED else FACE_NORMAL
         }
         faceModeBuffer.bindBufferData(gl)
         // indices
-        nIndices = poly.fs.sumOf { 3 * (it.size - 2) }
-        val indices = indexBuffer.takeData(nIndices)
+        val indices = indexBuffer.takeData(poly.fs.sumOf { 3 * (it.size - 2) })
+        hasHiddenFaces = false // face mode
+        nIndices = 0
         var i = 0
-        var j = 0
         for (f in poly.fs) {
             // Note: In GL front faces are CCW
-            for (k in 2 until f.size) {
-                indices[j++] = i
-                indices[j++] = i + k
-                indices[j++] = i + k - 1
+            if (f.isPlanar && f.kind !in hideFaces) {
+                for (k in 2 until f.size) {
+                    indices[nIndices++] = i
+                    indices[nIndices++] = i + k
+                    indices[nIndices++] = i + k - 1
+                }
+            } else {
+                hasHiddenFaces = true
             }
             i += f.size
         }

@@ -19,11 +19,11 @@ data class Color(
         "Color(${r.fmt(3)}, ${g.fmt(3)}, ${b.fmt(3)}, ${a.fmt(3)})"
 }
 
-fun hsvColor(h: Double, s: Double, v: Double, a: Double = 1.0): Color {
-    val c = v * s // chroma
+fun hslColor(h: Double, s: Double, l: Double, a: Double = 1.0): Color {
+    val c = (1 -  (2 * l - 1).absoluteValue) * s // chroma
     val p = frac(h) * 6
     val x = c * (1 - abs((p mod 2.0) - 1))
-    val m = (v - c).toFloat()
+    val m = (l - c / 2).toFloat()
     val cm = (c + m).toFloat()
     val xm = (x + m).toFloat()
     val af = a.toFloat()
@@ -37,7 +37,7 @@ fun hsvColor(h: Double, s: Double, v: Double, a: Double = 1.0): Color {
     }
 }
 
-fun Color.toFloat32Array(): Float32Array = float32Of(r, g, b, a)
+fun Color.toFloat32Array4(): Float32Array = float32Of(r, g, b, a)
 
 fun Color.toRgbString() =
     "rgb(${r.intColor},${g.intColor},${b.intColor})"
