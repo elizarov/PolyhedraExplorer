@@ -24,10 +24,8 @@ class DrawContext(
 
     val view = ViewContext(params.view)
     val lightning = LightningContext(params.lighting)
-    
-    val polyContext = PolyContext(gl, params.poly)
-    val faceContext = FaceContext(gl, polyContext, params.poly)
-    val edgeContext = EdgeContext(gl, polyContext, params.poly)
+    val faces = FaceContext(gl, params.poly)
+    val edges = EdgeContext(gl, params.poly)
 
     init {
         setup()
@@ -56,27 +54,27 @@ fun DrawContext.drawScene() {
 
     val hasFaces = display.hasFaces() && view.transparentFaces < 1.0
     val hasEdges = display.hasEdges()
-    val transparent = hasFaces && (view.transparentFaces != 0.0 || faceContext.hasHiddenFaces)
+    val transparent = hasFaces && (view.transparentFaces != 0.0 || faces.hasHiddenFaces)
     gl[GL.DEPTH_TEST] = !transparent
     gl[GL.BLEND] = transparent
     if (transparent) {
         // special code for transparent faces - draw back faces, then front faces
         gl[GL.CULL_FACE] = true
         gl.cullFace(GL.FRONT)
-        faceContext.draw(view, lightning)
-        if (hasEdges) edgeContext.draw(view, 1)
+        faces.draw(view, lightning)
+        if (hasEdges) edges.draw(view, 1)
         gl.cullFace(GL.BACK)
-        faceContext.draw(view, lightning)
-        if (hasEdges) edgeContext.draw(view, -1)
+        faces.draw(view, lightning)
+        if (hasEdges) edges.draw(view, -1)
     } else {
         if (hasFaces) {
             // regular draw faces
             val solid = view.expandFaces == 0.0
             gl[GL.CULL_FACE] = solid // can cull faces when drawing solid
-            faceContext.draw(view, lightning)
+            faces.draw(view, lightning)
         }
         if (hasEdges) {
-            edgeContext.draw(view)
+            edges.draw(view)
         }
     }
 }

@@ -5,12 +5,11 @@
 package polyhedra.js.glsl
 
 import org.khronos.webgl.*
+import polyhedra.common.util.*
+import polyhedra.js.util.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
 fun <T : GLType.Floats<T>> createBuffer(gl: GL, type: T): Float32Buffer<T> =
-    Float32Buffer(type, gl.createBuffer()!!)
-
-fun <T : GLType.Floats<T>> GLProgram.Attribute<T>.createBuffer(): Float32Buffer<T> =
     Float32Buffer(type, gl.createBuffer()!!)
 
 fun GLProgram.createUint8Buffer(): Uint8Buffer = Uint8Buffer(gl.createBuffer()!!)
@@ -19,34 +18,53 @@ fun GLProgram.createUint16Buffer(): Uint16Buffer = Uint16Buffer(gl.createBuffer(
 
 abstract class GLBuffer<T : GLType<T>, D : BufferDataSource>(
     val type: T,
-    val glBuffer: WebGLBuffer
+    val glBuffer: WebGLBuffer,
 ) {
-    var data: D? = null
-    abstract fun takeData(length: Int): D
+    @Suppress("LeakingThis")
+    var data: D = allocate(128)
+
+    protected abstract val capacity: Int
+    protected abstract fun allocate(capacity: Int): D
+
+    fun ensureCapacity(length: Int) {
+        val capacity = capacity
+        val size = length * type.bufferSize
+        if (capacity < size) data = allocate(maxOf(size, capacity * 2))
+    }
+}
+
+fun GLBuffer<*, *>.bindBufferData(gl: GL, target: Int = GL.ARRAY_BUFFER) {
+    gl.bindBuffer(target, glBuffer)
+    gl.bufferData(target, data, GL.STATIC_DRAW)
 }
 
 class Float32Buffer<T : GLType<T>>(type: T, glBuffer: WebGLBuffer) : GLBuffer<T, Float32Array>(type, glBuffer) {
-    override fun takeData(length: Int): Float32Array {
-        data?.takeIf { it.length >= length }?.let { return it }
-        return Float32Array(length).also { data = it }
-    }
-}
-
-fun GLBuffer<*, *>.bindBufferData(gl: GL) {
-    gl.bindBuffer(GL.ARRAY_BUFFER, glBuffer)
-    gl.bufferData(GL.ARRAY_BUFFER, data, GL.STATIC_DRAW)
+    override val capacity: Int get() = data.length
+    override fun allocate(capacity: Int): Float32Array = Float32Array(capacity)
 }
 
 class Uint8Buffer(glBuffer: WebGLBuffer) : GLBuffer<GLType.int, Uint8Array>(GLType.int, glBuffer) {
-    override fun takeData(length: Int): Uint8Array {
-        data?.takeIf { it.length >= length }?.let { return it }
-        return Uint8Array(length).also { data = it }
-    }
+    override val capacity: Int get() = data.length
+    override fun allocate(capacity: Int): Uint8Array = Uint8Array(capacity)
 }
 
 class Uint16Buffer(glBuffer: WebGLBuffer) : GLBuffer<GLType.int, Uint16Array>(GLType.int, glBuffer) {
-    override fun takeData(length: Int): Uint16Array {
-        data?.takeIf { it.length >= length }?.let { return it }
-        return Uint16Array(length).also { data = it }
-    }
+    override val capacity: Int get() = data.length
+    override fun allocate(capacity: Int): Uint16Array = Uint16Array(capacity)
+}
+
+operator fun Float32Buffer<GLType.vec3>.set(i: Int, v: Vec3) {
+    data[3 * i] = v
+}
+
+operator fun Float32Buffer<GLType.vec3>.set(i: Int, c: Color) {
+    data.setRGB(3 * i, c)
+}
+
+operator fun Uint8Buffer.set(i: Int, x: Int) {
+    data[i] = x
+}
+
+operator fun Uint16Buffer.set(i: Int, x: Int) {
+    data[i] = x
 }

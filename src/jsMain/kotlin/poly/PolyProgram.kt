@@ -63,20 +63,3 @@ abstract class PolyProgram(gl: GL) : GLProgram(gl) {
         }
     }
 }
-
-fun PolyProgram.assignPolyContext(polyContext: PolyContext) {
-    aVertexPosition by polyContext.target.positionBuffer
-    aVertexNormal by polyContext.target.normalBuffer
-    val animation = polyContext.animation
-    if (animation != null) {
-        uTargetFraction by animation.targetFraction
-        uPrevFraction by animation.prevFraction
-        aPrevVertexPosition by polyContext.prev.positionBuffer
-        aPrevVertexNormal by polyContext.prev.normalBuffer
-    } else {
-        uTargetFraction by 1.0
-        uPrevFraction by 0.0
-        aPrevVertexPosition by polyContext.target.positionBuffer
-        aPrevVertexNormal by polyContext.target.normalBuffer
-    }
-}

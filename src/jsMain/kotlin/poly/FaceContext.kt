@@ -9,73 +9,91 @@ import polyhedra.common.poly.*
 import polyhedra.js.glsl.*
 import polyhedra.js.main.*
 import polyhedra.js.params.*
-import polyhedra.js.util.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
-class FaceContext(val gl: GL, val polyContext: PolyContext, params: PolyParams) : Param.Context(params)  {
+class FaceContext(val gl: GL, params: PolyParams) : Param.Context(params)  {
     val poly by { params.targetPoly }
     val animation by { params.transformAnimation }
     val hideFaces by { params.hideFaces.value }
     val selectedFace by { params.selectedFace.value }
 
     val program = FaceProgram(gl)
-    val colorBuffer = program.aVertexColor.createBuffer()
-    val prevColorBuffer = program.aPrevVertexColor.createBuffer()
-    val faceModeBuffer = program.createUint8Buffer()
-    val indexBuffer = program.createUint16Buffer()
-    var nIndices = 0
+
+    var indexSize = 0
     var hasHiddenFaces = false
+    val indexBuffer = program.createUint16Buffer()
+    val faceModeBuffer = program.createUint8Buffer()
+    val target = FaceBuffers()
+    val prev = FaceBuffers() // only filled when animation != null
 
     init { setup() }
 
     override fun update() {
-        val animation = animation
-        // colors
-        updateColor(gl, poly, colorBuffer)
-        if (animation != null) updateColor(gl, animation.prevPoly, prevColorBuffer)
-        // geometry
-        poly.faceVerticesData(faceModeBuffer) { f, _, a, i ->
-            a[i] = if (f.kind == selectedFace) FACE_SELECTED else FACE_NORMAL
-        }
-        animation?.prevPoly?.faceVerticesData(faceModeBuffer) { f, _, a, i ->
-            a[i] = if (f.kind == selectedFace) FACE_SELECTED else FACE_NORMAL
-        }
-        faceModeBuffer.bindBufferData(gl)
-        // indices
-        val indices = indexBuffer.takeData(poly.fs.sumOf { 3 * (it.size - 2) })
-        hasHiddenFaces = false // face mode
-        nIndices = 0
-        var i = 0
-        for (f in poly.fs) {
-            // Note: In GL front faces are CCW
-            if (f.isPlanar && f.kind !in hideFaces) {
-                for (k in 2 until f.size) {
-                    indices[nIndices++] = i
-                    indices[nIndices++] = i + k
-                    indices[nIndices++] = i + k - 1
+        program.use()
+        indexSize = target.update(poly, indexBuffer, faceModeBuffer)
+        animation?.let { prev.update(it.prevPoly) }
+    }
+
+    inner class FaceBuffers {
+        val positionBuffer = createBuffer(gl, GLType.vec3)
+        val normalBuffer = createBuffer(gl, GLType.vec3)
+        val colorBuffer = createBuffer(gl, GLType.vec3)
+
+        fun update(poly: Polyhedron, indexBuffer: Uint16Buffer? = null, faceModeBuffer: Uint8Buffer? = null): Int {
+            var bufferSize = 0
+            var indexSize = 0
+            for (f in poly.fs) {
+                if (f.isPlanar && f.kind !in hideFaces) {
+                    bufferSize += f.size
+                    indexSize += (f.size - 2) * 3
                 }
-            } else {
-                hasHiddenFaces = true
             }
-            i += f.size
+            positionBuffer.ensureCapacity(bufferSize)
+            normalBuffer.ensureCapacity(bufferSize)
+            colorBuffer.ensureCapacity(bufferSize)
+            faceModeBuffer?.ensureCapacity(bufferSize)
+            indexBuffer?.ensureCapacity(indexSize)
+            var idxOfs = 0
+            var bufOfs = 0
+            for (f in poly.fs) {
+                // Note: In GL front faces are CCW
+                if (f.isPlanar && f.kind !in hideFaces) {
+                    val faceColor = PolyStyle.faceColor(f)
+                    for (k in 0 until f.size) {
+                        positionBuffer[bufOfs + k] = f[k]
+                        normalBuffer[bufOfs + k] = f
+                        colorBuffer[bufOfs + k] = faceColor
+                        faceModeBuffer?.set(bufOfs + k, if (f.kind == selectedFace) FACE_SELECTED else FACE_NORMAL)
+                    }
+                    if (indexBuffer != null) {
+                        for (k in 2 until f.size) {
+                            indexBuffer[idxOfs++] = bufOfs
+                            indexBuffer[idxOfs++] = bufOfs + k
+                            indexBuffer[idxOfs++] = bufOfs + k - 1
+                        }
+                    }
+                    bufOfs += f.size
+                } else {
+                    hasHiddenFaces = true
+                }
+            }
+            positionBuffer.bindBufferData(gl)
+            normalBuffer.bindBufferData(gl)
+            colorBuffer.bindBufferData(gl)
+            faceModeBuffer?.bindBufferData(gl)
+            indexBuffer?.bindBufferData(gl, GL.ELEMENT_ARRAY_BUFFER)
+            check(bufOfs == bufferSize)
+            if (indexBuffer != null) check(idxOfs == indexSize)
+            return indexSize
         }
-        gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, indexBuffer.glBuffer)
-        gl.bufferData(GL.ELEMENT_ARRAY_BUFFER, indices, GL.STATIC_DRAW)
     }
-
-}
-
-private fun updateColor(gl: GL, poly: Polyhedron, buffer: Float32Buffer<GLType.vec3>) {
-    poly.faceVerticesData(buffer) { f, _, a, i ->
-        a.setRGB(i, PolyStyle.faceColor(f))
-    }
-    buffer.bindBufferData(gl)
 }
 
 fun FaceContext.draw(view: ViewContext, lightning: LightningContext) {
+    val animation = animation
+    val prevOrTarget = if (animation != null) prev else target
     program.use {
         assignView(view)
-        assignPolyContext(polyContext)
 
         uAmbientLightColor by lightning.ambientLightColor
         uDiffuseLightColor by lightning.diffuseLightColor
@@ -83,13 +101,18 @@ fun FaceContext.draw(view: ViewContext, lightning: LightningContext) {
         uSpecularLightPower by lightning.specularLightPower
         uLightPosition by lightning.lightPosition
 
-        aVertexColor by colorBuffer
-        aPrevVertexColor by if (animation != null) prevColorBuffer else colorBuffer
+        uTargetFraction by (animation?.targetFraction ?: 1.0)
+        uPrevFraction by (animation?.prevFraction ?: 0.0)
 
+        aVertexPosition by target.positionBuffer
+        aVertexNormal by target.normalBuffer
+        aVertexColor by target.colorBuffer
+        aPrevVertexPosition by prevOrTarget.positionBuffer
+        aPrevVertexNormal by prevOrTarget.normalBuffer
+        aPrevVertexColor by prevOrTarget.colorBuffer
         aFaceMode by faceModeBuffer
     }
-    
     gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, indexBuffer.glBuffer)
-    gl.drawElements(GL.TRIANGLES, nIndices, GL.UNSIGNED_SHORT, 0)
+    gl.drawElements(GL.TRIANGLES, indexSize, GL.UNSIGNED_SHORT, 0)
 }
 
