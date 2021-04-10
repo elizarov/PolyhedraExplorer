@@ -42,6 +42,7 @@ private fun DrawContext.initGL() {
     gl.depthFunc(GL.LEQUAL)
     gl.clearColor(0.0f, 0.0f, 0.0f, 0.0f)
     gl.clearDepth(1.0f)
+    gl.getExtension("OES_element_index_uint");
 }
 
 fun DrawContext.drawScene() {

@@ -21,7 +21,7 @@ class FaceContext(val gl: GL, params: PolyParams) : Param.Context(params)  {
 
     var indexSize = 0
     var hasHiddenFaces = false
-    val indexBuffer = program.createUint16Buffer()
+    val indexBuffer = program.createUint32Buffer()
     val faceModeBuffer = program.createUint8Buffer()
     val target = FaceBuffers()
     val prev = FaceBuffers() // only filled when animation != null
@@ -39,7 +39,7 @@ class FaceContext(val gl: GL, params: PolyParams) : Param.Context(params)  {
         val normalBuffer = createBuffer(gl, GLType.vec3)
         val colorBuffer = createBuffer(gl, GLType.vec3)
 
-        fun update(poly: Polyhedron, indexBuffer: Uint16Buffer? = null, faceModeBuffer: Uint8Buffer? = null): Int {
+        fun update(poly: Polyhedron, indexBuffer: Uint32Buffer? = null, faceModeBuffer: Uint8Buffer? = null): Int {
             var bufferSize = 0
             var indexSize = 0
             for (f in poly.fs) {
@@ -113,6 +113,6 @@ fun FaceContext.draw(view: ViewContext, lightning: LightningContext) {
         aFaceMode by faceModeBuffer
     }
     gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, indexBuffer.glBuffer)
-    gl.drawElements(GL.TRIANGLES, indexSize, GL.UNSIGNED_SHORT, 0)
+    gl.drawElements(GL.TRIANGLES, indexSize, GL.UNSIGNED_INT, 0)
 }
 

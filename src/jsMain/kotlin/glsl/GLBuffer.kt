@@ -13,8 +13,8 @@ fun <T : GLType.Floats<T>> createBuffer(gl: GL, type: T): Float32Buffer<T> =
     Float32Buffer(type, gl.createBuffer()!!)
 
 fun GLProgram.createUint8Buffer(): Uint8Buffer = Uint8Buffer(gl.createBuffer()!!)
-
 fun GLProgram.createUint16Buffer(): Uint16Buffer = Uint16Buffer(gl.createBuffer()!!)
+fun GLProgram.createUint32Buffer(): Uint32Buffer = Uint32Buffer(gl.createBuffer()!!)
 
 abstract class GLBuffer<T : GLType<T>, D : BufferDataSource>(
     val type: T,
@@ -53,6 +53,11 @@ class Uint16Buffer(glBuffer: WebGLBuffer) : GLBuffer<GLType.int, Uint16Array>(GL
     override fun allocate(capacity: Int): Uint16Array = Uint16Array(capacity)
 }
 
+class Uint32Buffer(glBuffer: WebGLBuffer) : GLBuffer<GLType.int, Uint32Array>(GLType.int, glBuffer) {
+    override val capacity: Int get() = data.length
+    override fun allocate(capacity: Int): Uint32Array = Uint32Array(capacity)
+}
+
 operator fun Float32Buffer<GLType.vec3>.set(i: Int, v: Vec3) {
     data[3 * i] = v
 }
@@ -66,5 +71,9 @@ operator fun Uint8Buffer.set(i: Int, x: Int) {
 }
 
 operator fun Uint16Buffer.set(i: Int, x: Int) {
+    data[i] = x
+}
+
+operator fun Uint32Buffer.set(i: Int, x: Int) {
     data[i] = x
 }
