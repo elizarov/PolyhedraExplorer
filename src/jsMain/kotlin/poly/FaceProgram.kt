@@ -38,6 +38,7 @@ class FaceProgram(gl: GL) : ViewBaseProgram(gl) {
     private val vToCamera by varying(GLType.vec3)
     private val vToLight by varying(GLType.vec3)
     private val vColor by varying(GLType.vec3, GLPrecision.lowp)
+    private val vColorAlpha by varying(GLType.float, GLPrecision.lowp)
 
     val fInterpolatedPosition by function(GLType.vec3) {
         val pos by aPosition * uTargetFraction + aPrevPosition * uPrevFraction
@@ -58,7 +59,7 @@ class FaceProgram(gl: GL) : ViewBaseProgram(gl) {
 
     // world position of the current element
     val fPosition by function(GLType.vec4) {
-        computePosition(fInterpolatedPosition(), fInterpolatedExpandDir())
+        fViewPosition(fInterpolatedPosition(), fInterpolatedExpandDir())
     }
 
     // world normal of the current element
@@ -79,6 +80,7 @@ class FaceProgram(gl: GL) : ViewBaseProgram(gl) {
         vToCamera by uCameraPosition - position.xyz
         vToLight by uLightPosition - position.xyz
         vColor by fInterpolatedColor() * aFaceMode
+        vColorAlpha by uColorAlpha * fCullMull(position, uNormalMatrix * fInterpolatedExpandDir())
     }
 
     override val fragmentShader = shader(ShaderType.Fragment) {
@@ -87,7 +89,7 @@ class FaceProgram(gl: GL) : ViewBaseProgram(gl) {
         val halfVector by normalize(normToCamera + normToLight)
         val light by uAmbientLightColor + uDiffuseLightColor * max(dot(vNormal, normToLight), 0.0)
         val specular by uSpecularLightColor * pow(max(dot(vNormal, halfVector), 0.0), uSpecularLightPower)
-        gl_FragColor by vec4(vColor * light + specular, uColorAlpha)
+        gl_FragColor by vec4(vColor * light + specular, vColorAlpha)
     }
 }
 

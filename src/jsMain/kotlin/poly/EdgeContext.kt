@@ -77,10 +77,9 @@ fun EdgeContext.draw(view: ViewContext, cullMode: Int = 0) {
     val animation = animation
     val prevOrTarget = if (animation != null) prev else target
     program.use {
-        assignView(view)
+        assignView(view, cullMode)
 
         uVertexColor by color
-        uCullMode by cullMode.toDouble()
 
         uTargetFraction by (animation?.targetFraction ?: 1.0)
         uPrevFraction by (animation?.prevFraction ?: 0.0)

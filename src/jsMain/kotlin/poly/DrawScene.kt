@@ -16,7 +16,6 @@ class DrawContext(
     private val onUpdate: () -> Unit,
 ) : Param.Context(params) {
     val transparentFaces by { params.view.transparentFaces.value }
-    val expandFaces by { params.view.expandFaces.value }
 
     val gl: GL = canvas.getContext("webgl", js {
         premultipliedAlpha = false  // Ask for non-premultiplied alpha
@@ -42,7 +41,9 @@ private fun DrawContext.initGL() {
     gl.depthFunc(GL.LEQUAL)
     gl.clearColor(0.0f, 0.0f, 0.0f, 0.0f)
     gl.clearDepth(1.0f)
-    gl.getExtension("OES_element_index_uint");
+    gl.getExtension("OES_element_index_uint")
+    gl[GL.CULL_FACE] = true
+    gl.cullFace(GL.BACK)
 }
 
 fun DrawContext.drawScene() {
@@ -57,17 +58,13 @@ fun DrawContext.drawScene() {
     gl[GL.DEPTH_TEST] = !transparentFaces
     gl[GL.BLEND] = transparentFaces
     if (transparentFaces) {
-        // special code for transparent faces - draw back faces, then front faces
-        gl[GL.CULL_FACE] = true
-        gl.cullFace(GL.FRONT)
-        faces.draw(view, lightning)
+        // special code for transparent faces - draw back "front faces", then front "front faces"
+        faces.draw(view, lightning, 1)
         edges.draw(view, 1)
-        gl.cullFace(GL.BACK)
-        faces.draw(view, lightning)
+        faces.draw(view, lightning, -1)
         edges.draw(view, -1)
     } else {
         // regular draw faces
-        gl[GL.CULL_FACE] = true
         faces.draw(view, lightning)
         edges.draw(view)
     }
