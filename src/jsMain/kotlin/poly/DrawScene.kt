@@ -67,8 +67,7 @@ fun DrawContext.drawScene() {
         edges.draw(view, -1)
     } else {
         // regular draw faces
-        val solid = expandFaces == 0.0 && !faces.hasHiddenFaces
-        gl[GL.CULL_FACE] = solid // can cull faces when drawing solid
+        gl[GL.CULL_FACE] = true
         faces.draw(view, lightning)
         edges.draw(view)
     }

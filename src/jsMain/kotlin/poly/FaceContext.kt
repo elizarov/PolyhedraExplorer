@@ -16,18 +16,21 @@ import org.khronos.webgl.WebGLRenderingContext as GL
 private const val MAX_RIM_FRACTION = 0.8
 
 class FaceContext(val gl: GL, params: RenderParams) : Param.Context(params)  {
-    val drawFaces by { params.view.display.value.hasFaces() && params.view.transparentFaces.value < 1.0 }
-    val hasWidth by { params.view.faceWidth.value > 0.0 }
-    val hasRim by { params.view.faceRim.value > 0.0 }
     val poly by { params.poly.targetPoly }
     val animation by { params.poly.transformAnimation }
     val hideFaces by { params.poly.hideFaces.value }
     val selectedFace by { params.poly.selectedFace.value }
+    val drawFaces by { params.view.display.value.hasFaces() && params.view.transparentFaces.value < 1.0 }
+    val hasExpand by { params.view.expandFaces.value > 0.0 }
+    val hasRim by { params.view.faceRim.value > 0.0 }
+    val hasWidth by { params.view.faceWidth.value > 0.0 }
+    val hasHiddenFaces by {
+        poly.fs.any { f -> !f.isPlanar || f.kind in hideFaces }
+    }
 
     val program = FaceProgram(gl)
 
     var indexSize = 0
-    var hasHiddenFaces = false
     val target = FaceBuffers()
     val prev = FaceBuffers() // only filled when animation != null
     val innerBuffer = createUint8Buffer(gl)
@@ -59,20 +62,24 @@ class FaceContext(val gl: GL, params: RenderParams) : Param.Context(params)  {
         ): Int {
             var bufferSize = 0
             var indexSize = 0
-            val widthSizeMul = if (hasWidth) 2 else 1
+            val otherSideSizeMul = if (hasHiddenFaces) 2 else 1
             for (f in poly.fs) {
                 if (f.isPlanar && f.kind !in hideFaces) {
-                    bufferSize += f.size * widthSizeMul
-                    indexSize += (f.size - 2) * 3 * widthSizeMul
+                    bufferSize += f.size * otherSideSizeMul
+                    indexSize += (f.size - 2) * 3 * otherSideSizeMul
                 } else {
                     if (hasRim) {
-                        bufferSize += 2 * f.size * widthSizeMul
-                        indexSize += 6 * f.size * widthSizeMul
+                        bufferSize += 2 * 2 * f.size
+                        indexSize += 2 * 6 * f.size
                     }
                     if (hasWidth) {
                         bufferSize += 2 * f.size
                         indexSize += 6 * f.size
                     }
+                }
+                if (hasExpand && hasWidth) {
+                    bufferSize += 2 * f.size
+                    indexSize += 6 * f.size
                 }
             }
             positionBuffer.ensureCapacity(bufferSize)
@@ -88,11 +95,23 @@ class FaceContext(val gl: GL, params: RenderParams) : Param.Context(params)  {
             var idxOfs = 0
             var bufOfs = 0
 
-            fun makeFace(f: Face, inner: Int) {
+            fun Uint32Buffer.indexTriangle(a: Int, b: Int, c: Int, invert: Boolean) {
+                this[idxOfs++] = a
+                if (invert) {
+                    this[idxOfs++] = c
+                    this[idxOfs++] = b
+                } else {
+                    this[idxOfs++] = b
+                    this[idxOfs++] = c
+                }
+            }
+
+            fun makeFace(f: Face, inner: Boolean) {
                 val n = f.size
                 val faceColor = PolyStyle.faceColor(f)
                 var ofs = bufOfs
-                val lNorm: Vec3 = if (inner == 1) f * -1.0 else f
+                val lNorm: Vec3 = if (inner) f * -1.0 else f
+                val innerFlag = if (inner) 1 else 0
                 for (i in 0 until n) {
                     positionBuffer[ofs] = f[i]
                     lightNormalBuffer[ofs] = lNorm
@@ -100,15 +119,13 @@ class FaceContext(val gl: GL, params: RenderParams) : Param.Context(params)  {
                     rimDirBuffer[ofs] = Vec3.ZERO
                     rimMaxBuffer[ofs] = 0.0
                     colorBuffer[ofs] = faceColor
-                    innerBuffer?.set(ofs, inner)
+                    innerBuffer?.set(ofs, innerFlag)
                     faceModeBuffer?.set(ofs, if (f.kind == selectedFace) FACE_SELECTED else FACE_NORMAL)
                     ofs++
                 }
                 if (indexBuffer != null) {
                     for (i in 2 until n) {
-                        indexBuffer[idxOfs++] = bufOfs
-                        indexBuffer[idxOfs++] = bufOfs + i
-                        indexBuffer[idxOfs++] = bufOfs + i - 1
+                        indexBuffer.indexTriangle(bufOfs, bufOfs + i, bufOfs + i - 1, inner)
                     }
                 }
                 bufOfs = ofs
@@ -139,73 +156,76 @@ class FaceContext(val gl: GL, params: RenderParams) : Param.Context(params)  {
                 }
             }
 
-            fun Uint32Buffer.addRectangleIndices(n: Int) {
+            fun Uint32Buffer.indexRectangles(n: Int, invert: Boolean) {
                 for (i in 0 until n) {
                     val j = (i + 1) % n
-                    this[idxOfs++] = bufOfs + 2 * i
-                    this[idxOfs++] = bufOfs + 2 * i + 1
-                    this[idxOfs++] = bufOfs + 2 * j
-                    this[idxOfs++] = bufOfs + 2 * i + 1
-                    this[idxOfs++] = bufOfs + 2 * j + 1
-                    this[idxOfs++] = bufOfs + 2 * j
+                    indexTriangle(bufOfs + 2 * i, bufOfs + 2 * i + 1, bufOfs + 2 * j, invert)
+                    indexTriangle(bufOfs + 2 * i + 1, bufOfs + 2 * j + 1, bufOfs + 2 * j, invert)
                 }
             }
 
-            fun FaceRimData.makeRim(inner: Int) {
+            fun makeRim(fr: FaceRimData, inner: Boolean) {
+                val f = fr.f
+                val n = f.size
                 var ofs = bufOfs
-                val lNorm: Vec3 = if (inner == 1) f * -1.0 else f
+                val lNorm: Vec3 = if (inner) f * -1.0 else f
+                val innerFlag = if (inner) 1 else 0
                 for (i in 0 until n) {
                     for (rim in 0..1) {
                         positionBuffer[ofs] = f[i]
                         lightNormalBuffer[ofs] = lNorm
                         expandDirBuffer[ofs] = f
-                        rimDirBuffer[ofs] = if (rim == 0) Vec3.ZERO else rimDir[i]
-                        rimMaxBuffer[ofs] = if (rim == 0) 0.0 else maxRim
-                        colorBuffer[ofs] = faceColor
-                        innerBuffer?.set(ofs, inner)
+                        rimDirBuffer[ofs] = if (rim == 0) Vec3.ZERO else fr.rimDir[i]
+                        rimMaxBuffer[ofs] = if (rim == 0) 0.0 else fr.maxRim
+                        colorBuffer[ofs] = fr.faceColor
+                        innerBuffer?.set(ofs, innerFlag)
                         faceModeBuffer?.set(ofs, if (f.kind == selectedFace) FACE_SELECTED else FACE_NORMAL)
                         ofs++
                     }
                 }
-                indexBuffer?.addRectangleIndices(n)
+                indexBuffer?.indexRectangles(n, inner)
                 bufOfs = ofs
             }
 
-            fun FaceRimData.makeBorder(f: Face) {
+            fun makeBorder(fr: FaceRimData?, f: Face, invert: Boolean) {
+                val faceColor = fr?.faceColor ?: PolyStyle.faceColor(f)
+                val n = f.size
                 var ofs = bufOfs
                 for (i in 0 until n) {
                     val j = (i + 1) % n
                     val lNorm = (f[j] cross f[i]).unit
-                    for (inner in 0..1) {
+                    for (innnerFlag in 0..1) {
                         positionBuffer[ofs] = f[i]
                         lightNormalBuffer[ofs] = lNorm
                         expandDirBuffer[ofs] = f
-                        rimDirBuffer[ofs] = if (inner == 0) Vec3.ZERO else rimDir[i]
-                        rimMaxBuffer[ofs] = if (inner == 0) 0.0 else maxRim
+                        rimDirBuffer[ofs] = if (innnerFlag == 0 || fr == null) Vec3.ZERO else fr.rimDir[i]
+                        rimMaxBuffer[ofs] = if (innnerFlag == 0 || fr == null) 0.0 else fr.maxRim
                         colorBuffer[ofs] = faceColor
-                        innerBuffer?.set(ofs, inner)
+                        innerBuffer?.set(ofs, innnerFlag)
                         faceModeBuffer?.set(ofs, if (f.kind == selectedFace) FACE_SELECTED else FACE_NORMAL)
                         ofs++
                     }
                 }
-                indexBuffer?.addRectangleIndices(n)
+                indexBuffer?.indexRectangles(f.size, invert)
                 bufOfs = ofs
             }
 
             for (f in poly.fs) {
                 // Note: In GL front faces are CCW
                 if (f.isPlanar && f.kind !in hideFaces) {
-                    makeFace(f, 0)
-                    if (hasWidth) makeFace(f, 1)
+                    makeFace(f, false)
+                    if (hasHiddenFaces) makeFace(f, true)
                 } else {
-                    hasHiddenFaces = true
                     val fr = FaceRimData(f)
                     if (hasRim) {
-                        fr.makeRim(0)
-                        if (hasWidth) fr.makeRim(1)
+                        makeRim(fr, false)
+                        makeRim(fr, true)
                     }
-                    if (hasWidth) fr.makeBorder(f)
+                    if (hasWidth) {
+                        makeBorder(fr, f, false)
+                    }
                 }
+                if (hasExpand && hasWidth) makeBorder(null, f, true)
             }
             positionBuffer.bindBufferData(gl)
             lightNormalBuffer.bindBufferData(gl)
