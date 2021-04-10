@@ -462,6 +462,8 @@ class ViewParams(
     val scale = using(DoubleParam("s", 0.0, -2.0, 2.0, 0.01, animationParams))
     val expandFaces = using(DoubleParam("e", 0.0, 0.0, 2.0, 0.01, animationParams))
     val transparentFaces = using(DoubleParam("t", 0.0, 0.0, 1.0, 0.01, animationParams))
+    val faceWidth = using(DoubleParam("fw", 0.0, 0.0, 0.2, 0.001, animationParams))
+    val faceRim = using(DoubleParam("fr", 0.0, 0.0, 0.2, 0.001, animationParams))
     val display = using(EnumParam("d", Display.All, Displays))
 }
 

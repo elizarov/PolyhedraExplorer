@@ -82,10 +82,12 @@ operator fun GLExpr<GLType.mat3>.times(other: GLExpr<GLType.vec3>): GLExpr<GLTyp
 operator fun GLExpr<GLType.mat4>.times(other: GLExpr<GLType.vec4>): GLExpr<GLType.vec4> = BinaryOp(GLType.vec4, this, "*", other)
 
 // vector binary funs
+fun <T : GLType.VecFloats<T>> distance(a: GLExpr<T>, b: GLExpr<T>): GLExpr<GLType.float> = Call(GLType.float, "distance", a, b)
 fun <T : GLType.VecFloats<T>> dot(a: GLExpr<T>, b: GLExpr<T>): GLExpr<GLType.float> = Call(GLType.float, "dot", a, b)
 fun <T : GLType.VecFloats<T>> cross(a: GLExpr<T>, b: GLExpr<T>): GLExpr<T> = Call(a.type, "cross", a, b)
 
 // vector unary funs
+fun <T : GLType.VecFloats<T>> length(a: GLExpr<T>): GLExpr<GLType.float> = Call(GLType.float, "length", a)
 fun <T : GLType.VecFloats<T>> normalize(a: GLExpr<T>): GLExpr<T> = Call(a.type, "normalize", a)
 
 // unary component-wise funs on floats and vecs

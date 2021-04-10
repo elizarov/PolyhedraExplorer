@@ -7,7 +7,6 @@ package polyhedra.js.poly
 import kotlinext.js.*
 import org.w3c.dom.*
 import polyhedra.js.glsl.*
-import polyhedra.js.main.*
 import polyhedra.js.params.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
@@ -16,7 +15,8 @@ class DrawContext(
     params: RenderParams,
     private val onUpdate: () -> Unit,
 ) : Param.Context(params) {
-    val display by { params.view.display.value }
+    val transparentFaces by { params.view.transparentFaces.value }
+    val expandFaces by { params.view.expandFaces.value }
 
     val gl: GL = canvas.getContext("webgl", js {
         premultipliedAlpha = false  // Ask for non-premultiplied alpha
@@ -24,8 +24,8 @@ class DrawContext(
 
     val view = ViewContext(params.view)
     val lightning = LightningContext(params.lighting)
-    val faces = FaceContext(gl, params.poly)
-    val edges = EdgeContext(gl, params.poly)
+    val faces = FaceContext(gl, params)
+    val edges = EdgeContext(gl, params)
 
     init {
         setup()
@@ -53,33 +53,24 @@ fun DrawContext.drawScene() {
     gl.viewport(0, 0, width, height)
     gl.clear(GL.COLOR_BUFFER_BIT or GL.DEPTH_BUFFER_BIT)
 
-    val hasFaces = display.hasFaces() && view.transparentFaces < 1.0
-    val hasEdges = display.hasEdges()
-    val transparent = hasFaces && (view.transparentFaces != 0.0 || faces.hasHiddenFaces)
-    gl[GL.DEPTH_TEST] = !transparent
-    gl[GL.BLEND] = transparent
-    if (transparent) {
+    val transparentFaces = faces.drawFaces && transparentFaces != 0.0
+    gl[GL.DEPTH_TEST] = !transparentFaces
+    gl[GL.BLEND] = transparentFaces
+    if (transparentFaces) {
         // special code for transparent faces - draw back faces, then front faces
         gl[GL.CULL_FACE] = true
         gl.cullFace(GL.FRONT)
         faces.draw(view, lightning)
-        if (hasEdges) edges.draw(view, 1)
+        edges.draw(view, 1)
         gl.cullFace(GL.BACK)
         faces.draw(view, lightning)
-        if (hasEdges) edges.draw(view, -1)
+        edges.draw(view, -1)
     } else {
-        if (hasFaces) {
-            // regular draw faces
-            val solid = view.expandFaces == 0.0
-            gl[GL.CULL_FACE] = solid // can cull faces when drawing solid
-            faces.draw(view, lightning)
-        }
-        if (hasEdges) {
-            edges.draw(view)
-        }
+        // regular draw faces
+        val solid = expandFaces == 0.0 && !faces.hasHiddenFaces
+        gl[GL.CULL_FACE] = solid // can cull faces when drawing solid
+        faces.draw(view, lightning)
+        edges.draw(view)
     }
 }
-
-
-
 

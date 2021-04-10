@@ -12,21 +12,23 @@ import polyhedra.js.params.*
 import polyhedra.js.util.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
-class EdgeContext(val gl: GL, params: PolyParams) : Param.Context(params) {
-    val poly by { params.targetPoly }
-    val animation by { params.transformAnimation }
+class EdgeContext(val gl: GL, params: RenderParams) : Param.Context(params) {
+    val drawEdges by { params.view.display.value.hasEdges() }
+    val poly by { params.poly.targetPoly }
+    val animation by { params.poly.transformAnimation }
 
     val program = EdgeProgram(gl)
 
     lateinit var color: Float32Array
     var indexSize = 0
-    val indexBuffer = program.createUint16Buffer()
+    val indexBuffer = createUint16Buffer(gl)
     val target = EdgeBuffers()
     val prev = EdgeBuffers() // only filled when animation != null
 
     init { setup() }
 
     override fun update() {
+        if (!drawEdges) return
         program.use()
         color = PolyStyle.edgeColor.toFloat32Array4()
         indexSize = target.update(poly, indexBuffer)
@@ -46,14 +48,15 @@ class EdgeContext(val gl: GL, params: PolyParams) : Param.Context(params) {
             var bufOfs = 0
             var idxOfs = 0
             for (f in poly.fs) {
-                for (k in 0 until f.size) {
-                    positionBuffer[bufOfs + k] = f[k]
-                    normalBuffer[bufOfs + k] = f
+                for (i in 0 until f.size) {
+                    positionBuffer[bufOfs + i] = f[i]
+                    normalBuffer[bufOfs + i] = f
                 }
                 if (indexBuffer != null) {
-                    for (k in 0 until f.size) {
-                        indexBuffer[idxOfs++] = bufOfs + k
-                        indexBuffer[idxOfs++] = bufOfs + (k + 1) % f.size
+                    for (i in 0 until f.size) {
+                        val j = (i + 1) % f.size
+                        indexBuffer[idxOfs++] = bufOfs + i
+                        indexBuffer[idxOfs++] = bufOfs + j
                     }
                 }
                 bufOfs += f.size
@@ -70,6 +73,7 @@ class EdgeContext(val gl: GL, params: PolyParams) : Param.Context(params) {
 
 // cullMode: 0 - no, 1 - cull front, -1 - cull back
 fun EdgeContext.draw(view: ViewContext, cullMode: Int = 0) {
+    if (!drawEdges) return
     val animation = animation
     val prevOrTarget = if (animation != null) prev else target
     program.use {
@@ -81,10 +85,10 @@ fun EdgeContext.draw(view: ViewContext, cullMode: Int = 0) {
         uTargetFraction by (animation?.targetFraction ?: 1.0)
         uPrevFraction by (animation?.prevFraction ?: 0.0)
 
-        aVertexPosition by target.positionBuffer
-        aVertexNormal by target.normalBuffer
-        aPrevVertexPosition by prevOrTarget.positionBuffer
-        aPrevVertexNormal by prevOrTarget.normalBuffer
+        aPosition by target.positionBuffer
+        aNormal by target.normalBuffer
+        aPrevPosition by prevOrTarget.positionBuffer
+        aPrevNormal by prevOrTarget.normalBuffer
     }
     gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, indexBuffer.glBuffer)
     gl.drawElements(GL.LINES, indexSize, GL.UNSIGNED_SHORT, 0)

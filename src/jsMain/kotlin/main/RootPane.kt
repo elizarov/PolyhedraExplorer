@@ -84,13 +84,19 @@ class RootPane(props: PComponentProps<RootParams>) :
         }
 
         header("View")
-        val lightingDisabled = !state.display.hasFaces()
+        val facesDisabled = !state.display.hasFaces()
         tableBody {
             controlRow("Base scale") { pDropdown(props.param.render.poly.baseScale) }
             controlRow("View scale") { pSlider(props.param.render.view.scale) }
             controlRow("Expand") { pSlider(props.param.render.view.expandFaces) }
-            controlRow("Transparent") { pSlider(props.param.render.view.transparentFaces, lightingDisabled) }
             controlRow("Display") { pDropdown(props.param.render.view.display) }
+        }
+
+        header("Faces")
+        tableBody {
+            controlRow("Transparent") { pSlider(props.param.render.view.transparentFaces, facesDisabled) }
+            controlRow("Width") { pSlider(props.param.render.view.faceWidth, facesDisabled) }
+            controlRow("Rim") { pSlider(props.param.render.view.faceRim, facesDisabled) }
         }
 
         header("Animation")
@@ -108,10 +114,10 @@ class RootPane(props: PComponentProps<RootParams>) :
 
         header("Lighting")
         tableBody {
-            controlRow("Ambient") { pSlider(props.param.render.lighting.ambientLight, lightingDisabled) }
-            controlRow("Diffuse") { pSlider(props.param.render.lighting.diffuseLight, lightingDisabled) }
-            controlRow("Specular") { pSlider(props.param.render.lighting.specularLight, lightingDisabled) }
-            controlRow("Shininess") { pSlider(props.param.render.lighting.specularPower, lightingDisabled) }
+            controlRow("Ambient") { pSlider(props.param.render.lighting.ambientLight, facesDisabled) }
+            controlRow("Diffuse") { pSlider(props.param.render.lighting.diffuseLight, facesDisabled) }
+            controlRow("Specular") { pSlider(props.param.render.lighting.specularLight, facesDisabled) }
+            controlRow("Shininess") { pSlider(props.param.render.lighting.specularPower, facesDisabled) }
         }
 
         header("Export")

@@ -12,9 +12,9 @@ import org.khronos.webgl.WebGLRenderingContext as GL
 fun <T : GLType.Floats<T>> createBuffer(gl: GL, type: T): Float32Buffer<T> =
     Float32Buffer(type, gl.createBuffer()!!)
 
-fun GLProgram.createUint8Buffer(): Uint8Buffer = Uint8Buffer(gl.createBuffer()!!)
-fun GLProgram.createUint16Buffer(): Uint16Buffer = Uint16Buffer(gl.createBuffer()!!)
-fun GLProgram.createUint32Buffer(): Uint32Buffer = Uint32Buffer(gl.createBuffer()!!)
+fun createUint8Buffer(gl: GL): Uint8Buffer = Uint8Buffer(gl.createBuffer()!!)
+fun createUint16Buffer(gl: GL): Uint16Buffer = Uint16Buffer(gl.createBuffer()!!)
+fun createUint32Buffer(gl: GL): Uint32Buffer = Uint32Buffer(gl.createBuffer()!!)
 
 abstract class GLBuffer<T : GLType<T>, D : BufferDataSource>(
     val type: T,
@@ -56,6 +56,10 @@ class Uint16Buffer(glBuffer: WebGLBuffer) : GLBuffer<GLType.int, Uint16Array>(GL
 class Uint32Buffer(glBuffer: WebGLBuffer) : GLBuffer<GLType.int, Uint32Array>(GLType.int, glBuffer) {
     override val capacity: Int get() = data.length
     override fun allocate(capacity: Int): Uint32Array = Uint32Array(capacity)
+}
+
+operator fun Float32Buffer<GLType.float>.set(i: Int, x: Double) {
+    data[i] = x
 }
 
 operator fun Float32Buffer<GLType.vec3>.set(i: Int, v: Vec3) {

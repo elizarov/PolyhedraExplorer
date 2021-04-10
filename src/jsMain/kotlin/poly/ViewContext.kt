@@ -16,6 +16,8 @@ class ViewContext(params: ViewParams) : Param.Context(params) {
 
     val expandFaces by { params.expandFaces.value }
     val transparentFaces by { params.transparentFaces.value }
+    val faceWidth by { params.faceWidth.value }
+    val faceRim by { params.faceRim.value }
 
     val cameraPosition = float32Of(0.0, 0.0, 3.0)
     val projectionMatrix = mat4.create()
