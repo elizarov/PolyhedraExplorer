@@ -62,11 +62,14 @@ class FaceContext(val gl: GL, params: RenderParams) : Param.Context(params)  {
         ): Int {
             var bufferSize = 0
             var indexSize = 0
-            val otherSideSizeMul = if (hasHiddenFaces) 2 else 1
             for (f in poly.fs) {
                 if (f.isPlanar && f.kind !in hideFaces) {
-                    bufferSize += f.size * otherSideSizeMul
-                    indexSize += (f.size - 2) * 3 * otherSideSizeMul
+                    bufferSize += f.size
+                    indexSize += (f.size - 2) * 3
+                    if (hasHiddenFaces || hasExpand) {
+                        bufferSize += f.size
+                        indexSize += (f.size - 2) * 3
+                    }
                 } else {
                     if (hasRim) {
                         bufferSize += 2 * 2 * f.size
@@ -214,7 +217,7 @@ class FaceContext(val gl: GL, params: RenderParams) : Param.Context(params)  {
                 // Note: In GL front faces are CCW
                 if (f.isPlanar && f.kind !in hideFaces) {
                     makeFace(f, false)
-                    if (hasHiddenFaces) makeFace(f, true)
+                    if (hasHiddenFaces || hasExpand) makeFace(f, true)
                 } else {
                     val fr = FaceRimData(f)
                     if (hasRim) {
