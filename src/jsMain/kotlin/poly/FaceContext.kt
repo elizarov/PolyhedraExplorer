@@ -168,7 +168,7 @@ class FaceContext(val gl: GL, params: RenderParams) : Param.Context(params)  {
                 val f = fr.f
                 val n = f.size
                 var ofs = bufOfs
-                val lNorm: Vec3 = if (inner) f * -1.0 else f
+                val lNorm = if (inner) -f else f
                 val innerFlag = if (inner) 1 else 0
                 for (i in 0 until n) {
                     for (rim in 0..1) {
@@ -193,7 +193,7 @@ class FaceContext(val gl: GL, params: RenderParams) : Param.Context(params)  {
                 var ofs = bufOfs
                 for (i in 0 until n) {
                     val j = (i + 1) % n
-                    val lNorm = (f[j] cross f[i]).unit
+                    val lNorm = (f[j] cross f[i]).unit.let { if (invert) -it else it }
                     for (innnerFlag in 0..1) {
                         positionBuffer[ofs] = f[i]
                         lightNormalBuffer[ofs] = lNorm
