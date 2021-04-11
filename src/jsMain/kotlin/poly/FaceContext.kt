@@ -267,7 +267,7 @@ class FaceContext(val gl: GL, params: RenderParams) : Param.Context(params)  {
     }
 }
 
-class FaceExportParams(
+data class FaceExportParams(
     val scale: Double,
     val width: Double,
     val rim: Double,

@@ -6,7 +6,6 @@ package polyhedra.js.main
 
 import kotlinx.html.*
 import kotlinx.html.js.*
-import polyhedra.common.poly.*
 import polyhedra.common.transform.*
 import polyhedra.common.util.*
 import polyhedra.js.components.*
@@ -16,47 +15,38 @@ import react.*
 import react.dom.*
 
 external interface RootPaneState : RState {
-    var seed: Seed
-    var transforms: List<Transform>
-    var baseScale: Scale
-
-    var poly: Polyhedron
-    var polyName: String
-    var transformWarnings: List<IndicatorMessage<*>?>
-    var transformError: TransformError?
-    var transformProgress: Int
-
-    var display: Display
-    var animateUpdates: Boolean
-    var rotate: Boolean
-
     var faceContext: FaceContext
-    var exportWidth: Double
-    var exportRim: Double
+    var context: RootPane.Context
 }
 
 @Suppress("NON_EXPORTABLE_TYPE")
 @JsExport
-class RootPane(props: PComponentProps<RootParams>) :
-    PComponent<RootParams, PComponentProps<RootParams>, RootPaneState>(props, Param.TargetValue + Param.Progress)
-{
+class RootPane(props: PComponentProps<RootParams>) : RComponent<PComponentProps<RootParams>, RootPaneState>(props) {
     override fun RootPaneState.init(props: PComponentProps<RootParams>) {
-        seed = props.param.render.poly.seed.value
-        transforms = props.param.render.poly.transforms.value
-        baseScale = props.param.render.poly.baseScale.value
+        context = Context(props.param)
+    }
 
-        poly = props.param.render.poly.poly
-        polyName = props.param.render.poly.polyName
-        transformWarnings = props.param.render.poly.transformWarnings
-        transformError = props.param.render.poly.transformError
-        transformProgress = props.param.render.poly.transformProgress
+    inner class Context(params: RootParams) : Param.Context(params, Param.TargetValue + Param.Progress) {
+        val transforms by { params.render.poly.transforms.value }
 
-        display = props.param.render.view.display.value
-        animateUpdates = props.param.animationParams.animateValueUpdates.value
-        rotate = props.param.animationParams.animatedRotation.value
+        val poly by { params.render.poly.poly }
+        val polyName by { params.render.poly.polyName }
+        val transformWarnings by { params.render.poly.transformWarnings }
+        val transformError by { params.render.poly.transformError }
+        val transformProgress by { params.render.poly.transformProgress }
 
-        exportWidth = props.param.render.view.faceWidth.value * props.param.export.size.value
-        exportRim = props.param.render.view.faceRim.value * props.param.export.size.value
+        val hasFaces by { params.render.view.display.value.hasFaces() }
+        val animateUpdates by { params.animationParams.animateValueUpdates.value }
+        val rotate by { params.animationParams.animatedRotation.value  }
+
+        val exportWidth by { params.render.view.faceWidth.targetValue * params.export.size.targetValue }
+        val exportRim by { params.render.view.faceRim.targetValue * params.export.size.targetValue }
+
+        init { setup() }
+
+        override fun update() {
+            forceUpdate()
+        }
     }
 
     override fun RBuilder.render() {
@@ -66,10 +56,10 @@ class RootPane(props: PComponentProps<RootParams>) :
             }
             div("canvas-column card") {
                 // Canvas & Info
-                header(state.polyName)
+                header(state.context.polyName)
                 polyCanvas("poly") {
                     params = props.param.render
-                    poly = state.poly
+                    poly = state.context.poly
                     faceContextSink = { setState { faceContext = it } }
                 }
                 polyInfoPane {
@@ -80,6 +70,8 @@ class RootPane(props: PComponentProps<RootParams>) :
     }
 
     private fun RDOMBuilder<DIV>.renderControls() {
+        val context = state.context
+
         header("Polyhedron")
         div("row control") {
             label { +"Seed" }
@@ -92,7 +84,6 @@ class RootPane(props: PComponentProps<RootParams>) :
         }
 
         header("View")
-        val facesDisabled = !state.display.hasFaces()
         tableBody {
             controlRow("Base scale") { pDropdown(props.param.render.poly.baseScale) }
             controlRow("View scale") { pSlider(props.param.render.view.scale) }
@@ -102,30 +93,30 @@ class RootPane(props: PComponentProps<RootParams>) :
 
         header("Faces")
         tableBody {
-            controlRow("Transparent") { pSlider(props.param.render.view.transparentFaces, facesDisabled) }
-            controlRow("Width") { pSlider(props.param.render.view.faceWidth, facesDisabled) }
-            controlRow("Rim") { pSlider(props.param.render.view.faceRim, facesDisabled) }
+            controlRow("Transparent") { pSlider(props.param.render.view.transparentFaces, !context.hasFaces) }
+            controlRow("Width") { pSlider(props.param.render.view.faceWidth, !context.hasFaces) }
+            controlRow("Rim") { pSlider(props.param.render.view.faceRim, !context.hasFaces) }
         }
 
         header("Animation")
         tableBody {
             controlRow2("Rotation", { pCheckbox(props.param.animationParams.animatedRotation) }) {
-                pSlider(props.param.animationParams.rotationSpeed, !state.rotate)
+                pSlider(props.param.animationParams.rotationSpeed, !context.rotate)
             }
             controlRow2("Angle", {}, {
-                pSlider(props.param.animationParams.rotationAngle, !state.rotate)
+                pSlider(props.param.animationParams.rotationAngle, !context.rotate)
             })
             controlRow2("Updates", { pCheckbox(props.param.animationParams.animateValueUpdates) }) {
-                pSlider(props.param.animationParams.animationDuration, !state.animateUpdates)
+                pSlider(props.param.animationParams.animationDuration, !context.animateUpdates)
             }
         }
 
         header("Lighting")
         tableBody {
-            controlRow("Ambient") { pSlider(props.param.render.lighting.ambientLight, facesDisabled) }
-            controlRow("Diffuse") { pSlider(props.param.render.lighting.diffuseLight, facesDisabled) }
-            controlRow("Specular") { pSlider(props.param.render.lighting.specularLight, facesDisabled) }
-            controlRow("Shininess") { pSlider(props.param.render.lighting.specularPower, facesDisabled) }
+            controlRow("Ambient") { pSlider(props.param.render.lighting.ambientLight, !context.hasFaces) }
+            controlRow("Diffuse") { pSlider(props.param.render.lighting.diffuseLight, !context.hasFaces) }
+            controlRow("Specular") { pSlider(props.param.render.lighting.specularLight, !context.hasFaces) }
+            controlRow("Shininess") { pSlider(props.param.render.lighting.specularPower, !context.hasFaces) }
         }
 
         header("Export geometry")
@@ -135,7 +126,7 @@ class RootPane(props: PComponentProps<RootParams>) :
                     onClickFunction = {
                         val name = exportName()
                         val description = props.param.toString()
-                        download("$name.scad", state.poly.exportGeometryToScad(name, description))
+                        download("$name.scad", context.poly.exportGeometryToScad(name, description))
                     }
                 }
                 +"Export to SCAD"
@@ -149,7 +140,7 @@ class RootPane(props: PComponentProps<RootParams>) :
             span("suffix") { +"(mm)" }
         }
         div("control row") {
-            +"Face width ${state.exportWidth.fmt(1)} (mm); rim ${state.exportRim.fmt(1)} (mm)"
+            +"Face width ${context.exportWidth.fmt(1)} (mm); rim ${context.exportRim.fmt(1)} (mm)"
         }
         div("control row") {
             button {
@@ -158,10 +149,10 @@ class RootPane(props: PComponentProps<RootParams>) :
                         val name = exportName()
                         val description = props.param.toString()
                         val exportParams = FaceExportParams(
-                            props.param.export.size.value / 2,
-                            props.param.render.view.faceWidth.value,
-                            props.param.render.view.faceRim.value,
-                            props.param.render.view.expandFaces.value,
+                            props.param.export.size.targetValue / 2,
+                            props.param.render.view.faceWidth.targetValue,
+                            props.param.render.view.faceRim.targetValue,
+                            props.param.render.view.expandFaces.targetValue,
                         )
                         download("$name.stl",
                             state.faceContext.exportSolidToStl(name, description, exportParams)
@@ -173,12 +164,13 @@ class RootPane(props: PComponentProps<RootParams>) :
         }
     }
 
-    private fun exportName() = state.polyName.replace(' ', '_').lowercase()
+    private fun exportName() = state.context.polyName.replace(' ', '_').lowercase()
 
     private fun RDOMBuilder<TBODY>.renderTransformsRows() {
-        val transformError = state.transformError
+        val context = state.context
+        val transformError = context.transformError
         val errorIndex = transformError?.index ?: Int.MAX_VALUE
-        for ((i, transform) in state.transforms.withIndex()) {
+        for ((i, transform) in context.transforms.withIndex()) {
             controlRow("${i + 1}:") {
                 dropdown<Transform> {
                     disabled = i > errorIndex
@@ -197,21 +189,21 @@ class RootPane(props: PComponentProps<RootParams>) :
                     if (isInProcess) {
                         span {
                             span("spinner") {}
-                            +"${state.transformProgress}%"
+                            +"${context.transformProgress}%"
                             span("tooltip-text") { +"Transformation is running" }
                         }
                     } else {
                         transformError?.msg?.let { messageSpan(it) }
                     }
                 } else {
-                    val warning = state.transformWarnings.getOrNull(i)
+                    val warning = context.transformWarnings.getOrNull(i)
                     if (warning != null) messageSpan(warning)
                 }
             }
         }
-        controlRow("${state.transforms.size + 1}:") {
+        controlRow("${context.transforms.size + 1}:") {
             dropdown<Transform> {
-                disabled = errorIndex < state.transforms.size
+                disabled = errorIndex < context.transforms.size
                 value = Transform.None
                 options = Transforms
                 onChange = { value ->
@@ -221,7 +213,7 @@ class RootPane(props: PComponentProps<RootParams>) :
                 }
             }
         }
-        for (i in state.transforms.size + 1..8) controlRow("${i + 1}:") {}
+        for (i in context.transforms.size + 1..8) controlRow("${i + 1}:") {}
         controlRow("") {
             button {
                 attrs {

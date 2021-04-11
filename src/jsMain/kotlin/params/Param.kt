@@ -197,13 +197,13 @@ abstract class Param(val tag: String) {
             }
 
             @Suppress("UNCHECKED_CAST")
-            fun checkedValue(): T {
-                check(value !== UNINITIALIZED)
+            fun lazyValue(): T {
+                if (value === UNINITIALIZED) value = provider()
                 return value as T
             }
 
             @Suppress("NOTHING_TO_INLINE")
-            inline operator fun getValue(thisRef: Context, prop: KProperty<*>): T = checkedValue()
+            inline operator fun getValue(thisRef: Context, prop: KProperty<*>): T = lazyValue()
         }
     }
 
@@ -399,6 +399,8 @@ class DoubleParam(
     valueAnimationParams: ValueAnimationParams? = null
 ) : AnimatedValueParam<Double, DoubleParam>(tag, value, valueAnimationParams) {
     override var targetValue: Double = value
+        protected set
+
     override fun updateValue(value: Double, updateType: UpdateType?) {
         // round the value to step and then coerce into range
         val r = floor(value / step + 0.5) * step
