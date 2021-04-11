@@ -136,7 +136,7 @@ class RootPane(props: PComponentProps<RootParams>) : RComponent<PComponentProps<
         header("Export solid")
         div("control row") {
             label { +"Export size" }
-            pSlider(props.param.export.size)
+            pSlider(props.param.export.size, !context.hasFaces)
             span("suffix") { +"(mm)" }
         }
         div("control row") {
@@ -145,6 +145,7 @@ class RootPane(props: PComponentProps<RootParams>) : RComponent<PComponentProps<
         div("control row") {
             button {
                 attrs {
+                    disabled = !context.hasFaces
                     onClickFunction = {
                         val name = exportName()
                         val description = props.param.toString()
