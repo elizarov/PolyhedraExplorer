@@ -3,13 +3,13 @@ package polyhedra.js.poly
 import polyhedra.common.util.*
 import kotlin.math.*
 
-fun FaceContext.exportSolidToStl(name: String, exportParams: FaceExportParams): String {
+fun FaceContext.exportSolidToStl(name: String, description: String, exportParams: FaceExportParams): String {
     val ofs = MutableVec3(0.0, 0.0, Double.POSITIVE_INFINITY)
     exportVertices(exportParams) { v ->
         ofs.z = min(ofs.z, v.z)
     }
     return buildString {
-        appendLine("solid $name")
+        appendLine("solid $name ; $description")
         val normal = MutableVec3()
         exportTriangles(exportParams) { v1, v2, v3 ->
             normal.setToZero()

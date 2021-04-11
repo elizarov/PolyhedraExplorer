@@ -134,7 +134,8 @@ class RootPane(props: PComponentProps<RootParams>) :
                 attrs {
                     onClickFunction = {
                         val name = exportName()
-                        download("$name.scad", state.poly.exportGeometryToScad(name))
+                        val description = props.param.toString()
+                        download("$name.scad", state.poly.exportGeometryToScad(name, description))
                     }
                 }
                 +"Export to SCAD"
@@ -155,13 +156,16 @@ class RootPane(props: PComponentProps<RootParams>) :
                 attrs {
                     onClickFunction = {
                         val name = exportName()
+                        val description = props.param.toString()
                         val exportParams = FaceExportParams(
                             props.param.export.size.value / 2,
                             props.param.render.view.faceWidth.value,
                             props.param.render.view.faceRim.value,
                             props.param.render.view.expandFaces.value,
                         )
-                        download("$name.stl", state.faceContext.exportSolidToStl(name, exportParams))
+                        download("$name.stl",
+                            state.faceContext.exportSolidToStl(name, description, exportParams)
+                        )
                     }
                 }
                 +"Export to STL"

@@ -10,8 +10,9 @@ import polyhedra.common.*
 import polyhedra.common.poly.*
 import polyhedra.common.util.*
 
-fun Polyhedron.exportGeometryToScad(name: String): String = buildString {
+fun Polyhedron.exportGeometryToScad(name: String, description: String): String = buildString {
     appendLine("// polyhedron($name[0], $name[1]);")
+    appendLine("// $description")
     appendLine()
     appendLine("// Elements of the $name array")
     appendLine("//    0 - vertices coordinates")

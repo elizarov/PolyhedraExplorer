@@ -1,4 +1,4 @@
-solid truncated_canonical_snub_rectified_dodecahedron
+solid truncated_canonical_snub_rectified_dodecahedron ; a(r(n)rs(0.45))s(D)t(a,s,o,t)hf(α,γ,δ,η,β)v(r(176.2,-42.6,26.2)s(0.16)fw(0.058)fr(0.025))
 facet normal 0 -0.5257 -0.8507
 outer loop
 vertex -5.3146 -11.0693 3.8716
