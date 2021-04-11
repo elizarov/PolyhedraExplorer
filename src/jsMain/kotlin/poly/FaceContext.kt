@@ -10,10 +10,9 @@ import polyhedra.common.util.*
 import polyhedra.js.glsl.*
 import polyhedra.js.main.*
 import polyhedra.js.params.*
+import polyhedra.js.util.*
 import kotlin.math.*
 import org.khronos.webgl.WebGLRenderingContext as GL
-
-private const val MAX_RIM_FRACTION = 0.8
 
 class FaceContext(val gl: GL, params: RenderParams) : Param.Context(params)  {
     val poly by { params.poly.targetPoly }
@@ -31,6 +30,7 @@ class FaceContext(val gl: GL, params: RenderParams) : Param.Context(params)  {
     val program = FaceProgram(gl)
 
     var indexSize = 0
+    var bufferSize = 0
     val target = FaceBuffers()
     val prev = FaceBuffers() // only filled when animation != null
     val innerBuffer = createUint8Buffer(gl)
@@ -109,11 +109,10 @@ class FaceContext(val gl: GL, params: RenderParams) : Param.Context(params)  {
                 }
             }
 
-            fun makeFace(f: Face, inner: Boolean) {
+            fun makeFace(f: Face, faceColor: Color, inner: Boolean) {
                 val n = f.size
-                val faceColor = PolyStyle.faceColor(f)
                 var ofs = bufOfs
-                val lNorm: Vec3 = if (inner) f * -1.0 else f
+                val lNorm: Vec3 = if (inner) -f else f
                 val innerFlag = if (inner) 1 else 0
                 for (i in 0 until n) {
                     positionBuffer[ofs] = f[i]
@@ -134,31 +133,6 @@ class FaceContext(val gl: GL, params: RenderParams) : Param.Context(params)  {
                 bufOfs = ofs
             }
 
-            class FaceRimData(val f: Face)  {
-                val n = f.size
-                val faceColor = PolyStyle.faceColor(f)
-                val evs = Array(n) { i ->
-                    val j = (i + 1) % n
-                    (f[j] - f[i]).unit
-                }
-                val rimDir = Array(n) { i ->
-                    val k = (i + n - 1) % n
-                    val a = evs[i]
-                    val b = evs[k]
-                    val c = 1 - a * b
-                    (a - b) / sqrt(2 * c - c * c)
-                }
-                val maxRim = run {
-                    var maxRim = Double.POSITIVE_INFINITY
-                    for (i in 0 until n) {
-                        val j = (i + 1) % n
-                        maxRim = minOf(maxRim, (f[j] - f[i]).norm / (evs[i] * rimDir[i] - evs[i] * rimDir[j]))
-                    }
-                    maxRim *= MAX_RIM_FRACTION
-                    maxRim
-                }
-            }
-
             fun Uint32Buffer.indexRectangles(n: Int, invert: Boolean) {
                 for (i in 0 until n) {
                     val j = (i + 1) % n
@@ -167,8 +141,7 @@ class FaceContext(val gl: GL, params: RenderParams) : Param.Context(params)  {
                 }
             }
 
-            fun makeRim(fr: FaceRimData, inner: Boolean) {
-                val f = fr.f
+            fun makeRim(f: Face, fr: FaceRim, faceColor: Color, inner: Boolean) {
                 val n = f.size
                 var ofs = bufOfs
                 val lNorm = if (inner) -f else f
@@ -180,7 +153,7 @@ class FaceContext(val gl: GL, params: RenderParams) : Param.Context(params)  {
                         expandDirBuffer[ofs] = f
                         rimDirBuffer[ofs] = if (rim == 0) Vec3.ZERO else fr.rimDir[i]
                         rimMaxBuffer[ofs] = if (rim == 0) 0.0 else fr.maxRim
-                        colorBuffer[ofs] = fr.faceColor
+                        colorBuffer[ofs] = faceColor
                         innerBuffer?.set(ofs, innerFlag)
                         faceModeBuffer?.set(ofs, if (f.kind == selectedFace) FACE_SELECTED else FACE_NORMAL)
                         ofs++
@@ -190,45 +163,47 @@ class FaceContext(val gl: GL, params: RenderParams) : Param.Context(params)  {
                 bufOfs = ofs
             }
 
-            fun makeBorder(fr: FaceRimData?, f: Face, invert: Boolean) {
-                val faceColor = fr?.faceColor ?: PolyStyle.faceColor(f)
+            fun makeBorder(f: Face, fr: FaceRim, faceColor: Color, noRim: Boolean) {
                 val n = f.size
                 var ofs = bufOfs
                 for (i in 0 until n) {
-                    val j = (i + 1) % n
-                    val lNorm = (f[j] cross f[i]).unit.let { if (invert) -it else it }
-                    for (innnerFlag in 0..1) {
+                    val lNorm = if (noRim) -fr.borderNorm[i] else fr.borderNorm[i]
+                    for (innerFlag in 0..1) {
                         positionBuffer[ofs] = f[i]
                         lightNormalBuffer[ofs] = lNorm
                         expandDirBuffer[ofs] = f
-                        rimDirBuffer[ofs] = if (innnerFlag == 0 || fr == null) Vec3.ZERO else fr.rimDir[i]
-                        rimMaxBuffer[ofs] = if (innnerFlag == 0 || fr == null) 0.0 else fr.maxRim
+                        rimDirBuffer[ofs] = if (noRim) Vec3.ZERO else fr.rimDir[i]
+                        rimMaxBuffer[ofs] = if (noRim) 0.0 else fr.maxRim
                         colorBuffer[ofs] = faceColor
-                        innerBuffer?.set(ofs, innnerFlag)
+                        innerBuffer?.set(ofs, innerFlag)
                         faceModeBuffer?.set(ofs, if (f.kind == selectedFace) FACE_SELECTED else FACE_NORMAL)
                         ofs++
                     }
                 }
-                indexBuffer?.indexRectangles(f.size, invert)
+                indexBuffer?.indexRectangles(f.size, noRim)
                 bufOfs = ofs
             }
 
             for (f in poly.fs) {
+                val faceColor = PolyStyle.faceColor(f)
                 // Note: In GL front faces are CCW
                 if (f.isPlanar && f.kind !in hideFaces) {
-                    makeFace(f, false)
-                    if (hasHiddenFaces || hasExpand) makeFace(f, true)
+                    makeFace(f, faceColor,false)
+                    if (hasHiddenFaces || hasExpand) {
+                        makeFace(f, faceColor, true)
+                    }
                 } else {
-                    val fr = FaceRimData(f)
                     if (hasRim) {
-                        makeRim(fr, false)
-                        makeRim(fr, true)
+                        makeRim(f, poly.faceRim(f), faceColor, false)
+                        makeRim(f, poly.faceRim(f), faceColor, true)
                     }
                     if (hasWidth) {
-                        makeBorder(fr, f, false)
+                        makeBorder(f, poly.faceRim(f), faceColor, false)
                     }
                 }
-                if (hasExpand && hasWidth) makeBorder(null, f, true)
+                if (hasExpand && hasWidth) {
+                    makeBorder(f, poly.faceRim(f), faceColor, true)
+                }
             }
             positionBuffer.bindBufferData(gl)
             lightNormalBuffer.bindBufferData(gl)
@@ -241,53 +216,63 @@ class FaceContext(val gl: GL, params: RenderParams) : Param.Context(params)  {
             indexBuffer?.bindBufferData(gl, GL.ELEMENT_ARRAY_BUFFER)
             check(bufOfs == bufferSize)
             if (indexBuffer != null) check(idxOfs == indexSize)
+            this@FaceContext.bufferSize = bufferSize
             return indexSize
         }
     }
 
+    private fun FaceExportParams.setIndex(v: MutableVec3, i: Int) = with(target) {
+        val ri = min(target.rimMaxBuffer.data[i].toDouble(), rim)
+        val diLen = innerBuffer[i] * width
+        val posLen = norm(
+            positionBuffer[i, 0],
+            positionBuffer[i, 1],
+            positionBuffer[i, 2]
+        )
+        fun coord(j: Int) = scale * (
+            positionBuffer[i, j] -
+            positionBuffer[i, j] * diLen / posLen +
+            rimDirBuffer[i, j] * ri * (posLen - diLen) / posLen +
+            expandDirBuffer[i, j] * expand
+        )
+        v.x = coord(0)
+        v.y = coord(1)
+        v.z = coord(2)
+    }
+
+    fun exportVertices(
+        exportParams: FaceExportParams,
+        block: (Vec3) -> Unit
+    ) = with(exportParams) {
+        val v = MutableVec3()
+        for (i in 0 until bufferSize) {           
+            setIndex(v, i)
+            block(v)
+        }
+    }
+
     fun exportTriangles(
-        scale: Double,
-        faceWidth: Double,
-        faceRim: Double,
+        exportParams: FaceExportParams,
         block: (Vec3, Vec3, Vec3) -> Unit
-    ) {
+    ) = with(exportParams) {
         val v1 = MutableVec3()
         val v2 = MutableVec3()
         val v3 = MutableVec3()
-
-        fun MutableVec3.setIndex(i: Int) = with(target) {
-            val ri = min(target.rimMaxBuffer.data[i].toDouble(), faceRim)
-            val diLen = innerBuffer[i] * faceWidth
-            val posLen = norm(
-                positionBuffer[i, 0],
-                positionBuffer[i, 1],
-                positionBuffer[i, 2]
-            )
-            x = scale * (
-                positionBuffer[i, 0] -
-                positionBuffer[i, 0] * diLen / posLen +
-                rimDirBuffer[i, 0] * ri * (posLen - diLen) / posLen
-            )
-            y = scale * (
-                positionBuffer[i, 1] -
-                positionBuffer[i, 1] * diLen / posLen +
-                rimDirBuffer[i, 1] * ri * (posLen - diLen) / posLen
-            )
-            z = scale * (
-                positionBuffer[i, 2] -
-                positionBuffer[i, 2] * diLen / posLen +
-                rimDirBuffer[i, 2] * ri * (posLen - diLen) / posLen
-            )
-        }
-
         for (i in 0 until indexSize step 3) {
-            v1.setIndex(indexBuffer.data[i])
-            v2.setIndex(indexBuffer.data[i + 1])
-            v3.setIndex(indexBuffer.data[i + 2])
+            setIndex(v1, indexBuffer[i])
+            setIndex(v2, indexBuffer[i + 1])
+            setIndex(v3, indexBuffer[i + 2])
             block(v1, v2, v3)
         }
     }
 }
+
+class FaceExportParams(
+    val scale: Double,
+    val width: Double,
+    val rim: Double,
+    val expand: Double
+)
 
 // cullMode: 0 - no, 1 - cull front, -1 - cull back
 fun FaceContext.draw(view: ViewContext, lightning: LightningContext, cullMode: Int = 0) {

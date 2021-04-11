@@ -155,14 +155,13 @@ class RootPane(props: PComponentProps<RootParams>) :
                 attrs {
                     onClickFunction = {
                         val name = exportName()
-                        download("$name.stl",
-                            state.faceContext.exportSolidToStl(
-                                name,
-                                props.param.export.size.value / 2,
-                                props.param.render.view.faceWidth.value,
-                                props.param.render.view.faceRim.value,
-                            )
+                        val exportParams = FaceExportParams(
+                            props.param.export.size.value / 2,
+                            props.param.render.view.faceWidth.value,
+                            props.param.render.view.faceRim.value,
+                            props.param.render.view.expandFaces.value,
                         )
+                        download("$name.stl", state.faceContext.exportSolidToStl(name, exportParams))
                     }
                 }
                 +"Export to STL"

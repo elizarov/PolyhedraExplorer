@@ -85,3 +85,5 @@ operator fun Uint16Buffer.set(i: Int, x: Int) {
 operator fun Uint32Buffer.set(i: Int, x: Int) {
     data[i] = x
 }
+
+operator fun Uint32Buffer.get(i: Int): Int = data[i]

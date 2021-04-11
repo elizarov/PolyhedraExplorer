@@ -110,6 +110,11 @@ class Polyhedron(
         if (es.all { e -> e.isTangentInSegment() }) MidPoint.Tangent else MidPoint.Center
     }
 
+    private val faceRims by lazy { ArrayIdMap<Face, FaceRim>() }
+
+    fun faceRim(f: Face) =
+        faceRims.getOrPut(f) { FaceRim(f) }
+
     override fun toString(): String =
         "Polyhedron(vs=${vs.size}, es=${es.size}, fs=${fs.size})"
 }
