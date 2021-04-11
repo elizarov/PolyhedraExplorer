@@ -29,6 +29,10 @@ external interface RootPaneState : RState {
     var display: Display
     var animateUpdates: Boolean
     var rotate: Boolean
+
+    var faceContext: FaceContext
+    var exportWidth: Double
+    var exportRim: Double
 }
 
 @Suppress("NON_EXPORTABLE_TYPE")
@@ -50,6 +54,9 @@ class RootPane(props: PComponentProps<RootParams>) :
         display = props.param.render.view.display.value
         animateUpdates = props.param.animationParams.animateValueUpdates.value
         rotate = props.param.animationParams.animatedRotation.value
+
+        exportWidth = props.param.render.view.faceWidth.value * props.param.export.size.value
+        exportRim = props.param.render.view.faceRim.value * props.param.export.size.value
     }
 
     override fun RBuilder.render() {
@@ -63,6 +70,7 @@ class RootPane(props: PComponentProps<RootParams>) :
                 polyCanvas("poly") {
                     params = props.param.render
                     poly = state.poly
+                    faceContextSink = { setState { faceContext = it } }
                 }
                 polyInfoPane {
                     param = props.param.render.poly
@@ -120,19 +128,49 @@ class RootPane(props: PComponentProps<RootParams>) :
             controlRow("Shininess") { pSlider(props.param.render.lighting.specularPower, facesDisabled) }
         }
 
-        header("Export")
+        header("Export geometry")
         div("control row") {
             button {
                 attrs {
                     onClickFunction = {
-                        val name = state.polyName.replace(' ', '_').lowercase()
+                        val name = exportName()
                         download("$name.scad", state.poly.exportGeometryToScad(name))
                     }
                 }
-                +"Geometry to SCAD"
+                +"Export to SCAD"
+            }
+        }
+
+        header("Export solid")
+        div("control row") {
+            label { +"Export size" }
+            pSlider(props.param.export.size)
+            span("suffix") { +"(mm)" }
+        }
+        div("control row") {
+            +"Face width ${state.exportWidth.fmt(1)} (mm); rim ${state.exportRim.fmt(1)} (mm)"
+        }
+        div("control row") {
+            button {
+                attrs {
+                    onClickFunction = {
+                        val name = exportName()
+                        download("$name.stl",
+                            state.faceContext.exportSolidToStl(
+                                name,
+                                props.param.export.size.value / 2,
+                                props.param.render.view.faceWidth.value,
+                                props.param.render.view.faceRim.value,
+                            )
+                        )
+                    }
+                }
+                +"Export to STL"
             }
         }
     }
+
+    private fun exportName() = state.polyName.replace(' ', '_').lowercase()
 
     private fun RDOMBuilder<TBODY>.renderTransformsRows() {
         val transformError = state.transformError

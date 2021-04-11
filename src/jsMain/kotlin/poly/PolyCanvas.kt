@@ -19,6 +19,7 @@ external interface PolyCanvasProps : RProps {
     var classes: String?
     var poly: Polyhedron
     var params: RenderParams
+    var faceContextSink: (FaceContext) -> Unit
 }
 
 fun RBuilder.polyCanvas(classes: String? = null, handler: PolyCanvasProps.() -> Unit) {
@@ -64,6 +65,7 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
         canvas.onmousemove = this::handleMouseMove
         canvas.onwheel = this::handleWheel
         drawContext = DrawContext(canvas, props.params, ::draw)
+        props.faceContextSink(drawContext.faces)
         ResizeTracker.add(requestRedrawFun)
         requestFpsTimeout()
     }

@@ -66,6 +66,8 @@ operator fun Float32Buffer<GLType.vec3>.set(i: Int, v: Vec3) {
     data[3 * i] = v
 }
 
+operator fun Float32Buffer<GLType.vec3>.get(i: Int, j: Int): Double = data[3 * i + j].toDouble()
+
 operator fun Float32Buffer<GLType.vec3>.set(i: Int, c: Color) {
     data.setRGB(3 * i, c)
 }
@@ -73,6 +75,8 @@ operator fun Float32Buffer<GLType.vec3>.set(i: Int, c: Color) {
 operator fun Uint8Buffer.set(i: Int, x: Int) {
     data[i] = x
 }
+
+operator fun Uint8Buffer.get(i: Int): Int = data[i].toInt()
 
 operator fun Uint16Buffer.set(i: Int, x: Int) {
     data[i] = x

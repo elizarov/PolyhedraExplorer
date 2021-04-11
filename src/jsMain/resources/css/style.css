@@ -79,6 +79,10 @@ label {
     margin-right: 1ch;
 }
 
+.suffix {
+    margin-left: 1ch;
+}
+
 div.control {
     height: 1.5em;
     margin-top: 0.3em;

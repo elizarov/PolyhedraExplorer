@@ -462,8 +462,8 @@ class ViewParams(
     val scale = using(DoubleParam("s", 0.0, -2.0, 2.0, 0.01, animationParams))
     val expandFaces = using(DoubleParam("e", 0.0, 0.0, 2.0, 0.01, animationParams))
     val transparentFaces = using(DoubleParam("t", 0.0, 0.0, 1.0, 0.01, animationParams))
-    val faceWidth = using(DoubleParam("fw", 0.0, 0.0, 0.2, 0.001, animationParams))
-    val faceRim = using(DoubleParam("fr", 0.0, 0.0, 0.2, 0.001, animationParams))
+    val faceWidth = using(DoubleParam("fw", 0.05, 0.0, 0.2, 0.001, animationParams))
+    val faceRim = using(DoubleParam("fr", 0.05, 0.0, 0.2, 0.001, animationParams))
     val display = using(EnumParam("d", Display.All, Displays))
 }
 
@@ -472,5 +472,9 @@ class LightingParams(tag: String, animationParams: ViewAnimationParams?) : Param
     val diffuseLight = using(DoubleParam("d", 1.0, 0.0, 1.0, 0.01, animationParams))
     val specularLight = using(DoubleParam("s", 1.0, 0.0, 1.0, 0.01, animationParams))
     val specularPower = using(DoubleParam("sp", 30.0, 0.0, 100.0, 1.0, animationParams))
+}
+
+class ExportParams(tag: String) : Param.Composite(tag) {
+    val size = using(DoubleParam("s", 40.0, 10.0, 100.0, 0.1))
 }
 

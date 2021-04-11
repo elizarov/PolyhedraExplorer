@@ -22,6 +22,7 @@ fun main() {
 class RootParams : Param.Composite("") {
     val animationParams = using(ViewAnimationParams("a"))
     val render = using(RenderParams("", animationParams))
+    val export = using(ExportParams("e"))
 }
 
 private fun onLoad() {

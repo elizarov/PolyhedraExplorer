@@ -244,6 +244,49 @@ class FaceContext(val gl: GL, params: RenderParams) : Param.Context(params)  {
             return indexSize
         }
     }
+
+    fun exportTriangles(
+        scale: Double,
+        faceWidth: Double,
+        faceRim: Double,
+        block: (Vec3, Vec3, Vec3) -> Unit
+    ) {
+        val v1 = MutableVec3()
+        val v2 = MutableVec3()
+        val v3 = MutableVec3()
+
+        fun MutableVec3.setIndex(i: Int) = with(target) {
+            val ri = min(target.rimMaxBuffer.data[i].toDouble(), faceRim)
+            val diLen = innerBuffer[i] * faceWidth
+            val posLen = norm(
+                positionBuffer[i, 0],
+                positionBuffer[i, 1],
+                positionBuffer[i, 2]
+            )
+            x = scale * (
+                positionBuffer[i, 0] -
+                positionBuffer[i, 0] * diLen / posLen +
+                rimDirBuffer[i, 0] * ri * (posLen - diLen) / posLen
+            )
+            y = scale * (
+                positionBuffer[i, 1] -
+                positionBuffer[i, 1] * diLen / posLen +
+                rimDirBuffer[i, 1] * ri * (posLen - diLen) / posLen
+            )
+            z = scale * (
+                positionBuffer[i, 2] -
+                positionBuffer[i, 2] * diLen / posLen +
+                rimDirBuffer[i, 2] * ri * (posLen - diLen) / posLen
+            )
+        }
+
+        for (i in 0 until indexSize step 3) {
+            v1.setIndex(indexBuffer.data[i])
+            v2.setIndex(indexBuffer.data[i + 1])
+            v3.setIndex(indexBuffer.data[i + 2])
+            block(v1, v2, v3)
+        }
+    }
 }
 
 // cullMode: 0 - no, 1 - cull front, -1 - cull back
