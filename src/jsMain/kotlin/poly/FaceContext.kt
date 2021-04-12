@@ -17,14 +17,18 @@ import org.khronos.webgl.WebGLRenderingContext as GL
 class FaceContext(val gl: GL, params: RenderParams) : Param.Context(params)  {
     val poly by { params.poly.targetPoly }
     val animation by { params.poly.transformAnimation }
-    val hideFaces by { params.poly.hideFaces.value }
     val selectedFace by { params.poly.selectedFace.value }
     val drawFaces by { params.view.display.value.hasFaces() && params.view.transparentFaces.value < 1.0 }
     val hasExpand by { params.view.expandFaces.value > 0.0 }
     val hasRim by { params.view.faceRim.value > 0.0 }
     val hasWidth by { params.view.faceWidth.value > 0.0 }
-    val hasHiddenFaces by {
-        poly.fs.any { f -> !f.isPlanar || f.kind in hideFaces }
+    
+    // effectively hidden faces
+    val hiddenFaces by {
+        val animation = animation
+        // note: poly == animation.targetPoly
+        val hf = params.poly.hideFaces.value.intersect(poly.faceKinds.keys) + poly.nonPlanarFaceKinds
+        if (animation == null) hf else hf + animation.prevPoly.nonPlanarFaceKinds
     }
 
     val program = FaceProgram(gl)
@@ -42,8 +46,14 @@ class FaceContext(val gl: GL, params: RenderParams) : Param.Context(params)  {
     override fun update() {
         if (!drawFaces) return
         program.use()
-        indexSize = target.update(poly, innerBuffer, faceModeBuffer, indexBuffer)
-        animation?.let { prev.update(it.prevPoly) }
+        val altFaceKind = animation?.let {
+            { f: Face -> it.prevPoly.fs[f.id].kind }
+        }
+        indexSize = target.update(poly, altFaceKind, innerBuffer, faceModeBuffer, indexBuffer)
+        animation?.let {
+            val prevIndexSize = prev.update(it.prevPoly, { f -> poly.fs[f.id].kind })
+            check(prevIndexSize == indexSize)
+        }
     }
 
     inner class FaceBuffers {
@@ -56,14 +66,19 @@ class FaceContext(val gl: GL, params: RenderParams) : Param.Context(params)  {
 
         fun update(
             poly: Polyhedron,
+            altFaceKind: ((Face) -> FaceKind)?,
             innerBuffer: Uint8Buffer? = null,
             faceModeBuffer: Uint8Buffer? = null,
             indexBuffer: Uint32Buffer? = null,
         ): Int {
+            fun faceShown(f: Face): Boolean =
+                f.kind !in hiddenFaces && (altFaceKind == null || altFaceKind(f) !in hiddenFaces)
+
             var bufferSize = 0
             var indexSize = 0
+            val hasHiddenFaces = hiddenFaces.isNotEmpty()
             for (f in poly.fs) {
-                if (f.isPlanar && f.kind !in hideFaces) {
+                if (faceShown(f)) {
                     bufferSize += f.size
                     indexSize += (f.size - 2) * 3
                     if (hasHiddenFaces || hasExpand) {
@@ -187,7 +202,7 @@ class FaceContext(val gl: GL, params: RenderParams) : Param.Context(params)  {
             for (f in poly.fs) {
                 val faceColor = PolyStyle.faceColor(f)
                 // Note: In GL front faces are CCW
-                if (f.isPlanar && f.kind !in hideFaces) {
+                if (faceShown(f)) {
                     makeFace(f, faceColor,false)
                     if (hasHiddenFaces || hasExpand) {
                         makeFace(f, faceColor, true)

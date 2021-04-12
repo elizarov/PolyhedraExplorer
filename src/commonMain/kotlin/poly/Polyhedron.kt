@@ -64,6 +64,12 @@ class Polyhedron(
     val faceKinds: IdMap<FaceKind, List<Face>> by lazy { fs.groupById { it.kind } }
     val edgeKinds: Map<EdgeKind, List<Edge>> by lazy { es.groupBy { it.kind } }
 
+    val nonPlanarFaceKinds by lazy {
+        faceKinds.entries
+            .filter { (_, fs) -> !fs[0].isPlanar }
+            .map { (fk, _) -> fk }
+    }
+
     val edgeKindsIndex: Map<EdgeKind, Int> by lazy {
         es.asSequence()
             .map { it.kind }
