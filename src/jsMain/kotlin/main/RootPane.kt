@@ -39,7 +39,7 @@ class RootPane(props: PComponentProps<RootParams>) : RComponent<PComponentProps<
         val animateUpdates by { params.animationParams.animateValueUpdates.value }
         val rotate by { params.animationParams.animatedRotation.value  }
 
-        val exportSize by { params.export.size.targetValue }
+        val scale by { params.export.size.targetValue / 2 }
         val faceWidth by { params.render.view.faceWidth.targetValue }
         val faceRim by { params.render.view.faceRim.targetValue }
         val expandFaces by { params.render.view.expandFaces.targetValue }
@@ -96,8 +96,14 @@ class RootPane(props: PComponentProps<RootParams>) : RComponent<PComponentProps<
         header("Faces")
         tableBody {
             controlRow("Transparent") { pSlider(props.param.render.view.transparentFaces, !ctx.hasFaces) }
-            controlRow("Width") { pSlider(props.param.render.view.faceWidth, !ctx.hasFaces) }
-            controlRow("Rim") { pSlider(props.param.render.view.faceRim, !ctx.hasFaces) }
+            controlRow("Width") {
+                pSlider(props.param.render.view.faceWidth, !ctx.hasFaces, showValue = false)
+                span { +"${(ctx.scale * ctx.faceWidth).fmt(1)} (mm)" }
+            }
+            controlRow("Rim") {
+                pSlider(props.param.render.view.faceRim, !ctx.hasFaces, showValue = false)
+                span { +"${(ctx.scale * ctx.faceRim).fmt(1)} (mm)" }
+            }
         }
 
         header("Animation")
@@ -141,10 +147,6 @@ class RootPane(props: PComponentProps<RootParams>) : RComponent<PComponentProps<
             pSlider(props.param.export.size, !ctx.hasFaces)
             span("suffix") { +"(mm)" }
         }
-        val scale = ctx.exportSize / 2
-        div("control row") {
-            +"Face width ${(scale * ctx.faceWidth).fmt(1)} (mm); rim ${(scale * ctx.faceRim).fmt(1)} (mm)"
-        }
         div("control row") {
             button {
                 attrs {
@@ -152,7 +154,7 @@ class RootPane(props: PComponentProps<RootParams>) : RComponent<PComponentProps<
                     onClickFunction = {
                         val name = exportName()
                         val description = props.param.toString()
-                        val exportParams = FaceExportParams(scale, ctx.faceWidth, ctx.faceRim, ctx.expandFaces)
+                        val exportParams = FaceExportParams(ctx.scale, ctx.faceWidth, ctx.faceRim, ctx.expandFaces)
                         download("$name.stl",
                             state.faceContext.exportSolidToStl(name, description, exportParams)
                         )
