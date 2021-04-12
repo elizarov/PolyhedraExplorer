@@ -39,8 +39,10 @@ class RootPane(props: PComponentProps<RootParams>) : RComponent<PComponentProps<
         val animateUpdates by { params.animationParams.animateValueUpdates.value }
         val rotate by { params.animationParams.animatedRotation.value  }
 
-        val exportWidth by { params.render.view.faceWidth.targetValue * params.export.size.targetValue }
-        val exportRim by { params.render.view.faceRim.targetValue * params.export.size.targetValue }
+        val exportSize by { params.export.size.targetValue }
+        val faceWidth by { params.render.view.faceWidth.targetValue }
+        val faceRim by { params.render.view.faceRim.targetValue }
+        val expandFaces by { params.render.view.expandFaces.targetValue }
 
         init { setup() }
 
@@ -70,7 +72,7 @@ class RootPane(props: PComponentProps<RootParams>) : RComponent<PComponentProps<
     }
 
     private fun RDOMBuilder<DIV>.renderControls() {
-        val context = state.context
+        val ctx = state.context
 
         header("Polyhedron")
         div("row control") {
@@ -93,30 +95,30 @@ class RootPane(props: PComponentProps<RootParams>) : RComponent<PComponentProps<
 
         header("Faces")
         tableBody {
-            controlRow("Transparent") { pSlider(props.param.render.view.transparentFaces, !context.hasFaces) }
-            controlRow("Width") { pSlider(props.param.render.view.faceWidth, !context.hasFaces) }
-            controlRow("Rim") { pSlider(props.param.render.view.faceRim, !context.hasFaces) }
+            controlRow("Transparent") { pSlider(props.param.render.view.transparentFaces, !ctx.hasFaces) }
+            controlRow("Width") { pSlider(props.param.render.view.faceWidth, !ctx.hasFaces) }
+            controlRow("Rim") { pSlider(props.param.render.view.faceRim, !ctx.hasFaces) }
         }
 
         header("Animation")
         tableBody {
             controlRow2("Rotation", { pCheckbox(props.param.animationParams.animatedRotation) }) {
-                pSlider(props.param.animationParams.rotationSpeed, !context.rotate)
+                pSlider(props.param.animationParams.rotationSpeed, !ctx.rotate)
             }
             controlRow2("Angle", {}, {
-                pSlider(props.param.animationParams.rotationAngle, !context.rotate)
+                pSlider(props.param.animationParams.rotationAngle, !ctx.rotate)
             })
             controlRow2("Updates", { pCheckbox(props.param.animationParams.animateValueUpdates) }) {
-                pSlider(props.param.animationParams.animationDuration, !context.animateUpdates)
+                pSlider(props.param.animationParams.animationDuration, !ctx.animateUpdates)
             }
         }
 
         header("Lighting")
         tableBody {
-            controlRow("Ambient") { pSlider(props.param.render.lighting.ambientLight, !context.hasFaces) }
-            controlRow("Diffuse") { pSlider(props.param.render.lighting.diffuseLight, !context.hasFaces) }
-            controlRow("Specular") { pSlider(props.param.render.lighting.specularLight, !context.hasFaces) }
-            controlRow("Shininess") { pSlider(props.param.render.lighting.specularPower, !context.hasFaces) }
+            controlRow("Ambient") { pSlider(props.param.render.lighting.ambientLight, !ctx.hasFaces) }
+            controlRow("Diffuse") { pSlider(props.param.render.lighting.diffuseLight, !ctx.hasFaces) }
+            controlRow("Specular") { pSlider(props.param.render.lighting.specularLight, !ctx.hasFaces) }
+            controlRow("Shininess") { pSlider(props.param.render.lighting.specularPower, !ctx.hasFaces) }
         }
 
         header("Export geometry")
@@ -126,7 +128,7 @@ class RootPane(props: PComponentProps<RootParams>) : RComponent<PComponentProps<
                     onClickFunction = {
                         val name = exportName()
                         val description = props.param.toString()
-                        download("$name.scad", context.poly.exportGeometryToScad(name, description))
+                        download("$name.scad", ctx.poly.exportGeometryToScad(name, description))
                     }
                 }
                 +"Export to SCAD"
@@ -136,25 +138,21 @@ class RootPane(props: PComponentProps<RootParams>) : RComponent<PComponentProps<
         header("Export solid")
         div("control row") {
             label { +"Export size" }
-            pSlider(props.param.export.size, !context.hasFaces)
+            pSlider(props.param.export.size, !ctx.hasFaces)
             span("suffix") { +"(mm)" }
         }
+        val scale = ctx.exportSize / 2
         div("control row") {
-            +"Face width ${context.exportWidth.fmt(1)} (mm); rim ${context.exportRim.fmt(1)} (mm)"
+            +"Face width ${(scale * ctx.faceWidth).fmt(1)} (mm); rim ${(scale * ctx.faceRim).fmt(1)} (mm)"
         }
         div("control row") {
             button {
                 attrs {
-                    disabled = !context.hasFaces
+                    disabled = !ctx.hasFaces
                     onClickFunction = {
                         val name = exportName()
                         val description = props.param.toString()
-                        val exportParams = FaceExportParams(
-                            props.param.export.size.targetValue / 2,
-                            props.param.render.view.faceWidth.targetValue,
-                            props.param.render.view.faceRim.targetValue,
-                            props.param.render.view.expandFaces.targetValue,
-                        )
+                        val exportParams = FaceExportParams(scale, ctx.faceWidth, ctx.faceRim, ctx.expandFaces)
                         download("$name.stl",
                             state.faceContext.exportSolidToStl(name, description, exportParams)
                         )
