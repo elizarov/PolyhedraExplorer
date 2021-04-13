@@ -60,13 +60,17 @@ class Polyhedron(
         this.directedEdges = directedEdges
     }
 
-    val vertexKinds: IdMap<VertexKind, List<Vertex>> by lazy { vs.groupById { it.kind } }
-    val faceKinds: IdMap<FaceKind, List<Face>> by lazy { fs.groupById { it.kind } }
-    val edgeKinds: Map<EdgeKind, List<Edge>> by lazy { es.groupBy { it.kind } }
+    val vertexKinds: IdMap<VertexKind, Vertex> by lazy { vs.associateById({ it.kind }, { it }) }
+    val faceKinds: IdMap<FaceKind, Face> by lazy { fs.associateById({ it.kind }, { it }) }
+    val edgeKinds: Map<EdgeKind, Edge> by lazy { es.associateBy({ it.kind }, { it }) }
+
+    val vertexKindCount: IdMap<VertexKind, Int> by lazy { vs.groupingBy { it.kind }.eachCountTo(ArrayIdMap()) }
+    val faceKindCount: IdMap<FaceKind, Int> by lazy { fs.groupingBy { it.kind }.eachCountTo(ArrayIdMap()) }
+    val edgeKindCount: Map<EdgeKind, Int> by lazy { es.groupingBy { it.kind }.eachCount() }
 
     val nonPlanarFaceKinds by lazy {
         faceKinds.entries
-            .filter { (_, fs) -> !fs[0].isPlanar }
+            .filter { (_, f0) -> !f0.isPlanar }
             .map { (fk, _) -> fk }
     }
 

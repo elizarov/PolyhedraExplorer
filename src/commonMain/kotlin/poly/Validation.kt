@@ -41,15 +41,15 @@ fun Polyhedron.validateGeometry() {
 
 fun Polyhedron.validateKinds() {
     // Validate face kinds
-    for ((fk, fs) in faceKinds) {
+    for ((fk, fs) in fs.groupBy { it.kind }) {
         fs.validateUnique("$fk faces", FaceKindEssence::approx) { it.essence() }
     }
     // Validate vertex kinds
-    for ((vk, vs) in vertexKinds) {
+    for ((vk, vs) in vs.groupBy { it.kind }) {
         vs.validateUnique("$vk vertices", VertexKindEssence::approx) { it.essence() }
     }
     // Validate edge kinds
-    for ((ek, es) in edgeKinds) {
+    for ((ek, es) in es.groupBy { it.kind }) {
         es.validateUnique("$ek edges", EdgeKindEssence::approx) { it.essence() }
     }
 }

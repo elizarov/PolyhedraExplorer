@@ -20,7 +20,7 @@ class QuatTest {
     private val testAngles = listOf(0.0, ra, rb, rc, rd, -ra, -rb, -rc, -rd)
 
     @Test
-    fun testRotation() {
+    fun testRotationAround() {
         assertApprox(ux, ux.rotated(ux.toRotationAroundQuat(ra)))
         assertApprox(-uz, ux.rotated(uy.toRotationAroundQuat(ra)))
         assertApprox(uy, ux.rotated(uz.toRotationAroundQuat(ra)))
@@ -30,6 +30,13 @@ class QuatTest {
         assertApprox(-uy, uz.rotated(ux.toRotationAroundQuat(ra)))
         assertApprox(ux, uz.rotated(uy.toRotationAroundQuat(ra)))
         assertApprox(uz, uz.rotated(uz.toRotationAroundQuat(ra)))
+    }
+
+    @Test
+    fun testRotationBetween() {
+        assertApprox(uz.toRotationAroundQuat(ra), rotationBetweenQuat(ux, uy))
+        assertApprox(ux.toRotationAroundQuat(ra), rotationBetweenQuat(uy, uz))
+        assertApprox(uy.toRotationAroundQuat(ra), rotationBetweenQuat(uz, ux))
     }
 
     @Test

@@ -49,8 +49,7 @@ class PolyInfoPane(params: PComponentProps<PolyParams>) : PComponent<PolyParams,
             tbody {
                 // Faces
                 infoHeader("Faces", poly.fs.size, poly.inradius, "inradius")
-                for ((fk, fs) in poly.faceKinds) {
-                    val f0 = fs[0]
+                for ((fk, f0) in poly.faceKinds) {
                     val fe = f0.essence()
                     tr("info") {
                         attrs {
@@ -75,7 +74,7 @@ class PolyInfoPane(params: PComponentProps<PolyParams>) : PComponent<PolyParams,
                             }
                         }
                         td("rt") { +fk.toString() }
-                        td { +fs.size.toString() }
+                        td { +poly.faceKindCount[fk].toString() }
                         td { +fe.dist.fmtFix }
                         td {
                             svgPolygon(
@@ -95,15 +94,14 @@ class PolyInfoPane(params: PComponentProps<PolyParams>) : PComponent<PolyParams,
                 }
                 // Vertices
                 infoHeader("Vertices", poly.vs.size, poly.circumradius, "circumradius")
-                for ((vk, vs) in poly.vertexKinds) {
-                    val v0 = vs[0]
+                for ((vk, v0) in poly.vertexKinds) {
                     val ve = v0.essence()
                     tr("info") {
                         td("rt") {
                             attrs { colSpan = "2" }
                             +vk.toString()
                         }
-                        td { +vs.size.toString() }
+                        td { +poly.vertexKindCount[vk].toString() }
                         td { +ve.dist.fmtFix }
                         td {
                             svgPolygon(
@@ -123,14 +121,14 @@ class PolyInfoPane(params: PComponentProps<PolyParams>) : PComponent<PolyParams,
                 }
                 // Edges
                 infoHeader("Edges", poly.es.size, poly.midradius, "midradius")
-                for ((ek, es) in poly.edgeKinds) {
-                    val ee = es[0].essence()
+                for ((ek, e0) in poly.edgeKinds) {
+                    val ee = e0.essence()
                     tr("info") {
                         td("rt") {
                             attrs { colSpan = "2" }
                             +ek.toString()
                         }
-                        td { +es.size.toString() }
+                        td { +poly.edgeKindCount[ek].toString() }
                         td { +ee.dist.fmtFix }
                         td {}
                         td {}

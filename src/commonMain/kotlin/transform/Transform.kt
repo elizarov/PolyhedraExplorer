@@ -147,7 +147,7 @@ fun Polyhedron.rectified(): Polyhedron = transformedPolyhedron(Transform.Rectifi
 fun regularTruncationRatio(ea: Double): Double = 1 / (1 + cos(ea))
 
 fun Polyhedron.regularTruncationRatio(faceKind: FaceKind = FaceKind(0)): Double {
-    val f = faceKinds[faceKind]!!.first() // take representative face of this kind
+    val f = faceKinds[faceKind]!! // take representative face of this kind
     return regularTruncationRatio(PI / f.size)
 }
 
@@ -184,7 +184,7 @@ data class RegularFaceGeometry(
 
 fun Polyhedron.regularFaceGeometry(edgeKind: EdgeKind? = null): RegularFaceGeometry {
     val ek = edgeKind ?: edgeKinds.keys.first() // min edge kind by default
-    val e = edgeKinds[ek]!!.first() // representative edge
+    val e = edgeKinds[ek]!! // representative edge
     val f = e.r // primary face
     val g = e.l // secondary face
     val n = f.size // primary face size

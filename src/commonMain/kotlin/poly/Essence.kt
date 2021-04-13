@@ -44,6 +44,17 @@ fun Face.essence(): FaceKindEssence {
     return FaceKindEssence(kind, d, isPlanar, vfs.minCycle(), computeProjectionFigure())
 }
 
+fun FaceKindEssence.area(): Double {
+    var sum = 0.0
+    val vs = figure.vs
+    val n = vs.size
+    for (i in 0 until n) {
+        val j = (i + 1) % n
+        sum += (vs[j].x - vs[i].x) * (vs[j].y + vs[i].y)
+    }
+    return sum / 2
+}
+
 class VertexKindEssence(
     val kind: VertexKind,
     val dist: Double,

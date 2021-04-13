@@ -69,6 +69,13 @@ operator fun Quat.times(a: Double): Quat =
 
 operator fun Double.times(q: Quat): Quat = q * this
 
+operator fun MutableQuat.divAssign(a: Double) {
+    x /= a
+    y /= a
+    z /= a
+    w /= a
+}
+
 fun Vec3.toRotationAroundQuat(angle: Double): Quat =
     rotationAroundQuat(x, y, z, angle)
 
@@ -76,6 +83,14 @@ fun rotationAroundQuat(x: Double, y: Double, z: Double, angle: Double): Quat {
     val s = sin(angle * 0.5) / norm(x, y, z)
     val w = cos(angle * 0.5)
     return Quat(s * x, s * y, s * z, w)
+}
+
+fun rotationBetweenQuat(v1: Vec3, v2: Vec3): Quat {
+    val c = v1 cross v2
+    if (c approx Vec3.ZERO) return Quat.ID
+    val q = MutableQuat(c.x, c.y, c.z, v1.norm * v2.norm + v1 * v2)
+    q /= q.norm
+    return q
 }
 
 fun MutableQuat.multiplyFront(x: Double, y: Double, z: Double, w: Double): Unit = by(
