@@ -32,7 +32,7 @@ private fun onLoad() {
     render(document.getElementById("root")) {
         child(RootPane::class) {
             attrs {
-                param = rootParams
+                params = rootParams
             }
         }
     }

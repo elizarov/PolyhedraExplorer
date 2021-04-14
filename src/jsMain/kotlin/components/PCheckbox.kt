@@ -13,7 +13,7 @@ import react.dom.*
 fun RBuilder.pCheckbox(param: BooleanParam, disabled: Boolean = false) {
     child(PCheckbox::class) {
         attrs {
-            this.param = param
+            this.params = param
             this.disabled = disabled
         }
     }
@@ -27,7 +27,7 @@ class PCheckbox(props: PValueComponentProps<BooleanParam>) : PValueComponent<Boo
                 // See https://github.com/JetBrains/kotlin-wrappers/issues/35
                 this["checked"] = state.value
                 onChangeFunction = { 
-                    props.param.toggle()
+                    props.params.toggle()
                 }
             }
         }

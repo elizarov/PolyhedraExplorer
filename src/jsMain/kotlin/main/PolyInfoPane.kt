@@ -4,35 +4,51 @@
 
 package polyhedra.js.main
 
+import kotlinx.html.*
 import kotlinx.html.js.*
 import polyhedra.common.poly.*
 import polyhedra.common.util.*
 import polyhedra.js.components.*
+import polyhedra.js.params.*
 import polyhedra.js.poly.*
 import react.*
 import react.dom.*
 
-external interface PolyInfoState : RState {
-    var poly: Polyhedron
-}
-
-fun RBuilder.polyInfoPane(builder: PComponentProps<PolyParams>.() -> Unit) {
+fun RBuilder.polyInfoPane(builder: PComponentProps<RenderParams>.() -> Unit) {
     child(PolyInfoPane::class) {
         attrs(builder)
     }
 }
 
-class PolyInfoPane(params: PComponentProps<PolyParams>) : PComponent<PolyParams, PComponentProps<PolyParams>, PolyInfoState>(params) {
-    override fun PolyInfoState.init(props: PComponentProps<PolyParams>) {
-        poly = props.param.poly
+class PolyInfoPane(props: PComponentProps<RenderParams>) : RComponent<PComponentProps<RenderParams>, RState>(props) {
+    private inner class Context(params: RenderParams) : Param.Context(params, Param.TargetValue) {
+        val poly by { params.poly.poly }
+        val hideFaces by { params.poly.hideFaces.value }
+        val faceRim by { params.view.faceRim.targetValue }
+
+        init { setup() }
+
+        override fun update() {
+            forceUpdate()
+        }
     }
 
-    private fun RBuilder.infoHeader(name: String, cnt: Int, distValue: Double, distName: String) {
+    private val ctx = Context(props.params)
+
+    override fun componentWillUnmount() {
+        ctx.destroy()
+    }
+
+    private fun RBuilder.infoHeader(
+        name: String,
+        cnt: Int,
+        distValue: Double,
+        distName: String,
+        controls: RDOMBuilder<TD>.() -> Unit = {}
+    ) {
         tr("header") {
-            td {
-                attrs { colSpan = "2" }
-                +name
-            }
+            td { controls() }
+            td { +name }
             td { +cnt.toString() }
             td { +distValue.fmtFix }
             td {
@@ -43,29 +59,51 @@ class PolyInfoPane(params: PComponentProps<PolyParams>) : PComponent<PolyParams,
     }
 
     override fun RBuilder.render() {
-        val poly = state.poly
-        val hideFaces = props.param.hideFaces.value
+        val poly = ctx.poly
+        val hideFaces = ctx.hideFaces
         table {
             tbody {
                 // Faces
-                infoHeader("Faces", poly.fs.size, poly.inradius, "inradius")
+                infoHeader("Faces", poly.fs.size, poly.inradius, "inradius") {
+                    val icon = when {
+                        hideFaces.isEmpty() -> "fa-circle"
+                        hideFaces.containsAll(poly.faceKinds.keys) -> "fa-circle-o"
+                        else -> "fa-dot-circle-o"
+                    }
+                    i("fa $icon") {
+                        attrs {
+                            onClickFunction = {
+                                props.params.poly.hideFaces.updateValue(
+                                    when {
+                                        hideFaces.isEmpty() -> poly.faceKinds.keys
+                                        else -> emptySet()
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
                 for ((fk, f0) in poly.faceKinds) {
                     val fe = f0.essence()
                     tr("info") {
                         attrs {
-                            onMouseOverFunction = { props.param.selectedFace.updateValue(fk) }
-                            onMouseOutFunction = { props.param.selectedFace.updateValue(null) }
+                            onMouseOverFunction = { props.params.poly.selectedFace.updateValue(fk) }
+                            onMouseOutFunction = { props.params.poly.selectedFace.updateValue(null) }
                         }
                         td {
                             if (!fe.isPlanar) {
                                 messageSpan(FaceNotPlanar())
                             } else {
                                 val hidden = fk in hideFaces
-                                val icon = if (hidden) "fa-eye-slash" else "fa-eye"
-                                i("far $icon") {
+                                val icon = when {
+                                    hidden && ctx.faceRim >= poly.faceRim(f0).maxRim -> "fa-exclamation-circle face-attn"
+                                    hidden -> "fa-circle-o"
+                                    else -> "fa-circle"
+                                }
+                                i("fa $icon") {
                                     attrs {
                                         onClickFunction = {
-                                            props.param.hideFaces.updateValue(
+                                            props.params.poly.hideFaces.updateValue(
                                                 if (hidden) hideFaces - fk else hideFaces + fk
                                             )
                                         }

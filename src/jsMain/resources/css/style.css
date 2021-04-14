@@ -142,6 +142,10 @@ tr.info:hover {
     background: hsl(70, 90%, 50%);
 }
 
+.face-attn {
+    color: red;
+}
+
 /* --------- canvas fps --------- */
 
 .fps-container {

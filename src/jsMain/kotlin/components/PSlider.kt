@@ -20,7 +20,7 @@ external interface PSliderProps : PValueComponentProps<DoubleParam> {
 fun RBuilder.pSlider(param: DoubleParam, disabled: Boolean = false, showValue: Boolean = true) {
     child(PSlider::class) {
         attrs {
-            this.param = param
+            this.params = param
             this.disabled = disabled
             this.showValue = showValue
         }
@@ -35,12 +35,12 @@ class PSlider(props: PSliderProps) : PValueComponent<Double, DoubleParam, PSlide
             attrs {
                 disabled = props.disabled
                 with(props) {
-                    min = (param.min / param.step).intStr()
-                    max = (param.max / param.step).intStr()
-                    value = (state.value / param.step).intStr()
+                    min = (params.min / params.step).intStr()
+                    max = (params.max / params.step).intStr()
+                    value = (state.value / params.step).intStr()
                 }
                 onChangeFunction = { event ->
-                    props.param.updateValue((event.target as HTMLInputElement).value.toInt() * props.param.step)
+                    props.params.updateValue((event.target as HTMLInputElement).value.toInt() * props.params.step)
                 }
             }
         }

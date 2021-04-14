@@ -11,7 +11,7 @@ import react.*
 fun <T : Tagged> RBuilder.pDropdown(param: EnumParam<T>, disabled: Boolean = false) {
     child<PValueComponentProps<EnumParam<T>>, PDropdown<T>> {
         attrs {
-            this.param = param
+            this.params = param
             this.disabled = disabled
         }
     }
@@ -21,9 +21,9 @@ class PDropdown<T : Tagged>(props: PValueComponentProps<EnumParam<T>>) : PValueC
     override fun RBuilder.render() {
         dropdown<T> {
             disabled = props.disabled
-            value = props.param.value
-            options = props.param.options
-            onChange = { props.param.updateValue(it) }
+            value = props.params.value
+            options = props.params.options
+            onChange = { props.params.updateValue(it) }
         }
     }
 }
