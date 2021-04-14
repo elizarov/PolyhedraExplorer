@@ -30,7 +30,7 @@ gradlew jsBrowserDevelopmentRun
   * [ ] Better progress bar display
   * [x] Cancellation
 * Export 
-  * [ ] Solid to STL
+  * [x] Solid to STL
   * [x] Geometry to OpenSCAD  
   * [ ] Picture to SVG
 * Polyhedra
@@ -43,7 +43,7 @@ gradlew jsBrowserDevelopmentRun
 * Rendering
   * [ ] Render nicer edges and vertices
   * [ ] Render better-looking (physical) materials 
-  * [ ] Render hollow models with select faces
+  * [x] Render hollow models with select faces
   * [ ] Custom faces coloring: by orbit with reflections, by geometry, by size
   * [ ] Nicer-looking transparent views (only transparent front)
 * Interaction
