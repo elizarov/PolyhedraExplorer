@@ -112,11 +112,11 @@ table {
     width: 100%;
 }
 
-table td:last-child {
+table td.fill {
     width: 100%;
 }
 
-table td:not(:last-child) {
+table td:not(.fill) {
     white-space: nowrap;
 }
 
@@ -124,9 +124,12 @@ td {
     padding-left: 1ch;
 }
 
+table td:last-child {
+    padding-right: 1ch;
+}
+
 td.rt {
     text-align: right;
-    padding-left: 1ch;
 }
 
 tr.info {

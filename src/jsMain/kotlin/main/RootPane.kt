@@ -171,7 +171,7 @@ class RootPane(props: PComponentProps<RootParams>) : RComponent<PComponentProps<
                 dropdown<Transform> {
                     disabled = i > errorIndex
                     value = transform
-                    options = Transforms
+                    options = Transforms.toSet() + transform
                     onChange = { value ->
                         if (value != Transform.None) {
                             props.params.render.poly.transforms.updateValue(props.params.render.poly.transforms.value.updatedAt(i, value))

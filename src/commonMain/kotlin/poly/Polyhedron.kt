@@ -5,7 +5,9 @@
 package polyhedra.common.poly
 
 import kotlinx.serialization.*
+import polyhedra.common.transform.*
 import polyhedra.common.util.*
+import kotlin.jvm.*
 
 @Serializable(with = PolyhedronSerializer::class)
 class Polyhedron(
@@ -125,6 +127,16 @@ class Polyhedron(
     fun faceRim(f: Face) =
         faceRims.getOrPut(f) { FaceRim(f) }
 
+    val canDrop: Set<AnyKind> by lazy {
+        val kinds = mutableSetOf<AnyKind>()
+        kinds += vertexKinds.keys
+        kinds += faceKinds.keys
+        kinds += edgeKinds.keys
+        kinds.filter {
+            DropExpansion(this, it).isValid
+        }.toSet()
+    }
+
     override fun toString(): String =
         "Polyhedron(vs=${vs.size}, es=${es.size}, fs=${fs.size})"
 }
@@ -174,6 +186,13 @@ interface MutableKind<K : Id> {
 
 interface AnyKind
 
+fun String.toAnyKindOrNull(): AnyKind? {
+    toEdgeKindOrNull()?.let { return it }
+    toVertexKindOrNull()?.let { return it }
+    toFaceKindOrNull()?.let { return it }
+    return null
+}
+
 interface FaceKindSource {
     val kind: FaceKind
     val source: AnyKind
@@ -187,10 +206,14 @@ data class MutableFaceKindSource(
 }
 
 @Serializable
-inline class VertexKind(override val id: Int) : Id, AnyKind, Comparable<VertexKind> {
+@JvmInline
+value class VertexKind(override val id: Int) : Id, AnyKind, Comparable<VertexKind> {
     override fun compareTo(other: VertexKind): Int = id.compareTo(other.id)
     override fun toString(): String = idString(id, 'A', 'Z')
 }
+
+fun String.toVertexKindOrNull() =
+    toIdOrNull('A', 'Z')?.let { VertexKind(it) }
 
 interface Vertex : Id, Vec3 {
     val kind: VertexKind
@@ -212,7 +235,8 @@ fun Vertex.toMutableVertex(): MutableVertex =
     MutableVertex(id, this, kind, directedEdges.toMutableList())
 
 @Serializable
-inline class FaceKind(override val id: Int) : Id, AnyKind, Tagged, Comparable<FaceKind> {
+@JvmInline
+value class FaceKind(override val id: Int) : Id, AnyKind, Tagged, Comparable<FaceKind> {
     override fun compareTo(other: FaceKind): Int = id.compareTo(other.id)
     override fun toString(): String = idString(id, 'α', 'ω')
     override val tag: String get() = toString()
@@ -246,6 +270,7 @@ val Face.size: Int get() = fvs.size
 operator fun Face.get(index: Int): Vertex = fvs[index]
 operator fun Face.iterator(): Iterator<Vertex> = fvs.iterator()
 
+@Serializable
 data class EdgeKind(val a: VertexKind, val b: VertexKind, val l: FaceKind, val r: FaceKind) : AnyKind, Comparable<EdgeKind> {
     override fun compareTo(other: EdgeKind): Int {
         if (a != other.a) return a.compareTo(other.a)
@@ -255,6 +280,16 @@ data class EdgeKind(val a: VertexKind, val b: VertexKind, val l: FaceKind, val r
     }
 
     override fun toString(): String = "$a-$l/$r-$b"
+}
+
+fun String.toEdgeKindOrNull(): EdgeKind? {
+    val s = split("-").takeIf { it.size == 3 } ?: return null
+    val a = s[0].toVertexKindOrNull() ?: return null
+    val b = s[2].toVertexKindOrNull() ?: return null
+    val t = s[1].split("/").takeIf { it.size == 2 } ?: return null
+    val l = t[0].toFaceKindOrNull() ?: return null
+    val r = t[1].toFaceKindOrNull() ?: return null
+    return EdgeKind(a, b, l, r)
 }
 
 fun EdgeKind.reversed(): EdgeKind = EdgeKind(b, a, r, l)

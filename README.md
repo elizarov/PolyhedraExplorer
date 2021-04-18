@@ -67,8 +67,7 @@ gradlew jsBrowserDevelopmentRun
   * [ ] Truncate specific vertices
   * [ ] Cantellate specific edges
   * [ ] Augment specific faces
-  * [ ] Drop selected vertices
-  * [ ] Drop selected edges
+  * [x] Drop selected vertices/faces/edges
 * Infrastructure    
   * [ ] Embed CSS into WebPack
   * [ ] `jsBrowserProductionRun` shall work

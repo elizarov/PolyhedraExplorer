@@ -59,7 +59,7 @@ private fun seed(tag: String, type: SeedType, poly: Polyhedron) =
     seed(tag, type, poly.fev()) { poly }
 
 private fun seed(tag: String, type: SeedType, transform: Transform, base: Seed, wikiName: String? = null) =
-    seed(tag, type, transform.fev * base.fev, wikiName) {
+    seed(tag, type, transform.fev!! * base.fev, wikiName) {
         base.poly.transformed(transform)
     }
 

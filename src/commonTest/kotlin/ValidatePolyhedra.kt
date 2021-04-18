@@ -133,6 +133,32 @@ class ValidatePolyhedra {
         }
         println("Total iterations $totalIterations")
     }
+
+    @Test
+    fun testCannotDropRegularVerticesAndFaces() {
+        testParameter("seed", Seeds.filter { it.type in listOf(SeedType.Platonic, SeedType.Arhimedean) }) { seed ->
+            val poly = seed.poly
+            val dropSet = poly.canDrop.filter { it is VertexKind || it is FaceKind }
+            assertTrue(dropSet.isEmpty(), "Non empty: $dropSet")
+        }
+    }
+
+    @Test
+    fun testDropComplex() {
+        testParameter("seed", Seeds.filter { it.type == SeedType.Platonic}) { seed ->
+            testParameter("transform1", expandingTransforms) { transform1 ->
+                testParameter("transform2", expandingTransforms) { transform2 ->
+                    val poly = seed.poly.transformed(transform1, transform2)
+                    if (poly.canDrop.isNotEmpty()) {
+                        testParameter("drop", poly.canDrop) { kind ->
+                            println("Checking drop($kind) $transform2 $transform1 $seed")
+                            poly.drop(kind).validateKinds()
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 private fun isOkSequence(vararg transforms: Transform): Boolean {

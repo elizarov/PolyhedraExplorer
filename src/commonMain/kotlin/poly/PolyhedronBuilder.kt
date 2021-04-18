@@ -127,7 +127,8 @@ class PolyhedronBuilder(
             vks to fks
         }
         val (vkg, fkg) = gk.filterIndistinguishableKinds()
-        if (vkg.isEmpty() && fkg.isEmpty()) return poly
+        // Return early when nothing to merge & they are all numbered contiguously
+        if (vkg.isEmpty() && fkg.isEmpty() && poly.contiguousVertexKinds() && poly.contiguousFaceKinds()) return poly
         if (DEBUG_MERGE_KINDS) {
             println("--- mergeIndistinguishableKinds")
             ge.forEachIndexed { i, g -> println("Edge group #$i: $g") }
@@ -152,6 +153,12 @@ class PolyhedronBuilder(
         mergeIndistinguishableKinds = true
     }
 }
+
+fun Polyhedron.contiguousVertexKinds(): Boolean =
+    vertexKinds.keys.maxOrNull() == VertexKind(vertexKinds.size - 1)
+
+fun Polyhedron.contiguousFaceKinds(): Boolean =
+    faceKinds.keys.maxOrNull() == FaceKind(faceKinds.size - 1)
 
 fun polyhedron(mergeIndistinguishableKinds: Boolean = false, block: PolyhedronBuilder.() -> Unit): Polyhedron =
     PolyhedronBuilder(mergeIndistinguishableKinds).run {
@@ -220,7 +227,6 @@ private fun <K, T : MutableKind<K>> List<T>.renumberKinds(
     gs: Collection<Collection<K>>,
     factory: (Int) -> K
 ) where K : Id, K : Comparable<K> {
-    if (gs.isEmpty()) return
     val map = ArrayIdMap<K, K>()
     for (g in gs) {
         val k0 = g.minOrNull()!!

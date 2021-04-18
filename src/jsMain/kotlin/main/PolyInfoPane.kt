@@ -7,6 +7,7 @@ package polyhedra.js.main
 import kotlinx.html.*
 import kotlinx.html.js.*
 import polyhedra.common.poly.*
+import polyhedra.common.transform.*
 import polyhedra.common.util.*
 import polyhedra.js.components.*
 import polyhedra.js.params.*
@@ -51,8 +52,8 @@ class PolyInfoPane(props: PComponentProps<RenderParams>) : RComponent<PComponent
             td { +name }
             td { +cnt.toString() }
             td { +distValue.fmtFix }
-            td {
-                attrs { colSpan = "5" }
+            td("fill") {
+                attrs { colSpan = "6" }
                 +distName
             }
         }
@@ -124,10 +125,11 @@ class PolyInfoPane(props: PComponentProps<RenderParams>) : RComponent<PComponent
                         }
                         td("rt") { +"adj" }
                         td { +fe.vfs.size.toString() }
-                        td {
+                        td("fill") {
                             attrs { colSpan = "2" }
                             +fe.vfs.joinToString(" ", "[", "]")
                         }
+                        td { drop(poly, fk) }
                     }
                 }
                 // Vertices
@@ -151,10 +153,11 @@ class PolyInfoPane(props: PComponentProps<RenderParams>) : RComponent<PComponent
                         }
                         td("rt") { +"adj" }
                         td { +ve.vfs.size.toString() }
-                        td {
+                        td("fill") {
                             attrs { colSpan = "2" }
                             +ve.vfs.joinToString(" ", "[", "]")
                         }
+                        td { drop(poly, vk) }
                     }
                 }
                 // Edges
@@ -172,8 +175,20 @@ class PolyInfoPane(props: PComponentProps<RenderParams>) : RComponent<PComponent
                         td {}
                         td {}
                         td { +"len ${ee.len.fmtFix}" }
-                        td { +"⦦ ${ee.dihedralAngle.toDegrees().fmtFix(2)}°"}
+                        td("fill") { +"⦦ ${ee.dihedralAngle.toDegrees().fmtFix(2)}°"}
+                        td { drop(poly, ek) }
                     }
+                }
+            }
+        }
+    }
+
+    private fun RBuilder.drop(poly: Polyhedron, kind: AnyKind) {
+        if (kind !in poly.canDrop) return
+        i("fa fa-remove") {
+            attrs {
+                onClickFunction = {
+                    props.params.poly.transforms.updateValue(props.params.poly.transforms.value + Drop(kind))
                 }
             }
         }

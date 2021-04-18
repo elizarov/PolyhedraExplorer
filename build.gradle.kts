@@ -1,16 +1,17 @@
 plugins {
-    kotlin("multiplatform") version "1.4.31"
-    kotlin("plugin.serialization") version "1.4.31"
+    kotlin("multiplatform") version "1.5.0-680"
+    kotlin("plugin.serialization") version "1.5.0-680"
     application
 }
 
-group = "me.jetbrains"
+group = "me.polyhedron"
 version = "1.0-SNAPSHOT"
 
 repositories {
-    jcenter()
     mavenCentral()
-    maven { url = uri("https://dl.bintray.com/kotlin/kotlin-js-wrappers") }
+    maven { url = uri("https://maven.pkg.jetbrains.space/kotlin/p/kotlin/kotlin-js-wrappers") }
+    maven { url = uri("https://maven.pkg.jetbrains.space/public/p/kotlinx-html/maven") }
+    maven { url = uri("https://maven.pkg.jetbrains.space/kotlin/p/kotlin/dev/") }
 }
 
 val `kotlin-serialization-version`: String by project

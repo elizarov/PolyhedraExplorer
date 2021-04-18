@@ -45,7 +45,7 @@ suspend fun Polyhedron.canonical(progress: OperationProgressContext?): Polyhedro
     var iterations = 0
     var initialError = 0.0
     var prevDone = 0
-    var lastTime = 0
+    var lastTime = 0L
     while(true) {
         var maxError = 0.0
         // check all edges
@@ -117,12 +117,12 @@ suspend fun Polyhedron.canonical(progress: OperationProgressContext?): Polyhedro
             continue
         }
         // cancellation/log point (checked every 100 ms)
-        val curTime = (startTime.elapsedNow().inMilliseconds / 100).roundToInt()
+        val curTime = startTime.elapsedNow().inWholeMilliseconds / 100
         if (curTime <= lastTime) continue
         lastTime = curTime
         val done = (100 * log10(initialError / maxError) / log10(initialError / TARGET_TOLERANCE)).toInt()
         // log every second
-        if (curTime % 10 == 0) {
+        if (curTime % 10 == 0L) {
             println("Canonical: at $iterations iterations, log error = ${log10(maxError).fmt}, done = $done%")
         }
         // report progress when it changes
@@ -132,7 +132,7 @@ suspend fun Polyhedron.canonical(progress: OperationProgressContext?): Polyhedro
         }
         yield()
     }
-    println("Canonical: done $iterations iterations in ${startTime.elapsedNow().inSeconds.fmtFix(3)} sec")
+    println("Canonical: done $iterations iterations in ${startTime.elapsedNow().toDouble(DurationUnit.SECONDS).fmtFix(3)} sec")
     totalIterations += iterations
     // rebuild polyhedron with new vertices and old faces
     return polyhedron(mergeIndistinguishableKinds = true) {

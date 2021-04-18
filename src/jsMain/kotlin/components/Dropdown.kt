@@ -12,7 +12,7 @@ import react.dom.*
 external interface DropdownProps<T> : RProps {
     var disabled: Boolean
     var value: T
-    var options: List<T>
+    var options: Collection<T>
     var onChange: (T) -> Unit
 }
 

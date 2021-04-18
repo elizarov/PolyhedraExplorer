@@ -98,7 +98,7 @@ abstract class Param(val tag: String) {
 
     // ----------- Nested classes and interfaces -----------
 
-    inline class UpdateType(private val mask: Int) {
+    value class UpdateType(private val mask: Int) {
         fun intersect(other: UpdateType) = UpdateType(mask and other.mask)
         operator fun plus(other: UpdateType) = UpdateType(mask or other.mask)
         operator fun minus(other: UpdateType) = UpdateType(mask and other.mask.inv())
@@ -371,12 +371,11 @@ class EnumParam<T : Tagged>(
 class EnumListParam<T : Tagged>(
     tag: String,
     value: List<T>,
-    val options: List<T>
+    val options: List<T>,
+    val parseOption: (String) -> T? = { element -> options.find { it.tag == element } }
 ) : ImmutableValueParam<List<T>>(tag, value) {
     override fun valueToString(): String = value.joinToString(",") { it.tag }
-    override fun parseValue(value: String): List<T> = value.split(",").mapNotNull { element ->
-        options.find { it.tag == element }
-    }
+    override fun parseValue(value: String): List<T> = value.split(",").mapNotNull(parseOption)
 }
 
 class SetParam<T : Tagged>(

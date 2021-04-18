@@ -31,7 +31,7 @@ private val defaultScale = Scale.Circumradius
 
 class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param.Composite(tag) {
     val seed = using(EnumParam("s", defaultSeed, Seeds))
-    val transforms = using(EnumListParam("t", emptyList(), Transforms))
+    val transforms = using(EnumListParam("t", emptyList(), Transforms, String::toTransformOrNull))
     val baseScale = using(EnumParam("bs", defaultScale, Scales))
     val hideFaces = using(SetParam("hf", emptySet()) { it.toFaceKindOrNull() })
     val selectedFace = using(TransientParam<FaceKind?>(null))
@@ -174,8 +174,8 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
                     break
                 }
                 // compute FEV before doing an actual transform
-                val fev = transform.fev * curPoly.fev()
-                if (fev.e > MAX_DISPLAY_EDGES) {
+                val fev = transform.fev?.let { it * curPoly.fev() }
+                if (fev != null && fev.e > MAX_DISPLAY_EDGES) {
                     transformError = TransformError(curIndex, TooLarge(fev))
                     break@loop
                 }
