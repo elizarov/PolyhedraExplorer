@@ -65,6 +65,7 @@ class Polyhedron(
     val vertexKinds: IdMap<VertexKind, Vertex> by lazy { vs.associateById({ it.kind }, { it }) }
     val faceKinds: IdMap<FaceKind, Face> by lazy { fs.associateById({ it.kind }, { it }) }
     val edgeKinds: Map<EdgeKind, Edge> by lazy { es.associateBy({ it.kind }, { it }) }
+    val directedEdgeKinds: Map<EdgeKind, Edge> by lazy { directedEdges.associateBy({ it.kind }, { it }) }
 
     val vertexKindCount: IdMap<VertexKind, Int> by lazy { vs.groupingBy { it.kind }.eachCountTo(ArrayIdMap()) }
     val faceKindCount: IdMap<FaceKind, Int> by lazy { fs.groupingBy { it.kind }.eachCountTo(ArrayIdMap()) }

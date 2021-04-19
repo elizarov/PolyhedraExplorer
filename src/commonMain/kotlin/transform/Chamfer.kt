@@ -97,9 +97,9 @@ fun Polyhedron.chamferingRatio(edgeKind: EdgeKind? = null): Double =
 
 fun ChamferGeometry.chamferingRatio(edgeKind: EdgeKind? = null, limit: ChamferLimit = defaultChamferLimit): Double {
     // min for all edge kinds by default
-    if (edgeKind == null) return poly.edgeKinds.keys.minOf { chamferingRatio(it) }
+    if (edgeKind == null) return poly.directedEdgeKinds.keys.minOf { chamferingRatio(it) }
     // computing for a specific edge
-    val e = poly.edgeKinds[edgeKind]!! // representative edge
+    val e = poly.directedEdgeKinds[edgeKind]!! // representative edge
     return when (limit) {
         ChamferLimit.EdgeRegular -> {
             val f = e.r // looking at right face
