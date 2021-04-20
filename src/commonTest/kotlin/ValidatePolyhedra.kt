@@ -145,7 +145,7 @@ class ValidatePolyhedra {
 
     @Test
     fun testDropComplex() {
-        testParameter("seed", Seeds.filter { it.type == SeedType.Platonic}) { seed ->
+        testParameter("seed", Seeds.filter { it.type == SeedType.Platonic }) { seed ->
             testParameter("transform1", expandingTransforms) { transform1 ->
                 testParameter("transform2", expandingTransforms) { transform2 ->
                     val poly = seed.poly.transformed(transform1, transform2)

@@ -21,6 +21,8 @@ class DropExpansion(poly: Polyhedron, kind: AnyKind) {
     init {
         val dropVks = HashSet<VertexKind>()
         val dropEks = HashSet<EdgeKind>()
+        val checkVks = HashSet<VertexKind>()
+        val checkFks = HashSet<FaceKind>()
         val mergeFks = HashSet<FaceKind>()
         var changes: Boolean
 
@@ -28,14 +30,24 @@ class DropExpansion(poly: Polyhedron, kind: AnyKind) {
             if (!dropEks.add(ek)) return
             changes = true
             dropEks.add(ek.reversed())
-            mergeFks.add(ek.l)
-            mergeFks.add(ek.r)
+            checkVks += ek.a
+            checkVks += ek.b
+            checkFks += ek.l
+            checkFks += ek.r
+            mergeFks += ek.l
+            mergeFks += ek.r
         }
 
-        fun drop(vk: VertexKind) {
+        fun drop(vk: VertexKind, dropEdges: Boolean) {
             if (!dropVks.add(vk)) return
             changes = true
-            poly.vertexKinds[vk]!!.directedEdges.forEach { drop(it.kind) }
+            poly.vertexKinds[vk]!!.directedEdges.forEach {
+                if (dropEdges) {
+                    drop(it.kind)
+                } else {
+                    checkFks += it.r.kind
+                }
+            }
         }
 
         fun drop(fk: FaceKind) {
@@ -44,11 +56,23 @@ class DropExpansion(poly: Polyhedron, kind: AnyKind) {
 
         fun check(vk: VertexKind) {
             val cnt = poly.vertexKinds[vk]!!.directedEdges.count { it.kind !in dropEks }
-            if (cnt < 3) drop(vk)
+            if (cnt >= 3) return // good vertex
+            drop(vk, dropEdges = cnt < 2)
+        }
+
+        fun check(fk: FaceKind) {
+            if (fk in mergeFks) return // don't care, will be merged into a single face
+            val cnt = poly.faceKinds[fk]!!.fvs.count { v -> v.kind !in dropVks }
+            if (cnt >= 3) return // good face
+            poly.faceKinds[fk]!!.directedEdges.forEach { e ->
+                if (e.l.kind in mergeFks) {
+                    drop(e.kind)
+                }
+            }
         }
 
         when (kind) {
-            is VertexKind -> drop(kind)
+            is VertexKind -> drop(kind, dropEdges = true)
             is FaceKind -> drop(kind)
             is EdgeKind -> drop(kind)
             else -> error("Unexpected kind: $kind")
@@ -56,9 +80,8 @@ class DropExpansion(poly: Polyhedron, kind: AnyKind) {
 
         do {
             changes = false
-            for (ek in dropEks.toList()) {
-                check(ek.a) // reverse edge is there, will check ek.b
-            }
+            for (vk in checkVks.toList()) check(vk)
+            for (fk in checkFks.toList()) check(fk)
         } while (changes)
 
         this.dropVks = dropVks
@@ -108,12 +131,16 @@ fun Polyhedron.drop(kind: AnyKind) = transformedPolyhedron(Drop, kind) {
         val processed = HashSet<Face>()
         for (f in fs) {
             if (!processed.add(f)) continue
-            val start = f.directedEdges.firstOrNull() { it.kind !in dropEks } ?: continue
+            val start = f.directedEdges.firstOrNull() { it.kind !in dropEks && it.kind.a !in dropVks } ?: continue
             val fvs = ArrayList<Vertex>()
             var fk = f.kind
             var cur = start
             do {
                 fvs.add(vv[cur.a]!!)
+                while (cur.b.kind in dropVks) {
+                    val curReversed = cur.reversed
+                    cur = cur.b.directedEdges.single { e -> e != curReversed && e.kind !in dropEks }
+                }
                 val v = cur.b
                 val n = v.directedEdges.size
                 val i0 = v.directedEdges.indexOf(cur.reversed)
