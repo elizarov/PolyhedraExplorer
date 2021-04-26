@@ -9,6 +9,7 @@ import org.w3c.dom.*
 import org.w3c.dom.events.*
 import polyhedra.common.poly.*
 import polyhedra.common.util.*
+import polyhedra.js.main.*
 import polyhedra.js.params.*
 import polyhedra.js.util.*
 import react.*
@@ -20,6 +21,7 @@ external interface PolyCanvasProps : RProps {
     var poly: Polyhedron
     var params: RenderParams
     var faceContextSink: (FaceContext) -> Unit
+    var resetPopup: () -> Unit
 }
 
 fun RBuilder.polyCanvas(classes: String? = null, handler: PolyCanvasProps.() -> Unit) {
@@ -99,6 +101,7 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
     }
 
     private fun handleMouseDown(e: MouseEvent) {
+        props.resetPopup()
         if (e.isLeftButtonPressed()) {
             savePrevMouseEvent(e)
             props.params.animationParams?.animatedRotation?.updateValue(false)

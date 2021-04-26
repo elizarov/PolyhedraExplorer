@@ -41,6 +41,7 @@ class RootPane2(props: PComponentProps<RootParams>) : RComponent<PComponentProps
             params = props.params.render
             poly = ctx.poly
             faceContextSink = { setState { faces = it } }
+            resetPopup = ::resetPopup
         }
         controlPane {
             params = props.params.render.poly
@@ -76,8 +77,14 @@ class RootPane2(props: PComponentProps<RootParams>) : RComponent<PComponentProps
     }
 
     private fun togglePopup(popup: Popup?) {
-        setState {
-            this.popup = if (this.popup == popup) null else popup
-        }
+        setPopup(if(state.popup == popup) null else popup)
+    }
+
+    private fun resetPopup() {
+        setPopup(null)
+    }
+
+    private fun setPopup(popup: Popup?) {
+        if (state.popup != popup) setState { this.popup = popup }
     }
 }
