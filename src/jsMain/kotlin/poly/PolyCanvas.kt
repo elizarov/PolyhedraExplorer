@@ -9,6 +9,7 @@ import org.w3c.dom.*
 import org.w3c.dom.events.*
 import polyhedra.common.poly.*
 import polyhedra.common.util.*
+import polyhedra.js.main.*
 import polyhedra.js.params.*
 import polyhedra.js.util.*
 import react.*
@@ -20,6 +21,7 @@ external interface PolyCanvasProps : RProps {
     var poly: Polyhedron
     var params: RenderParams
     var faceContextSink: (FaceContext) -> Unit
+    var resetPopup: () -> Unit
 }
 
 fun RBuilder.polyCanvas(classes: String? = null, handler: PolyCanvasProps.() -> Unit) {
@@ -31,6 +33,8 @@ fun RBuilder.polyCanvas(classes: String? = null, handler: PolyCanvasProps.() -> 
     }
 }
 
+private const val MIN_MOUSE_MOVE_DISTANCE = 3.0
+
 @Suppress("NON_EXPORTABLE_TYPE")
 @JsExport
 class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RState>(props) {
@@ -39,22 +43,21 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
     private lateinit var drawContext: DrawContext
     private var prevX = 0.0
     private var prevY = 0.0
+    private var isRotating = false
 
     private val canvasRef = createRef<HTMLCanvasElement>()
     private var drawCount = 0
     private var fpsTimeout = 0
 
     override fun RBuilder.render() {
-        div("fps-container") {
-            canvas(props.classes) {
-                attrs {
-                    ref = canvasRef
-                }
+        canvas(props.classes) {
+            attrs {
+                ref = canvasRef
             }
-            div("fps") {
-                attrs {
-                    ref = fpsRef
-                }
+        }
+        div("fps") {
+            attrs {
+                ref = fpsRef
             }
         }
     }
@@ -62,6 +65,7 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
     override fun componentDidMount() {
         canvas = canvasRef.current
         canvas.onmousedown = this::handleMouseDown
+        canvas.onmouseup = this::handleMouseUp
         canvas.onmousemove = this::handleMouseMove
         canvas.onwheel = this::handleWheel
         drawContext = DrawContext(canvas, props.params, ::draw)
@@ -100,15 +104,33 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
         prevY = e.offsetY
     }
 
+    private fun distanceFromPrevMouseEvent(e: MouseEvent) =
+        norm(prevX - e.offsetX, prevY - e.offsetY)
+
     private fun handleMouseDown(e: MouseEvent) {
-        if (e.isLeftButtonPressed()) {
-            savePrevMouseEvent(e)
-            props.params.animationParams?.animatedRotation?.updateValue(false)
+        if (!e.isLeftButtonEvent()) return
+        savePrevMouseEvent(e)
+        isRotating = false
+    }
+
+    private fun handleMouseUp(e: MouseEvent) {
+        if (!e.isLeftButtonEvent()) return
+        if (!isRotating) {
+            props.resetPopup()
+        } else {
+            isRotating = false
         }
     }
 
     private fun handleMouseMove(e: MouseEvent) {
         if (!e.isLeftButtonPressed()) return
+        if (!isRotating && distanceFromPrevMouseEvent(e) < MIN_MOUSE_MOVE_DISTANCE) return
+        if (!isRotating) {
+            isRotating = true
+            props.params.animationParams?.animatedRotation?.updateValue(false)
+            savePrevMouseEvent(e)
+            return
+        }
         val h = canvas.clientHeight
         val w = canvas.clientWidth
         // prev pos

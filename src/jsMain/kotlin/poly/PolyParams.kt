@@ -57,6 +57,10 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
     val targetPoly: Polyhedron
         get() = transformAnimation?.targetPoly ?: poly
 
+    // poly after each transform
+    val transformedPolys: List<Polyhedron>
+        get() = prevPolys
+
     // previous state stored to compute animated transformations
     private var prevSeed: Seed = defaultSeed
     private var prevTransforms: List<Transform> = emptyList()
@@ -441,7 +445,7 @@ class ViewAnimationParams(tag: String) : Param.Composite(tag), ValueAnimationPar
     val animationDuration = using(DoubleParam("d", 0.5, 0.0, 2.0, 0.1))
 
     override val animatedRotation: BooleanParam = using(BooleanParam("r", true))
-    val rotationSpeed = using(DoubleParam("rs", 1.0, 0.0, 2.0, 0.01))
+    val rotationSpeed = using(DoubleParam("rs", 0.5, 0.0, 2.0, 0.01))
     val rotationAngle = using(DoubleParam("ra", 60.0, 0.0, 360.0, 1.0))
 
     override val animateValueUpdatesDuration: Double?

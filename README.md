@@ -62,7 +62,7 @@ gradlew jsBrowserDevelopmentRun
   * [ ] Rectification solution for non-regular polyhedra  
   * [ ] Stellation
   * [x] Chamfering
-  * [ ] Redesign chamfering artefacts on non-canonical polyhedra 
+  * [x] Redesign chamfering artefacts on non-canonical polyhedra 
 * Custom transformations
   * [ ] Truncate specific vertices
   * [ ] Cantellate specific edges
@@ -72,9 +72,9 @@ gradlew jsBrowserDevelopmentRun
   * [ ] Embed CSS into WebPack
   * [ ] `jsBrowserProductionRun` shall work
 * Overall style / layout
-  * [ ] Move inessential params to popup
-  * [ ] Flip left-right through seeds and transforms
-  * [ ] Design and implement a full-screen UI
+  * [x] Move inessential params to popup
+  * [x] Design and implement a full-screen UI
+  * [x] Flip left-right through seeds and transforms
 * Backend
   * [ ] Render polyhedra picture by params
         

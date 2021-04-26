@@ -8,7 +8,7 @@
     box-sizing: border-box;
 }
 
-body, p, table, tbody, tr, td, label {
+html, body, p, table, tbody, tr, td, label {
     padding: 0;
     margin: 0;
 }
@@ -19,57 +19,244 @@ input, button, select {
 
 /* --------- root style & layout --------- */
 
+:root {
+    --shadow: 0 3px 5px -1px rgba(0, 0, 0, .2), 0 6px 10px 0 rgba(0, 0, 0, .14), 0 1px 18px 0 rgba(0, 0, 0, .12);
+    --border: 1px solid black;
+    --background-color: hsl(0, 0%, 95%);
+    --text-color: hsl(0, 0%, 5%);
+    --tooltip-background-color: hsl(0, 0%, 75%);
+    --popup-background-color: hsla(0, 0%, 95%, .8);
+    --button-background-color: #1976d2;
+    --button-active-color: #8daecd;
+    --button-color: #ffffff;
+    --hover-color: #8cefd0;
+    --disabled-color: hsl(0, 0%, 80%);
+    --row-height: 1.5em;
+}
+
 body {
-    background-color: hsl(0, 0%, 95%);
-    color: hsl(0, 0%, 5%);
+    background-color: var(--background-color);
+    color: var(--text-color);
     font-family: 'Roboto', sans-serif;
     font-weight: 300;
+    font-size: 22px;
+    height: 100vh;
 }
 
-.card {
-    border: 1px solid hsl(0, 0%, 5%);
-    margin-top: 10px;
-    margin-left: 10px;
+#root, canvas.poly {
+    width: 100%;
+    height: 100%;
 }
 
-.main-layout {
+div.ctrl-pane {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: calc(100% - 4em);
+    height: 100%;
     display: flex;
     flex-flow: row wrap;
+    align-content: flex-start;
+    pointer-events: none;
 }
 
-.control-column {
-    width: calc(350px);
+div.ctrl-pane > div.btn {
+    margin-left: 1em;
+    margin-top: 1em;
 }
 
-.canvas-column {
-    width: calc(100vw - 395px);
+/* --------- Floating Buttons --------- */
+
+div.btn {
+    position: relative;
+    height: 2em;
+    color: var(--button-color);
+    background-color: var(--button-background-color);
+    box-shadow: var(--shadow);
+    border-radius: 1em;
+    pointer-events: auto;
+    display: flex;
+    flex-flow: nowrap row;
 }
 
-canvas.poly {
+div.btn.left {
+    border-radius: 1em 0 0 1em;
+}
+
+div.btn.mid {
+    border-radius: 0;
+}
+
+div.btn.right {
+    border-radius: 0 1em 1em 0;
+}
+
+div.btn.active {
+    background-color: var(--button-active-color);
+}
+
+div.btn > button {
+    height: 2em;
+    font-size: 1em;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    color: inherit;
+    background-color: transparent;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+div.btn > button:hover:not(:disabled) {
+   color: var(--hover-color);
+}
+
+div.btn > button:disabled {
+    color: var(--disabled-color);
+}
+
+div.btn > button.square {
+    width: 2em;
+}
+
+div.btn > button.txt {
+    padding-left: 0.6em;
+    padding-right: 0.6em;
+}
+
+div.btn > button.msg {
+    padding-right: 0.6em;
+}
+
+div.btn > div.sep {
+    width: 1px;
+    height: 2em;
+    background-color: var(--button-color);
+}
+
+div.btn.config {
+    position: absolute;
+    top: 1em;
+    right: 1em;
+}
+
+div.btn.export {
+    position: absolute;
+    top: 4em;
+    right: 1em;
+}
+
+div.btn.reset {
+    position: absolute;
+    left: 1em;
+    bottom: 1em;
+}
+
+div.fev {
+    position: absolute;
+    left: 50%;
+    bottom: 1em;
+    display: flex;
+    flex-flow: nowrap row;
+}
+
+div.fev > div {
+    position: relative;
+    left: -50%;
+}
+
+/* --------- Export/Config Drawers --------- */
+
+aside.drawer {
+    display: block;
+    position: absolute;
+    right: 0.5em;
+    width: calc(min(17em, 100vw - 1em));
+    background-color: var(--popup-background-color);
+    border: var(--border);
+    border-radius: calc(0.5 * var(--row-height));
+    box-shadow: var(--shadow);
+    overflow-y: auto;
+    z-index: 1;
+}
+
+aside.drawer.config {
+    top: 3.5em;
+    height: calc(100vh - 4em);
+}
+
+aside.drawer.export {
+    top: 6.5em;
+    height: calc(100vh - 7em);
+}
+
+/* --------- Transform/Seed Dropdowns --------- */
+
+aside.dropdown {
+    display: block;
+    position: absolute;
+    top: 2.5em;
+    left: -0.5em;
+    background-color: var(--popup-background-color);
+    color: var(--text-color);
+    border: var(--border);
+    border-radius: calc(0.5 * var(--row-height));
+    box-shadow: var(--shadow);
+    overflow-y: scroll;
+    max-height: calc(min(20.25em, 100vh - 5em));
+    z-index: 1;
+}
+
+aside.dropdown div.item:hover {
+    background-color: var(--hover-color);
+}
+
+/* --------- FEV popup --------- */
+
+aside.fev {
+    display: block;
+    position: absolute;
+    bottom: 3.5em;
+    left: 0.5em;
+    width: calc(100vw - 1em);
+    background-color: var(--popup-background-color);
+    border: var(--border);
+    border-radius: calc(0.5 * var(--row-height));
+    box-shadow: var(--shadow);
+    max-height: 50vh;
+    overflow-y: auto;
+    z-index: 1;
+}
+
+/* --------- headers / items --------- */
+
+div.text-row {
+    display: table;
     width: 100%;
-    height: 50vw;
 }
 
-/* --------- headers --------- */
+div.text-row > div {
+    display: table-cell;
+}
 
 .header {
     padding-left: 1ch;
     background-color: hsl(0, 0%, 85%);
     font-weight: 500;
-    height: 1.8em;
+    height: var(--row-height);
     vertical-align: middle;
+    white-space: nowrap;
 }
 
-div.header-container {
-    display: table;
-    width: 100%;
+.item {
+    padding-left: 1ch;
+    padding-right: 1ch;
+    height: var(--row-height);
+    vertical-align: middle;
+    white-space: nowrap;
 }
 
-div.header {
-    display: table-cell;
-}
-
-/* --------- controls --------- */
+/* --------- controls--------- */
 
 div.row {
     padding-left: 1ch;
@@ -90,13 +277,13 @@ div.control {
 }
 
 tr.control {
-    height: 1.8em;
+    height: var(--row-height);
     border-top: 0.3em solid transparent;
     border-bottom: 0.3em solid transparent;
 }
 
-input, button, select {
-    margin-right: 1ch;
+tr.control > td > input, tr.control > td > button, tr.control > td > select {
+    margin-right: 1ch
 }
 
 .download {
@@ -142,7 +329,7 @@ svg.figure {
 }
 
 tr.info:hover {
-    background: hsl(70, 90%, 50%);
+    background: var(--hover-color);
 }
 
 .face-attn {
@@ -150,10 +337,6 @@ tr.info:hover {
 }
 
 /* --------- canvas fps --------- */
-
-.fps-container {
-    position: relative;
-}
 
 .fps {
     position: absolute;
@@ -164,19 +347,25 @@ tr.info:hover {
 
 /* --------- tooltip --------- */
 
-.tooltip-text {
-    visibility: hidden;
-    position: absolute;
-    z-index: 1;
-    padding: 0.2em;
-    margin-left: -10ch;
-    margin-top: -1.6em;
-    background-color: hsl(0, 0%, 75%);
-    border: 1px solid black;
-    border-radius: 6px;
+.msg {
+    position: relative;
 }
 
-*:hover > .tooltip-text {
+aside.tooltip-text {
+    visibility: hidden;
+    position: absolute;
+    top: 1.5em;
+    left: -0.5em;
+    color: var(--text-color);
+    background-color: var(--tooltip-background-color);
+    padding: 0.2em;
+    border: 1px solid black;
+    border-radius: 6px;
+    white-space: nowrap;
+    z-index: 2;
+}
+
+*:hover:not(.active) > aside.tooltip-text {
     visibility: visible;
 }
 
@@ -191,10 +380,10 @@ span.emoji {
 
 .spinner {
     position: relative;
+    left: -0.4em;
+    padding-right: 1.5em;
     opacity: 1;
     transition: opacity linear 0.1s;
-    margin-left: 1em;
-    margin-right: 1em;
 }
 
 .spinner::before {
