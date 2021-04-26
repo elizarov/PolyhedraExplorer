@@ -20,18 +20,24 @@ input, button, select {
 /* --------- root style & layout --------- */
 
 :root {
-    --grid: 28px;
+    --grid: 22px;
     --shadow: 0 3px 5px -1px rgba(0, 0, 0, .2), 0 6px 10px 0 rgba(0, 0, 0, .14), 0 1px 18px 0 rgba(0, 0, 0, .12);
-    --background: hsl(0, 0%, 95%);
-    --popup-background: hsla(0, 0%, 95%, .8);
-    --header-height: 1.8em;
+    --border: 1px solid black;
+    --background-color: hsl(0, 0%, 95%);
+    --text-color: hsl(0, 0%, 5%);
+    --popup-background-color: hsla(0, 0%, 95%, .8);
+    --button-background-color: #1976d2;
+    --button-color: #ffffff;
+    --hover-color: #8cefd0;
+    --row-height: calc(1.5 * var(--grid));
 }
 
 body {
-    background-color: var(--background);
-    color: hsl(0, 0%, 5%);
+    background-color: var(--background-color);
+    color: var(--text-color);
     font-family: 'Roboto', sans-serif;
     font-weight: 300;
+    font-size: var(--grid);
     height: 100vh;
 }
 
@@ -52,7 +58,7 @@ div.ctrl-pane {
     pointer-events: none;
 }
 
-div.ctrl-pane div {
+div.ctrl-pane div.btn {
     margin-left: var(--grid);
     margin-top: var(--grid);
 }
@@ -60,10 +66,10 @@ div.ctrl-pane div {
 /* --------- Floating Buttons --------- */
 
 div.btn {
+    position: relative;
     height: calc(2 * var(--grid));
-    font-size: var(--grid);
-    color: #ffffff;
-    background-color: #1976d2;
+    color: var(--button-color);
+    background-color: var(--button-background-color);
     box-shadow: var(--shadow);
     border-radius: var(--grid);
     pointer-events: auto;
@@ -73,6 +79,7 @@ div.btn {
 
 div.btn button {
     height: calc(2 * var(--grid));
+    font-size: var(--grid);
     padding: 0;
     margin: 0;
     border: 0;
@@ -83,7 +90,7 @@ div.btn button {
 }
 
 div.btn button:hover {
-   color: #8cefd0
+   color: var(--hover-color);
 }
 
 div.btn button.square {
@@ -113,12 +120,13 @@ aside.popup {
     display: block;
     position: absolute;
     right: calc(0.5 * var(--grid));
-    width: calc(min(12 * var(--grid), 100vw - var(--grid)));
-    background-color: var(--popup-background);
-    border: 1px solid black;
-    border-radius: calc(0.5 * var(--header-height));
-    overflow-y: auto;
+    width: calc(min(17 * var(--grid), 100vw - var(--grid)));
+    background-color: var(--popup-background-color);
+    border: var(--border);
+    border-radius: calc(0.5 * var(--row-height));
     box-shadow: var(--shadow);
+    overflow-y: auto;
+    z-index: 2;
 }
 
 aside.popup.config {
@@ -131,8 +139,55 @@ aside.popup.export {
     height: calc(100vh - 7 * var(--grid));
 }
 
-/* --------- LEGACY --------- */
+/* --------- Dropdowns --------- */
 
+aside.dropdown {
+    display: block;
+    position: absolute;
+    top: calc(2.5 * var(--grid));
+    left: calc(-0.5 * var(--grid));
+    background-color: var(--popup-background-color);
+    color: var(--text-color);
+    border: var(--border);
+    border-radius: calc(0.5 * var(--row-height));
+    box-shadow: var(--shadow);
+    overflow-y: auto;
+    z-index: 3;
+}
+
+aside.dropdown div.item:hover {
+    background-color: var(--hover-color);
+}
+
+/* --------- headers / items --------- */
+
+div.text-row {
+    display: table;
+    width: 100%;
+}
+
+div.text-row > div {
+    display: table-cell;
+}
+
+.header {
+    padding-left: 1ch;
+    background-color: hsl(0, 0%, 85%);
+    font-weight: 500;
+    height: var(--row-height);
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.item {
+    padding-left: 1ch;
+    padding-right: 1ch;
+    height: var(--row-height);
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+/* --------- LEGACY --------- */
 
 .card {
     border: 1px solid hsl(0, 0%, 5%);
@@ -151,25 +206,6 @@ aside.popup.export {
 
 .canvas-column {
     width: calc(100vw - 395px);
-}
-
-/* --------- headers --------- */
-
-.header {
-    padding-left: 1ch;
-    background-color: hsl(0, 0%, 85%);
-    font-weight: 500;
-    height: var(--header-height);
-    vertical-align: middle;
-}
-
-div.header-container {
-    display: table;
-    width: 100%;
-}
-
-div.header {
-    display: table-cell;
 }
 
 /* --------- controls --------- */
@@ -193,7 +229,7 @@ div.control {
 }
 
 tr.control {
-    height: 1.8em;
+    height: var(--row-height);
     border-top: 0.3em solid transparent;
     border-bottom: 0.3em solid transparent;
 }

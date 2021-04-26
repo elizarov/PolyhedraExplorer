@@ -38,7 +38,7 @@ class ConfigPopup(props: PComponentProps<RootParams>) : RComponent<PComponentPro
     }
 
     override fun RBuilder.render() {
-        popupHeader("View")
+        groupHeader("View")
         tableBody {
             controlRow("Base scale") { pDropdown(props.params.render.poly.baseScale) }
             controlRow("View scale") { pSlider(props.params.render.view.scale) }
@@ -46,7 +46,7 @@ class ConfigPopup(props: PComponentProps<RootParams>) : RComponent<PComponentPro
             controlRow("Display") { pDropdown(props.params.render.view.display) }
         }
 
-        popupHeader("Faces")
+        groupHeader("Faces")
         tableBody {
             controlRow("Transparent") { pSlider(props.params.render.view.transparentFaces, !ctx.hasFaces) }
             controlRow("Width") {
@@ -59,7 +59,7 @@ class ConfigPopup(props: PComponentProps<RootParams>) : RComponent<PComponentPro
             }
         }
 
-        popupHeader("Animation")
+        groupHeader("Animation")
         tableBody {
             controlRow2("Rotation", { pCheckbox(props.params.animationParams.animatedRotation) }) {
                 pSlider(props.params.animationParams.rotationSpeed, !ctx.rotate)
@@ -72,7 +72,7 @@ class ConfigPopup(props: PComponentProps<RootParams>) : RComponent<PComponentPro
             }
         }
 
-        popupHeader("Lighting")
+        groupHeader("Lighting")
         tableBody {
             controlRow("Ambient") { pSlider(props.params.render.lighting.ambientLight, !ctx.hasFaces) }
             controlRow("Diffuse") { pSlider(props.params.render.lighting.diffuseLight, !ctx.hasFaces) }

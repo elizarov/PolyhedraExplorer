@@ -45,7 +45,7 @@ class ExportPopup(props: ExportPopupProps) : RComponent<ExportPopupProps, RState
     }
 
     override fun RBuilder.render() {
-        popupHeader("Export size")
+        groupHeader("Export size")
         tableBody {
             controlRow("Width") {
                 pSlider(props.params.render.view.faceWidth, !ctx.hasFaces, showValue = false)
@@ -61,7 +61,7 @@ class ExportPopup(props: ExportPopupProps) : RComponent<ExportPopupProps, RState
             }
         }
 
-        popupHeader("Export solid")
+        groupHeader("Export solid")
         div("control row") {
             button {
                 attrs {
@@ -80,7 +80,7 @@ class ExportPopup(props: ExportPopupProps) : RComponent<ExportPopupProps, RState
             }
         }
 
-        popupHeader("Export geometry")
+        groupHeader("Export geometry")
         div("control row") {
             button {
                 attrs {
