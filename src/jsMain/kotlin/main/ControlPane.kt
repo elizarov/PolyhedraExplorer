@@ -1,6 +1,5 @@
 package polyhedra.js.main
 
-import kotlinx.html.js.*
 import polyhedra.common.poly.*
 import polyhedra.common.transform.*
 import polyhedra.common.util.*
@@ -10,23 +9,18 @@ import polyhedra.js.poly.*
 import react.*
 import react.dom.*
 
-fun RBuilder.controlPane(params: PolyParams) {
+fun RBuilder.controlPane(handler: ControlPaneProps.() -> Unit) {
     child(ControlPane::class) {
-        attrs {
-            this.params = params
-        }
+        attrs(handler)
     }
 }
 
-external interface ControlPaneState : RState {
-    var dropdownIndex: Int?
+external interface ControlPaneProps : PComponentProps<PolyParams> {
+    var popup: Popup?
+    var togglePopup: (Popup?) -> Unit
 }
 
-class ControlPane(props: PComponentProps<PolyParams>) : RComponent<PComponentProps<PolyParams>, ControlPaneState>(props) {
-    override fun ControlPaneState.init(props: PComponentProps<PolyParams>) {
-        dropdownIndex = null
-    }
-
+class ControlPane(props: ControlPaneProps) : RComponent<ControlPaneProps, RState>(props) {
     private inner class Context(params: PolyParams) : Param.Context(params, Param.TargetValue + Param.Progress) {
         val seed by { params.seed.value }
         val transforms by { params.transforms.value }
@@ -49,12 +43,12 @@ class ControlPane(props: PComponentProps<PolyParams>) : RComponent<PComponentPro
         div("ctrl-pane") {
             // new transform
             div("btn") {
-                if (state.dropdownIndex == transforms.size) {
+                if (props.popup == Popup.AddTransform) {
                     transformsDropdown(transforms.size, Transforms.filter { it != Transform.None })
                 }
                 button(classes = "square") {
                     i("fa fa-plus") {
-                        onClick { toggleDropdown(transforms.size) }
+                        onClick { props.togglePopup(Popup.AddTransform) }
                     }
                 }
             }
@@ -65,11 +59,11 @@ class ControlPane(props: PComponentProps<PolyParams>) : RComponent<PComponentPro
                     if (index == transforms.lastIndex) {
                         leftRightSpinner(::adjustLastTransform)
                     }
-                    if (state.dropdownIndex == index) {
+                    if (props.popup == Popup.ModifyTransform(index)) {
                         transformsDropdown(index, Transforms)
                     }
                     button(classes = "txt") {
-                        onClick { toggleDropdown(index) }
+                        onClick { props.togglePopup(Popup.ModifyTransform(index)) }
                         +transform.toString()
                     }
                 }
@@ -79,11 +73,11 @@ class ControlPane(props: PComponentProps<PolyParams>) : RComponent<PComponentPro
                 if (transforms.isEmpty()) {
                     leftRightSpinner(::adjustSeed)
                 }
-                if (state.dropdownIndex == -1) {
+                if (props.popup == Popup.Seed) {
                     seedsDropdown()
                 }
                 button(classes = "txt") {
-                    onClick { toggleDropdown(-1) }
+                    onClick { props.togglePopup(Popup.Seed) }
                     +ctx.seed.toString()
                 }
             }
@@ -133,20 +127,14 @@ class ControlPane(props: PComponentProps<PolyParams>) : RComponent<PComponentPro
         }
     }
 
-    private fun toggleDropdown(index: Int?) {
-        setState {
-            dropdownIndex = if (index == dropdownIndex) null else index
-        }
-    }
-
     private fun adjustSeed(delta: Int) {
-        toggleDropdown(null)
+        props.togglePopup(null)
         val newSeed = Seeds.getOrNull(Seeds.indexOf(ctx.seed) + delta) ?: return
         props.params.seed.updateValue(newSeed)
     }
 
     private fun adjustLastTransform(delta: Int) {
-        toggleDropdown(null)
+        props.togglePopup(null)
         val curTransforms = ctx.transforms
         val curTransform = curTransforms.lastOrNull() ?: return
         val newTransform = Transforms.getOrNull(Transforms.indexOf(curTransform) + delta) ?: return
@@ -155,7 +143,7 @@ class ControlPane(props: PComponentProps<PolyParams>) : RComponent<PComponentPro
     }
 
     private fun updateTransform(index: Int, transform: Transform) {
-        toggleDropdown(null)
+        props.togglePopup(null)
         val curTransforms = ctx.transforms
         val newTransforms = when {
             index >= curTransforms.size -> curTransforms + transform
@@ -166,7 +154,7 @@ class ControlPane(props: PComponentProps<PolyParams>) : RComponent<PComponentPro
     }
 
     private fun updateSeed(seed: Seed) {
-        toggleDropdown(null)
+        props.togglePopup(null)
         props.params.seed.updateValue(seed)
     }
 }

@@ -126,7 +126,7 @@ aside.popup {
     border-radius: calc(0.5 * var(--row-height));
     box-shadow: var(--shadow);
     overflow-y: auto;
-    z-index: 2;
+    z-index: 1;
 }
 
 aside.popup.config {
@@ -152,7 +152,7 @@ aside.dropdown {
     border-radius: calc(0.5 * var(--row-height));
     box-shadow: var(--shadow);
     overflow-y: auto;
-    z-index: 3;
+    z-index: 1;
 }
 
 aside.dropdown div.item:hover {
@@ -302,7 +302,7 @@ tr.info:hover {
 .tooltip-text {
     visibility: hidden;
     position: absolute;
-    z-index: 1;
+    z-index: 2;
     padding: 0.2em;
     margin-left: -10ch;
     margin-top: -1.6em;

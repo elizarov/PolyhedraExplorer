@@ -11,10 +11,8 @@ import polyhedra.js.poly.*
 import react.*
 import react.dom.*
 
-enum class RootPanePopup { NONE, CONFIG, EXPORT }
-
 external interface RootPaneState : RState {
-    var popup: RootPanePopup
+    var popup: Popup?
     var faces: FaceContext?
 }
 
@@ -22,7 +20,7 @@ external interface RootPaneState : RState {
 @JsExport
 class RootPane2(props: PComponentProps<RootParams>) : RComponent<PComponentProps<RootParams>, RootPaneState>(props) {
     override fun RootPaneState.init(props: PComponentProps<RootParams>) {
-        popup = RootPanePopup.NONE
+        popup = null
         faces = null
     }
 
@@ -44,29 +42,32 @@ class RootPane2(props: PComponentProps<RootParams>) : RComponent<PComponentProps
             poly = ctx.poly
             faceContextSink = { setState { faces = it } }
         }
-        controlPane(props.params.render.poly)
+        controlPane {
+            params = props.params.render.poly
+            popup = state.popup
+            togglePopup = ::togglePopup
+        }
         div("btn config") {
             button(classes = "square") {
-                attrs { onClickFunction = { togglePopup(RootPanePopup.CONFIG) } }
+                attrs { onClickFunction = { togglePopup(Popup.Config) } }
                 i("fa fa-cog") {}
             }
         }
-        if (state.popup != RootPanePopup.CONFIG) {
+        if (state.popup != Popup.Config) {
             div("btn export") {
                 button(classes = "square") {
-                    attrs { onClickFunction = { togglePopup(RootPanePopup.EXPORT) } }
+                    attrs { onClickFunction = { togglePopup(Popup.Export) } }
                     i("fa fa-print") {}
                 }
             }
         }
         when (state.popup) {
-            RootPanePopup.NONE -> {}
-            RootPanePopup.CONFIG -> {
+            Popup.Config -> {
                 aside("popup config") {
                     configPopup(props.params)
                 }
             }
-            RootPanePopup.EXPORT -> {
+            Popup.Export -> {
                 aside("popup export") {
                     exportPopup(props.params, state.faces)
                 }
@@ -74,9 +75,9 @@ class RootPane2(props: PComponentProps<RootParams>) : RComponent<PComponentProps
         }
     }
 
-    private fun togglePopup(popup: RootPanePopup) {
+    private fun togglePopup(popup: Popup?) {
         setState {
-            this.popup = if (this.popup == popup) RootPanePopup.NONE else popup
+            this.popup = if (this.popup == popup) null else popup
         }
     }
 }
