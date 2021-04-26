@@ -56,7 +56,7 @@ class RootPane(props: PComponentProps<RootParams>) : RComponent<PComponentProps<
             }
             div("canvas-column card") {
                 // Canvas & Info
-                header(ctx.polyName)
+                popupHeader(ctx.polyName)
                 polyCanvas("poly") {
                     params = props.params.render
                     poly = ctx.poly
@@ -70,18 +70,18 @@ class RootPane(props: PComponentProps<RootParams>) : RComponent<PComponentProps<
     }
 
     private fun RDOMBuilder<DIV>.renderControls() {
-        header("Polyhedron")
+        popupHeader("Polyhedron")
         div("row control") {
             label { +"Seed" }
             pDropdown(props.params.render.poly.seed)
         }
 
-        header("Transforms")
+        popupHeader("Transforms")
         tableBody {
             renderTransformsRows()
         }
 
-        header("View")
+        popupHeader("View")
         tableBody {
             controlRow("Base scale") { pDropdown(props.params.render.poly.baseScale) }
             controlRow("View scale") { pSlider(props.params.render.view.scale) }
@@ -89,7 +89,7 @@ class RootPane(props: PComponentProps<RootParams>) : RComponent<PComponentProps<
             controlRow("Display") { pDropdown(props.params.render.view.display) }
         }
 
-        header("Faces")
+        popupHeader("Faces")
         tableBody {
             controlRow("Transparent") { pSlider(props.params.render.view.transparentFaces, !ctx.hasFaces) }
             controlRow("Width") {
@@ -102,7 +102,7 @@ class RootPane(props: PComponentProps<RootParams>) : RComponent<PComponentProps<
             }
         }
 
-        header("Animation")
+        popupHeader("Animation")
         tableBody {
             controlRow2("Rotation", { pCheckbox(props.params.animationParams.animatedRotation) }) {
                 pSlider(props.params.animationParams.rotationSpeed, !ctx.rotate)
@@ -115,7 +115,7 @@ class RootPane(props: PComponentProps<RootParams>) : RComponent<PComponentProps<
             }
         }
 
-        header("Lighting")
+        popupHeader("Lighting")
         tableBody {
             controlRow("Ambient") { pSlider(props.params.render.lighting.ambientLight, !ctx.hasFaces) }
             controlRow("Diffuse") { pSlider(props.params.render.lighting.diffuseLight, !ctx.hasFaces) }
@@ -123,7 +123,7 @@ class RootPane(props: PComponentProps<RootParams>) : RComponent<PComponentProps<
             controlRow("Shininess") { pSlider(props.params.render.lighting.specularPower, !ctx.hasFaces) }
         }
 
-        header("Export geometry")
+        popupHeader("Export geometry")
         div("control row") {
             button {
                 attrs {
@@ -137,7 +137,7 @@ class RootPane(props: PComponentProps<RootParams>) : RComponent<PComponentProps<
             }
         }
 
-        header("Export solid")
+        popupHeader("Export solid")
         div("control row") {
             label { +"Export size" }
             pSlider(props.params.export.size, !ctx.hasFaces)
@@ -221,33 +221,3 @@ class RootPane(props: PComponentProps<RootParams>) : RComponent<PComponentProps<
     }
 }
 
-private fun RDOMBuilder<DIV>.header(text: String) {
-    div("header-container") {
-        div("header") { +text }
-    }
-}
-
-private fun RBuilder.tableBody(block: RDOMBuilder<TBODY>.() -> Unit) {
-    table {
-        tbody(block = block)
-    }
-}
-
-private fun RDOMBuilder<TBODY>.controlRow(label: String, block: RDOMBuilder<TD>.() -> Unit) {
-    tr("control") {
-        td { +label }
-        td(block = block)
-    }
-}
-
-private fun RDOMBuilder<TBODY>.controlRow2(
-    label: String,
-    block1: RDOMBuilder<TD>.() -> Unit,
-    block2: RDOMBuilder<TD>.() -> Unit
-) {
-    tr("control") {
-        td { +label }
-        td(block = block1)
-        td(block = block2)
-    }
-}

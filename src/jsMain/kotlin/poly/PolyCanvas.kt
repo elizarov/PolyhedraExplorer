@@ -45,16 +45,14 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
     private var fpsTimeout = 0
 
     override fun RBuilder.render() {
-        div("fps-container") {
-            canvas(props.classes) {
-                attrs {
-                    ref = canvasRef
-                }
+        canvas(props.classes) {
+            attrs {
+                ref = canvasRef
             }
-            div("fps") {
-                attrs {
-                    ref = fpsRef
-                }
+        }
+        div("fps") {
+            attrs {
+                ref = fpsRef
             }
         }
     }

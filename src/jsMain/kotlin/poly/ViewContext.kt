@@ -19,7 +19,7 @@ class ViewContext(params: ViewParams) : Param.Context(params) {
     val faceWidth by { params.faceWidth.value }
     val faceRim by { params.faceRim.value }
 
-    val cameraPosition = float32Of(0.0, 0.0, 3.0)
+    val cameraPosition = float32Of(0.0, 0.0, 4.0)
     val projectionMatrix = mat4.create()
     val modelMatrix = mat4.create()
     val normalMatrix = mat3.create()

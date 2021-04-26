@@ -8,7 +8,7 @@
     box-sizing: border-box;
 }
 
-body, p, table, tbody, tr, td, label {
+html, body, p, table, tbody, tr, td, label {
     padding: 0;
     margin: 0;
 }
@@ -19,12 +19,120 @@ input, button, select {
 
 /* --------- root style & layout --------- */
 
+:root {
+    --grid: 28px;
+    --shadow: 0 3px 5px -1px rgba(0, 0, 0, .2), 0 6px 10px 0 rgba(0, 0, 0, .14), 0 1px 18px 0 rgba(0, 0, 0, .12);
+    --background: hsl(0, 0%, 95%);
+    --popup-background: hsla(0, 0%, 95%, .8);
+    --header-height: 1.8em;
+}
+
 body {
-    background-color: hsl(0, 0%, 95%);
+    background-color: var(--background);
     color: hsl(0, 0%, 5%);
     font-family: 'Roboto', sans-serif;
     font-weight: 300;
+    height: 100vh;
 }
+
+#root, canvas.poly {
+    width: 100%;
+    height: 100%;
+}
+
+div.ctrl-pane {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: calc(100% - 4 * var(--grid));
+    height: 100%;
+    display: flex;
+    flex-flow: row wrap;
+    align-content: flex-start;
+    pointer-events: none;
+}
+
+div.ctrl-pane div {
+    margin-left: var(--grid);
+    margin-top: var(--grid);
+}
+
+/* --------- Floating Buttons --------- */
+
+div.btn {
+    height: calc(2 * var(--grid));
+    font-size: var(--grid);
+    color: #ffffff;
+    background-color: #1976d2;
+    box-shadow: var(--shadow);
+    border-radius: var(--grid);
+    pointer-events: auto;
+    display: flex;
+    flex-flow: nowrap row;
+}
+
+div.btn button {
+    height: calc(2 * var(--grid));
+    padding: 0;
+    margin: 0;
+    border: 0;
+    color: inherit;
+    background-color: transparent;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+div.btn button:hover {
+   color: #8cefd0
+}
+
+div.btn button.square {
+    width: calc(2 * var(--grid));
+}
+
+div.btn button.txt {
+    padding-left: calc(var(--grid) - 0.5ch);
+    padding-right: calc(var(--grid) - 0.5ch);
+}
+
+div.btn.config {
+    position: absolute;
+    top: var(--grid);
+    right: var(--grid);
+}
+
+div.btn.export {
+    position: absolute;
+    top: calc(4 * var(--grid));
+    right: var(--grid);
+}
+
+/* --------- Popups --------- */
+
+aside.popup {
+    display: block;
+    position: absolute;
+    right: calc(0.5 * var(--grid));
+    width: calc(min(12 * var(--grid), 100vw - var(--grid)));
+    background-color: var(--popup-background);
+    border: 1px solid black;
+    border-radius: calc(0.5 * var(--header-height));
+    overflow-y: auto;
+    box-shadow: var(--shadow);
+}
+
+aside.popup.config {
+    top: calc(3.5 * var(--grid));
+    height: calc(100vh - 4 * var(--grid));
+}
+
+aside.popup.export {
+    top: calc(6.5 * var(--grid));
+    height: calc(100vh - 7 * var(--grid));
+}
+
+/* --------- LEGACY --------- */
+
 
 .card {
     border: 1px solid hsl(0, 0%, 5%);
@@ -45,18 +153,13 @@ body {
     width: calc(100vw - 395px);
 }
 
-canvas.poly {
-    width: 100%;
-    height: 50vw;
-}
-
 /* --------- headers --------- */
 
 .header {
     padding-left: 1ch;
     background-color: hsl(0, 0%, 85%);
     font-weight: 500;
-    height: 1.8em;
+    height: var(--header-height);
     vertical-align: middle;
 }
 
@@ -95,9 +198,9 @@ tr.control {
     border-bottom: 0.3em solid transparent;
 }
 
-input, button, select {
-    margin-right: 1ch;
-}
+/*input, button, select {*/
+/*    margin-right: 1ch;*/
+/*}*/
 
 .download {
     display: none;
@@ -150,10 +253,6 @@ tr.info:hover {
 }
 
 /* --------- canvas fps --------- */
-
-.fps-container {
-    position: relative;
-}
 
 .fps {
     position: absolute;
