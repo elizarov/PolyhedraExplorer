@@ -57,6 +57,10 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
     val targetPoly: Polyhedron
         get() = transformAnimation?.targetPoly ?: poly
 
+    // poly after each transform
+    val transformedPolys: List<Polyhedron>
+        get() = prevPolys
+
     // previous state stored to compute animated transformations
     private var prevSeed: Seed = defaultSeed
     private var prevTransforms: List<Transform> = emptyList()

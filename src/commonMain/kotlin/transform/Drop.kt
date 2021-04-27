@@ -6,7 +6,7 @@ import polyhedra.common.poly.*
 const val DROP_TAG = "x"
 
 @Serializable
-class Drop(val kind: AnyKind) : Transform() {
+data class Drop(val kind: AnyKind) : Transform() {
     override val tag: String
         get() = "$DROP_TAG[$kind]"
     override fun transform(poly: Polyhedron): Polyhedron = poly.drop(kind)

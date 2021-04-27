@@ -30,7 +30,7 @@ private fun onLoad() {
     AnimationTracker(rootParams).start()
     // Unit UI
     render(document.getElementById("root")) {
-        child(RootPane2::class) {
+        child(RootPane::class) {
             attrs {
                 params = rootParams
             }

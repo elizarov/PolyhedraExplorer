@@ -24,6 +24,7 @@ input, button, select {
     --border: 1px solid black;
     --background-color: hsl(0, 0%, 95%);
     --text-color: hsl(0, 0%, 5%);
+    --tooltip-background-color: hsl(0, 0%, 75%);
     --popup-background-color: hsla(0, 0%, 95%, .8);
     --button-background-color: #1976d2;
     --button-color: #ffffff;
@@ -57,7 +58,7 @@ div.ctrl-pane {
     pointer-events: none;
 }
 
-div.ctrl-pane div.btn {
+div.ctrl-pane > div.btn {
     margin-left: 1em;
     margin-top: 1em;
 }
@@ -76,7 +77,7 @@ div.btn {
     flex-flow: nowrap row;
 }
 
-div.btn button {
+div.btn > button {
     height: 2em;
     font-size: 1em;
     padding: 0;
@@ -88,17 +89,34 @@ div.btn button {
     cursor: pointer;
 }
 
-div.btn button:hover {
+div.btn > button:hover {
    color: var(--hover-color);
 }
 
-div.btn button.square {
+div.btn > button.square {
     width: 2em;
 }
 
-div.btn button.txt {
+div.btn > button.txt {
     padding-left: calc(1em - 0.5ch);
     padding-right: calc(1em - 0.5ch);
+}
+
+div.btn > div.sep {
+    width: 1px;
+    height: 2em;
+    background-color: var(--button-color);
+}
+
+div.btn > span.msg {
+    display: table;
+    padding-right: calc(1em - 0.5ch);
+}
+
+div.btn > span.msg > span {
+    display: table-cell;
+    height: 2em;
+    vertical-align: middle;
 }
 
 div.btn.config {
@@ -113,9 +131,20 @@ div.btn.export {
     right: 1em;
 }
 
-/* --------- Popups --------- */
+div.fev {
+    position: absolute;
+    left: 50%;
+    bottom: 1em;
+}
 
-aside.popup {
+div.fev > div {
+    position: relative;
+    left: -50%;
+}
+
+/* --------- Export/Config Drawers --------- */
+
+aside.drawer {
     display: block;
     position: absolute;
     right: 0.5em;
@@ -128,17 +157,17 @@ aside.popup {
     z-index: 1;
 }
 
-aside.popup.config {
+aside.drawer.config {
     top: 3.5em;
     height: calc(100vh - 4em);
 }
 
-aside.popup.export {
+aside.drawer.export {
     top: 6.5em;
     height: calc(100vh - 7em);
 }
 
-/* --------- Dropdowns --------- */
+/* --------- Transform/Seed Dropdowns --------- */
 
 aside.dropdown {
     display: block;
@@ -150,12 +179,29 @@ aside.dropdown {
     border: var(--border);
     border-radius: calc(0.5 * var(--row-height));
     box-shadow: var(--shadow);
-    overflow-y: auto;
+    overflow-y: scroll;
+    max-height: calc(min(20.25em, 100vh - 5em));
     z-index: 1;
 }
 
 aside.dropdown div.item:hover {
     background-color: var(--hover-color);
+}
+
+/* --------- FEV popup --------- */
+
+aside.fev {
+    display: block;
+    position: absolute;
+    bottom: 3.5em;
+    left: 0.5em;
+    width: calc(100vw - 1em);
+    background-color: var(--popup-background-color);
+    border: var(--border);
+    border-radius: calc(0.5 * var(--row-height));
+    box-shadow: var(--shadow);
+    overflow-y: auto;
+    z-index: 1;
 }
 
 /* --------- headers / items --------- */
@@ -280,7 +326,7 @@ svg.figure {
 }
 
 tr.info:hover {
-    background: hsl(70, 90%, 50%);
+    background: var(--hover-color);
 }
 
 .face-attn {
@@ -298,19 +344,25 @@ tr.info:hover {
 
 /* --------- tooltip --------- */
 
-.tooltip-text {
-    visibility: hidden;
-    position: absolute;
-    z-index: 2;
-    padding: 0.2em;
-    margin-left: -10ch;
-    margin-top: -1.6em;
-    background-color: hsl(0, 0%, 75%);
-    border: 1px solid black;
-    border-radius: 6px;
+span.msg {
+    position: relative;
 }
 
-*:hover > .tooltip-text {
+aside.tooltip-text {
+    visibility: hidden;
+    position: absolute;
+    top: 1.5em;
+    left: -0.5em;
+    color: var(--text-color);
+    background-color: var(--tooltip-background-color);
+    padding: 0.2em;
+    border: 1px solid black;
+    border-radius: 6px;
+    white-space: nowrap;
+    z-index: 2;
+}
+
+*:hover > aside.tooltip-text {
     visibility: visible;
 }
 
@@ -325,10 +377,10 @@ span.emoji {
 
 .spinner {
     position: relative;
+    left: -0.4em;
+    padding-right: 1.5em;
     opacity: 1;
     transition: opacity linear 0.1s;
-    margin-left: 1em;
-    margin-right: 1em;
 }
 
 .spinner::before {

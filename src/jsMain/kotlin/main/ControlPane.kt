@@ -22,8 +22,12 @@ external interface ControlPaneProps : PComponentProps<PolyParams> {
 
 class ControlPane(props: ControlPaneProps) : RComponent<ControlPaneProps, RState>(props) {
     private inner class Context(params: PolyParams) : Param.Context(params, Param.TargetValue + Param.Progress) {
+        val transformedPolys by { params.transformedPolys }
         val seed by { params.seed.value }
         val transforms by { params.transforms.value }
+        val transformWarnings by { params.transformWarnings }
+        val transformError by { params.transformError }
+        val transformProgress by { params.transformProgress }
 
         init { setup() }
 
@@ -40,11 +44,13 @@ class ControlPane(props: ControlPaneProps) : RComponent<ControlPaneProps, RState
 
     override fun RBuilder.render() {
         val transforms = ctx.transforms
+        val transformError = ctx.transformError
+        val errorIndex = transformError?.index ?: Int.MAX_VALUE
         div("ctrl-pane") {
             // new transform
             div("btn") {
                 if (props.popup == Popup.AddTransform) {
-                    transformsDropdown(transforms.size, Transforms.filter { it != Transform.None })
+                    transformsDropdown(transforms.size)
                 }
                 button(classes = "square") {
                     i("fa fa-plus") {
@@ -54,17 +60,31 @@ class ControlPane(props: ControlPaneProps) : RComponent<ControlPaneProps, RState
             }
             // existing transforms
             for (index in transforms.lastIndex downTo 0) {
-                val transform = transforms[index]
                 div("btn") {
                     if (index == transforms.lastIndex) {
                         leftRightSpinner(::adjustLastTransform)
                     }
                     if (props.popup == Popup.ModifyTransform(index)) {
-                        transformsDropdown(index, Transforms)
+                        transformsDropdown(index)
                     }
                     button(classes = "txt") {
                         onClick { props.togglePopup(Popup.ModifyTransform(index)) }
-                        +transform.toString()
+                        +transforms[index].toString()
+                    }
+                    if (index == errorIndex) {
+                        val isInProcess = transformError?.isAsync == true
+                        if (isInProcess) {
+                            span("msg") {
+                                span("spinner") {}
+                                span { +"${ctx.transformProgress}%" }
+                                aside("tooltip-text") { +"Transformation is running" }
+                            }
+                        } else {
+                            transformError?.msg?.let { messageSpan(it) }
+                        }
+                    } else {
+                        val warning = ctx.transformWarnings.getOrNull(index)
+                        if (warning != null) messageSpan(warning)
                     }
                 }
             }
@@ -95,10 +115,19 @@ class ControlPane(props: ControlPaneProps) : RComponent<ControlPaneProps, RState
         }
     }
 
-    private fun RBuilder.transformsDropdown(index: Int, values: List<Transform>) {
+    private fun possibleTransformsAt(index: Int): Set<Transform> {
+        val result = Transforms.toMutableSet()
+        val poly = if (index == 0) ctx.seed.poly else ctx.transformedPolys[index - 1]
+        poly.canDrop.mapTo(result) { Drop(it) }
+        ctx.transforms.getOrNull(index)?.let { result += it }
+        if (index == ctx.transforms.size) result -= Transform.None
+        return result
+    }
+
+    private fun RBuilder.transformsDropdown(index: Int) {
         aside("dropdown") {
             groupHeader("Transform")
-            for (transform in values) {
+            for (transform in possibleTransformsAt(index)) {
                 div("text-row") {
                     div("item") {
                         onClick { updateTransform(index, transform) }
@@ -108,7 +137,7 @@ class ControlPane(props: ControlPaneProps) : RComponent<ControlPaneProps, RState
             }
         }
     }
-    
+
     private fun RBuilder.seedsDropdown() {
         aside("dropdown") {
             var type: SeedType? = null
@@ -137,7 +166,8 @@ class ControlPane(props: ControlPaneProps) : RComponent<ControlPaneProps, RState
         props.togglePopup(null)
         val curTransforms = ctx.transforms
         val curTransform = curTransforms.lastOrNull() ?: return
-        val newTransform = Transforms.getOrNull(Transforms.indexOf(curTransform) + delta) ?: return
+        val possibleTransforms = possibleTransformsAt(curTransforms.lastIndex).toList()
+        val newTransform = possibleTransforms.getOrNull(possibleTransforms.indexOf(curTransform) + delta) ?: return
         if (newTransform == Transform.None) return
         props.params.transforms.updateValue(curTransforms.dropLast(1) + newTransform)
     }
