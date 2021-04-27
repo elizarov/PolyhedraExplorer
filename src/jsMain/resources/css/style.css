@@ -200,6 +200,7 @@ aside.fev {
     border: var(--border);
     border-radius: calc(0.5 * var(--row-height));
     box-shadow: var(--shadow);
+    max-height: 50vh;
     overflow-y: auto;
     z-index: 1;
 }
