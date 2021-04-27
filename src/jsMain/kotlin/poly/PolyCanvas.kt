@@ -33,6 +33,8 @@ fun RBuilder.polyCanvas(classes: String? = null, handler: PolyCanvasProps.() -> 
     }
 }
 
+private const val MIN_MOUSE_MOVE_DISTANCE = 3.0
+
 @Suppress("NON_EXPORTABLE_TYPE")
 @JsExport
 class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RState>(props) {
@@ -41,6 +43,7 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
     private lateinit var drawContext: DrawContext
     private var prevX = 0.0
     private var prevY = 0.0
+    private var isRotating = false
 
     private val canvasRef = createRef<HTMLCanvasElement>()
     private var drawCount = 0
@@ -62,6 +65,7 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
     override fun componentDidMount() {
         canvas = canvasRef.current
         canvas.onmousedown = this::handleMouseDown
+        canvas.onmouseup = this::handleMouseUp
         canvas.onmousemove = this::handleMouseMove
         canvas.onwheel = this::handleWheel
         drawContext = DrawContext(canvas, props.params, ::draw)
@@ -100,16 +104,33 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
         prevY = e.offsetY
     }
 
+    private fun distanceFromPrevMouseEvent(e: MouseEvent) =
+        norm(prevX - e.offsetX, prevY - e.offsetY)
+
     private fun handleMouseDown(e: MouseEvent) {
-        props.resetPopup()
-        if (e.isLeftButtonPressed()) {
-            savePrevMouseEvent(e)
-            props.params.animationParams?.animatedRotation?.updateValue(false)
+        if (!e.isLeftButtonEvent()) return
+        savePrevMouseEvent(e)
+        isRotating = false
+    }
+
+    private fun handleMouseUp(e: MouseEvent) {
+        if (!e.isLeftButtonEvent()) return
+        if (!isRotating) {
+            props.resetPopup()
+        } else {
+            isRotating = false
         }
     }
 
     private fun handleMouseMove(e: MouseEvent) {
         if (!e.isLeftButtonPressed()) return
+        if (!isRotating && distanceFromPrevMouseEvent(e) < MIN_MOUSE_MOVE_DISTANCE) return
+        if (!isRotating) {
+            isRotating = true
+            props.params.animationParams?.animatedRotation?.updateValue(false)
+            savePrevMouseEvent(e)
+            return
+        }
         val h = canvas.clientHeight
         val w = canvas.clientWidth
         // prev pos

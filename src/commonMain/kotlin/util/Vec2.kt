@@ -11,6 +11,8 @@ interface Vec2 {
     val y: Double
 }
 
+fun Vec2(x: Double, y: Double): Vec2 = MutableVec2(x, y)
+
 open class MutableVec2(
     override var x: Double = 0.0,
     override var y: Double = 0.0

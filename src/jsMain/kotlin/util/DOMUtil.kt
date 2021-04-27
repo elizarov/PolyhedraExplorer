@@ -12,5 +12,8 @@ import kotlin.experimental.*
 fun HTMLElement.computedStyle() =
     window.document.defaultView!!.getComputedStyle(this)
 
+fun MouseEvent.isLeftButtonEvent() =
+    button.toInt() == 0
+
 fun MouseEvent.isLeftButtonPressed() =
     (buttons and 1) != 0.toShort()
