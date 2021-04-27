@@ -232,28 +232,7 @@ div.text-row > div {
     white-space: nowrap;
 }
 
-/* --------- LEGACY --------- */
-
-.card {
-    border: 1px solid hsl(0, 0%, 5%);
-    margin-top: 10px;
-    margin-left: 10px;
-}
-
-.main-layout {
-    display: flex;
-    flex-flow: row wrap;
-}
-
-.control-column {
-    width: calc(350px);
-}
-
-.canvas-column {
-    width: calc(100vw - 395px);
-}
-
-/* --------- controls --------- */
+/* --------- controls--------- */
 
 div.row {
     padding-left: 1ch;
@@ -279,9 +258,9 @@ tr.control {
     border-bottom: 0.3em solid transparent;
 }
 
-/*input, button, select {*/
-/*    margin-right: 1ch;*/
-/*}*/
+tr.control > td > input, tr.control > td > button, tr.control > td > select {
+    margin-right: 1ch
+}
 
 .download {
     display: none;
