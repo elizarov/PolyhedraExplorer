@@ -63,7 +63,7 @@ class RootPane(props: PComponentProps<RootParams>) : RComponent<PComponentProps<
             div("btn export") {
                 button(classes = "square") {
                     attrs { onClickFunction = { togglePopup(Popup.Export) } }
-                    i("fa fa-print") {}
+                    i("fa fa-share-square-o") {}
                 }
             }
         }

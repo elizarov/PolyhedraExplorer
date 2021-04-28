@@ -29,6 +29,7 @@ input, button, select {
     --button-background-color: #1976d2;
     --button-color: #ffffff;
     --hover-color: #8cefd0;
+    --disabled-color: hsl(0, 0%, 80%);
     --row-height: 1.5em;
 }
 
@@ -89,8 +90,12 @@ div.btn > button {
     cursor: pointer;
 }
 
-div.btn > button:hover {
+div.btn > button:hover:not(:disabled) {
    color: var(--hover-color);
+}
+
+div.btn > button:disabled {
+    color: var(--disabled-color);
 }
 
 div.btn > button.square {
@@ -98,25 +103,18 @@ div.btn > button.square {
 }
 
 div.btn > button.txt {
-    padding-left: calc(1em - 0.5ch);
-    padding-right: calc(1em - 0.5ch);
+    padding-left: 0.6em;
+    padding-right: 0.6em;
+}
+
+div.btn > button.msg {
+    padding-right: 0.6em;
 }
 
 div.btn > div.sep {
     width: 1px;
     height: 2em;
     background-color: var(--button-color);
-}
-
-div.btn > span.msg {
-    display: table;
-    padding-right: calc(1em - 0.5ch);
-}
-
-div.btn > span.msg > span {
-    display: table-cell;
-    height: 2em;
-    vertical-align: middle;
 }
 
 div.btn.config {
@@ -324,7 +322,7 @@ tr.info:hover {
 
 /* --------- tooltip --------- */
 
-span.msg {
+.msg {
     position: relative;
 }
 

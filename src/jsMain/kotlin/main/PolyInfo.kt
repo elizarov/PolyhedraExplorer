@@ -123,7 +123,9 @@ class PolyInfo(props: PolyInfoProps) : RComponent<PolyInfoProps, RState>(props) 
                             }
                             td {
                                 if (!fe.isPlanar) {
-                                    messageSpan(FaceNotPlanar())
+                                    span("msg") {
+                                        messageSpan(FaceNotPlanar())
+                                    }
                                 } else {
                                     val hidden = fk in hideFaces
                                     val icon = when {

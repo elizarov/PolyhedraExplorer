@@ -49,10 +49,12 @@ class ControlPane(props: ControlPaneProps) : RComponent<ControlPaneProps, RState
         div("ctrl-pane") {
             // new transform
             div("btn") {
-                if (props.popup == Popup.AddTransform) {
+                val disabled = transforms.size > errorIndex
+                if (props.popup == Popup.AddTransform && !disabled) {
                     transformsDropdown(transforms.size)
                 }
                 button(classes = "square") {
+                    attrs { this.disabled = disabled }
                     i("fa fa-plus") {
                         onClick { props.togglePopup(Popup.AddTransform) }
                     }
@@ -61,37 +63,40 @@ class ControlPane(props: ControlPaneProps) : RComponent<ControlPaneProps, RState
             // existing transforms
             for (index in transforms.lastIndex downTo 0) {
                 div("btn") {
+                    val disabled = index > errorIndex
                     if (index == transforms.lastIndex) {
-                        leftRightSpinner(::adjustLastTransform)
+                        leftRightSpinner(::adjustLastTransform, disabled)
                     }
-                    if (props.popup == Popup.ModifyTransform(index)) {
+                    if (props.popup == Popup.ModifyTransform(index) && !disabled) {
                         transformsDropdown(index)
                     }
                     button(classes = "txt") {
+                        attrs { this.disabled = disabled }
                         onClick { props.togglePopup(Popup.ModifyTransform(index)) }
                         +transforms[index].toString()
                     }
                     if (index == errorIndex) {
                         val isInProcess = transformError?.isAsync == true
                         if (isInProcess) {
-                            span("msg") {
+                            button(classes = "msg") {
+                                onClick { updateTransform(index, Transform.None) }
                                 span("spinner") {}
                                 span { +"${ctx.transformProgress}%" }
                                 aside("tooltip-text") { +"Transformation is running" }
                             }
                         } else {
-                            transformError?.msg?.let { messageSpan(it) }
+                            transformError?.msg?.let { messageButton(index, it) }
                         }
                     } else {
                         val warning = ctx.transformWarnings.getOrNull(index)
-                        if (warning != null) messageSpan(warning)
+                        if (warning != null) messageButton(index, warning)
                     }
                 }
             }
             // Seed
             div("btn") {
                 if (transforms.isEmpty()) {
-                    leftRightSpinner(::adjustSeed)
+                    leftRightSpinner(::adjustSeed, disabled = false)
                 }
                 if (props.popup == Popup.Seed) {
                     seedsDropdown()
@@ -104,12 +109,30 @@ class ControlPane(props: ControlPaneProps) : RComponent<ControlPaneProps, RState
         }
     }
 
-    private fun RBuilder.leftRightSpinner(adjust: (Int) -> Unit) {
+    private fun <T> RBuilder.messageButton(index: Int, msg: IndicatorMessage<T>) {
+        button(classes = "msg") {
+            onClick {
+                when(msg.indicator) {
+                    TransformFailed, TransformNotApplicable, TransformIsId, TooLarge -> {
+                        updateTransform(index, Transform.None)
+                    }
+                    SomeFacesNotPlanar -> {
+                        updateTransform(ctx.transforms.size, Transform.Canonical)
+                    }
+                }
+            }
+            messageSpan(msg)
+        }
+    }
+
+    private fun RBuilder.leftRightSpinner(adjust: (Int) -> Unit, disabled: Boolean) {
         button(classes = "square") {
+            attrs { this.disabled = disabled }
             onClick { adjust(-1) }
             +"❮"
         }
         button {
+            attrs { this.disabled = disabled }
             onClick { adjust(+1) }
             +"❯"
         }
@@ -117,8 +140,8 @@ class ControlPane(props: ControlPaneProps) : RComponent<ControlPaneProps, RState
 
     private fun possibleTransformsAt(index: Int): Set<Transform> {
         val result = Transforms.toMutableSet()
-        val poly = if (index == 0) ctx.seed.poly else ctx.transformedPolys[index - 1]
-        poly.canDrop.mapTo(result) { Drop(it) }
+        val poly = if (index == 0) ctx.seed.poly else ctx.transformedPolys.getOrNull(index - 1)
+        poly?.canDrop?.mapTo(result) { Drop(it) }
         ctx.transforms.getOrNull(index)?.let { result += it }
         if (index == ctx.transforms.size) result -= Transform.None
         return result

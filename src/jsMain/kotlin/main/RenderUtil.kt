@@ -10,11 +10,9 @@ import react.*
 import react.dom.*
 
 fun <T> RBuilder.messageSpan(msg: IndicatorMessage<T>) {
-    span("msg") {
-        span("emoji") { +msg.indicator.text }
-        aside("tooltip-text") {
-            +msg.indicator.tooltip.replace("{}", msg.value.toString())
-        }
+    span(msg.indicator.classes) { +msg.indicator.text }
+    aside("tooltip-text") {
+        +msg.indicator.tooltip.replace("{}", msg.value.toString())
     }
 }
 
