@@ -189,6 +189,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
                     }
                     transform.isIdentityTransform(curPoly) -> {
                         // keep poly if this transform is an identity transform for this polyhedron
+                        equalsToPrev = false
                         curWarning = TransformIsId(transform)
                         curPoly
                     }
