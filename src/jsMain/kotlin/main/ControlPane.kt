@@ -58,6 +58,7 @@ class ControlPane(props: ControlPaneProps) : RComponent<ControlPaneProps, RState
                     i("fa fa-plus") {
                         onClick { props.togglePopup(Popup.AddTransform) }
                     }
+                    aside("tooltip-text") { +"Add transform" }
                 }
             }
             // existing transforms
@@ -75,6 +76,7 @@ class ControlPane(props: ControlPaneProps) : RComponent<ControlPaneProps, RState
                         attrs { this.disabled = disabled }
                         onClick { props.togglePopup(popup) }
                         +transforms[index].toString()
+                        aside("tooltip-text") { +"Modify transform" }
                     }
                     if (index == errorIndex) {
                         val isInProcess = transformError?.isAsync == true
@@ -105,7 +107,17 @@ class ControlPane(props: ControlPaneProps) : RComponent<ControlPaneProps, RState
                 button(classes = "txt") {
                     onClick { props.togglePopup(Popup.Seed) }
                     +ctx.seed.toString()
+                    aside("tooltip-text") { +"Seed" }
                 }
+            }
+        }
+        // reset button
+        div("btn reset") {
+            button(classes = "square") {
+                attrs { disabled = isReset() }
+                onClick { resetLast() }
+                i("fa fa-trash-o") {}
+                aside("tooltip-text") { +"Delete transform/reset seed" }
             }
         }
     }
@@ -212,5 +224,16 @@ class ControlPane(props: ControlPaneProps) : RComponent<ControlPaneProps, RState
     private fun updateSeed(seed: Seed) {
         props.togglePopup(null)
         props.params.seed.updateValue(seed)
+    }
+
+    private fun isReset() =
+        ctx.transforms.isEmpty() && ctx.seed == Seed.Tetrahedron
+
+    private fun resetLast() {
+        if (ctx.transforms.isNotEmpty()) {
+            props.params.transforms.updateValue(ctx.transforms.dropLast(1))
+        } else {
+            props.params.seed.updateValue(Seed.Tetrahedron)
+        }
     }
 }

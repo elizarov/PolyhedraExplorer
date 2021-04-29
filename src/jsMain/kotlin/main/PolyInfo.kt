@@ -48,6 +48,7 @@ class PolyInfo(props: PolyInfoProps) : RComponent<PolyInfoProps, RState>(props) 
                 button(classes = "txt") {
                     onClick { props.togglePopup(Popup.Faces) }
                     +"F: ${fev.f}"
+                    aside("tooltip-text") { +"Faces" }
                 }
             }
             div("btn mid" + activeWhen(Popup.Edges)) {
@@ -55,6 +56,7 @@ class PolyInfo(props: PolyInfoProps) : RComponent<PolyInfoProps, RState>(props) 
                 button(classes = "txt") {
                     onClick { props.togglePopup(Popup.Edges) }
                     +"E: ${fev.e}"
+                    aside("tooltip-text") { +"Edges" }
                 }
                 div("sep") {}
             }
@@ -62,6 +64,7 @@ class PolyInfo(props: PolyInfoProps) : RComponent<PolyInfoProps, RState>(props) 
                 button(classes = "txt") {
                     onClick { props.togglePopup(Popup.Vertices) }
                     +"V: ${fev.v}"
+                    aside("tooltip-text") { +"Vertices" }
                 }
             }
         }
