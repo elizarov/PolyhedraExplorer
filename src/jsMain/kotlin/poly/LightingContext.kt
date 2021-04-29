@@ -17,7 +17,7 @@ class LightningContext(params: LightingParams) : Param.Context(params) {
     val ambientLightColor = float32Of(0.3, 0.3, 0.3)
     val diffuseLightColor = float32Of(1.0, 1.0, 1.0)
     val specularLightColor = float32Of(1.0, 1.0, 1.0)
-    val lightPosition = float32Of(1.0, 1.0, 4.0)
+    val lightPosition = float32Of(-1.2, 1.2, 4.0)
     
     init { setup() }
 
