@@ -48,7 +48,7 @@ class ControlPane(props: ControlPaneProps) : RComponent<ControlPaneProps, RState
         val errorIndex = transformError?.index ?: Int.MAX_VALUE
         div("ctrl-pane") {
             // new transform
-            div("btn") {
+            div("btn" + activeWhen(Popup.AddTransform)) {
                 val disabled = transforms.size > errorIndex
                 if (props.popup == Popup.AddTransform && !disabled) {
                     transformsDropdown(transforms.size)
@@ -62,17 +62,18 @@ class ControlPane(props: ControlPaneProps) : RComponent<ControlPaneProps, RState
             }
             // existing transforms
             for (index in transforms.lastIndex downTo 0) {
-                div("btn") {
-                    val disabled = index > errorIndex
+                val disabled = index > errorIndex
+                val popup = Popup.ModifyTransform(index)
+                div("btn" + activeWhen(popup)) {
                     if (index == transforms.lastIndex) {
                         leftRightSpinner(::adjustLastTransform, disabled)
                     }
-                    if (props.popup == Popup.ModifyTransform(index) && !disabled) {
+                    if (props.popup == popup && !disabled) {
                         transformsDropdown(index)
                     }
                     button(classes = "txt") {
                         attrs { this.disabled = disabled }
-                        onClick { props.togglePopup(Popup.ModifyTransform(index)) }
+                        onClick { props.togglePopup(popup) }
                         +transforms[index].toString()
                     }
                     if (index == errorIndex) {
@@ -94,7 +95,7 @@ class ControlPane(props: ControlPaneProps) : RComponent<ControlPaneProps, RState
                 }
             }
             // Seed
-            div("btn") {
+            div("btn" + activeWhen(Popup.Seed)) {
                 if (transforms.isEmpty()) {
                     leftRightSpinner(::adjustSeed, disabled = false)
                 }
@@ -108,6 +109,8 @@ class ControlPane(props: ControlPaneProps) : RComponent<ControlPaneProps, RState
             }
         }
     }
+
+    private fun activeWhen(popup: Popup): String = if (props.popup == popup) " active" else ""
 
     private fun <T> RBuilder.messageButton(index: Int, msg: IndicatorMessage<T>) {
         button(classes = "msg") {

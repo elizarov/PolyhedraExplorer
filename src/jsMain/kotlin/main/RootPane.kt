@@ -53,14 +53,14 @@ class RootPane(props: PComponentProps<RootParams>) : RComponent<PComponentProps<
             popup = state.popup
             togglePopup = ::togglePopup
         }
-        div("btn config") {
+        div("btn config" + activeWhen(Popup.Config)) {
             button(classes = "square") {
                 attrs { onClickFunction = { togglePopup(Popup.Config) } }
                 i("fa fa-cog") {}
             }
         }
         if (state.popup != Popup.Config) {
-            div("btn export") {
+            div("btn export" + activeWhen(Popup.Export)) {
                 button(classes = "square") {
                     attrs { onClickFunction = { togglePopup(Popup.Export) } }
                     i("fa fa-share-square-o") {}
@@ -80,6 +80,8 @@ class RootPane(props: PComponentProps<RootParams>) : RComponent<PComponentProps<
             }
         }
     }
+
+    private fun activeWhen(popup: Popup): String = if (state.popup == popup) " active" else ""
 
     private fun togglePopup(popup: Popup?) {
         setPopup(if(state.popup == popup) null else popup)

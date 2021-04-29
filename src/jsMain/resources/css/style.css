@@ -27,6 +27,7 @@ input, button, select {
     --tooltip-background-color: hsl(0, 0%, 75%);
     --popup-background-color: hsla(0, 0%, 95%, .8);
     --button-background-color: #1976d2;
+    --button-active-color: #8daecd;
     --button-color: #ffffff;
     --hover-color: #8cefd0;
     --disabled-color: hsl(0, 0%, 80%);
@@ -76,6 +77,22 @@ div.btn {
     pointer-events: auto;
     display: flex;
     flex-flow: nowrap row;
+}
+
+div.btn.left {
+    border-radius: 1em 0 0 1em;
+}
+
+div.btn.mid {
+    border-radius: 0;
+}
+
+div.btn.right {
+    border-radius: 0 1em 1em 0;
+}
+
+div.btn.active {
+    background-color: var(--button-active-color);
 }
 
 div.btn > button {
@@ -133,6 +150,8 @@ div.fev {
     position: absolute;
     left: 50%;
     bottom: 1em;
+    display: flex;
+    flex-flow: nowrap row;
 }
 
 div.fev > div {

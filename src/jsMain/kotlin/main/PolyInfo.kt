@@ -44,17 +44,21 @@ class PolyInfo(props: PolyInfoProps) : RComponent<PolyInfoProps, RState>(props) 
     override fun RBuilder.render() {
         val fev = ctx.poly.fev()
         div("fev") {
-            div("btn") {
+            div("btn left" + activeWhen(Popup.Faces)) {
                 button(classes = "txt") {
                     onClick { props.togglePopup(Popup.Faces) }
                     +"F: ${fev.f}"
                 }
+            }
+            div("btn mid" + activeWhen(Popup.Edges)) {
                 div("sep") {}
                 button(classes = "txt") {
                     onClick { props.togglePopup(Popup.Edges) }
                     +"E: ${fev.e}"
                 }
                 div("sep") {}
+            }
+            div("btn right" + activeWhen(Popup.Vertices)) {
                 button(classes = "txt") {
                     onClick { props.togglePopup(Popup.Vertices) }
                     +"V: ${fev.v}"
@@ -67,6 +71,8 @@ class PolyInfo(props: PolyInfoProps) : RComponent<PolyInfoProps, RState>(props) 
             Popup.Vertices -> verticesPopup()
         }
     }
+
+    private fun activeWhen(popup: Popup): String = if (props.popup == popup) " active" else ""
 
     private fun RBuilder.infoHeader(
         name: String,
