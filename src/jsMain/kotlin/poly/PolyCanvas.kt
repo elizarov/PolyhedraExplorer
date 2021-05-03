@@ -191,32 +191,34 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
     private fun handleTouchStart(e: TouchEvent) {
         e.preventDefault()
         if (currentTouchId != null) return
-        val touch = e.touches[0]!!
+        val touch = e.changedTouches[0]!!
         currentTouchId = touch.identifier
         handlePointerDown(touch.clientX.toDouble(), touch.clientY.toDouble())
     }
 
-    private fun handleTouchEndOrCancel(e: TouchEvent) {
-        e.preventDefault()
+    private fun TouchEvent.withCurrentTouch(handle: (Touch) -> Unit) {
         if (currentTouchId == null) return
-        for (i in 0 until e.touches.length) {
-            val touch = e.touches[i]!!
+        for (i in 0 until changedTouches.length) {
+            val touch = changedTouches[i]!!
             if (touch.identifier == currentTouchId) {
                 currentTouchId = null
-                handlePointerUp()
+                handle(touch)
                 return
             }
         }
     }
 
+    private fun handleTouchEndOrCancel(e: TouchEvent) {
+        e.preventDefault()
+        e.withCurrentTouch {
+            handlePointerUp()
+        }
+    }
+
     private fun handleTouchMove(e: TouchEvent) {
         e.preventDefault()
-        for (i in 0 until e.touches.length) {
-            val touch = e.touches[i]!!
-            if (touch.identifier == currentTouchId) {
-                handlePointerMove(touch.clientX.toDouble(), touch.clientY.toDouble(), e.shiftKey)
-                return
-            }
+        e.withCurrentTouch { touch ->
+            handlePointerMove(touch.clientX.toDouble(), touch.clientY.toDouble(), e.shiftKey)
         }
     }
 
