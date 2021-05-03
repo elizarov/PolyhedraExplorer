@@ -70,7 +70,7 @@ gradlew jsBrowserDevelopmentRun
   * [x] Drop selected vertices/faces/edges
 * Infrastructure    
   * [ ] Embed CSS into WebPack
-  * [ ] `jsBrowserProductionRun` shall work
+  * [x] `jsBrowserProductionRun` shall work
 * Overall style / layout
   * [x] Move inessential params to popup
   * [x] Design and implement a full-screen UI

@@ -5,6 +5,8 @@
 package polyhedra.js.main
 
 import kotlinx.browser.*
+import polyhedra.common.poly.*
+import polyhedra.js.components.*
 import polyhedra.js.params.*
 import polyhedra.js.poly.*
 import polyhedra.js.util.*
@@ -35,6 +37,19 @@ private fun onLoad() {
                 params = rootParams
             }
         }
+    }
+    // TODO: FIXME: workaround for https://youtrack.jetbrains.com/issue/KT-41651
+    @Suppress("UNREACHABLE_CODE", "ConstantConditionIf")
+    if (false) {
+        RootPane(null!!)
+        ControlPane(null!!)
+        ConfigPopup(null!!)
+        ExportPopup(null!!)
+        PolyInfo(null!!)
+        Dropdown<Any>(null!!)
+        PDropdown<Scale>(null!!)
+        PSlider(null!!)
+        PCheckbox(null!!)
     }
 }
 
