@@ -43,7 +43,9 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
     private var prevX = 0.0
     private var prevY = 0.0
     private var isRotating = false
-    private var currentTouchId: Int? = null
+    private val ongoingTouches = ArrayList<OngoingTouch>()
+    private var prevDist = 0.0
+    private var prevAngle = 0.0
 
     private val canvasRef = createRef<HTMLCanvasElement>()
     private var drawCount = 0
@@ -69,8 +71,8 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
         canvas.onmousemove = this::handleMouseMove
         canvas.onwheel = this::handleWheel
         canvas.addTouchListener("touchstart", this::handleTouchStart)
-        canvas.addTouchListener("touchend", this::handleTouchEndOrCancel)
-        canvas.addTouchListener("touchcancel", this::handleTouchEndOrCancel)
+        canvas.addTouchListener("touchend", this::handleTouchEnd)
+        canvas.addTouchListener("touchcancel", this::handleTouchCancel)
         canvas.addTouchListener("touchmove", this::handleTouchMove)
         drawContext = DrawContext(canvas, props.params, ::draw)
         props.faceContextSink(drawContext.faces)
@@ -103,7 +105,7 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
         canvas.height = height
     }
 
-    private fun savePrevPointerEvent(x: Double, y: Double) {
+    private fun savePrevPointerLocation(x: Double, y: Double) {
         prevX = x
         prevY = y
     }
@@ -112,7 +114,7 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
         norm(prevX - x, prevY - y)
 
     private fun handlePointerDown(x: Double, y: Double) {
-        savePrevPointerEvent(x, y)
+        savePrevPointerLocation(x, y)
         isRotating = false
     }
 
@@ -129,7 +131,7 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
         if (!isRotating) {
             isRotating = true
             props.params.animationParams?.animatedRotation?.updateValue(false)
-            savePrevPointerEvent(x, y)
+            savePrevPointerLocation(x, y)
             return
         }
         val h = canvas.clientHeight
@@ -154,15 +156,15 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
             val sin = (x10 * y20 - y10 * x20) / n10 / n20
             val cos = (x10 * x20 + y10 * y20) / n10 / n20
             val a = atan2(sin, cos)
-            props.params.view.rotate.rotate(0.0, 0.0, -a, Param.TargetValue)
+            rotate(0.0, 0.0, -a)
         } else {
             // x-y rotation
             val scale = 2 * PI / minOf(h, w)
             val dx = x - x1
             val dy = y - y1
-            props.params.view.rotate.rotate(dy * scale, dx * scale, 0.0, Param.TargetValue)
+            rotate(dy * scale, dx * scale, 0.0)
         }
-        savePrevPointerEvent(x, y)
+        savePrevPointerLocation(x, y)
     }
 
     private fun handleMouseDown(e: MouseEvent) {
@@ -183,42 +185,94 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
     private fun handleWheel(e: WheelEvent) {
         if (!e.ctrlKey) return
         e.preventDefault()
-        val dScale = e.deltaY / 50
+        scale(-e.deltaY / 50)
+    }
+
+    private fun scale(dScale: Double) {
         val scale = props.params.view.scale
-        scale.updateValue(scale.value - dScale, Param.TargetValue)
+        scale.updateValue(scale.value + dScale, Param.TargetValue)
+    }
+
+    private fun rotate(x: Double, y: Double, z: Double) {
+        props.params.view.rotate.rotate(x, y, z, Param.TargetValue)
+    }
+
+    private inline fun withTouchMidpoint(handle: (x: Double, y: Double) -> Unit) {
+        var x = 0.0
+        var y = 0.0
+        val n = ongoingTouches.size.coerceAtMost(2)
+        for (i in 0 until n) {
+            val t = ongoingTouches[i]
+            x += t.x
+            y += t.y
+        }
+        handle(x / n, y / n)
+    }
+
+    private inline fun withTouchDistanceAngle(handle: (dist: Double, angle: Double) -> Unit) {
+        if (ongoingTouches.size < 2) return
+        val t1 = ongoingTouches[0]
+        val t2 = ongoingTouches[1]
+        val dx = (t2.x - t1.x).toDouble()
+        val dy = (t2.y - t1.y).toDouble()
+        val dist = norm(dx, dy)
+        val angle = atan2(dy, dx)
+        handle(dist, angle)
     }
 
     private fun handleTouchStart(e: TouchEvent) {
         e.preventDefault()
-        if (currentTouchId != null) return
-        val touch = e.changedTouches[0]!!
-        currentTouchId = touch.identifier
-        handlePointerDown(touch.clientX.toDouble(), touch.clientY.toDouble())
-    }
-
-    private fun TouchEvent.withCurrentTouch(handle: (Touch) -> Unit) {
-        if (currentTouchId == null) return
-        for (i in 0 until changedTouches.length) {
-            val touch = changedTouches[i]!!
-            if (touch.identifier == currentTouchId) {
-                currentTouchId = null
-                handle(touch)
-                return
+        e.withChangedTouches { touch ->
+            ongoingTouches += OngoingTouch(touch.identifier, touch.clientX, touch.clientY)
+            withTouchMidpoint { x, y ->
+                handlePointerDown(x, y)
+            }
+            withTouchDistanceAngle { dist, angle ->
+                prevDist = dist
+                prevAngle = angle
             }
         }
     }
 
-    private fun handleTouchEndOrCancel(e: TouchEvent) {
+    private fun handleTouchEnd(e: TouchEvent) {
         e.preventDefault()
-        e.withCurrentTouch {
-            handlePointerUp()
+        e.withChangedTouches { touch ->
+            val t = ongoingTouches.find { it.id == touch.identifier }
+            if (t != null) {
+                ongoingTouches.remove(t)
+                if (ongoingTouches.isEmpty()) {
+                    handlePointerUp()
+                }
+                withTouchMidpoint { x, y ->
+                    savePrevPointerLocation(x, y)
+                }
+            }
         }
+    }
+
+    private fun handleTouchCancel(e: TouchEvent) {
+        e.preventDefault()
     }
 
     private fun handleTouchMove(e: TouchEvent) {
         e.preventDefault()
-        e.withCurrentTouch { touch ->
-            handlePointerMove(touch.clientX.toDouble(), touch.clientY.toDouble(), e.shiftKey)
+        e.withChangedTouches { touch ->
+            val t = ongoingTouches.find { it.id == touch.identifier }
+            if (t != null) {
+                t.x = touch.clientX
+                t.y = touch.clientY
+                withTouchMidpoint { x, y ->
+                    handlePointerMove(x, y, e.shiftKey)
+                }
+                withTouchDistanceAngle { dist, angle ->
+                    val dDist = dist - prevDist
+                    val dAngle = angle - prevAngle
+                    scale(dDist / 200)
+                    rotate(0.0, 0.0, -dAngle)
+                    prevDist = dist
+                    prevAngle = angle
+                }
+            }
         }
     }
 
@@ -244,4 +298,12 @@ class PolyCanvas(props: PolyCanvasProps) : RPureComponent<PolyCanvasProps, RStat
 private fun HTMLCanvasElement.addTouchListener(type: String, handler: (TouchEvent) -> Unit) {
     @Suppress("UNCHECKED_CAST")
     addEventListener(type, handler as (Event) -> Unit)
+}
+
+private class OngoingTouch(val id: Int, var x: Int, var y: Int)
+
+private inline fun TouchEvent.withChangedTouches(handle: (Touch) -> Unit) {
+    for (i in 0 until changedTouches.length) {
+        handle(changedTouches[i]!!)
+    }
 }
