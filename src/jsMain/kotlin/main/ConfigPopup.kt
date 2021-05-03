@@ -14,6 +14,8 @@ fun RBuilder.configPopup(params: RootParams) {
     }
 }
 
+@Suppress("NON_EXPORTABLE_TYPE")
+@JsExport
 class ConfigPopup(props: PComponentProps<RootParams>) : RComponent<PComponentProps<RootParams>, RState>(props) {
     private inner class Context(params: RootParams) : Param.Context(params, Param.TargetValue) {
         val hasFaces by { params.render.view.display.value.hasFaces() }

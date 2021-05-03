@@ -38,19 +38,6 @@ private fun onLoad() {
             }
         }
     }
-    // TODO: FIXME: workaround for https://youtrack.jetbrains.com/issue/KT-41651
-    @Suppress("UNREACHABLE_CODE", "ConstantConditionIf")
-    if (false) {
-        RootPane(null!!)
-        ControlPane(null!!)
-        ConfigPopup(null!!)
-        ExportPopup(null!!)
-        PolyInfo(null!!)
-        Dropdown<Any>(null!!)
-        PDropdown<Scale>(null!!)
-        PSlider(null!!)
-        PCheckbox(null!!)
-    }
 }
 
 private fun loadAndAutoSaveRootParams(): RootParams {

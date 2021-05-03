@@ -27,6 +27,8 @@ fun RBuilder.pSlider(param: DoubleParam, disabled: Boolean = false, showValue: B
     }
 }
 
+@Suppress("NON_EXPORTABLE_TYPE")
+@JsExport
 class PSlider(props: PSliderProps) : PValueComponent<Double, DoubleParam, PSliderProps, PValueComponentState<Double>>(props) {
     private fun Double.intStr() = roundToInt().toString()
 

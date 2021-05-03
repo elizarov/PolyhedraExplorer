@@ -20,6 +20,8 @@ external interface ControlPaneProps : PComponentProps<PolyParams> {
     var togglePopup: (Popup?) -> Unit
 }
 
+@Suppress("NON_EXPORTABLE_TYPE")
+@JsExport
 class ControlPane(props: ControlPaneProps) : RComponent<ControlPaneProps, RState>(props) {
     private inner class Context(params: PolyParams) : Param.Context(params, Param.TargetValue + Param.Progress) {
         val transformedPolys by { params.transformedPolys }

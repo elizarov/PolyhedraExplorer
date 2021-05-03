@@ -25,6 +25,8 @@ fun <T> RBuilder.dropdown(handler: DropdownProps<T>.() -> Unit) {
     }
 }
 
+@Suppress("NON_EXPORTABLE_TYPE")
+@JsExport
 class Dropdown<T>(props: DropdownProps<T>) : RComponent<DropdownProps<T>, RState>(props) {
     override fun RBuilder.render() {
         select {

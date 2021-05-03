@@ -22,6 +22,8 @@ fun RBuilder.polyInfo(handler: PolyInfoProps.() -> Unit) {
     }
 }
 
+@Suppress("NON_EXPORTABLE_TYPE")
+@JsExport
 class PolyInfo(props: PolyInfoProps) : RComponent<PolyInfoProps, RState>(props) {
     private inner class Context(params: RenderParams) : Param.Context(params, Param.TargetValue) {
         val poly by { params.poly.poly }

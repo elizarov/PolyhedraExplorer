@@ -21,6 +21,8 @@ external interface ExportPopupProps : PComponentProps<RootParams> {
     var faces: FaceContext?
 }
 
+@Suppress("NON_EXPORTABLE_TYPE")
+@JsExport
 class ExportPopup(props: ExportPopupProps) : RComponent<ExportPopupProps, RState>(props) {
     private inner class Context(params: RootParams) : Param.Context(params, Param.TargetValue) {
         val poly by { params.render.poly.poly }

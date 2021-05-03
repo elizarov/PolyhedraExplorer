@@ -17,6 +17,8 @@ fun <T : Tagged> RBuilder.pDropdown(param: EnumParam<T>, disabled: Boolean = fal
     }
 }
 
+@Suppress("NON_EXPORTABLE_TYPE")
+@JsExport
 class PDropdown<T : Tagged>(props: PValueComponentProps<EnumParam<T>>) : PValueComponent<T, EnumParam<T>, PValueComponentProps<EnumParam<T>>, PValueComponentState<T>>(props) {
     override fun RBuilder.render() {
         dropdown<T> {

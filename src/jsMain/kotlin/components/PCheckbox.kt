@@ -19,6 +19,8 @@ fun RBuilder.pCheckbox(param: BooleanParam, disabled: Boolean = false) {
     }
 }
 
+@Suppress("NON_EXPORTABLE_TYPE")
+@JsExport
 class PCheckbox(props: PValueComponentProps<BooleanParam>) : PValueComponent<Boolean, BooleanParam, PValueComponentProps<BooleanParam>, PValueComponentState<Boolean>>(props) {
     override fun RBuilder.render() {
         input(InputType.checkBox) {
