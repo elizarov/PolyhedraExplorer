@@ -1,0 +1,414 @@
+/*
+ * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
+ */
+
+/* --------- reset --------- */
+
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+html, body, p, table, tbody, tr, td, label {
+    padding: 0;
+    margin: 0;
+}
+
+input, button, select {
+    font: inherit;
+}
+
+/* --------- root style & layout --------- */
+
+:root {
+    --shadow: 0 3px 5px -1px rgba(0, 0, 0, .2), 0 6px 10px 0 rgba(0, 0, 0, .14), 0 1px 18px 0 rgba(0, 0, 0, .12);
+    --border: 1px solid black;
+    --background-color: hsl(0, 0%, 95%);
+    --text-color: hsl(0, 0%, 5%);
+    --tooltip-background-color: hsl(0, 0%, 75%);
+    --popup-background-color: hsla(0, 0%, 95%, .8);
+    --button-background-color: #1976d2;
+    --button-active-color: #8daecd;
+    --button-color: #ffffff;
+    --hover-color: #8cefd0;
+    --disabled-color: hsl(0, 0%, 80%);
+    --row-height: 1.5em;
+}
+
+body {
+    background-color: var(--background-color);
+    color: var(--text-color);
+    font-family: 'Roboto', sans-serif;
+    font-weight: 300;
+    font-size: 22px;
+    height: 100vh;
+}
+
+#root, canvas.poly {
+    width: 100%;
+    height: 100%;
+}
+
+div.ctrl-pane {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: calc(100% - 4em);
+    height: 100%;
+    display: flex;
+    flex-flow: row wrap;
+    align-content: flex-start;
+    pointer-events: none;
+}
+
+div.ctrl-pane > div.btn {
+    margin-left: 1em;
+    margin-top: 1em;
+}
+
+/* --------- Floating Buttons --------- */
+
+div.btn {
+    position: relative;
+    height: 2em;
+    color: var(--button-color);
+    background-color: var(--button-background-color);
+    box-shadow: var(--shadow);
+    border-radius: 1em;
+    pointer-events: auto;
+    display: flex;
+    flex-flow: nowrap row;
+}
+
+div.btn.left {
+    border-radius: 1em 0 0 1em;
+}
+
+div.btn.mid {
+    border-radius: 0;
+}
+
+div.btn.right {
+    border-radius: 0 1em 1em 0;
+}
+
+div.btn.active {
+    background-color: var(--button-active-color);
+}
+
+div.btn > button {
+    height: 2em;
+    font-size: 1em;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    color: inherit;
+    background-color: transparent;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+div.btn > button:hover:not(:disabled) {
+   color: var(--hover-color);
+}
+
+div.btn > button:disabled {
+    color: var(--disabled-color);
+}
+
+div.btn > button.square {
+    width: 2em;
+}
+
+div.btn > button.txt {
+    padding-left: 0.6em;
+    padding-right: 0.6em;
+}
+
+div.btn > button.msg {
+    padding-right: 0.6em;
+}
+
+div.btn > div.sep {
+    width: 1px;
+    height: 2em;
+    background-color: var(--button-color);
+}
+
+div.btn.config {
+    position: absolute;
+    top: 1em;
+    right: 1em;
+}
+
+div.btn.export {
+    position: absolute;
+    top: 4em;
+    right: 1em;
+}
+
+div.btn.reset {
+    position: absolute;
+    left: 1em;
+    bottom: 1em;
+}
+
+div.fev {
+    position: absolute;
+    left: 50%;
+    bottom: 1em;
+    display: flex;
+    flex-flow: nowrap row;
+}
+
+div.fev > div {
+    position: relative;
+    left: -50%;
+}
+
+/* --------- Export/Config Drawers --------- */
+
+aside.drawer {
+    display: block;
+    position: absolute;
+    right: 0.5em;
+    width: calc(min(17em, 100vw - 1em));
+    background-color: var(--popup-background-color);
+    border: var(--border);
+    border-radius: calc(0.5 * var(--row-height));
+    box-shadow: var(--shadow);
+    overflow-y: auto;
+    z-index: 1;
+}
+
+aside.drawer.config {
+    top: 3.5em;
+    height: calc(100vh - 4em);
+}
+
+aside.drawer.export {
+    top: 6.5em;
+    height: calc(100vh - 7em);
+}
+
+/* --------- Transform/Seed Dropdowns --------- */
+
+aside.dropdown {
+    display: block;
+    position: absolute;
+    top: 2.5em;
+    left: -0.5em;
+    background-color: var(--popup-background-color);
+    color: var(--text-color);
+    border: var(--border);
+    border-radius: calc(0.5 * var(--row-height));
+    box-shadow: var(--shadow);
+    overflow-y: scroll;
+    max-height: calc(min(20.25em, 100vh - 5em));
+    z-index: 1;
+}
+
+aside.dropdown div.item:hover {
+    background-color: var(--hover-color);
+}
+
+/* --------- FEV popup --------- */
+
+aside.fev {
+    display: block;
+    position: absolute;
+    bottom: 3.5em;
+    left: 0.5em;
+    width: calc(100vw - 1em);
+    background-color: var(--popup-background-color);
+    border: var(--border);
+    border-radius: calc(0.5 * var(--row-height));
+    box-shadow: var(--shadow);
+    max-height: 50vh;
+    overflow-y: auto;
+    z-index: 1;
+}
+
+/* --------- headers / items --------- */
+
+div.text-row {
+    display: table;
+    width: 100%;
+}
+
+div.text-row > div {
+    display: table-cell;
+}
+
+.header {
+    padding-left: 1ch;
+    background-color: hsl(0, 0%, 85%);
+    font-weight: 500;
+    height: var(--row-height);
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.item {
+    padding-left: 1ch;
+    padding-right: 1ch;
+    height: var(--row-height);
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+/* --------- controls--------- */
+
+div.row {
+    padding-left: 1ch;
+}
+
+label {
+    margin-right: 1ch;
+}
+
+.suffix {
+    margin-left: 1ch;
+}
+
+div.control {
+    height: 1.5em;
+    margin-top: 0.3em;
+    margin-bottom: 0.3em;
+}
+
+tr.control {
+    height: var(--row-height);
+    border-top: 0.3em solid transparent;
+    border-bottom: 0.3em solid transparent;
+}
+
+tr.control > td > input, tr.control > td > button, tr.control > td > select {
+    margin-right: 1ch
+}
+
+.download {
+    display: none;
+}
+
+/* --------- tables --------- */
+
+table {
+    border: none;
+    border-spacing: 0;
+    border-collapse: collapse;
+    width: 100%;
+}
+
+table td.fill {
+    width: 100%;
+}
+
+table td:not(.fill) {
+    white-space: nowrap;
+}
+
+td {
+    padding-left: 1ch;
+}
+
+table td:last-child {
+    padding-right: 1ch;
+}
+
+td.rt {
+    text-align: right;
+}
+
+tr.info {
+    vertical-align: top;
+}
+
+svg.figure {
+    width: 1em;
+    height: 1em;
+}
+
+tr.info:hover {
+    background: var(--hover-color);
+}
+
+.face-attn {
+    color: red;
+}
+
+/* --------- canvas fps --------- */
+
+.fps {
+    position: absolute;
+    margin-right: 5px;
+    bottom: 0;
+    right: 0;
+}
+
+/* --------- tooltip --------- */
+
+.msg {
+    position: relative;
+}
+
+aside.tooltip-text {
+    visibility: hidden;
+    position: absolute;
+    top: 1.5em;
+    left: -0.5em;
+    color: var(--text-color);
+    background-color: var(--tooltip-background-color);
+    padding: 0.2em;
+    border: 1px solid black;
+    border-radius: 6px;
+    white-space: nowrap;
+    z-index: 2;
+}
+
+*:hover:not(.active) > aside.tooltip-text {
+    visibility: visible;
+}
+
+/* --------- emoji --------- */
+
+span.emoji {
+    vertical-align: middle;
+    line-height: 1;
+}
+
+/* --------- spinner --------- */
+
+.spinner {
+    position: relative;
+    left: -0.4em;
+    padding-right: 1.5em;
+    opacity: 1;
+    transition: opacity linear 0.1s;
+}
+
+.spinner::before {
+    border: solid 3px #eee;
+    border-radius: 50%;
+    content: "";
+    height: 1.3em;
+    left: 50%;
+    position: absolute;
+    top: 50%;
+    transform: translate3d(-50%, -50%, 0);
+    width: 1.3em;
+    animation: 2s linear infinite spinner;
+    border-bottom-color: #EF6565;
+    opacity: inherit;
+    transform-origin: center;
+    will-change: transform;
+}
+
+@keyframes spinner {
+    0% {
+        transform: translate3d(-50%, -50%, 0) rotate(0deg);
+    }
+    100% {
+        transform: translate3d(-50%, -50%, 0) rotate(360deg);
+    }
+}
+
