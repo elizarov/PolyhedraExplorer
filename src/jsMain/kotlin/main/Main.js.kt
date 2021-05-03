@@ -5,8 +5,6 @@
 package polyhedra.js.main
 
 import kotlinx.browser.*
-import polyhedra.common.poly.*
-import polyhedra.js.components.*
 import polyhedra.js.params.*
 import polyhedra.js.poly.*
 import polyhedra.js.util.*
