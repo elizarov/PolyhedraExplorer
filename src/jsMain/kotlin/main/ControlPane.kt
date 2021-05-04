@@ -55,7 +55,7 @@ class ControlPane(props: ControlPaneProps) : RComponent<ControlPaneProps, RState
                 if (props.popup == Popup.AddTransform && !disabled) {
                     transformsDropdown(transforms.size)
                 }
-                button(classes = "square") {
+                button(classes = "square" + activeWhen(Popup.AddTransform)) {
                     attrs { this.disabled = disabled }
                     i("fa fa-plus") {
                         onClick { props.togglePopup(Popup.AddTransform) }
@@ -74,7 +74,7 @@ class ControlPane(props: ControlPaneProps) : RComponent<ControlPaneProps, RState
                     if (props.popup == popup && !disabled) {
                         transformsDropdown(index)
                     }
-                    button(classes = "txt") {
+                    button(classes = "txt" + activeWhen(popup)) {
                         attrs { this.disabled = disabled }
                         onClick { props.togglePopup(popup) }
                         +transforms[index].toString()
@@ -83,7 +83,7 @@ class ControlPane(props: ControlPaneProps) : RComponent<ControlPaneProps, RState
                     if (index == errorIndex) {
                         val isInProcess = transformError?.isAsync == true
                         if (isInProcess) {
-                            button(classes = "msg") {
+                            button(classes = "msg" + activeWhen(popup)) {
                                 onClick { updateTransform(index, Transform.None) }
                                 span("spinner") {}
                                 span { +"${ctx.transformProgress}%" }
@@ -106,7 +106,7 @@ class ControlPane(props: ControlPaneProps) : RComponent<ControlPaneProps, RState
                 if (props.popup == Popup.Seed) {
                     seedsDropdown()
                 }
-                button(classes = "txt") {
+                button(classes = "txt" + activeWhen(Popup.Seed)) {
                     onClick { props.togglePopup(Popup.Seed) }
                     +ctx.seed.toString()
                     aside("tooltip-text") { +"Seed" }

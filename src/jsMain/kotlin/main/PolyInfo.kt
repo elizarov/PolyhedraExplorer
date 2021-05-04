@@ -47,7 +47,7 @@ class PolyInfo(props: PolyInfoProps) : RComponent<PolyInfoProps, RState>(props) 
         val fev = ctx.poly.fev()
         div("fev") {
             div("btn left" + activeWhen(Popup.Faces)) {
-                button(classes = "txt") {
+                button(classes = "txt" + activeWhen(Popup.Faces)) {
                     onClick { props.togglePopup(Popup.Faces) }
                     +"F: ${fev.f}"
                     aside("tooltip-text") { +"Faces" }
@@ -55,7 +55,7 @@ class PolyInfo(props: PolyInfoProps) : RComponent<PolyInfoProps, RState>(props) 
             }
             div("btn mid" + activeWhen(Popup.Edges)) {
                 div("sep") {}
-                button(classes = "txt") {
+                button(classes = "txt" + activeWhen(Popup.Edges)) {
                     onClick { props.togglePopup(Popup.Edges) }
                     +"E: ${fev.e}"
                     aside("tooltip-text") { +"Edges" }
@@ -63,7 +63,7 @@ class PolyInfo(props: PolyInfoProps) : RComponent<PolyInfoProps, RState>(props) 
                 div("sep") {}
             }
             div("btn right" + activeWhen(Popup.Vertices)) {
-                button(classes = "txt") {
+                button(classes = "txt" + activeWhen(Popup.Vertices)) {
                     onClick { props.togglePopup(Popup.Vertices) }
                     +"V: ${fev.v}"
                     aside("tooltip-text") { +"Vertices" }
