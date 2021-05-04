@@ -29,22 +29,24 @@ fun <T> RBuilder.dropdown(handler: DropdownProps<T>.() -> Unit) {
 @JsExport
 class Dropdown<T>(props: DropdownProps<T>) : RComponent<DropdownProps<T>, RState>(props) {
     override fun RBuilder.render() {
-        select {
-            attrs {
-                disabled = props.disabled
-                this["value"] = props.value.toString()
-                onChangeFunction = { event ->
-                    val valueString = (event.target as HTMLSelectElement).value
-                    val value = props.options.first { it.toString() == valueString }
-                    props.onChange(value)
-                }
-            }
-            for (opt in props.options) {
-                option {
-                    attrs {
-                        value = opt.toString()
+        div("select") {
+            select {
+                attrs {
+                    disabled = props.disabled
+                    this["value"] = props.value.toString()
+                    onChangeFunction = { event ->
+                        val valueString = (event.target as HTMLSelectElement).value
+                        val value = props.options.first { it.toString() == valueString }
+                        props.onChange(value)
                     }
-                    +opt.toString()
+                }
+                for (opt in props.options) {
+                    option {
+                        attrs {
+                            value = opt.toString()
+                        }
+                        +opt.toString()
+                    }
                 }
             }
         }

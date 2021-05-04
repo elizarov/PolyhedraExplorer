@@ -13,7 +13,7 @@ html, body, p, table, tbody, tr, td, label {
     margin: 0;
 }
 
-input, button, select {
+input, button {
     font: inherit;
 }
 
@@ -22,6 +22,7 @@ input, button, select {
 :root {
     --shadow: 0 3px 5px -1px rgba(0, 0, 0, .2), 0 6px 10px 0 rgba(0, 0, 0, .14), 0 1px 18px 0 rgba(0, 0, 0, .12);
     --border: 1px solid black;
+    --select-arrow-color: black;
     --background-color: hsl(0, 0%, 95%);
     --text-color: hsl(0, 0%, 5%);
     --tooltip-background-color: hsl(0, 0%, 75%);
@@ -41,6 +42,7 @@ body {
     font-weight: 300;
     font-size: 30px;
     height: 100vh;
+    width: 100vw;
     overflow: hidden;
 }
 
@@ -349,6 +351,41 @@ tr.info:hover {
     margin-right: 5px;
     bottom: 0;
     right: 0;
+}
+
+/* --------- custom select style --------- */
+
+select {
+    -webkit-appearance: none;
+    appearance: none;
+    background-color: transparent;
+    border: none;
+    padding: 0 1em 0 0;
+    margin: 0;
+    font: inherit;
+    cursor: inherit;
+    line-height: inherit;
+    grid-area: select;
+}
+
+.select::after {
+    content: "";
+    width: 0.8em;
+    height: 0.5em;
+    background-color: var(--select-arrow-color);
+    clip-path: polygon(100% 0%, 0 0%, 50% 100%);
+    grid-area: select;
+    justify-self: end;
+}
+
+div.select {
+    display: grid;
+    grid-template-areas: "select";
+    align-items: center;
+    border: var(--border);
+    border-radius: 0.25em;
+    padding: 0 0.5em;
+    cursor: pointer;
 }
 
 /* --------- tooltip --------- */
