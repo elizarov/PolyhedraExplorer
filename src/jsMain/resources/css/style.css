@@ -398,7 +398,6 @@ div.select {
 
 aside.tooltip-text {
     visibility: hidden;
-    opacity: 0;
     position: absolute;
     top: 1.5em;
     left: -0.5em;
@@ -413,8 +412,7 @@ aside.tooltip-text {
 
 *:hover:not(.active) > aside.tooltip-text {
     visibility: visible;
-    opacity: 1;
-    transition: opacity 0s linear 0.5s;
+    transition: visibility 0s linear 0.5s;
 }
 
 /* --------- emoji --------- */
