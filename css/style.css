@@ -357,7 +357,17 @@ tr.info:hover {
 
 /* --------- custom select style --------- */
 
-select {
+div.select {
+    display: grid;
+    grid-template-areas: "select";
+    align-items: center;
+    border: var(--border);
+    border-radius: 0.25em;
+    padding: 0 0.5em;
+    cursor: pointer;
+}
+
+div.select > select {
     -webkit-appearance: none;
     appearance: none;
     background-color: transparent;
@@ -370,7 +380,7 @@ select {
     grid-area: select;
 }
 
-.select::after {
+div.select::after {
     content: "";
     width: 0.8em;
     height: 0.5em;
@@ -380,14 +390,57 @@ select {
     justify-self: end;
 }
 
-div.select {
-    display: grid;
-    grid-template-areas: "select";
-    align-items: center;
-    border: var(--border);
-    border-radius: 0.25em;
-    padding: 0 0.5em;
+/* --------- custom checkbox style --------- */
+
+div.checkbox {
+    display: block;
+    position: relative;
     cursor: pointer;
+    user-select: none;
+    width: 1.2em;
+    height: 1.2em;
+}
+
+div.checkbox > input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 0;
+    width: 0;
+}
+
+div.checkbox > span.checkmark {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 1.2em;
+    width: 1.2em;
+    background-color: var(--button-background-color);
+    border: 1px solid black;
+}
+
+div.checkbox:hover > input ~ span.checkmark {
+    background-color: var(--button-active-color);
+}
+
+div.checkbox > span.checkmark:after {
+    content: "";
+    position: absolute;
+    display: none;
+}
+
+div.checkbox > input:checked ~ span.checkmark:after {
+    display: block;
+}
+
+div.checkbox > span.checkmark:after {
+    left: 0.9em;
+    top: 0.5em;
+    width: 0.4em;
+    height: 0.8em;
+    border: solid white;
+    border-width: 0 3px 3px 0;
+    transform: translate(-0.5em, -0.5em) rotate(45deg);
 }
 
 /* --------- tooltip --------- */
@@ -398,7 +451,6 @@ div.select {
 
 aside.tooltip-text {
     visibility: hidden;
-    opacity: 0;
     position: absolute;
     top: 1.5em;
     left: -0.5em;
@@ -413,8 +465,7 @@ aside.tooltip-text {
 
 *:hover:not(.active) > aside.tooltip-text {
     visibility: visible;
-    opacity: 1;
-    transition: opacity 0s linear 0.5s;
+    transition: visibility 0s linear 0.5s;
 }
 
 /* --------- emoji --------- */
