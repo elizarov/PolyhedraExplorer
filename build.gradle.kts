@@ -22,10 +22,6 @@ val `history-version`: String by project
 
 kotlin {
     jvm {
-        compilations.all {
-            kotlinOptions.jvmTarget = "1.8"
-            kotlinOptions.freeCompilerArgs += "-Xuse-ir"
-        }
         testRuns["test"].executionTask.configure {
             useJUnit()
         }
