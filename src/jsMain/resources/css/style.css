@@ -463,9 +463,11 @@ aside.tooltip-text {
     z-index: 2;
 }
 
-*:hover:not(.active) > aside.tooltip-text {
-    visibility: visible;
-    transition: visibility 0s linear 0.5s;
+@media (any-hover: hover) {
+    *:hover:not(.active) > aside.tooltip-text {
+        visibility: visible;
+        transition: visibility 0s linear 0.5s;
+    }
 }
 
 /* --------- emoji --------- */
