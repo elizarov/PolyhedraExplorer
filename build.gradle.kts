@@ -1,6 +1,6 @@
 plugins {
-    kotlin("multiplatform") version "1.5.0-680"
-    kotlin("plugin.serialization") version "1.5.0-680"
+    kotlin("multiplatform") version "1.5.0"
+    kotlin("plugin.serialization") version "1.5.0"
     application
 }
 
@@ -11,7 +11,6 @@ repositories {
     mavenCentral()
     maven { url = uri("https://maven.pkg.jetbrains.space/kotlin/p/kotlin/kotlin-js-wrappers") }
     maven { url = uri("https://maven.pkg.jetbrains.space/public/p/kotlinx-html/maven") }
-    maven { url = uri("https://maven.pkg.jetbrains.space/kotlin/p/kotlin/dev/") }
 }
 
 val `kotlin-serialization-version`: String by project
@@ -80,7 +79,6 @@ kotlin {
             }
         }
         all {
-            languageSettings.enableLanguageFeature("InlineClasses")
             languageSettings.useExperimentalAnnotation("kotlin.RequiresOptIn")
             languageSettings.useExperimentalAnnotation("kotlin.ExperimentalStdlibApi")
             languageSettings.useExperimentalAnnotation("kotlin.js.ExperimentalJsExport")
