@@ -48,6 +48,12 @@ body {
     overflow: hidden;
 }
 
+@media only screen and (max-device-width: 1000px) {
+    body {
+        font-size: 32px;
+    }
+}
+
 #root, canvas.poly {
     width: 100%;
     height: 100%;
@@ -463,9 +469,11 @@ aside.tooltip-text {
     z-index: 2;
 }
 
-*:hover:not(.active) > aside.tooltip-text {
-    visibility: visible;
-    transition: visibility 0s linear 0.5s;
+@media (any-hover: hover) {
+    *:hover:not(.active) > aside.tooltip-text {
+        visibility: visible;
+        transition: visibility 0s linear 0.5s;
+    }
 }
 
 /* --------- emoji --------- */
