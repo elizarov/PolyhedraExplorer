@@ -37,7 +37,7 @@ gradlew jsBrowserDevelopmentRun
   * [ ] Bigger library of seeds
       * [x] Platonic solids
       * [x] Arhimedean solids
-      * [ ] Catalan solids
+      * [x] Catalan solids
       * [ ] Johnson solids
   * [ ] Identify names of well-know polyhedra
 * Rendering

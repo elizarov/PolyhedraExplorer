@@ -63,6 +63,9 @@ private fun seed(tag: String, type: SeedType, transform: Transform, base: Seed, 
         base.poly.transformed(transform)
     }
 
+private fun seed(type: SeedType, transform: Transform, base: Seed, wikiName: String? = null) =
+    seed(transform.tag + base.tag, type, transform, base, wikiName)
+
 // --------------------- Basic platonic geometry ---------------------
 
 @Suppress("ObjectPropertyName")
@@ -154,3 +157,19 @@ val SC.TruncatedIcosahedron by seed("tI", SeedType.Arhimedean, Transform.Truncat
 val SC.Rhombicosidodecahedron by seed("eD", SeedType.Arhimedean, Transform.Cantellated, SC.Dodecahedron)
 val SC.RhombitruncatedIcosidodecahedron by seed("bD", SeedType.Arhimedean, Transform.Bevelled, SC.Dodecahedron, "Truncated icosidodecahedron")
 val SC.SnubDodecahedron by seed("sD", SeedType.Arhimedean, Transform.Snub, SC.Dodecahedron)
+
+// --------------------- 13 Catalan Solids ---------------------
+
+val SC.TriakisTetrahedron by seed(SeedType.Catalan, Transform.Dual, SC.TruncatedTetrahedron)
+val SC.RhombicDodecahedron by seed(SeedType.Catalan, Transform.Dual, SC.Cuboctahedron)
+val SC.TriakisOctahedron by seed(SeedType.Catalan, Transform.Dual, SC.TruncatedCube)
+val SC.TetrakisHexahedron by seed(SeedType.Catalan, Transform.Dual, SC.TruncatedOctahedron)
+val SC.DeltoidalIcositetrahedron by seed(SeedType.Catalan, Transform.Dual, SC.Rhombicuboctahedron)
+val SC.DisdyakisDodecahedron by seed(SeedType.Catalan, Transform.Dual, SC.RhombitruncatedCuboctahedron)
+val SC.PentagonalIcositetrahedron by seed(SeedType.Catalan, Transform.Dual, SC.SnubCube)
+val SC.RhombicTriacontahedron by seed(SeedType.Catalan, Transform.Dual, SC.Icosidodecahedron)
+val SC.TriakisIcosahedron by seed(SeedType.Catalan, Transform.Dual, SC.TruncatedDodecahedron)
+val SC.PentakisDodecahedron by seed(SeedType.Catalan, Transform.Dual, SC.TruncatedIcosahedron)
+val SC.DeltoidalHexecontahedron by seed(SeedType.Catalan, Transform.Dual, SC.Rhombicosidodecahedron)
+val SC.DisdyakisTriacontahedron by seed(SeedType.Catalan, Transform.Dual, SC.RhombitruncatedIcosidodecahedron)
+val SC.PentagonalHexecontahedron by seed(SeedType.Catalan, Transform.Dual, SC.SnubDodecahedron)
