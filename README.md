@@ -8,7 +8,7 @@ polyhedra and derivation of larger polyhedra via
 All transformations are symmetry-preserving and all resulting elements (faces, edges, vertices) 
 are grouped into rotation orbits and are colored by default with respect to them.  
 
-**👷🏽 It is an engineering prototype. There is no nice UI yet.**
+Prototype is deployed at [http://polyhedron.me](http://polyhedron.me)
                                               
 ## Building & running
 
@@ -18,65 +18,52 @@ gradlew jsBrowserDevelopmentRun
 
 ## Roadmap / TODO
                        
-* Animations
-  * [x] Animate all param changes
-  * [x] Animate polyhedra transformations
-  * [x] Animate topology-preserving transformations (canonicalization)
-  * [x] Animate two-step transition between very different transforms
+* UI/UX
   * [ ] Animate seed changes with fly in/out
-  * [x] Optimize rendering during transform animation (do not update geometry on every frame)
-* Asynchrony 
-  * [x] Move canonicalization algo to a WebWorker
   * [ ] Better progress bar display
-  * [x] Cancellation
-* Export 
+  * [ ] Show/kind faces by kind with point and click on the polyhedron
+  * [ ] Mark experimental features in UI
+  * [ ] Better slider UI on mobile devices
+* Export/Share 
   * [x] Solid to STL
   * [x] Geometry to OpenSCAD  
   * [ ] Picture to SVG
+  * [ ] Share link
 * Polyhedra
   * [ ] Bigger library of seeds
       * [x] Platonic solids
       * [x] Arhimedean solids
       * [x] Catalan solids
+      * [ ] Infinite families of prisms/antiprisms 
       * [ ] Johnson solids
   * [ ] Identify names of well-know polyhedra
 * Rendering
   * [ ] Render nicer edges and vertices
   * [ ] Render better-looking (physical) materials 
-  * [x] Render hollow models with select faces
   * [ ] Custom faces coloring: by orbit with reflections, by geometry, by size
   * [ ] Nicer-looking transparent views (only transparent front)
-* Interaction
-  * [x] Pinch-to-zoom gesture (or Ctrl+Wheel)
-  * [x] Z-rotate with Shift+Mouse 
-  * [ ] Two-finger Z-rotate gesture (does not seem to be supported on macOS Chrome)
-  * [x] Highlight faces by hovering over them in the list
-  * [x] Show/hide faces by kind
-  * [ ] Show/kind faces by kind with point and click on the polyhedron
 * Polyhedron info
-  * [x] Show face and vertex geometry
-  * [x] Show edge dihedral angles
+  * [ ] Show edge geometry (two faces)
+  * [ ] Show face areas
+  * [ ] Sort by selected column (kind/distance/length/area)
 * Transformations
-  * [x] Merge face kind when possible
   * [ ] Redesign truncation algorithm so that it always works
   * [ ] Rectification solution for non-regular polyhedra  
   * [ ] Stellation
-  * [x] Chamfering
-  * [x] Redesign chamfering artefacts on non-canonical polyhedra 
+  * [ ] Better canonical algorithm
+  * [ ] Long-term caching of canonical geometry keyed by topology
+  * [ ] Improve transformation performance
 * Custom transformations
   * [ ] Truncate specific vertices
   * [ ] Cantellate specific edges
   * [ ] Augment specific faces
-  * [x] Drop selected vertices/faces/edges
+  * [ ] Improve dropping of selected vertices/faces/edges
 * Infrastructure    
   * [ ] Embed CSS into WebPack
-  * [x] `jsBrowserProductionRun` shall work
-* Overall style / layout
-  * [x] Move inessential params to popup
-  * [x] Design and implement a full-screen UI
-  * [x] Flip left-right through seeds and transforms
-* Backend
-  * [ ] Render polyhedra picture by params
+  * [ ] Drop gl-matrix
+  * [ ] Switch from React to Compose
+  * [ ] Benchmarking
+  * [ ] Software gl impl: render polyhedra picture by params on backend
         
 ## License
 
