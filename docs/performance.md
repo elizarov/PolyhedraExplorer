@@ -11,7 +11,7 @@ Median time per uncached operation; lower is better.
 | Bevel / dodecahedron | 602.672 µs | 264.076 µs | 2.28× | 56.2% |
 | Snub / dodecahedron | 530.886 µs | 238.703 µs | 2.22× | 55.0% |
 | Chamfer / icosahedron | 521.857 µs | 213.624 µs | 2.44× | 59.1% |
-| Canonical / irregular truncated cube | 4.036 ms | 2.917 ms | 1.38× | 27.7% |
+| Canonicalization / irregular truncated cube | 4.036 ms | 2.917 ms | 1.38× | 27.7% |
 
 The geometric-mean speedup across these six workloads is approximately 1.96×.
 

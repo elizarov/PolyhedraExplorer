@@ -3,10 +3,10 @@
 ## Polyhedra
 
 - 31 built-in convex seeds: 5 Platonic, 13 Archimedean, and 13 Catalan solids.
-- Transform chains containing None/removal, Truncated, Rectified, Cantellated, Dual, Bevelled, Snub, Chamfered, Canonical, and topology-valid Drop operations.
+- Transform chains containing None/removal, Truncated, Rectified, Cantellated, Dual, Bevelled, Snub, Chamfered, `Canonical` (the canonicalization operation), and topology-valid Drop operations.
+- Background WasmGC execution for manipulation algorithms, with live convergence progress for canonicalization and cancellation when a newer state supersedes it.
 - Circumradius, midradius, or inradius normalization.
 - Transform applicability, identity, maximum-size, failure, and non-planar-face feedback.
-- Progress reporting for iterative canonicalization.
 
 ## Exploration and rendering
 

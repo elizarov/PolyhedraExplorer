@@ -11,7 +11,8 @@
 | Topology | Connectivity of vertices, edges, and faces independent of coordinates. |
 | Same topology | Two meshes whose indexed connectivity is compatible, allowing direct WebGL interpolation. |
 | Drop | Removal of a topologically admissible face, edge, or vertex kind followed by reconstruction of the remaining boundary. |
-| Canonical | Iterative adjustment toward a polyhedron whose edges are tangent to a common midsphere. |
+| Canonical representation | The single normalized geometric representation targeted by the application for a polyhedron topology: it is centered, its faces are planar, and every edge is tangent to one common midsphere within project tolerances. This term names the resulting form, not the procedure used to find it. |
+| Canonicalization | The iterative numerical algorithm that adjusts a polyhedron's vertex coordinates toward its canonical representation. The UI exposes this operation as the `Canonical` transform and reports its convergence progress. |
 | Planar face | A face whose vertices lie in one plane within the project tolerance. |
 | Circumradius | Maximum distance from the origin to a vertex. |
 | Midradius | Mean closest distance from the origin to an edge. |
@@ -20,5 +21,5 @@
 | Keyframe | A mesh and interpolation fraction returned by the core for a transform animation step. |
 | Compose HTML | JetBrains Compose runtime and DOM builders used for the browser controls. |
 | WasmGC | WebAssembly garbage-collected object model targeted by Kotlin/Wasm. |
-| Core request | Serialized seed, transform, scale, prior-state, and animation inputs sent to Wasm. |
-| Core response | Serialized mesh, intermediates, topology metadata, issues, progress outcome, and keyframes returned by Wasm. |
+| Core request | Serialized seed, transform, scale, prior-state, and animation inputs sent to the Wasm worker. |
+| Core response | Serialized mesh, intermediates, topology metadata, issues, and keyframes returned by Wasm. Progress is delivered separately while the worker is running. |

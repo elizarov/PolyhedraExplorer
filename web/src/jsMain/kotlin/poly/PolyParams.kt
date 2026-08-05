@@ -62,6 +62,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
 
     private var requestId = 0
     private var coreStarted = false
+    private var cancelCoreRequest: (() -> Unit)? = null
     private val coreResultListeners = linkedSetOf<() -> Unit>()
     private var requestedState: CoreState? = null
     private var appliedState: CoreState? = null
@@ -91,7 +92,8 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         val duration = animationParams?.animateValueUpdatesDuration
 
         val activeRequestId = ++requestId
-        evaluateInWasm(
+        cancelCoreRequest?.invoke()
+        cancelCoreRequest = evaluateInWasm(
             request = CoreRequest(
                 state = state,
                 previousState = previousState,
@@ -105,6 +107,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
             },
             onSuccess = success@{ response ->
                 if (requestId != activeRequestId || requestedState != state) return@success
+                cancelCoreRequest = null
                 applyResponse(state, response)
                 notifyUpdated(TargetValue)
                 performUpdate(null, 0.0)
@@ -112,6 +115,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
             },
             onFailure = failure@{ cause ->
                 if (requestId != activeRequestId || requestedState != state) return@failure
+                cancelCoreRequest = null
                 coreError = cause.message ?: cause.toString()
                 console.error("Wasm core request failed", cause)
                 transformError = state.transformTags.firstOrNull()?.toTransformOrNull()?.let {
@@ -176,6 +180,8 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
 
     override fun destroy() {
         requestId++
+        cancelCoreRequest?.invoke()
+        cancelCoreRequest = null
         coreResultListeners.clear()
         super.destroy()
     }
