@@ -8,6 +8,7 @@ import polyhedra.common.util.toDegrees
 import polyhedra.js.catalog.Drop
 import polyhedra.js.components.ObserveParam
 import polyhedra.js.params.Param
+import polyhedra.js.params.SetParam
 import polyhedra.js.poly.*
 
 @Composable
@@ -72,25 +73,12 @@ private fun InfoHeader(
 
 @Composable
 private fun FacesPopup(params: RenderParams, poly: Polyhedron) {
-    val hiddenFaces = params.poly.hideFaces.value
     val faceRim = params.view.faceRim.targetValue
     Aside(attrs = { classes("fev") }) {
         Table {
             Tbody {
                 InfoHeader("Faces", poly.fs.size, poly.inradius, "inradius", 9) {
-                    val icon = when {
-                        hiddenFaces.isEmpty() -> "fa-circle"
-                        hiddenFaces.containsAll(poly.faceKinds.keys) -> "fa-circle-o"
-                        else -> "fa-dot-circle-o"
-                    }
-                    I(attrs = {
-                        classes("fa", icon)
-                        onClick {
-                            params.poly.hideFaces.updateValue(
-                                if (hiddenFaces.isEmpty()) poly.faceKinds.keys else emptySet(),
-                            )
-                        }
-                    })
+                    AllFacesVisibilityControl(params.poly.hideFaces, poly.faceKinds.keys)
                 }
                 for ((kind, face) in poly.faceKinds) {
                     val essence = face.essence()
@@ -103,21 +91,11 @@ private fun FacesPopup(params: RenderParams, poly: Polyhedron) {
                             if (!essence.isPlanar) {
                                 Span(attrs = { classes("msg") }) { MessageSpan(FaceNotPlanar()) }
                             } else {
-                                val hidden = kind in hiddenFaces
-                                val icon = when {
-                                    hidden && faceRim >= poly.faceRim(face).maxRim ->
-                                        arrayOf("fa", "fa-exclamation-circle", "face-attn")
-                                    hidden -> arrayOf("fa", "fa-circle-o")
-                                    else -> arrayOf("fa", "fa-circle")
-                                }
-                                I(attrs = {
-                                    classes(*icon)
-                                    onClick {
-                                        params.poly.hideFaces.updateValue(
-                                            if (hidden) hiddenFaces - kind else hiddenFaces + kind,
-                                        )
-                                    }
-                                })
+                                FaceVisibilityControl(
+                                    params.poly.hideFaces,
+                                    kind,
+                                    faceRim >= poly.faceRim(face).maxRim,
+                                )
                             }
                         }
                         Td(attrs = { classes("rt") }) { Text(kind.toString()) }
@@ -135,6 +113,48 @@ private fun FacesPopup(params: RenderParams, poly: Polyhedron) {
             }
         }
     }
+}
+
+@Composable
+internal fun AllFacesVisibilityControl(
+    hiddenFacesParam: SetParam<FaceKind>,
+    faceKinds: Set<FaceKind>,
+) {
+    ObserveParam(hiddenFacesParam, Param.TargetValue).value
+    val hiddenFaces = hiddenFacesParam.value
+    val icon = when {
+        hiddenFaces.isEmpty() -> "fa-circle"
+        hiddenFaces.containsAll(faceKinds) -> "fa-circle-o"
+        else -> "fa-dot-circle-o"
+    }
+    I(attrs = {
+        classes("fa", icon)
+        onClick {
+            hiddenFacesParam.updateValue(if (hiddenFaces.isEmpty()) faceKinds else emptySet())
+        }
+    })
+}
+
+@Composable
+internal fun FaceVisibilityControl(
+    hiddenFacesParam: SetParam<FaceKind>,
+    kind: FaceKind,
+    attentionWhenHidden: Boolean,
+) {
+    ObserveParam(hiddenFacesParam, Param.TargetValue).value
+    val hiddenFaces = hiddenFacesParam.value
+    val hidden = kind in hiddenFaces
+    val icon = when {
+        hidden && attentionWhenHidden -> arrayOf("fa", "fa-exclamation-circle", "face-attn")
+        hidden -> arrayOf("fa", "fa-circle-o")
+        else -> arrayOf("fa", "fa-circle")
+    }
+    I(attrs = {
+        classes(*icon)
+        onClick {
+            hiddenFacesParam.updateValue(if (hidden) hiddenFaces - kind else hiddenFaces + kind)
+        }
+    })
 }
 
 @Composable

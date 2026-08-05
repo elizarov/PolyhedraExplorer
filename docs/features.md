@@ -22,7 +22,7 @@
 - Face-kind table with count, inradius, adjacency, vertex figure, planarity, visibility, and available drop action.
 - Edge-kind table with count, midradius, adjacency, and local geometry.
 - Vertex-kind table with count, circumradius, adjacency, and vertex figure.
-- Hide/show all faces or individual face kinds while retaining configurable rims and shell width.
+- Hide/show all faces or individual face kinds with immediately synchronized popup controls, while retaining configurable rims and shell width.
 
 ## Persistence and export
 
