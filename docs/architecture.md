@@ -17,7 +17,7 @@ flowchart LR
     C --> B["JSON core request"]
     B --> Q["Dedicated Web Worker"]
     Q --> W["Kotlin/WasmGC core"]
-    W --> R["Mesh, topology, issues, animation keyframes"]
+    W --> R["Mesh, catalog match, topology, issues, animation keyframes"]
     W -. "canonicalization progress" .-> Q
     Q -. "progress messages" .-> C
     R --> V["JS view model"]
@@ -38,6 +38,7 @@ The Wasm core owns:
 - truncate, rectify, cantellate, dual, bevel, snub, chamfer, canonicalization (the UI's `Canonical` transform), and drop operations;
 - size guards, applicability checks, warnings, and progress;
 - scale normalization and topology/drop analysis;
+- rotation-orbit refinement and geometric comparison with built-in seeds;
 - topology-changing animation keyframe construction.
 
 The JS application owns DOM composition, user events, hash serialization, interpolation between returned keyframes, render-buffer generation, WebGL drawing, and file download.
@@ -46,7 +47,9 @@ The JS application owns DOM composition, user events, hash serialization, interp
 
 `RootParams` is the authoritative UI state. Its compact serialization is stored after `#/` in the URL, so reloads and copied links reproduce the current seed, transform chain, view, lighting, animation, and export settings.
 
-Every seed/transform/scale change creates a `CoreState`. Results from superseded requests are ignored. A response contains the scaled display mesh, unscaled intermediate meshes, valid transform tags, per-stage droppable kinds, structured issues, and optional animation steps. Progress arrives as separate worker messages. Compose receives an explicit core-update signal so asynchronous results and progress are rendered immediately.
+Every seed/transform/scale change creates a `CoreState`. Results from superseded requests are ignored. A response contains the scaled display mesh, an optional recognized catalog-seed tag, unscaled intermediate meshes, valid transform tags, per-stage droppable kinds, structured issues, and optional animation steps. Progress arrives as separate worker messages. Compose receives an explicit core-update signal so asynchronous results and progress are rendered immediately.
+
+When the seed or transform chain changes, the request explicitly asks the Wasm worker to detect a catalog seed. After a complete, successful chain, the core filters catalog seeds by FEV and compares normalized local edge projection classes; catalog fingerprints are cached. When it finds a geometric match, the JS view model presents the returned tag as an optional action to the right of the transform chain. The exploratory state is preserved until the user accepts the suggestion, which atomically replaces the seed and clears the transform list. Scale-only requests, animation evaluation of the previous state, animation frames, and other view/config updates never run detection. Partial or failed chains never offer a replacement.
 
 ## Build outputs
 

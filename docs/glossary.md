@@ -4,10 +4,12 @@
 | --- | --- |
 | Polyhedron | An immutable vertex/edge/face mesh plus orbit-kind metadata. |
 | Seed | A built-in starting polyhedron selected before transforms. |
+| Catalog recognition | Comparison of a completed transform result with the built-in seeds after circumradius normalization. A match is offered as an optional replacement; accepting it replaces the equivalent seed-plus-transform-chain state with the single catalog seed. |
 | Transform | An ordered operation that derives a new polyhedron from the previous stage. |
 | Transform chain | The ordered list of transforms applied after the seed. |
 | F/E/V or FEV | Face, edge, and vertex counts, in that order. |
 | Kind | A rotation-orbit identifier for equivalent faces, edges, or vertices. Greek letters denote face kinds; capital Latin letters denote vertex kinds. |
+| Rotation orbit | A set of mesh elements that are interchangeable under the polyhedron's rotational symmetries. |
 | Topology | Connectivity of vertices, edges, and faces independent of coordinates. |
 | Same topology | Two meshes whose indexed connectivity is compatible, allowing direct WebGL interpolation. |
 | Drop | Removal of a topologically admissible face, edge, or vertex kind followed by reconstruction of the remaining boundary. |

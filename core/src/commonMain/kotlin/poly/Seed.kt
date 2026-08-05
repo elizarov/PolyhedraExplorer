@@ -27,6 +27,7 @@ class Seed(
     private val producer: SC.() -> Polyhedron
 ) : Tagged {
     val poly: Polyhedron by lazy { producer().scaled(seedScale) }
+    internal val geometryFingerprint: PolyhedronGeometryFingerprint by lazy { poly.geometryFingerprint() }
     fun wikiURL(): String = "https://en.wikipedia.org/wiki/${wikiName.replace(' ', '_')}"
     override fun toString(): String = name
     companion object
@@ -34,6 +35,13 @@ class Seed(
 
 val Seeds: List<Seed>
     get() = _seeds
+
+fun Polyhedron.recognizedSeedOrNull(): Seed? {
+    val candidates = Seeds.filter { seed -> seed.fev == fev() }
+    if (candidates.isEmpty()) return null
+    val geometryFingerprint = geometryFingerprint()
+    return candidates.firstOrNull { seed -> geometryFingerprint.matches(seed.geometryFingerprint) }
+}
 
 @Suppress("ObjectPropertyName")
 private val _seeds = ArrayList<Seed>()

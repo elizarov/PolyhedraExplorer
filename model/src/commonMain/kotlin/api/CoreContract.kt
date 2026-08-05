@@ -17,6 +17,7 @@ data class CoreRequest(
     val state: CoreState,
     val previousState: CoreState? = null,
     val animationDuration: Double? = null,
+    val detectSeed: Boolean = false,
 )
 
 @Serializable
@@ -48,6 +49,7 @@ data class CoreAnimationStep(
 data class CoreResponse(
     val poly: Polyhedron,
     val polyName: String,
+    val recognizedSeedTag: String? = null,
     val transformedPolys: List<Polyhedron>,
     val validTransformTags: List<String>,
     val availableDrops: List<List<String>>,

@@ -12,7 +12,7 @@ suspend fun evaluateCore(
     reportProgress: (Int) -> Unit = {},
 ): CoreResponse {
     reportProgress(1)
-    val current = evaluateState(request.state, reportProgress)
+    val current = evaluateState(request.state, reportProgress, detectSeed = request.detectSeed)
     val duration = request.animationDuration?.takeIf { it > 0.0 }
     val previousState = request.previousState
     if (duration == null || previousState == null || previousState == request.state) {
@@ -20,7 +20,7 @@ suspend fun evaluateCore(
         return current.response
     }
 
-    val previous = evaluateState(previousState) {}
+    val previous = evaluateState(previousState, {}, detectSeed = false)
     val animation = computeAnimation(previous, current, duration)
     reportProgress(100)
     return current.response.copy(animation = animation)
@@ -38,6 +38,7 @@ private data class Evaluation(
 private suspend fun evaluateState(
     state: CoreState,
     reportProgress: (Int) -> Unit,
+    detectSeed: Boolean,
 ): Evaluation {
     val seed = Seeds.firstOrNull { it.tag == state.seedTag }
         ?: error("Unknown seed tag: ${state.seedTag}")
@@ -99,6 +100,11 @@ private suspend fun evaluateState(
     val response = CoreResponse(
         poly = poly.scaled(scale),
         polyName = polyName,
+        recognizedSeedTag = if (detectSeed && errorIndex == null && validTransforms.isNotEmpty()) {
+            poly.recognizedSeedOrNull()?.tag
+        } else {
+            null
+        },
         transformedPolys = transformedPolys,
         validTransformTags = validTransforms.map(Transform::tag),
         availableDrops = availableDrops,

@@ -26,6 +26,11 @@ private var checksum = 0.0
 suspend fun main() {
     val cases = listOf(
         BenchmarkCase("truncate/icosahedron", 200, prepare = { fresh(Seed.Icosahedron.poly) }) { it.truncated() },
+        BenchmarkCase(
+            "detect-seed/truncated-icosahedron",
+            200,
+            prepare = { fresh(Seed.TruncatedIcosahedron.poly) },
+        ) { it.recognizedSeedOrNull()?.poly ?: error("Expected catalog seed match") },
         BenchmarkCase("cantellate/dodecahedron", 100, prepare = { fresh(Seed.Dodecahedron.poly) }) { it.cantellated() },
         BenchmarkCase("bevel/dodecahedron", 100, prepare = { fresh(Seed.Dodecahedron.poly) }) { it.bevelled() },
         BenchmarkCase("snub/dodecahedron", 50, prepare = { fresh(Seed.Dodecahedron.poly) }) { it.snub() },

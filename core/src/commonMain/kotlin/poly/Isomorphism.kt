@@ -113,3 +113,38 @@ fun List<IsoEdge>.groupIndistinguishable(): List<List<IsoEdge>> {
     }
     return blocks.map { it.es }
 }
+
+/**
+ * Builds the normalized local-geometry signature used for catalog seed recognition.
+ *
+ * The edge projection figures are independent of global orientation and vertex numbering. Comparing their
+ * sorted multisets therefore recognizes a catalog solid even when it was reached through a different transform
+ * path, while still distinguishing solids that merely have the same face/edge/vertex counts.
+ */
+internal class PolyhedronGeometryFingerprint(
+    private val edgeClasses: List<EdgeClassCount>,
+) {
+    fun matches(other: PolyhedronGeometryFingerprint): Boolean =
+        edgeClasses.size == other.edgeClasses.size &&
+            edgeClasses.indices.all { index -> edgeClasses[index].compareTo(other.edgeClasses[index]) == 0 }
+}
+
+internal class EdgeClassCount(
+    val edgeClass: EdgeEquivalenceClass,
+    val count: Int,
+) : Comparable<EdgeClassCount> {
+    override fun compareTo(other: EdgeClassCount): Int {
+        val classComparison = edgeClass.compareTo(other.edgeClass)
+        return if (classComparison != 0) classComparison else count.compareTo(other.count)
+    }
+}
+
+internal fun Polyhedron.geometryFingerprint(): PolyhedronGeometryFingerprint =
+    scaled(Scale.Circumradius).let { normalized ->
+        val counts = normalized.directedEdges.groupingBy { it.kind }.eachCount()
+        PolyhedronGeometryFingerprint(
+            normalized.isoEdges
+                .map { edge -> EdgeClassCount(edge.eq, counts.getValue(edge.kind)) }
+                .sorted()
+        )
+    }

@@ -29,6 +29,7 @@ input, button {
     --popup-background-color: hsla(0, 0%, 95%, .8);
     --button-background-color: #1976d2;
     --button-active-color: #8daecd;
+    --suggestion-background-color: #2e7d32;
     --button-color: #ffffff;
     --hover-color: #8cefd0;
     --disabled-color: hsl(0, 0%, 80%);
@@ -85,6 +86,10 @@ div.ctrl-pane {
 div.ctrl-pane > div.btn {
     margin-left: 1em;
     margin-top: 1em;
+}
+
+div.ctrl-pane > div.btn.suggestion {
+    background-color: var(--suggestion-background-color);
 }
 
 /* --------- Floating Buttons --------- */

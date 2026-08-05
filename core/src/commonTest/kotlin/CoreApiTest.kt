@@ -29,6 +29,63 @@ class CoreApiTest {
     }
 
     @Test
+    fun recognizesTransformedPolyhedronAsCatalogSeed() {
+        runSynchronously {
+            val response = evaluateCore(
+                CoreRequest(
+                    state = CoreState("I", listOf("t"), "c"),
+                    detectSeed = true,
+                )
+            )
+
+            assertEquals("tI", response.recognizedSeedTag)
+            assertEquals("Truncated Icosahedron", response.polyName)
+        }
+    }
+
+    @Test
+    fun recognizesCatalogSeedReachedThroughEquivalentConstruction() {
+        runSynchronously {
+            val response = evaluateCore(
+                CoreRequest(
+                    state = CoreState("O", listOf("a"), "c"),
+                    detectSeed = true,
+                )
+            )
+
+            assertEquals("aC", response.recognizedSeedTag)
+        }
+    }
+
+    @Test
+    fun suggestsSnubDodecahedronForDualPentagonalHexecontahedron() {
+        runSynchronously {
+            val response = evaluateCore(
+                CoreRequest(
+                    state = CoreState("dsD", listOf("d"), "c"),
+                    detectSeed = true,
+                )
+            )
+
+            assertEquals("sD", response.recognizedSeedTag)
+        }
+    }
+
+    @Test
+    fun skipsCatalogDetectionUnlessExplicitlyRequested() {
+        runSynchronously {
+            val response = evaluateCore(
+                CoreRequest(
+                    state = CoreState("I", listOf("t"), "c"),
+                    detectSeed = false,
+                )
+            )
+
+            assertEquals(null, response.recognizedSeedTag)
+        }
+    }
+
+    @Test
     fun producesTopologyAnimationInsideCore() {
         runSynchronously {
             val response = evaluateCore(

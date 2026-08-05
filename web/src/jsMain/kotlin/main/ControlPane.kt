@@ -129,6 +129,23 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
                 Aside(attrs = { classes("tooltip-text") }) { Text("Seed") }
             }
         }
+
+        params.suggestedSeed?.let { suggestedSeed ->
+            Div(attrs = { classes("btn", "suggestion") }) {
+                Button(attrs = {
+                    classes("txt")
+                    onClick {
+                        togglePopup(null)
+                        params.acceptSuggestedSeed()
+                    }
+                }) {
+                    Text("→ $suggestedSeed")
+                    Aside(attrs = { classes("tooltip-text") }) {
+                        Text("Replace the current seed and transform chain with this catalog solid")
+                    }
+                }
+            }
+        }
     }
 
     Div(attrs = { classes("btn", "reset") }) {

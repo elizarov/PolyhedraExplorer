@@ -46,6 +46,8 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         private set
     var transformAnimation: TransformAnimation? = null
         private set
+    var suggestedSeed: Seed? = null
+        private set
 
     val targetPoly: Polyhedron
         get() = transformAnimation?.targetPoly ?: requireNotNull(poly) { "The Wasm core has not produced a polyhedron yet" }
@@ -66,6 +68,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
     private val coreResultListeners = linkedSetOf<() -> Unit>()
     private var requestedState: CoreState? = null
     private var appliedState: CoreState? = null
+    private var suggestedSeedKey: Pair<String, List<String>>? = null
 
     override fun update(update: Param.UpdateType, dt: Double) {
         transformAnimation?.let { animation ->
@@ -84,12 +87,19 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         val state = currentState()
         if (state == requestedState) return
 
+        val stateKey = state.seedDetectionKey()
+        if (suggestedSeedKey != null && suggestedSeedKey != stateKey) {
+            suggestedSeed = null
+            suggestedSeedKey = null
+        }
+
         requestedState = state
         coreError = null
         transformProgress = 0
         transformError = TransformError(firstChangedTransform(appliedState, state), isAsync = true)
         val previousState = appliedState
         val duration = animationParams?.animateValueUpdatesDuration
+        val detectSeed = shouldDetectSeed(previousState, state)
 
         val activeRequestId = ++requestId
         cancelCoreRequest?.invoke()
@@ -98,6 +108,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
                 state = state,
                 previousState = previousState,
                 animationDuration = duration,
+                detectSeed = detectSeed,
             ),
             reportProgress = progress@{ done ->
                 if (requestId != activeRequestId) return@progress
@@ -158,6 +169,26 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         coreError = null
         appliedState = state
         updateAnimation(response.animation.toUiAnimation())
+        updateSuggestedSeed(state, response)
+    }
+
+    internal fun updateSuggestedSeed(state: CoreState, response: CoreResponse) {
+        val seedTag = response.recognizedSeedTag ?: return
+        if (state.transformTags.isEmpty() || response.validTransformTags != state.transformTags) return
+        val recognizedSeed = Seeds.firstOrNull { it.tag == seedTag } ?: return
+
+        suggestedSeed = recognizedSeed
+        suggestedSeedKey = state.seedDetectionKey()
+    }
+
+    fun acceptSuggestedSeed() {
+        val replacement = suggestedSeed ?: return
+        suggestedSeed = null
+        suggestedSeedKey = null
+
+        // Set both values before sending one target-value notification, so no intermediate worker request is made.
+        seed.updateValue(replacement, Param.None)
+        transforms.updateValue(emptyList())
     }
 
     private fun currentState() = CoreState(
@@ -186,6 +217,12 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         super.destroy()
     }
 }
+
+internal fun shouldDetectSeed(previous: CoreState?, current: CoreState): Boolean =
+    current.transformTags.isNotEmpty() &&
+        (previous == null || previous.seedTag != current.seedTag || previous.transformTags != current.transformTags)
+
+private fun CoreState.seedDetectionKey(): Pair<String, List<String>> = seedTag to transformTags
 
 private fun List<CoreAnimationStep>.toUiAnimation(): TransformAnimation? {
     val steps = map { step ->
