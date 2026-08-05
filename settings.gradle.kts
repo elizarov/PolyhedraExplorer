@@ -1,9 +1,18 @@
-
 rootProject.name = "PolyhedraExplorer"
 
 pluginManagement {
     repositories {
+        gradlePluginPortal()
+        google()
         mavenCentral()
-        maven { url = uri("https://maven.pkg.jetbrains.space/kotlin/p/kotlin/dev/") }
     }
 }
+
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+include(":model", ":core", ":web", ":benchmarks")

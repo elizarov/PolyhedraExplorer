@@ -1,87 +1,41 @@
 plugins {
-    kotlin("multiplatform") version "1.5.10"
-    kotlin("plugin.serialization") version "1.5.10"
-    application
+    kotlin("multiplatform") version "2.4.10" apply false
+    kotlin("plugin.serialization") version "2.4.10" apply false
+    kotlin("plugin.compose") version "2.4.10" apply false
+    id("org.jetbrains.compose") version "1.11.1" apply false
 }
 
-group = "me.polyhedron"
-version = "1.0-SNAPSHOT"
-
-repositories {
-    mavenCentral()
-    maven { url = uri("https://maven.pkg.jetbrains.space/kotlin/p/kotlin/kotlin-js-wrappers") }
-    maven { url = uri("https://maven.pkg.jetbrains.space/public/p/kotlinx-html/maven") }
+allprojects {
+    group = "me.polyhedron"
+    version = "1.0-SNAPSHOT"
 }
 
-val `kotlin-serialization-version`: String by project
-val `kotlin-coroutines-version`: String by project
-val `kotlin-react-version`: String by project
-val `react-version`: String by project
-val `gl-matrix-version`: String by project
-val `history-version`: String by project
-
-kotlin {
-    jvm {
-        testRuns["test"].executionTask.configure {
-            useJUnit()
-        }
-        withJava()
+fun registerBrowserDistribution(
+    taskName: String,
+    mode: String,
+    webTask: String,
+    wasmTask: String,
+) = tasks.register<Sync>(taskName) {
+    group = "distribution"
+    description = "Assembles the $mode Compose/WebGL application with its WasmGC core."
+    dependsOn(webTask, wasmTask)
+    from(project(":web").layout.buildDirectory.dir("dist/js/${mode}Executable"))
+    from(project(":core").layout.buildDirectory.dir("compileSync/wasmJs/main/${mode}Executable/kotlin")) {
+        into("core")
     }
-    js(IR) {
-        browser {
-            binaries.executable()
-            commonWebpackConfig {
-                cssSupport.enabled = true
-            }
-            testTask {
-                useKarma {
-                    useChromeHeadless()
-                }
-            }
-        }
-    }
-    sourceSets {
-        val commonMain by getting {
-            dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:${`kotlin-serialization-version`}")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:${`kotlin-serialization-version`}")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${`kotlin-coroutines-version`}")
-            }
-        }
-        val commonTest by getting {
-            dependencies {
-                implementation(kotlin("test-common"))
-                implementation(kotlin("test-annotations-common"))
-            }
-        }
-        val jvmMain by getting
-        val jvmTest by getting {
-            dependencies {
-                implementation(kotlin("test-junit"))
-            }
-        }
-        val jsMain by getting {
-            dependencies {
-                implementation("org.jetbrains:kotlin-react:${`kotlin-react-version`}")
-                implementation("org.jetbrains:kotlin-react-dom:${`kotlin-react-version`}")
-                implementation(npm("react", `react-version`))
-                implementation(npm("gl-matrix", `gl-matrix-version`))
-                implementation(npm("history", `history-version`))
-            }
-        }
-        val jsTest by getting {
-            dependencies {
-                implementation(kotlin("test-js"))
-            }
-        }
-        all {
-            languageSettings.useExperimentalAnnotation("kotlin.RequiresOptIn")
-            languageSettings.useExperimentalAnnotation("kotlin.ExperimentalStdlibApi")
-            languageSettings.useExperimentalAnnotation("kotlin.js.ExperimentalJsExport")
-        }
-    }
+    into(layout.buildDirectory.dir("dist/browser/$mode"))
 }
 
-application {
-    mainClassName = "MainKt"
-}
+registerBrowserDistribution(
+    taskName = "browserDevelopmentDistribution",
+    mode = "development",
+    webTask = ":web:jsBrowserDevelopmentExecutableDistribution",
+    wasmTask = ":core:wasmJsDevelopmentExecutableCompileSync",
+)
+
+registerBrowserDistribution(
+    taskName = "browserProductionDistribution",
+    mode = "production",
+    webTask = ":web:jsBrowserDistribution",
+    wasmTask = ":core:wasmJsProductionExecutableCompileSync",
+)
