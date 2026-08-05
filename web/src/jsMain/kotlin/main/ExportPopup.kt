@@ -47,7 +47,7 @@ fun ExportPopup(params: RootParams, faces: FaceContext?) {
                 val faceContext = faces ?: return@onClick
                 val name = polyName.replace(' ', '_').lowercase()
                 val exportParams = FaceExportParams(scale, faceWidth, faceRim, expandFaces)
-                download("$name.stl", faceContext.exportSolidToStl(name, params.toString(), exportParams))
+                download("$name.stl", faceContext.exportSolidToStl(name, exportParams))
             }
         }) { Text("Export to STL") }
     }

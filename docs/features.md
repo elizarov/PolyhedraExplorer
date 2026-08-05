@@ -27,7 +27,7 @@
 ## Persistence and export
 
 - Complete application state is encoded in the URL hash and restored on load.
-- Export of rendered solid geometry to binary STL.
+- Export of rendered solid geometry to standards-compatible ASCII STL without zero-area facets.
 - Export of polyhedron vertices and faces to OpenSCAD source.
 - Export size and shell parameters are controlled from the export drawer.
 

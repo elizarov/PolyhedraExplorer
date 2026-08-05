@@ -14,8 +14,12 @@ import polyhedra.js.util.*
 import kotlin.math.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
-class FaceContext(val gl: GL, params: RenderParams) : Param.Context(params)  {
-    val poly by { params.poly.targetPoly }
+class FaceContext(
+    val gl: GL,
+    params: RenderParams,
+    private val polyProvider: () -> Polyhedron = { params.poly.targetPoly },
+) : Param.Context(params)  {
+    val poly by { polyProvider() }
     val animation by { params.poly.transformAnimation }
     val selectedFace by { params.poly.selectedFace.value }
     val drawFaces by { params.view.display.value.hasFaces() && params.view.transparentFaces.value < 1.0 }

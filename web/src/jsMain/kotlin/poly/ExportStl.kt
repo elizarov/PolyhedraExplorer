@@ -4,7 +4,10 @@ import polyhedra.common.poly.*
 import polyhedra.common.util.*
 import kotlin.math.*
 
-fun FaceContext.exportSolidToStl(name: String, description: String, exportParams: FaceExportParams): String {
+private const val STL_PRECISION = 4
+private const val STL_MIN_NORMAL_LENGTH = 1e-9
+
+fun FaceContext.exportSolidToStl(name: String, exportParams: FaceExportParams): String {
     val q = poly.rotationWithLargestFaceDown()
     val ofs = MutableVec3(0.0, 0.0, Double.POSITIVE_INFINITY)
     exportVertices(exportParams) { av ->
@@ -12,20 +15,22 @@ fun FaceContext.exportSolidToStl(name: String, description: String, exportParams
         ofs.z = min(ofs.z, v.z)
     }
     return buildString {
-        appendLine("solid $name ; $description")
+        appendLine("solid $name")
         val normal = MutableVec3()
         exportTriangles(exportParams) { av1, av2, av3 ->
-            val v1 = av1.rotated(q)
-            val v2 = av2.rotated(q)
-            val v3 = av3.rotated(q)
+            val v1 = (av1.rotated(q) - ofs).roundedForStl()
+            val v2 = (av2.rotated(q) - ofs).roundedForStl()
+            val v3 = (av3.rotated(q) - ofs).roundedForStl()
             normal.setToZero()
             crossCenteredAddTo(normal, v1, v2, v3)
-            normal /= normal.norm
+            val normalLength = normal.norm
+            if (normalLength <= STL_MIN_NORMAL_LENGTH || !normalLength.isFinite()) return@exportTriangles
+            normal /= normalLength
             appendLine(normal.toStl("facet normal"))
             appendLine("outer loop")
-            appendLine((v1 - ofs).toStl("vertex"))
-            appendLine((v2 - ofs).toStl("vertex"))
-            appendLine((v3 - ofs).toStl("vertex"))
+            appendLine(v1.toStl("vertex"))
+            appendLine(v2.toStl("vertex"))
+            appendLine(v3.toStl("vertex"))
             appendLine("endloop")
             appendLine("endfacet")
         }
@@ -33,7 +38,14 @@ fun FaceContext.exportSolidToStl(name: String, description: String, exportParams
     }
 }
 
-private fun Vec3.toStl(lbl: String) = "$lbl ${x.fmt} ${y.fmt} ${z.fmt}"
+private fun Vec3.roundedForStl(): Vec3 {
+    val factor = 10.0.pow(STL_PRECISION)
+    fun Double.rounded() = round(this * factor) / factor
+    return Vec3(x.rounded(), y.rounded(), z.rounded())
+}
+
+private fun Vec3.toStl(lbl: String) =
+    "$lbl ${x.fmt(STL_PRECISION)} ${y.fmt(STL_PRECISION)} ${z.fmt(STL_PRECISION)}"
 
 private fun Polyhedron.rotationWithLargestFaceDown(): Quat {
     val f = faceKinds.values.maxByOrNull { it.essence().area() }!!
