@@ -5,13 +5,13 @@ import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.dom.*
 import polyhedra.common.util.updatedAt
 import polyhedra.js.catalog.*
-import polyhedra.js.components.ObserveParam
+import polyhedra.js.components.observe
 import polyhedra.js.params.Param
 import polyhedra.js.poly.*
 
 @Composable
 fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit) {
-    ObserveParam(params, Param.TargetValue + Param.Progress).value
+    params.observe(Param.TargetValue + Param.Progress)
     val transforms = params.transforms.value
     val transformError = params.transformError
     val errorIndex = transformError?.index ?: Int.MAX_VALUE

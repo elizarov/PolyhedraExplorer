@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composition
 import kotlinx.browser.document
 import kotlinx.browser.window
 import org.jetbrains.compose.web.renderComposable
+import org.jetbrains.compose.web.dom.Text
 import org.w3c.dom.HTMLDivElement
 import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.HTMLSelectElement
@@ -12,6 +13,7 @@ import polyhedra.common.util.Tagged
 import polyhedra.js.params.BooleanParam
 import polyhedra.js.params.DoubleParam
 import polyhedra.js.params.EnumParam
+import polyhedra.js.params.Param
 import polyhedra.js.params.ValueAnimationParams
 import kotlin.js.Promise
 import kotlin.test.AfterTest
@@ -35,6 +37,29 @@ class ConfigControlsTest {
     fun tearDown() {
         if (::composition.isInitialized) composition.dispose()
         host.parentNode?.removeChild(host)
+    }
+
+    @Test
+    fun observerInvalidatesOnlyForSubscribedUpdates(): Promise<Unit> {
+        val param = BooleanParam("enabled", false)
+        var recompositions = 0
+        composition = renderComposable(host) {
+            param.observe()
+            recompositions++
+            Text(param.value.toString())
+        }
+
+        assertEquals(1, recompositions)
+        param.notifyUpdated(Param.AnimatedValue)
+
+        return awaitRecomposition().then {
+            assertEquals(1, recompositions, "Animated-only updates must not invalidate a target-value observer")
+            param.updateValue(true)
+            awaitRecomposition()
+        }.then {
+            assertEquals(2, recompositions)
+            assertEquals("true", host.textContent)
+        }
     }
 
     @Test

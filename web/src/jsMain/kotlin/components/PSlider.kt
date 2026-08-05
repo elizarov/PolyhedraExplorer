@@ -17,7 +17,7 @@ import kotlin.math.roundToInt
 
 @Composable
 fun PSlider(param: DoubleParam, disabled: Boolean = false, showValue: Boolean = true) {
-    ObserveParam(param).value
+    param.observe()
     fun Double.intString() = roundToInt().toString()
     val targetValue = param.targetValue
 

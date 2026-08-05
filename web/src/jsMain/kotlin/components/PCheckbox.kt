@@ -14,7 +14,8 @@ import polyhedra.js.params.BooleanParam
 
 @Composable
 fun PCheckbox(param: BooleanParam, disabled: Boolean = false) {
-    val revision = ObserveParam(param).value
+    param.observe()
+    val isChecked = param.value
     org.jetbrains.compose.web.dom.Div(attrs = {
         classes("checkbox")
         if (!disabled) onClick { event ->
@@ -22,10 +23,10 @@ fun PCheckbox(param: BooleanParam, disabled: Boolean = false) {
             param.toggle()
         }
     }) {
-        key(revision, disabled) {
+        key(isChecked, disabled) {
             Input(type = InputType.Checkbox, attrs = {
                 if (disabled) disabled()
-                checked(param.value)
+                checked(isChecked)
             })
         }
         Span(attrs = {

@@ -10,7 +10,7 @@ import polyhedra.js.params.EnumParam
 
 @Composable
 fun <T : Tagged> PDropdown(param: EnumParam<T>, disabled: Boolean = false) {
-    ObserveParam(param).value
+    param.observe()
     Dropdown(
         value = param.value,
         options = param.options,

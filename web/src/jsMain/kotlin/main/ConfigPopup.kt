@@ -4,15 +4,14 @@ import androidx.compose.runtime.Composable
 import org.jetbrains.compose.web.dom.Span
 import org.jetbrains.compose.web.dom.Text
 import polyhedra.common.util.fmt
-import polyhedra.js.components.ObserveParam
+import polyhedra.js.components.observe
 import polyhedra.js.components.PCheckbox
 import polyhedra.js.components.PDropdown
 import polyhedra.js.components.PSlider
-import polyhedra.js.params.Param
 
 @Composable
 fun ConfigPopup(params: RootParams) {
-    ObserveParam(params, Param.TargetValue).value
+    params.observe()
     val hasFaces = params.render.view.display.value.hasFaces()
     val animateUpdates = params.animationParams.animateValueUpdates.value
     val rotate = params.animationParams.animatedRotation.value

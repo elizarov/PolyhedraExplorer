@@ -7,14 +7,13 @@ import org.jetbrains.compose.web.dom.Div
 import org.jetbrains.compose.web.dom.Span
 import org.jetbrains.compose.web.dom.Text
 import polyhedra.common.util.fmt
-import polyhedra.js.components.ObserveParam
+import polyhedra.js.components.observe
 import polyhedra.js.components.PSlider
-import polyhedra.js.params.Param
 import polyhedra.js.poly.*
 
 @Composable
 fun ExportPopup(params: RootParams, faces: FaceContext?) {
-    ObserveParam(params, Param.TargetValue).value
+    params.observe()
     val poly = requireNotNull(params.render.poly.poly)
     val polyName = params.render.poly.polyName
     val hasFaces = params.render.view.display.value.hasFaces()

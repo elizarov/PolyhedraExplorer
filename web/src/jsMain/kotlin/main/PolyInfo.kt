@@ -6,14 +6,13 @@ import polyhedra.common.poly.*
 import polyhedra.common.util.fmtFix
 import polyhedra.common.util.toDegrees
 import polyhedra.js.catalog.Drop
-import polyhedra.js.components.ObserveParam
-import polyhedra.js.params.Param
+import polyhedra.js.components.observe
 import polyhedra.js.params.SetParam
 import polyhedra.js.poly.*
 
 @Composable
 fun PolyInfo(params: RenderParams, popup: Popup?, togglePopup: (Popup?) -> Unit) {
-    ObserveParam(params, Param.TargetValue).value
+    params.poly.observe()
     val poly = requireNotNull(params.poly.poly)
     val fev = poly.fev()
 
@@ -73,6 +72,7 @@ private fun InfoHeader(
 
 @Composable
 private fun FacesPopup(params: RenderParams, poly: Polyhedron) {
+    params.view.faceRim.observe()
     val faceRim = params.view.faceRim.targetValue
     Aside(attrs = { classes("fev") }) {
         Table {
@@ -120,7 +120,7 @@ internal fun AllFacesVisibilityControl(
     hiddenFacesParam: SetParam<FaceKind>,
     faceKinds: Set<FaceKind>,
 ) {
-    ObserveParam(hiddenFacesParam, Param.TargetValue).value
+    hiddenFacesParam.observe()
     val hiddenFaces = hiddenFacesParam.value
     val icon = when {
         hiddenFaces.isEmpty() -> "fa-circle"
@@ -141,7 +141,7 @@ internal fun FaceVisibilityControl(
     kind: FaceKind,
     attentionWhenHidden: Boolean,
 ) {
-    ObserveParam(hiddenFacesParam, Param.TargetValue).value
+    hiddenFacesParam.observe()
     val hiddenFaces = hiddenFacesParam.value
     val hidden = kind in hiddenFaces
     val icon = when {

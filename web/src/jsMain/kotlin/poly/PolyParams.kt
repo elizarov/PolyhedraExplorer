@@ -65,7 +65,6 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
     private var requestId = 0
     private var coreStarted = false
     private var cancelCoreRequest: (() -> Unit)? = null
-    private val coreResultListeners = linkedSetOf<() -> Unit>()
     private var requestedState: CoreState? = null
     private var appliedState: CoreState? = null
     private var suggestedSeedKey: Pair<String, List<String>>? = null
@@ -114,7 +113,6 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
                 if (requestId != activeRequestId) return@progress
                 transformProgress = done
                 notifyUpdated(Progress)
-                publishCoreUpdate()
             },
             onSuccess = success@{ response ->
                 if (requestId != activeRequestId || requestedState != state) return@success
@@ -122,7 +120,6 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
                 applyResponse(state, response)
                 notifyUpdated(TargetValue)
                 performUpdate(null, 0.0)
-                publishCoreUpdate()
             },
             onFailure = failure@{ cause ->
                 if (requestId != activeRequestId || requestedState != state) return@failure
@@ -134,7 +131,6 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
                 }
                 notifyUpdated(TargetValue)
                 performUpdate(null, 0.0)
-                publishCoreUpdate()
             },
         )
     }
@@ -143,15 +139,6 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         if (coreStarted) return
         coreStarted = true
         computeDerivedTargetValues()
-    }
-
-    fun onCoreResult(listener: () -> Unit): () -> Unit {
-        coreResultListeners += listener
-        return { coreResultListeners -= listener }
-    }
-
-    private fun publishCoreUpdate() {
-        coreResultListeners.toList().forEach { it() }
     }
 
     private fun applyResponse(state: CoreState, response: CoreResponse) {
@@ -213,7 +200,6 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         requestId++
         cancelCoreRequest?.invoke()
         cancelCoreRequest = null
-        coreResultListeners.clear()
         super.destroy()
     }
 }

@@ -5,7 +5,6 @@
 package polyhedra.js.main
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -15,23 +14,14 @@ import org.jetbrains.compose.web.dom.Button
 import org.jetbrains.compose.web.dom.Div
 import org.jetbrains.compose.web.dom.I
 import org.jetbrains.compose.web.dom.Text
-import polyhedra.js.components.ObserveParam
+import polyhedra.js.components.observe
 import polyhedra.js.params.Param
 import polyhedra.js.poly.FaceContext
 import polyhedra.js.poly.PolyCanvas
 
 @Composable
 fun RootPane(params: RootParams) {
-    ObserveParam(params, Param.TargetValue + Param.Progress).value
-    var coreRevision by remember { mutableStateOf(0) }
-    val removeCoreListener = remember(params.render.poly) {
-        params.render.poly.onCoreResult { coreRevision++ }
-    }
-    DisposableEffect(removeCoreListener) {
-        onDispose(removeCoreListener)
-    }
-    @Suppress("UNUSED_EXPRESSION")
-    coreRevision
+    params.render.poly.observe(Param.TargetValue + Param.Progress)
     var popup by remember { mutableStateOf<Popup?>(null) }
     var faces by remember { mutableStateOf<FaceContext?>(null) }
     val togglePopup: (Popup?) -> Unit = { requested -> popup = if (popup == requested) null else requested }
