@@ -12,6 +12,7 @@
 
 - Interactive WebGL face and edge rendering with mouse and touch rotation and zoom.
 - Configurable automatic rotation, view scale, face expansion, transparency, width, rim, display mode, lighting, and shininess.
+- Configuration sliders, checkboxes, and dropdowns stay synchronized in both directions with programmatic and URL-driven parameter changes.
 - Smooth geometry transitions and topology-aware keyframe animations returned by the Wasm core.
 - Orbit-based coloring and selection highlighting.
 - Live face/edge/vertex counts and frames-per-second display.

@@ -11,6 +11,7 @@ import org.jetbrains.compose.web.dom.Div
 import org.jetbrains.compose.web.dom.Option
 import org.jetbrains.compose.web.dom.Select
 import org.jetbrains.compose.web.dom.Text
+import org.w3c.dom.HTMLSelectElement
 
 @Composable
 fun <T> Dropdown(
@@ -22,6 +23,12 @@ fun <T> Dropdown(
     Div(attrs = { classes("select") }) {
         Select(attrs = {
             if (disabled) disabled()
+            prop(
+                { element: HTMLSelectElement, selectedValue: String ->
+                    if (element.value != selectedValue) element.value = selectedValue
+                },
+                value.toString(),
+            )
             onChange { event ->
                 val selectedValue = event.value ?: return@onChange
                 onChange(options.first { it.toString() == selectedValue })

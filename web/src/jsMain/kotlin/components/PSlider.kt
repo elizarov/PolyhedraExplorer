@@ -19,15 +19,16 @@ import kotlin.math.roundToInt
 fun PSlider(param: DoubleParam, disabled: Boolean = false, showValue: Boolean = true) {
     ObserveParam(param).value
     fun Double.intString() = roundToInt().toString()
+    val targetValue = param.targetValue
 
     Input(type = InputType.Range, attrs = {
         if (disabled) disabled()
         attr("min", (param.min / param.step).intString())
         attr("max", (param.max / param.step).intString())
-        value((param.value / param.step).intString())
+        value((targetValue / param.step).intString())
         onInput { event ->
             event.value?.let { param.updateValue(it.toDouble() * param.step) }
         }
     })
-    if (showValue) Span { Text(param.value.fmt) }
+    if (showValue) Span { Text(targetValue.fmt) }
 }
