@@ -12,6 +12,7 @@
 ## Exploration and rendering
 
 - Interactive WebGL face and edge rendering with mouse and touch rotation and zoom.
+- Two-way orbit rollover between the F/E/V popup rows and the canvas. Canvas picking considers front-facing geometry; manually hidden face orbits retain their full virtual picking surfaces. Selected faces are highlighted, selected edges receive a contrasting overlay, and selected vertices are marked with small shaded balls.
 - Configurable automatic rotation, view scale, face expansion, transparency, width, rim, display mode, lighting, and shininess.
 - Configuration sliders, checkboxes, and dropdowns stay synchronized in both directions with programmatic and URL-driven parameter changes.
 - Smooth geometry transitions and topology-aware keyframe animations returned by the Wasm core.

@@ -22,6 +22,7 @@ class DrawContext(
     val lightning = LightningContext(params.lighting)
     val faces = FaceContext(gl, params)
     val edges = EdgeContext(gl, params)
+    val vertices = VertexContext(gl, params)
 
     init {
         setup()
@@ -65,5 +66,8 @@ fun DrawContext.drawScene() {
         faces.draw(view, lightning)
         edges.draw(view)
     }
+    gl[GL.DEPTH_TEST] = true
+    gl[GL.BLEND] = false
+    vertices.draw(view)
 }
 

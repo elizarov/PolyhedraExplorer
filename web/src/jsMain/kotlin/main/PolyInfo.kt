@@ -8,6 +8,7 @@ import polyhedra.common.util.toDegrees
 import polyhedra.js.catalog.Drop
 import polyhedra.js.components.observe
 import polyhedra.js.params.SetParam
+import polyhedra.js.params.TransientParam
 import polyhedra.js.poly.*
 
 @Composable
@@ -71,6 +72,25 @@ private fun InfoHeader(
 }
 
 @Composable
+internal fun <K : AnyKind> OrbitInfoRow(
+    kind: K,
+    selectedKind: TransientParam<K?>,
+    content: @Composable () -> Unit,
+) {
+    selectedKind.observe()
+    val selected = selectedKind.value == kind
+    Tr(attrs = {
+        classes("info", *(if (selected) arrayOf("selected") else emptyArray()))
+        onMouseOver { selectedKind.updateValue(kind) }
+        onMouseOut {
+            if (selectedKind.value == kind) selectedKind.updateValue(null)
+        }
+    }) {
+        content()
+    }
+}
+
+@Composable
 private fun FacesPopup(params: RenderParams, poly: Polyhedron) {
     params.view.faceRim.observe()
     val faceRim = params.view.faceRim.targetValue
@@ -82,11 +102,7 @@ private fun FacesPopup(params: RenderParams, poly: Polyhedron) {
                 }
                 for ((kind, face) in poly.faceKinds) {
                     val essence = face.essence()
-                    Tr(attrs = {
-                        classes("info")
-                        onMouseOver { params.poly.selectedFace.updateValue(kind) }
-                        onMouseOut { params.poly.selectedFace.updateValue(null) }
-                    }) {
+                    OrbitInfoRow(kind, params.poly.selectedFace) {
                         Td {
                             if (!essence.isPlanar) {
                                 Span(attrs = { classes("msg") }) { MessageSpan(FaceNotPlanar()) }
@@ -165,7 +181,7 @@ private fun EdgesPopup(params: RenderParams, poly: Polyhedron) {
                 InfoHeader("Edges", poly.es.size, poly.midradius, "midradius", 7)
                 for ((kind, edge) in poly.edgeKinds) {
                     val essence = edge.essence()
-                    Tr(attrs = { classes("info") }) {
+                    OrbitInfoRow(kind, params.poly.selectedEdge) {
                         Td(attrs = { classes("rt"); attr("colspan", "2") }) { Text(kind.toString()) }
                         Td { Text(poly.edgeKindCount[kind].toString()) }
                         Td { Text(essence.dist.fmtFix) }
@@ -187,7 +203,7 @@ private fun VerticesPopup(params: RenderParams, poly: Polyhedron) {
                 InfoHeader("Vertices", poly.vs.size, poly.circumradius, "circumradius", 9)
                 for ((kind, vertex) in poly.vertexKinds) {
                     val essence = vertex.essence()
-                    Tr(attrs = { classes("info") }) {
+                    OrbitInfoRow(kind, params.poly.selectedVertex) {
                         Td(attrs = { classes("rt"); attr("colspan", "2") }) { Text(kind.toString()) }
                         Td { Text(poly.vertexKindCount[kind].toString()) }
                         Td { Text(essence.dist.fmtFix) }

@@ -355,7 +355,7 @@ tr.info {
     height: 1em;
 }
 
-tr.info:hover {
+tr.info:hover, tr.info.selected {
     background: var(--hover-color);
 }
 

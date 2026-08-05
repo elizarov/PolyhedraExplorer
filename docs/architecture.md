@@ -41,11 +41,13 @@ The Wasm core owns:
 - rotation-orbit refinement and geometric comparison with built-in seeds;
 - topology-changing animation keyframe construction.
 
-The JS application owns DOM composition, user events, hash serialization, interpolation between returned keyframes, render-buffer generation, WebGL drawing, and file download.
+The JS application owns DOM composition, user events, hash serialization, interpolation between returned keyframes, render-buffer generation, WebGL drawing, and file download. F/E/V rollover is transient JS state: popup rows and CPU-side front-face canvas picking update the same orbit-kind selection. Face picking uses the full virtual polygon independently of manual visibility, while excluding non-planar faces that have no reliable surface. WebGL consumes that selection through face modes, a selected-edge index overlay, or generated vertex-marker geometry.
 
 ## State and data flow
 
 `RootParams` is the authoritative UI state. Its compact serialization is stored after `#/` in the URL, so reloads and copied links reproduce the current seed, transform chain, view, lighting, animation, and export settings.
+
+Rollover selections are deliberately excluded from `RootParams` serialization. They are cleared when the pointer leaves the canvas or the active popup changes, and are recomputed on rendered animation frames while the pointer remains stationary so automatic rotation cannot leave a stale selection.
 
 Every seed/transform/scale change creates a `CoreState`. Results from superseded requests are ignored. A response contains the scaled display mesh, an optional recognized catalog-seed tag, unscaled intermediate meshes, valid transform tags, per-stage droppable kinds, structured issues, and optional animation steps. Progress arrives as separate worker messages. Compose scopes subscribe directly to the relevant `Param` update types, so asynchronous results and progress invalidate only the UI that observes them.
 

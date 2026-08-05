@@ -13,6 +13,7 @@ import org.w3c.dom.*
 import org.w3c.dom.events.*
 import polyhedra.common.poly.Polyhedron
 import polyhedra.common.util.norm
+import polyhedra.js.main.Popup
 import polyhedra.js.params.Param
 import polyhedra.js.util.ResizeTracker
 import polyhedra.js.util.isLeftButtonEvent
@@ -27,10 +28,12 @@ fun PolyCanvas(
     classes: String? = null,
     params: RenderParams,
     @Suppress("UNUSED_PARAMETER") poly: Polyhedron,
+    popup: Popup?,
     faceContextSink: (FaceContext) -> Unit,
     resetPopup: () -> Unit,
 ) {
     val controller = remember(params) { PolyCanvasController(params) }
+    controller.popup = popup
     controller.faceContextSink = faceContextSink
     controller.resetPopup = resetPopup
 
@@ -54,6 +57,12 @@ private class PolyCanvasController(private val params: RenderParams) {
     var faceContextSink: (FaceContext) -> Unit = {}
     var resetPopup: () -> Unit = {}
     var fpsElement: HTMLDivElement? = null
+    var popup: Popup? = null
+        set(value) {
+            if (field == value) return
+            field = value
+            params.poly.clearRolloverSelection()
+        }
 
     private lateinit var canvas: HTMLCanvasElement
     private lateinit var drawContext: DrawContext
@@ -61,6 +70,9 @@ private class PolyCanvasController(private val params: RenderParams) {
     private var prevX = 0.0
     private var prevY = 0.0
     private var isRotating = false
+    private var pointerOnCanvas = false
+    private var pointerX = 0.0
+    private var pointerY = 0.0
     private val ongoingTouches = ArrayList<OngoingTouch>()
     private var prevDist = 0.0
     private var prevAngle = 0.0
@@ -74,6 +86,10 @@ private class PolyCanvasController(private val params: RenderParams) {
         canvas.onmousedown = ::handleMouseDown
         canvas.onmouseup = ::handleMouseUp
         canvas.onmousemove = ::handleMouseMove
+        canvas.onmouseleave = {
+            pointerOnCanvas = false
+            params.poly.clearRolloverSelection()
+        }
         canvas.onwheel = ::handleWheel
         canvas.addTouchListener("touchstart", ::handleTouchStart)
         canvas.addTouchListener("touchend", ::handleTouchEnd)
@@ -101,6 +117,7 @@ private class PolyCanvasController(private val params: RenderParams) {
     private fun draw() {
         resizeCanvasIfNeeded(canvas.clientWidth, canvas.clientHeight)
         drawContext.drawScene()
+        if (pointerOnCanvas && !isRotating) updateRolloverSelection(pointerX, pointerY)
         drawCount++
     }
 
@@ -160,7 +177,42 @@ private class PolyCanvasController(private val params: RenderParams) {
     }
 
     private fun handleMouseMove(event: MouseEvent) {
-        if (event.isLeftButtonPressed()) handlePointerMove(event.offsetX, event.offsetY, event.shiftKey)
+        pointerOnCanvas = true
+        pointerX = event.offsetX
+        pointerY = event.offsetY
+        if (event.isLeftButtonPressed()) {
+            params.poly.clearRolloverSelection()
+            handlePointerMove(event.offsetX, event.offsetY, event.shiftKey)
+        } else {
+            updateRolloverSelection(event.offsetX, event.offsetY)
+        }
+    }
+
+    private fun updateRolloverSelection(x: Double, y: Double) {
+        val popup = popup
+        if (popup != Popup.Faces && popup != Popup.Edges && popup != Popup.Vertices) {
+            params.poly.clearRolloverSelection()
+            return
+        }
+        val animation = params.poly.transformAnimation
+        val picker = CanvasOrbitPicker(
+            poly = params.poly.targetPoly,
+            view = drawContext.view,
+            width = canvas.clientWidth,
+            height = canvas.clientHeight,
+            expand = params.view.expandFaces.value,
+            // User-hidden faces retain their full virtual picking surface.
+            excludedFaces = (
+                params.poly.targetPoly.nonPlanarFaceKinds +
+                    (animation?.prevPoly?.nonPlanarFaceKinds ?: emptyList())
+                ).toSet(),
+            animation = animation,
+        )
+        when (popup) {
+            Popup.Faces -> params.poly.selectedFace.updateValue(picker.hitFace(x, y))
+            Popup.Edges -> params.poly.selectedEdge.updateValue(picker.hitEdge(x, y))
+            Popup.Vertices -> params.poly.selectedVertex.updateValue(picker.hitVertex(x, y))
+        }
     }
 
     private fun handleWheel(event: WheelEvent) {

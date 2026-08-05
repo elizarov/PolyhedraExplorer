@@ -24,7 +24,10 @@ fun RootPane(params: RootParams) {
     params.render.poly.observe(Param.TargetValue + Param.Progress)
     var popup by remember { mutableStateOf<Popup?>(null) }
     var faces by remember { mutableStateOf<FaceContext?>(null) }
-    val togglePopup: (Popup?) -> Unit = { requested -> popup = if (popup == requested) null else requested }
+    val togglePopup: (Popup?) -> Unit = { requested ->
+        params.render.poly.clearRolloverSelection()
+        popup = if (popup == requested) null else requested
+    }
 
     val poly = params.render.poly.poly
     if (poly != null) {
@@ -32,8 +35,12 @@ fun RootPane(params: RootParams) {
             classes = "poly",
             params = params.render,
             poly = poly,
+            popup = popup,
             faceContextSink = { faces = it },
-            resetPopup = { popup = null },
+            resetPopup = {
+                params.render.poly.clearRolloverSelection()
+                popup = null
+            },
         )
     } else {
         Div(attrs = { classes("core-status") }) {

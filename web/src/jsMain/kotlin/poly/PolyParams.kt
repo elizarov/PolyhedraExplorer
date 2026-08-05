@@ -31,6 +31,8 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
     val baseScale = using(EnumParam("bs", defaultScale, Scales))
     val hideFaces = using(SetParam("hf", emptySet()) { it.toFaceKindOrNull() })
     val selectedFace = using(TransientParam<FaceKind?>(null))
+    val selectedEdge = using(TransientParam<EdgeKind?>(null))
+    val selectedVertex = using(TransientParam<VertexKind?>(null))
 
     var poly: Polyhedron? = null
         private set
@@ -65,6 +67,12 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
     private var requestId = 0
     private var coreStarted = false
     private var cancelCoreRequest: (() -> Unit)? = null
+
+    fun clearRolloverSelection() {
+        selectedFace.updateValue(null)
+        selectedEdge.updateValue(null)
+        selectedVertex.updateValue(null)
+    }
     private var requestedState: CoreState? = null
     private var appliedState: CoreState? = null
     private var suggestedSeedKey: Pair<String, List<String>>? = null

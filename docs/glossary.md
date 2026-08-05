@@ -10,6 +10,7 @@
 | F/E/V or FEV | Face, edge, and vertex counts, in that order. |
 | Kind | A rotation-orbit identifier for equivalent faces, edges, or vertices. Greek letters denote face kinds; capital Latin letters denote vertex kinds. |
 | Rotation orbit | A set of mesh elements that are interchangeable under the polyhedron's rotational symmetries. |
+| Orbit rollover | Transient selection of a face, edge, or vertex rotation orbit. Hovering either its F/E/V popup row or matching front-facing canvas geometry selects the entire orbit in both views. |
 | Topology | Connectivity of vertices, edges, and faces independent of coordinates. |
 | Same topology | Two meshes whose indexed connectivity is compatible, allowing direct WebGL interpolation. |
 | Drop | Removal of a topologically admissible face, edge, or vertex kind followed by reconstruction of the remaining boundary. |
