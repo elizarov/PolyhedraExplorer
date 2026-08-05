@@ -4,160 +4,275 @@
 
 package polyhedra.common.transform
 
-import kotlinx.coroutines.*
+import kotlinx.coroutines.yield
 import polyhedra.common.poly.*
 import polyhedra.common.util.*
-import kotlin.math.*
-import kotlin.time.*
+import kotlin.math.abs
+import kotlin.math.log10
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.time.ExperimentalTime
+import kotlin.time.TimeSource
 
 private const val TARGET_TOLERANCE = 1e-12
+private const val MAX_ITERATIONS = 100_000
+private const val INITIAL_ADJUSTMENT = 0.01
+private const val MAX_ADJUSTMENT = 0.5
+private const val ADJUSTMENT_UP = 1.01
+private const val ADJUSTMENT_DOWN = 0.995
+private const val ORTHOGONALITY_ADJUSTMENT = 0.5
 
 var totalIterations = 0
-
-// https://youtrack.jetbrains.com/issue/KT-40689 workaround
-private fun max(a: Double, b: Double) = if (a > b) a else b
 
 fun Polyhedron.canonical(): Polyhedron =
     runSynchronously { canonical(null) }
 
-// Tuning parameters for algorithm's convergence
-private const val speedFactorEdges = 1.0 // diverges when larger
-private const val speedFactorFaces = 2.0 // diverges when larger
+private data class PackingTopology(
+    val faces: List<IntArray>,
+    val pointFaces: List<IntArray>,
+)
 
-// Algorithm from https://www.georgehart.com/virtual-polyhedra/canonical.html
+/**
+ * Finds the canonical representation through the edge-nearpoint/circle-packing
+ * relaxation described by Adrian Rossiter's Antiprism implementation of the
+ * Koebe-Andreev-Thurston construction.
+ *
+ * The processing mesh has one unit-sphere point per source edge. Its faces are
+ * the two mutually orthogonal circle packings corresponding to source faces and
+ * source vertices. Once those points converge, polar reciprocation reconstructs
+ * a source-topology mesh with planar faces and unit-sphere-tangent edges.
+ */
 @OptIn(ExperimentalTime::class)
 suspend fun Polyhedron.canonical(progress: OperationProgressContext?): Polyhedron {
-    val poly = this
-    // https://youtrack.jetbrains.com/issue/KT-42625 workaround
-    val monotonic = kotlin.time.TimeSource.Monotonic
-    val startTime = monotonic.markNow()
-    // copy vertices coordinates to mutate them
-    val vs = vs.mapTo(ArrayList()) { it.toMutableVec3() }
-    // pre-scale to an average midRadius of 1
-    val preScale = 1 / midradius
-    for (v in vs) v *= preScale
-    // canonicalize
-    val vAvgFactor = DoubleArray(vs.size) { i -> 1.0 / poly.vs[i].directedEdges.size }
-    val dv = vs.map { MutableVec3() }
-    val center = MutableVec3()
-    val normSum = MutableVec3()
-    val h = MutableVec3()
+    val startTime = TimeSource.Monotonic.markNow()
+    val topology = packingTopology()
+    val points = initialPackingPoints()
+    val faceCenters = topology.faces.map { MutableVec3() }
+    val faceNormals = topology.faces.map { MutableVec3() }
+    val offsets = points.map { MutableVec3() }
+    val centroid = MutableVec3()
+
+    var adjustment = INITIAL_ADJUSTMENT
+    var lastMaxOffset = Double.POSITIVE_INFINITY
+    var initialMaxOffset = 0.0
+    var previousProgress = 0
+    var lastReportTime = 0L
     var iterations = 0
-    var initialError = 0.0
-    var prevDone = 0
-    var lastTime = 0L
-    while(true) {
-        var maxError = 0.0
-        // check all edges
-        for (f in fs) {
-            for (i in 0 until f.size) {
-                val aid = f[i].id
-                val bid = f[(i + 1) % f.size].id
-                val a = vs[aid]
-                val b = vs[bid]
-                val tf = tangentFraction(a, b)
-                check(!tf.isNaN())
-                tf.atSegmentTo(h, a, b)
-                val err = 1.0 - h.norm
-                maxError = max(maxError, abs(err))
-                dv[aid].plusAssignMul(h, err)
-                dv[bid].plusAssignMul(h, err)
+
+    while (true) {
+        updateFacePlanes(points, topology.faces, faceCenters, faceNormals)
+        centroid.setToZero()
+        for (point in points) centroid += point
+        centroid /= points.size
+
+        var maxOffset = 0.0
+        for (pointIndex in points.indices) {
+            val point = points[pointIndex]
+            val offset = offsets[pointIndex]
+            val surroundingFaces = topology.pointFaces[pointIndex]
+            offset.setToZero()
+
+            // Pull the point toward the centroid of its projections onto the
+            // four surrounding primal/dual circle planes.
+            for (faceIndex in surroundingFaces) {
+                val normal = faceNormals[faceIndex]
+                val center = faceCenters[faceIndex]
+                val distance =
+                    normal.x * (center.x - point.x) +
+                        normal.y * (center.y - point.y) +
+                        normal.z * (center.z - point.z)
+                offset.x += point.x + normal.x * distance
+                offset.y += point.y + normal.y * distance
+                offset.z += point.z + normal.z * distance
             }
-        }
-        // apply average of edge adjustments
-        for (i in vs.indices) {
-            vs[i].plusAssignMul(dv[i], speedFactorEdges * vAvgFactor[i])
-            dv[i].setToZero()
-        }
-        // compute current center of gravity
-        for (i in vs.indices) {
-            center += vs[i]
-        }
-        center /= vs.size
-        maxError = max(maxError, center.norm)
-        // recenter all vertices
-        for (i in vs.indices) {
-            vs[i].minusAssign(center)
-        }
-        center.setToZero()
-        // check all faces & project vertices
-        for (f in fs) {
-            // find centroid of face vertices
-            for (i in 0 until f.size) center += vs[f[i].id]
-            center /= f.size
-            // find sum cross-product of all face angles -> normal of the "average" plane
-            for (i in 0 until f.size) {
-                val a = vs[f[i].id]
-                val b = vs[f[(i + 1) % f.size].id]
-                crossCenteredAddTo(normSum, a, b, center)
+            offset.x = (offset.x / surroundingFaces.size - point.x) * adjustment - centroid.x
+            offset.y = (offset.y / surroundingFaces.size - point.y) * adjustment - centroid.y
+            offset.z = (offset.z / surroundingFaces.size - point.z) * adjustment - centroid.z
+
+            // Opposite surrounding faces belong to the same circle packing.
+            // Their normals define a plane through the origin on which the
+            // shared edge point must lie for mutual tangency/orthogonality.
+            for (pairIndex in 0 until 2) {
+                val first = faceNormals[surroundingFaces[pairIndex]]
+                val opposite = faceNormals[surroundingFaces[pairIndex + 2]]
+                val nx = opposite.y * first.z - opposite.z * first.y
+                val ny = opposite.z * first.x - opposite.x * first.z
+                val nz = opposite.x * first.y - opposite.y * first.x
+                val length = norm(nx, ny, nz)
+                check(length > EPS && length.isFinite()) { "Degenerate canonical packing plane" }
+                val ux = nx / length
+                val uy = ny / length
+                val uz = nz / length
+                val distance = point.x * ux + point.y * uy + point.z * uz
+                val factor = adjustment * ORTHOGONALITY_ADJUSTMENT * distance
+                offset.x -= ux * factor
+                offset.y -= uy * factor
+                offset.z -= uz * factor
             }
-            normSum /= normSum.norm // normalize to unit vector
-            // project vertices onto the resulting plane (if needed)
-            val pd = normSum * center // plane distance
-            for (v in f) {
-                val a = vs[v.id]
-                val dist = pd - normSum * a // vertex distance from plane
-                maxError = max(maxError, abs(dist))
-                dv[v.id].plusAssignMul(normSum, dist)
-            }
-            // clear temp vars
-            center.setToZero()
-            normSum.setToZero()
+
+            maxOffset = max(maxOffset, offset.norm)
         }
-        // apply average of face-projecting adjustments
-        for (i in vs.indices) {
-            vs[i].plusAssignMul(dv[i], speedFactorFaces * vAvgFactor[i])
-            dv[i].setToZero()
+
+        for (pointIndex in points.indices) {
+            val point = points[pointIndex]
+            point += offsets[pointIndex]
+            val length = point.norm
+            check(length > EPS && length.isFinite()) { "Degenerate canonical packing point" }
+            point /= length
         }
+
         iterations++
-        if (maxError <= TARGET_TOLERANCE) break // success
-        // Record initial error
-        if (initialError == 0.0) {
-            initialError = maxError
-            continue
+        if (initialMaxOffset == 0.0) initialMaxOffset = maxOffset
+        if (maxOffset <= TARGET_TOLERANCE) break
+        check(iterations < MAX_ITERATIONS) {
+            "Canonicalization did not converge after $iterations iterations (offset=$maxOffset)"
         }
-        // cancellation/log point (checked every 100 ms)
-        val curTime = startTime.elapsedNow().inWholeMilliseconds / 100
-        if (curTime <= lastTime) continue
-        lastTime = curTime
-        val done = (100 * log10(initialError / maxError) / log10(initialError / TARGET_TOLERANCE)).toInt()
-        // log every second
-        if (curTime % 10 == 0L) {
-            println("Canonical: at $iterations iterations, log error = ${log10(maxError).fmt}, done = $done%")
+
+        adjustment = if (maxOffset < lastMaxOffset) {
+            min(MAX_ADJUSTMENT, adjustment * ADJUSTMENT_UP)
+        } else {
+            adjustment * ADJUSTMENT_DOWN
         }
-        // report progress when it changes
-        if (done > prevDone) {
-            prevDone = done
+        lastMaxOffset = maxOffset
+
+        val currentTime = startTime.elapsedNow().inWholeMilliseconds / 100
+        if (currentTime <= lastReportTime) continue
+        lastReportTime = currentTime
+        val done = convergenceProgress(initialMaxOffset, maxOffset)
+        if (currentTime % 10 == 0L) {
+            println(
+                "Canonicalization: at $iterations iterations, log offset = ${log10(maxOffset).fmt}, " +
+                    "done = $done%"
+            )
+        }
+        if (done > previousProgress) {
+            previousProgress = done
             progress?.reportProgress(done)
         }
         yield()
     }
-    println("Canonical: done $iterations iterations in ${startTime.elapsedNow().toDouble(DurationUnit.SECONDS).fmtFix(3)} sec")
+
+    println(
+        "Canonicalization: done $iterations iterations in " +
+            "${(startTime.elapsedNow().inWholeMilliseconds / 1000.0).fmtFix(3)} sec"
+    )
     totalIterations += iterations
-    // rebuild polyhedron with new vertices and old faces
-    return polyhedron(mergeIndistinguishableKinds = true) {
-        for (i in vs.indices) vertex(vs[i], poly.vs[i].kind)
-        faces(fs)
+    updateFacePlanes(points, topology.faces, faceCenters, faceNormals)
+    return rebuildFromPacking(faceCenters, faceNormals)
+}
+
+private fun convergenceProgress(initialOffset: Double, currentOffset: Double): Int {
+    if (currentOffset <= TARGET_TOLERANCE) return 99
+    if (initialOffset <= TARGET_TOLERANCE || !currentOffset.isFinite()) return 1
+    val denominator = log10(initialOffset / TARGET_TOLERANCE)
+    if (denominator <= 0.0) return 1
+    return (100 * log10(initialOffset / currentOffset) / denominator).toInt().coerceIn(1, 99)
+}
+
+private fun Polyhedron.packingTopology(): PackingTopology {
+    val edgeIndices = HashMap<Long, Int>(es.size)
+    for ((index, edge) in es.withIndex()) {
+        edgeIndices[edgeKey(edge.a.id, edge.b.id)] = index
+    }
+    fun Edge.index(): Int = edgeIndices.getValue(edgeKey(a.id, b.id))
+
+    // Vertex-derived faces come first because they reciprocate directly back
+    // into source vertices after the packing converges.
+    val vertexFaces = vs.map { vertex ->
+        vertex.directedEdges.map { it.index() }.toIntArray()
+    }
+    val sourceFaces = fs.map { face ->
+        face.directedEdges.map { it.index() }.toIntArray()
+    }
+    val pointFaces = es.map { edge ->
+        intArrayOf(
+            edge.a.id,
+            vs.size + edge.l.id,
+            edge.b.id,
+            vs.size + edge.r.id,
+        )
+    }
+    return PackingTopology(vertexFaces + sourceFaces, pointFaces)
+}
+
+private fun edgeKey(a: Int, b: Int): Long {
+    val low = min(a, b)
+    val high = max(a, b)
+    return (low.toLong() shl 32) or (high.toLong() and 0xffffffffL)
+}
+
+private fun Polyhedron.initialPackingPoints(): List<MutableVec3> {
+    val points = es.map { edge ->
+        MutableVec3(
+            (edge.a.x + edge.b.x) / 2,
+            (edge.a.y + edge.b.y) / 2,
+            (edge.a.z + edge.b.z) / 2,
+        )
+    }
+    val centroid = MutableVec3()
+    for (point in points) centroid += point
+    centroid /= points.size
+    for (point in points) point -= centroid
+    return points
+}
+
+private fun updateFacePlanes(
+    points: List<MutableVec3>,
+    faces: List<IntArray>,
+    centers: List<MutableVec3>,
+    normals: List<MutableVec3>,
+) {
+    for (faceIndex in faces.indices) {
+        val face = faces[faceIndex]
+        val center = centers[faceIndex]
+        val normal = normals[faceIndex]
+        center.setToZero()
+        normal.setToZero()
+        for (pointIndex in face) center += points[pointIndex]
+        center /= face.size
+        for (index in face.indices) {
+            crossCenteredAddTo(
+                normal,
+                points[face[index]],
+                points[face[(index + 1) % face.size]],
+                center,
+            )
+        }
+        val length = normal.norm
+        check(length > EPS && length.isFinite()) { "Degenerate canonical packing face" }
+        normal /= length
+        if (normal * center < 0.0) normal *= -1.0
     }
 }
 
+private fun Polyhedron.rebuildFromPacking(
+    faceCenters: List<MutableVec3>,
+    faceNormals: List<MutableVec3>,
+): Polyhedron = polyhedron(mergeIndistinguishableKinds = true) {
+    for (vertex in vs) {
+        val faceIndex = vertex.id
+        val normal = faceNormals[faceIndex]
+        val distance = normal * faceCenters[faceIndex]
+        check(abs(distance) > EPS && distance.isFinite()) { "Degenerate canonical reciprocal face" }
+        vertex(MutableVec3(normal.x / distance, normal.y / distance, normal.z / distance), vertex.kind)
+    }
+    faces(fs)
+}
+
 fun Polyhedron.isCanonical(): Boolean {
-    // 1. Polyhedron must be centered at origin
+    // The canonical origin is the centroid of edge tangency points.
     val center = MutableVec3()
-    for (i in vs.indices) {
-        center += vs[i]
-    }
-    center /= vs.size
+    for (edge in es) center += edge.tangentPoint()
+    center /= es.size
     if (!(center approx Vec3.ZERO)) return false
-    // 2. All faces must be planar
     if (fs.any { !it.isPlanar }) return false
-    // 3. All edges must be tangent to the sphere of the same radius
-    var minD = Double.POSITIVE_INFINITY
-    var maxD = 0.0
-    for (e in es) {
-        val d = e.tangentDistance()
-        if (d < minD) minD = d
-        if (d > maxD) maxD = d
+
+    var minDistance = Double.POSITIVE_INFINITY
+    var maxDistance = 0.0
+    for (edge in es) {
+        val distance = edge.tangentDistance()
+        if (distance < minDistance) minDistance = distance
+        if (distance > maxDistance) maxDistance = distance
     }
-    return maxD approx minD
+    return maxDistance approx minDistance
 }

@@ -1,6 +1,7 @@
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import polyhedra.common.poly.fev
+import polyhedra.common.transform.isCanonical
 import polyhedra.common.util.runSynchronously
 import polyhedra.core.api.*
 import kotlin.test.Test
@@ -55,6 +56,32 @@ class CoreApiTest {
             assertEquals(response.polyName, decoded.polyName)
             assertEquals(response.poly.fev(), decoded.poly.fev())
             assertNotNull(decoded.poly)
+        }
+    }
+
+    @Test
+    fun evaluatesCantellateChamferSnubCanonicalChain() {
+        runSynchronously {
+            val progress = mutableListOf<Int>()
+            val response = evaluateCore(
+                CoreRequest(
+                    CoreState(
+                        seedTag = "tC",
+                        transformTags = listOf("e", "c", "s", "o"),
+                        scaleTag = "c",
+                    )
+                ),
+                progress::add,
+            )
+
+            assertEquals(null, response.error, "The complete transform chain must succeed")
+            assertEquals(listOf("e", "c", "s", "o"), response.validTransformTags)
+            assertEquals(1730, response.poly.fs.size)
+            assertEquals(2880, response.poly.es.size)
+            assertEquals(1152, response.poly.vs.size)
+            assertTrue(response.poly.isCanonical(), "The output must satisfy the canonical representation invariants")
+            assertTrue(progress.zipWithNext().all { (previous, next) -> next >= previous })
+            assertEquals(100, progress.last())
         }
     }
 }

@@ -6,14 +6,14 @@ Median time per uncached operation; lower is better.
 
 | Workload | Kotlin/JS | Kotlin/WasmGC | Speedup | Time reduction |
 | --- | ---: | ---: | ---: | ---: |
-| Truncate / icosahedron | 325.680 µs | 157.800 µs | 2.06× | 51.5% |
-| Cantellate / dodecahedron | 352.471 µs | 216.814 µs | 1.63× | 38.5% |
-| Bevel / dodecahedron | 602.672 µs | 264.076 µs | 2.28× | 56.2% |
-| Snub / dodecahedron | 530.886 µs | 238.703 µs | 2.22× | 55.0% |
-| Chamfer / icosahedron | 521.857 µs | 213.624 µs | 2.44× | 59.1% |
-| Canonicalization / irregular truncated cube | 4.036 ms | 2.917 ms | 1.38× | 27.7% |
+| Truncate / icosahedron | 286.526 µs | 154.199 µs | 1.86× | 46.2% |
+| Cantellate / dodecahedron | 350.624 µs | 201.546 µs | 1.74× | 42.5% |
+| Bevel / dodecahedron | 450.773 µs | 256.835 µs | 1.76× | 43.0% |
+| Snub / dodecahedron | 391.938 µs | 237.539 µs | 1.65× | 39.4% |
+| Chamfer / icosahedron | 412.374 µs | 212.608 µs | 1.94× | 48.4% |
+| Canonicalization / irregular truncated cube | 6.179 ms | 4.362 ms | 1.42× | 29.4% |
 
-The geometric-mean speedup across these six workloads is approximately 1.96×.
+The geometric-mean speedup across these six workloads is approximately 1.72×.
 
 ## Method
 

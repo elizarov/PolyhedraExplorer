@@ -30,6 +30,8 @@ flowchart LR
 
 The generated Kotlin loader and the worker's dynamic-import expression are the only JavaScript interop required for core execution. The production web bundle depends on `model`, not `core`, so it cannot contain a JavaScript fallback copy of the manipulation engine.
 
+Canonical representation invariants and the current circle-packing solver are specified in [Canonicalization](canonicalization.md).
+
 The Wasm core owns:
 
 - seed geometry construction;
@@ -44,7 +46,7 @@ The JS application owns DOM composition, user events, hash serialization, interp
 
 `RootParams` is the authoritative UI state. Its compact serialization is stored after `#/` in the URL, so reloads and copied links reproduce the current seed, transform chain, view, lighting, animation, and export settings.
 
-Every seed/transform/scale change creates a `CoreState`. Results from superseded requests are ignored. A response contains the scaled display mesh, unscaled intermediate meshes, valid transform tags, per-stage droppable kinds, structured issues, progress, and optional animation steps. Compose receives an explicit core-update signal so asynchronous results and progress are rendered immediately.
+Every seed/transform/scale change creates a `CoreState`. Results from superseded requests are ignored. A response contains the scaled display mesh, unscaled intermediate meshes, valid transform tags, per-stage droppable kinds, structured issues, and optional animation steps. Progress arrives as separate worker messages. Compose receives an explicit core-update signal so asynchronous results and progress are rendered immediately.
 
 ## Build outputs
 
