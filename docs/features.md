@@ -5,7 +5,7 @@
 - 31 built-in convex seeds: 5 Platonic, 13 Archimedean, and 13 Catalan solids.
 - Transform chains containing None/removal, Truncated, Rectified, Cantellated, Dual, Bevelled, Snub, Chamfered, `Canonical` (the canonicalization operation), and topology-valid Drop operations.
 - Optional catalog replacement: when a completed transform chain is geometrically equivalent to a built-in seed, a suggestion appears to the right of the chain. The current exploratory state remains unchanged until the suggestion is clicked.
-- Background WasmGC execution for manipulation algorithms, with live convergence progress for canonicalization and cancellation when a newer state supersedes it.
+- Background WasmGC execution for manipulation algorithms, with live convergence progress for symmetry-quotient canonicalization and cancellation when a newer state supersedes it.
 - Circumradius, midradius, or inradius normalization.
 - Transform applicability, identity, maximum-size, failure, and non-planar-face feedback.
 

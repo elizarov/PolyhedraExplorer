@@ -21,8 +21,16 @@ private const val MAX_ADJUSTMENT = 0.5
 private const val ADJUSTMENT_UP = 1.01
 private const val ADJUSTMENT_DOWN = 0.995
 private const val ORTHOGONALITY_ADJUSTMENT = 0.5
+private const val ORBIT_MATCH_TOLERANCE = 1e-8
 
 var totalIterations = 0
+
+internal data class CanonicalOrbitStats(
+    val points: Int,
+    val pointOrbits: Int,
+    val faces: Int,
+    val faceOrbits: Int,
+)
 
 fun Polyhedron.canonical(): Polyhedron =
     runSynchronously { canonical(null) }
@@ -32,25 +40,140 @@ private data class PackingTopology(
     val pointFaces: List<IntArray>,
 )
 
+private data class PackingSymmetry(
+    val fullPointCount: Int,
+    val pointOrbits: List<PackingPointOrbit>,
+    val faceOrbits: List<PackingFaceOrbit>,
+    val faceLocations: List<OrbitLocation>,
+    val surroundingFaces: List<List<PackingFaceReference>>,
+)
+
+private data class PackingPointOrbit(
+    val sourcePointIndex: Int,
+    val point: MutableVec3,
+    val centroidTransform: OrbitRotationSum,
+)
+
+private data class OrbitLocation(
+    val orbitIndex: Int,
+    val rotation: OrbitRotation,
+)
+
+private data class PackingFaceOrbit(
+    val points: List<PackingPointReference>,
+    val center: MutableVec3 = MutableVec3(),
+    val normal: MutableVec3 = MutableVec3(),
+)
+
+private data class PackingPointReference(
+    val orbitIndex: Int,
+    val rotation: OrbitRotation,
+    val point: MutableVec3 = MutableVec3(),
+)
+
+private data class PackingFaceReference(
+    val orbitIndex: Int,
+    val rotation: OrbitRotation,
+    val center: MutableVec3 = MutableVec3(),
+    val normal: MutableVec3 = MutableVec3(),
+)
+
+private data class OrbitFrame(
+    val radial: Vec3,
+    val tangent: Vec3,
+    val bitangent: Vec3,
+)
+
+private class OrbitRotation(
+    val xx: Double,
+    val xy: Double,
+    val xz: Double,
+    val yx: Double,
+    val yy: Double,
+    val yz: Double,
+    val zx: Double,
+    val zy: Double,
+    val zz: Double,
+) {
+    constructor(source: OrbitFrame, target: OrbitFrame) : this(
+        xx = target.radial.x * source.radial.x +
+            target.tangent.x * source.tangent.x + target.bitangent.x * source.bitangent.x,
+        xy = target.radial.x * source.radial.y +
+            target.tangent.x * source.tangent.y + target.bitangent.x * source.bitangent.y,
+        xz = target.radial.x * source.radial.z +
+            target.tangent.x * source.tangent.z + target.bitangent.x * source.bitangent.z,
+        yx = target.radial.y * source.radial.x +
+            target.tangent.y * source.tangent.x + target.bitangent.y * source.bitangent.x,
+        yy = target.radial.y * source.radial.y +
+            target.tangent.y * source.tangent.y + target.bitangent.y * source.bitangent.y,
+        yz = target.radial.y * source.radial.z +
+            target.tangent.y * source.tangent.z + target.bitangent.y * source.bitangent.z,
+        zx = target.radial.z * source.radial.x +
+            target.tangent.z * source.tangent.x + target.bitangent.z * source.bitangent.x,
+        zy = target.radial.z * source.radial.y +
+            target.tangent.z * source.tangent.y + target.bitangent.z * source.bitangent.y,
+        zz = target.radial.z * source.radial.z +
+            target.tangent.z * source.tangent.z + target.bitangent.z * source.bitangent.z,
+    )
+
+    fun transformTo(destination: MutableVec3, vector: Vec3) {
+        destination.set(
+            xx * vector.x + xy * vector.y + xz * vector.z,
+            yx * vector.x + yy * vector.y + yz * vector.z,
+            zx * vector.x + zy * vector.y + zz * vector.z,
+        )
+    }
+
+    companion object {
+        val ID = OrbitRotation(
+            xx = 1.0, xy = 0.0, xz = 0.0,
+            yx = 0.0, yy = 1.0, yz = 0.0,
+            zx = 0.0, zy = 0.0, zz = 1.0,
+        )
+    }
+}
+
+private class OrbitRotationSum(rotations: List<OrbitRotation>) {
+    private val xx = rotations.sumOf { it.xx }
+    private val xy = rotations.sumOf { it.xy }
+    private val xz = rotations.sumOf { it.xz }
+    private val yx = rotations.sumOf { it.yx }
+    private val yy = rotations.sumOf { it.yy }
+    private val yz = rotations.sumOf { it.yz }
+    private val zx = rotations.sumOf { it.zx }
+    private val zy = rotations.sumOf { it.zy }
+    private val zz = rotations.sumOf { it.zz }
+
+    fun transformTo(destination: MutableVec3, vector: Vec3) {
+        destination.set(
+            xx * vector.x + xy * vector.y + xz * vector.z,
+            yx * vector.x + yy * vector.y + yz * vector.z,
+            zx * vector.x + zy * vector.y + zz * vector.z,
+        )
+    }
+}
+
 /**
  * Finds the canonical representation through the edge-nearpoint/circle-packing
  * relaxation described by Adrian Rossiter's Antiprism implementation of the
  * Koebe-Andreev-Thurston construction.
  *
- * The processing mesh has one unit-sphere point per source edge. Its faces are
- * the two mutually orthogonal circle packings corresponding to source faces and
- * source vertices. Once those points converge, polar reciprocation reconstructs
- * a source-topology mesh with planar faces and unit-sphere-tangent edges.
+ * The conceptual processing mesh has one unit-sphere point per source edge. Its
+ * faces are the two mutually orthogonal circle packings corresponding to source
+ * faces and source vertices. The iterative solve keeps only one point and plane
+ * per validated rotational orbit; precomputed proper rotations supply every
+ * quotient incidence. Once those representatives converge, each vertex plane
+ * is rotated to its symmetric copies and polar reciprocation reconstructs a
+ * source-topology mesh with planar faces and unit-sphere-tangent edges.
  */
 @OptIn(ExperimentalTime::class)
 suspend fun Polyhedron.canonical(progress: OperationProgressContext?): Polyhedron {
     val startTime = TimeSource.Monotonic.markNow()
     val topology = packingTopology()
-    val points = initialPackingPoints()
-    val faceCenters = topology.faces.map { MutableVec3() }
-    val faceNormals = topology.faces.map { MutableVec3() }
-    val offsets = points.map { MutableVec3() }
+    val symmetry = packingSymmetry(topology, initialPackingPoints())
+    val offsets = symmetry.pointOrbits.map { MutableVec3() }
     val centroid = MutableVec3()
+    val centroidContribution = MutableVec3()
 
     var adjustment = INITIAL_ADJUSTMENT
     var lastMaxOffset = Double.POSITIVE_INFINITY
@@ -60,62 +183,32 @@ suspend fun Polyhedron.canonical(progress: OperationProgressContext?): Polyhedro
     var iterations = 0
 
     while (true) {
-        updateFacePlanes(points, topology.faces, faceCenters, faceNormals)
+        updateOrbitFacePlanes(symmetry)
         centroid.setToZero()
-        for (point in points) centroid += point
-        centroid /= points.size
+        for (orbit in symmetry.pointOrbits) {
+            orbit.centroidTransform.transformTo(centroidContribution, orbit.point)
+            centroid += centroidContribution
+        }
+        centroid /= symmetry.fullPointCount
 
         var maxOffset = 0.0
-        for (pointIndex in points.indices) {
-            val point = points[pointIndex]
-            val offset = offsets[pointIndex]
-            val surroundingFaces = topology.pointFaces[pointIndex]
-            offset.setToZero()
-
-            // Pull the point toward the centroid of its projections onto the
-            // four surrounding primal/dual circle planes.
-            for (faceIndex in surroundingFaces) {
-                val normal = faceNormals[faceIndex]
-                val center = faceCenters[faceIndex]
-                val distance =
-                    normal.x * (center.x - point.x) +
-                        normal.y * (center.y - point.y) +
-                        normal.z * (center.z - point.z)
-                offset.x += point.x + normal.x * distance
-                offset.y += point.y + normal.y * distance
-                offset.z += point.z + normal.z * distance
-            }
-            offset.x = (offset.x / surroundingFaces.size - point.x) * adjustment - centroid.x
-            offset.y = (offset.y / surroundingFaces.size - point.y) * adjustment - centroid.y
-            offset.z = (offset.z / surroundingFaces.size - point.z) * adjustment - centroid.z
-
-            // Opposite surrounding faces belong to the same circle packing.
-            // Their normals define a plane through the origin on which the
-            // shared edge point must lie for mutual tangency/orthogonality.
-            for (pairIndex in 0 until 2) {
-                val first = faceNormals[surroundingFaces[pairIndex]]
-                val opposite = faceNormals[surroundingFaces[pairIndex + 2]]
-                val nx = opposite.y * first.z - opposite.z * first.y
-                val ny = opposite.z * first.x - opposite.x * first.z
-                val nz = opposite.x * first.y - opposite.y * first.x
-                val length = norm(nx, ny, nz)
-                check(length > EPS && length.isFinite()) { "Degenerate canonical packing plane" }
-                val ux = nx / length
-                val uy = ny / length
-                val uz = nz / length
-                val distance = point.x * ux + point.y * uy + point.z * uz
-                val factor = adjustment * ORTHOGONALITY_ADJUSTMENT * distance
-                offset.x -= ux * factor
-                offset.y -= uy * factor
-                offset.z -= uz * factor
-            }
-
+        for (orbitIndex in symmetry.pointOrbits.indices) {
+            val orbit = symmetry.pointOrbits[orbitIndex]
+            val offset = offsets[orbitIndex]
+            updatePackingPointOffset(
+                point = orbit.point,
+                surroundingFaces = symmetry.surroundingFaces[orbitIndex],
+                faceOrbits = symmetry.faceOrbits,
+                adjustment = adjustment,
+                offset = offset,
+            )
+            offset -= centroid
             maxOffset = max(maxOffset, offset.norm)
         }
 
-        for (pointIndex in points.indices) {
-            val point = points[pointIndex]
-            point += offsets[pointIndex]
+        for (orbitIndex in symmetry.pointOrbits.indices) {
+            val point = symmetry.pointOrbits[orbitIndex].point
+            point += offsets[orbitIndex]
             val length = point.norm
             check(length > EPS && length.isFinite()) { "Degenerate canonical packing point" }
             point /= length
@@ -154,11 +247,13 @@ suspend fun Polyhedron.canonical(progress: OperationProgressContext?): Polyhedro
 
     println(
         "Canonicalization: done $iterations iterations in " +
-            "${(startTime.elapsedNow().inWholeMilliseconds / 1000.0).fmtFix(3)} sec"
+            "${(startTime.elapsedNow().inWholeMilliseconds / 1000.0).fmtFix(3)} sec " +
+            "(${symmetry.pointOrbits.size}/${symmetry.fullPointCount} point orbits, " +
+            "${symmetry.faceOrbits.size}/${topology.faces.size} face orbits)"
     )
     totalIterations += iterations
-    updateFacePlanes(points, topology.faces, faceCenters, faceNormals)
-    return rebuildFromPacking(faceCenters, faceNormals)
+    updateOrbitFacePlanes(symmetry)
+    return rebuildFromPacking(symmetry)
 }
 
 private fun convergenceProgress(initialOffset: Double, currentOffset: Double): Int {
@@ -216,6 +311,347 @@ private fun Polyhedron.initialPackingPoints(): List<MutableVec3> {
     return points
 }
 
+internal fun Polyhedron.canonicalOrbitStats(): CanonicalOrbitStats {
+    val topology = packingTopology()
+    val symmetry = packingSymmetry(topology, initialPackingPoints())
+    return CanonicalOrbitStats(
+        points = es.size,
+        pointOrbits = symmetry.pointOrbits.size,
+        faces = topology.faces.size,
+        faceOrbits = symmetry.faceOrbits.size,
+    )
+}
+
+private fun Polyhedron.packingSymmetry(
+    topology: PackingTopology,
+    initialPoints: List<MutableVec3>,
+): PackingSymmetry {
+    val pointLocations = arrayOfNulls<OrbitLocation>(initialPoints.size)
+    val pointOrbits = ArrayList<PackingPointOrbit>()
+    val pointGroups = es.indices.groupBy { es[it].kind }
+
+    for (group in pointGroups.values) {
+        val remaining = group.toMutableList()
+        while (remaining.isNotEmpty()) {
+            val representative = remaining.removeAt(0)
+            val representativeFrame = packingPointFrame(representative, initialPoints)
+            val orbitIndex = pointOrbits.size
+            val rotations = ArrayList<OrbitRotation>()
+            rotations += OrbitRotation.ID
+            pointLocations[representative] = OrbitLocation(orbitIndex, OrbitRotation.ID)
+
+            if (representativeFrame != null) {
+                val iterator = remaining.iterator()
+                while (iterator.hasNext()) {
+                    val pointIndex = iterator.next()
+                    val rotation = packingPointRotationOrNull(
+                        representative,
+                        pointIndex,
+                        representativeFrame,
+                        topology,
+                        initialPoints,
+                    ) ?: continue
+                    rotations += rotation
+                    pointLocations[pointIndex] = OrbitLocation(orbitIndex, rotation)
+                    iterator.remove()
+                }
+            }
+
+            pointOrbits += PackingPointOrbit(
+                sourcePointIndex = representative,
+                point = MutableVec3(initialPoints[representative]),
+                centroidTransform = OrbitRotationSum(rotations),
+            )
+        }
+    }
+
+    val initialFaceCenters = topology.faces.map { MutableVec3() }
+    val initialFaceNormals = topology.faces.map { MutableVec3() }
+    updateFacePlanes(initialPoints, topology.faces, initialFaceCenters, initialFaceNormals)
+
+    val faceLocations = arrayOfNulls<OrbitLocation>(topology.faces.size)
+    val faceRepresentatives = ArrayList<Int>()
+    val faceGroups = topology.faces.indices.groupBy { faceIndex ->
+        if (faceIndex < vs.size) {
+            0 to vs[faceIndex].kind.id
+        } else {
+            1 to fs[faceIndex - vs.size].kind.id
+        }
+    }
+    for (group in faceGroups.values) {
+        val remaining = group.toMutableList()
+        while (remaining.isNotEmpty()) {
+            val representative = remaining.removeAt(0)
+            val representativeFrame = packingFaceFrame(
+                representative,
+                topology,
+                initialPoints,
+                initialFaceCenters,
+            )
+            val orbitIndex = faceRepresentatives.size
+            faceRepresentatives += representative
+            faceLocations[representative] = OrbitLocation(orbitIndex, OrbitRotation.ID)
+
+            if (representativeFrame != null) {
+                val iterator = remaining.iterator()
+                while (iterator.hasNext()) {
+                    val faceIndex = iterator.next()
+                    val rotation = packingFaceRotationOrNull(
+                        representative,
+                        faceIndex,
+                        representativeFrame,
+                        topology,
+                        initialPoints,
+                        initialFaceCenters,
+                    ) ?: continue
+                    faceLocations[faceIndex] = OrbitLocation(orbitIndex, rotation)
+                    iterator.remove()
+                }
+            }
+        }
+    }
+
+    val resolvedPointLocations = pointLocations.map { requireNotNull(it) }
+    val resolvedFaceLocations = faceLocations.map { requireNotNull(it) }
+    val faceOrbits = faceRepresentatives.map { faceIndex ->
+        PackingFaceOrbit(
+            points = topology.faces[faceIndex].map { pointIndex ->
+                val location = resolvedPointLocations[pointIndex]
+                PackingPointReference(location.orbitIndex, location.rotation)
+            },
+        )
+    }
+    val surroundingFaces = pointOrbits.map { orbit ->
+        topology.pointFaces[orbit.sourcePointIndex].map { faceIndex ->
+            val location = resolvedFaceLocations[faceIndex]
+            PackingFaceReference(location.orbitIndex, location.rotation)
+        }
+    }
+
+    return PackingSymmetry(
+        fullPointCount = initialPoints.size,
+        pointOrbits = pointOrbits,
+        faceOrbits = faceOrbits,
+        faceLocations = resolvedFaceLocations,
+        surroundingFaces = surroundingFaces,
+    )
+}
+
+private fun Polyhedron.packingPointFrame(
+    pointIndex: Int,
+    points: List<MutableVec3>,
+): OrbitFrame? = packingFrame(points[pointIndex], es[pointIndex].vec)
+
+private fun Polyhedron.packingPointRotationOrNull(
+    representative: Int,
+    pointIndex: Int,
+    representativeFrame: OrbitFrame,
+    topology: PackingTopology,
+    points: List<MutableVec3>,
+): OrbitRotation? {
+    val targetEdgeVector = es[pointIndex].vec
+    for (direction in listOf(targetEdgeVector, targetEdgeVector * -1.0)) {
+        val targetFrame = packingFrame(points[pointIndex], direction) ?: continue
+        val rotation = OrbitRotation(representativeFrame, targetFrame)
+        if (packingPointNeighborhoodMatches(representative, pointIndex, rotation, topology, points)) {
+            return rotation
+        }
+    }
+    return null
+}
+
+private fun Polyhedron.packingFaceFrame(
+    faceIndex: Int,
+    topology: PackingTopology,
+    points: List<MutableVec3>,
+    faceCenters: List<MutableVec3>,
+): OrbitFrame? {
+    val face = topology.faces[faceIndex]
+    val anchorIndex = face.minWithOrNull(compareBy { es[it].kind }) ?: return null
+    return packingFrame(faceCenters[faceIndex], points[anchorIndex] - faceCenters[faceIndex])
+}
+
+private fun Polyhedron.packingFaceRotationOrNull(
+    representative: Int,
+    faceIndex: Int,
+    representativeFrame: OrbitFrame,
+    topology: PackingTopology,
+    points: List<MutableVec3>,
+    faceCenters: List<MutableVec3>,
+): OrbitRotation? {
+    val representativeAnchor = topology.faces[representative].minWithOrNull(compareBy { es[it].kind })
+        ?: return null
+    val anchorKind = es[representativeAnchor].kind
+    for (targetAnchor in topology.faces[faceIndex]) {
+        if (es[targetAnchor].kind != anchorKind) continue
+        val targetFrame = packingFrame(
+            faceCenters[faceIndex],
+            points[targetAnchor] - faceCenters[faceIndex],
+        ) ?: continue
+        val rotation = OrbitRotation(representativeFrame, targetFrame)
+        if (packingFacesMatch(
+                topology.faces[representative],
+                topology.faces[faceIndex],
+                rotation,
+                points,
+            )
+        ) return rotation
+    }
+    return null
+}
+
+private fun packingFrame(radialVector: Vec3, tangentVector: Vec3): OrbitFrame? {
+    val radialLength = radialVector.norm
+    if (radialLength <= EPS || !radialLength.isFinite()) return null
+    val radial = radialVector / radialLength
+    val radialProjection = tangentVector * radial
+    val tangent = tangentVector - radial * radialProjection
+    val tangentLength = tangent.norm
+    if (tangentLength <= EPS || !tangentLength.isFinite()) return null
+    val tangentUnit = tangent / tangentLength
+    return OrbitFrame(radial, tangentUnit, radial cross tangentUnit)
+}
+
+private fun packingPointNeighborhoodMatches(
+    representative: Int,
+    pointIndex: Int,
+    rotation: OrbitRotation,
+    topology: PackingTopology,
+    points: List<MutableVec3>,
+): Boolean {
+    val transformed = MutableVec3()
+    rotation.transformTo(transformed, points[representative])
+    if (!transformed.closeTo(points[pointIndex])) return false
+
+    val representativeFaces = topology.pointFaces[representative]
+    val pointFaces = topology.pointFaces[pointIndex]
+    val matched = BooleanArray(pointFaces.size)
+    for ((representativeIndex, representativeFace) in representativeFaces.withIndex()) {
+        var matchIndex = -1
+        for (index in pointFaces.indices) {
+            val targetFace = pointFaces[index]
+            if (matched[index]) continue
+            // Even slots are vertex-derived faces and odd slots are
+            // source-face-derived; rotations must preserve the two packings.
+            if (index % 2 != representativeIndex % 2) continue
+            if (packingFacesMatch(
+                    topology.faces[representativeFace],
+                    topology.faces[targetFace],
+                    rotation,
+                    points,
+                )
+            ) {
+                matchIndex = index
+                break
+            }
+        }
+        if (matchIndex < 0) return false
+        matched[matchIndex] = true
+    }
+    return true
+}
+
+private fun packingFacesMatch(
+    source: IntArray,
+    target: IntArray,
+    rotation: OrbitRotation,
+    points: List<MutableVec3>,
+): Boolean {
+    if (source.size != target.size) return false
+    val matched = BooleanArray(target.size)
+    val transformed = MutableVec3()
+    for (sourcePoint in source) {
+        rotation.transformTo(transformed, points[sourcePoint])
+        var matchIndex = -1
+        for (index in target.indices) {
+            if (!matched[index] && transformed.closeTo(points[target[index]])) {
+                matchIndex = index
+                break
+            }
+        }
+        if (matchIndex < 0) return false
+        matched[matchIndex] = true
+    }
+    return true
+}
+
+private fun Vec3.closeTo(other: Vec3): Boolean {
+    val dx = x - other.x
+    val dy = y - other.y
+    val dz = z - other.z
+    val scale = max(1.0, max(norm, other.norm))
+    return norm(dx, dy, dz) <= ORBIT_MATCH_TOLERANCE * scale
+}
+
+private fun updateOrbitFacePlanes(symmetry: PackingSymmetry) {
+    for (face in symmetry.faceOrbits) {
+        val center = face.center
+        val normal = face.normal
+        center.setToZero()
+        normal.setToZero()
+        for (pointRef in face.points) {
+            pointRef.rotation.transformTo(pointRef.point, symmetry.pointOrbits[pointRef.orbitIndex].point)
+            center += pointRef.point
+        }
+        center /= face.points.size
+        for (index in face.points.indices) {
+            crossCenteredAddTo(
+                normal,
+                face.points[index].point,
+                face.points[(index + 1) % face.points.size].point,
+                center,
+            )
+        }
+        val length = normal.norm
+        check(length > EPS && length.isFinite()) { "Degenerate canonical packing face" }
+        normal /= length
+        if (normal * center < 0.0) normal *= -1.0
+    }
+}
+
+private fun updatePackingPointOffset(
+    point: Vec3,
+    surroundingFaces: List<PackingFaceReference>,
+    faceOrbits: List<PackingFaceOrbit>,
+    adjustment: Double,
+    offset: MutableVec3,
+) {
+    offset.setToZero()
+    for (faceRef in surroundingFaces) {
+        val face = faceOrbits[faceRef.orbitIndex]
+        faceRef.rotation.transformTo(faceRef.center, face.center)
+        faceRef.rotation.transformTo(faceRef.normal, face.normal)
+        val distance =
+            faceRef.normal.x * (faceRef.center.x - point.x) +
+                faceRef.normal.y * (faceRef.center.y - point.y) +
+                faceRef.normal.z * (faceRef.center.z - point.z)
+        offset.x += point.x + faceRef.normal.x * distance
+        offset.y += point.y + faceRef.normal.y * distance
+        offset.z += point.z + faceRef.normal.z * distance
+    }
+    offset.x = (offset.x / surroundingFaces.size - point.x) * adjustment
+    offset.y = (offset.y / surroundingFaces.size - point.y) * adjustment
+    offset.z = (offset.z / surroundingFaces.size - point.z) * adjustment
+
+    for (pairIndex in 0 until 2) {
+        val first = surroundingFaces[pairIndex].normal
+        val opposite = surroundingFaces[pairIndex + 2].normal
+        val nx = opposite.y * first.z - opposite.z * first.y
+        val ny = opposite.z * first.x - opposite.x * first.z
+        val nz = opposite.x * first.y - opposite.y * first.x
+        val length = norm(nx, ny, nz)
+        check(length > EPS && length.isFinite()) { "Degenerate canonical packing plane" }
+        val ux = nx / length
+        val uy = ny / length
+        val uz = nz / length
+        val distance = point.x * ux + point.y * uy + point.z * uz
+        val factor = adjustment * ORTHOGONALITY_ADJUSTMENT * distance
+        offset.x -= ux * factor
+        offset.y -= uy * factor
+        offset.z -= uz * factor
+    }
+}
+
 private fun updateFacePlanes(
     points: List<MutableVec3>,
     faces: List<IntArray>,
@@ -245,19 +681,21 @@ private fun updateFacePlanes(
     }
 }
 
-private fun Polyhedron.rebuildFromPacking(
-    faceCenters: List<MutableVec3>,
-    faceNormals: List<MutableVec3>,
-): Polyhedron = polyhedron(mergeIndistinguishableKinds = true) {
-    for (vertex in vs) {
-        val faceIndex = vertex.id
-        val normal = faceNormals[faceIndex]
-        val distance = normal * faceCenters[faceIndex]
-        check(abs(distance) > EPS && distance.isFinite()) { "Degenerate canonical reciprocal face" }
-        vertex(MutableVec3(normal.x / distance, normal.y / distance, normal.z / distance), vertex.kind)
+private fun Polyhedron.rebuildFromPacking(symmetry: PackingSymmetry): Polyhedron =
+    polyhedron(mergeIndistinguishableKinds = true) {
+        val center = MutableVec3()
+        val normal = MutableVec3()
+        for (vertex in vs) {
+            val location = symmetry.faceLocations[vertex.id]
+            val face = symmetry.faceOrbits[location.orbitIndex]
+            location.rotation.transformTo(center, face.center)
+            location.rotation.transformTo(normal, face.normal)
+            val distance = normal * center
+            check(abs(distance) > EPS && distance.isFinite()) { "Degenerate canonical reciprocal face" }
+            vertex(MutableVec3(normal.x / distance, normal.y / distance, normal.z / distance), vertex.kind)
+        }
+        faces(fs)
     }
-    faces(fs)
-}
 
 fun Polyhedron.isCanonical(): Boolean {
     // The canonical origin is the centroid of edge tangency points.

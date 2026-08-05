@@ -30,7 +30,7 @@ flowchart LR
 
 The generated Kotlin loader and the worker's dynamic-import expression are the only JavaScript interop required for core execution. The production web bundle depends on `model`, not `core`, so it cannot contain a JavaScript fallback copy of the manipulation engine.
 
-Canonical representation invariants and the current circle-packing solver are specified in [Canonicalization](canonicalization.md).
+Canonical representation invariants and the current circle-packing solver are specified in [Canonicalization](canonicalization.md). The solver validates rotational kind groups, relaxes only one edge point and face plane per symmetry orbit, and expands the converged vertex planes through precomputed proper rotations once during final reconstruction.
 
 The Wasm core owns:
 
