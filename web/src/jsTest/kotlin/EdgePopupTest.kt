@@ -13,6 +13,7 @@ import polyhedra.model.poly.PolygonProjection
 import polyhedra.model.poly.Vertex
 import polyhedra.model.poly.computeNetProjection
 import polyhedra.model.poly.len
+import polyhedra.model.util.fmt
 import polyhedra.web.main.PolyStyle
 import polyhedra.web.main.SvgEdgeNet
 import polyhedra.web.util.toRgbString
@@ -80,11 +81,32 @@ class EdgePopupTest {
         assertEquals(PolyStyle.faceColor(edge.r).toRgbString(), right.getAttribute("fill"))
     }
 
+    @Test
+    fun edgeNetStrokeUsesIndividualFaceScale() {
+        val edge = representativeMixedFaceEdge()
+        val net = edge.computeNetProjection()
+        val expectedStrokeWidth = maxOf(
+            net.left.figure.maxDimension(),
+            net.right.figure.maxDimension(),
+        ) / 20.0
+        composition = renderComposable(host) {
+            SvgEdgeNet("figure edge-figure", edge, PolyStyle.edgeColor)
+        }
+
+        val svg = host.querySelector("svg") as Element
+        assertEquals(expectedStrokeWidth.fmt, svg.getAttribute("stroke-width"))
+    }
+
     private fun representativeMixedFaceEdge(): Edge =
         Seed.TruncatedCube.poly.es.first { it.l.kind != it.r.kind }
 
     private fun PolygonProjection.at(face: Face, vertex: Vertex) =
         vs[face.fvs.indexOf(vertex)]
+
+    private fun PolygonProjection.maxDimension(): Double = maxOf(
+        vs.maxOf { it.x } - vs.minOf { it.x },
+        vs.maxOf { it.y } - vs.minOf { it.y },
+    )
 
     private companion object {
         const val tolerance = 1e-8

@@ -45,7 +45,13 @@ private fun SvgPolygons(classes: String, stroke: Color, polygons: List<ColoredPo
     val y0 = vertices.minOf { it.y }
     val w0 = vertices.maxOf { it.x } - x0
     val h0 = vertices.maxOf { it.y } - y0
-    val strokeWidth = maxOf(w0, h0) / 20
+    val strokeWidth = polygons.maxOf { polygon ->
+        val polygonVertices = polygon.figure.vs
+        maxOf(
+            polygonVertices.maxOf { it.x } - polygonVertices.minOf { it.x },
+            polygonVertices.maxOf { it.y } - polygonVertices.minOf { it.y },
+        )
+    } / 20
     val viewBox = "${(x0 - strokeWidth).fmt} ${(y0 - strokeWidth).fmt} " +
         "${(w0 + 2 * strokeWidth).fmt} ${(h0 + 2 * strokeWidth).fmt}"
     val markup = """<svg viewBox="$viewBox" stroke="${stroke.toRgbString()}" """ +
