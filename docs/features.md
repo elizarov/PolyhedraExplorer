@@ -3,7 +3,7 @@
 ## Polyhedra
 
 - 31 built-in convex seed types: 5 Platonic, 13 Archimedean, and 13 Catalan solids. Snub cube, Snub dodecahedron, and their two Catalan duals expose both chiral realizations.
-- Transform chains containing the primitive Truncated, Rectified, Dual, Snub, Chamfered, `Canonical` (the canonicalization operation), and topology-dependent orbit-targeted operations. None removes an existing stage. The transform popup lists fixed primitives under Transform, combinations under Macro, and available Drop face, Kis face, Drop edge, Drop vertex, and Truncate vertex operations under a final Orbit-targeted section in standard F/E/V order.
+- Transform chains containing the primitive Truncated, Rectified, Dual, Snub, Chamfered, `Canonical` (the canonicalization operation), and topology-dependent orbit-targeted operations. None removes an existing stage. The transform popup lists fixed primitives under Transform, combinations under Macro, and available orbit-targeted operations under a final section in the global order Drop face, Drop edge, Drop vertex, Kis face, Truncate vertex.
 - Kis face is offered for inputs with multiple face orbits and replaces every face in one selected orbit with pyramidal triangles. Truncate vertex is offered for inputs with multiple vertex orbits and cuts every vertex in one selected orbit. Applying either core operation to all corresponding orbits produces exactly the same geometry as the existing full Kis or Truncated implementation.
 - A newly added orbit-targeted operation selects its first valid orbit and is displayed with its concrete target, such as `Kis α` or `Truncate A`. While it is the last chain item, compact up/down controls to its right cycle and wrap through the currently valid orbits of that same operation.
 - Conway-style macros for Kis (Dual → Truncated → Dual), Join (Dual → Rectified → Dual), Needle (Truncated → Dual), Zip (Dual → Truncated), Cantellated (Rectified → Rectified), Bevelled (Rectified → Truncated, conventionally `ta`), Ortho (Dual → Rectified → Rectified → Dual), Meta (Dual → Rectified → Truncated → Dual), and Gyro (Dual → Snub → Dual). Macros are stored as one chain item but execute as their primitive sequence in the Wasm core.
@@ -27,9 +27,10 @@
 
 ## Inspection
 
-- Face-kind table with count, inradius, adjacency, vertex figure, planarity, visibility, and available drop action.
-- Edge-kind table with count, midradius, adjacency, and local geometry.
-- Vertex-kind table with count, circumradius, adjacency, and vertex figure.
+- Face-kind table with count, inradius, adjacency, vertex figure, planarity, visibility, and available Drop/Kis actions.
+- Edge-kind table with count, midradius, adjacency, local geometry, and available Drop action.
+- Vertex-kind table with count, circumradius, adjacency, vertex figure, and available Drop/Truncate actions.
+- Every F/E/V orbit row places all currently available targeted actions at its right edge in the same global order as the transform popup. The ×, upward-caret, and scissors icons mean Drop, Kis face, and Truncate vertex; each icon has a tooltip naming its exact operation and target orbit.
 - Hide/show all faces or individual face kinds with immediately synchronized popup controls, while retaining configurable rims and shell width.
 
 ## Persistence and export

@@ -58,13 +58,8 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         private set
 
     private var orbitTransforms: List<Set<Transform>> = emptyList()
-    val currentCanDrop: Set<AnyKind>
+    val currentOrbitTransforms: Set<Transform>
         get() = orbitTransforms.getOrNull(transformedPolys.size).orEmpty()
-            .mapNotNullTo(linkedSetOf()) { transform ->
-                transform.orbitTargetOrNull()
-                    ?.takeIf { it.operation.isDrop }
-                    ?.kind
-            }
 
     fun availableOrbitTransformsAt(transformIndex: Int): Set<Transform> =
         orbitTransforms.getOrNull(transformIndex).orEmpty()

@@ -5,7 +5,9 @@ import org.jetbrains.compose.web.dom.*
 import polyhedra.model.poly.*
 import polyhedra.model.util.fmtFix
 import polyhedra.model.util.toDegrees
-import polyhedra.web.catalog.Drop
+import polyhedra.web.catalog.OrbitTargetedOperation
+import polyhedra.web.catalog.Transform
+import polyhedra.web.catalog.orbitTargetOrNull
 import polyhedra.web.components.observe
 import polyhedra.web.params.SetParam
 import polyhedra.web.params.TransientParam
@@ -123,7 +125,7 @@ private fun FacesPopup(params: RenderParams, poly: Polyhedron) {
                         Td(attrs = { classes("rt") }) { Text("adj") }
                         Td { Text(essence.vfs.size.toString()) }
                         Td(attrs = { classes("fill") }) { Text(essence.vfs.joinToString(" ", "[", "]")) }
-                        Td { DropAction(params, poly, kind) }
+                        OrbitTargetActions(params.poly, kind)
                     }
                 }
             }
@@ -187,7 +189,7 @@ private fun EdgesPopup(params: RenderParams, poly: Polyhedron) {
                         Td { Text(essence.dist.fmtFix) }
                         Td { Text("len ${essence.len.fmtFix}") }
                         Td(attrs = { classes("fill") }) { Text("∠ ${essence.dihedralAngle.toDegrees().fmtFix(2)}°") }
-                        Td { DropAction(params, poly, kind) }
+                        OrbitTargetActions(params.poly, kind)
                     }
                 }
             }
@@ -213,7 +215,7 @@ private fun VerticesPopup(params: RenderParams, poly: Polyhedron) {
                         Td(attrs = { classes("rt") }) { Text("adj") }
                         Td { Text(essence.vfs.size.toString()) }
                         Td(attrs = { classes("fill") }) { Text(essence.vfs.joinToString(" ", "[", "]")) }
-                        Td { DropAction(params, poly, kind) }
+                        OrbitTargetActions(params.poly, kind)
                     }
                 }
             }
@@ -222,10 +224,36 @@ private fun VerticesPopup(params: RenderParams, poly: Polyhedron) {
 }
 
 @Composable
-private fun DropAction(params: RenderParams, poly: Polyhedron, kind: AnyKind) {
-    if (kind !in params.poly.currentCanDrop) return
-    I(attrs = {
-        classes("fa", "fa-remove")
-        onClick { params.poly.transforms.updateValue(params.poly.transforms.value + Drop(kind)) }
-    })
+internal fun OrbitTargetActions(params: PolyParams, kind: AnyKind) {
+    val transformsByOperation = params.currentOrbitTransforms.mapNotNull { transform ->
+        transform.orbitTargetOrNull()
+            ?.takeIf { target -> target.kind == kind }
+            ?.let { target -> target.operation to transform }
+    }.toMap()
+
+    Td(attrs = { classes("orbit-target-actions") }) {
+        for (operation in OrbitTargetedOperation.entries) {
+            transformsByOperation[operation]?.let { transform ->
+                OrbitTargetAction(params, operation, transform, kind)
+            }
+        }
+    }
+}
+
+@Composable
+private fun OrbitTargetAction(
+    params: PolyParams,
+    operation: OrbitTargetedOperation,
+    transform: Transform,
+    kind: AnyKind,
+) {
+    val tooltip = "${operation.optionName} orbit $kind"
+    Button(attrs = {
+        classes("orbit-target-action")
+        attr("aria-label", tooltip)
+        onClick { params.transforms.updateValue(params.transforms.value + transform) }
+    }) {
+        I(attrs = { classes("fa", operation.iconClass) })
+        Aside(attrs = { classes("tooltip-text") }) { Text(tooltip) }
+    }
 }

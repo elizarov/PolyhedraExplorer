@@ -117,9 +117,12 @@ The operation is offered only when the input has more than one vertex orbit and
 is displayed as `Truncate A`, `Truncate B`, and so on.
 
 The transform popup presents valid selective operations in its final
-`Orbit-targeted` section. Entries remain in standard F/E/V order: face operations
-(Drop face, Kis face), Drop edge, then vertex operations (Drop vertex, Truncate
-vertex). Choosing one stores its first concrete target. When an orbit-targeted
+`Orbit-targeted` section. Entries use one global order: Drop face, Drop edge, Drop
+vertex, Kis face, Truncate vertex. The F/E/V orbit rows show every operation
+currently available for that exact orbit at the right edge in the same order,
+using × for Drop, an upward caret for Kis face, and scissors for Truncate vertex;
+hover tooltips name the operation and target orbit. Choosing one stores its first
+concrete target. When an orbit-targeted
 operation is the last chain item, its up/down controls cycle through all currently
 valid targets of that same operation and wrap at both ends. The URL retains the
 concrete `x[kind]`, `k[face]`, or `t[vertex]` tag, so the selected orbit round-trips.

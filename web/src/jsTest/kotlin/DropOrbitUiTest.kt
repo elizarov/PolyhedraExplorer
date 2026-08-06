@@ -4,8 +4,12 @@ import androidx.compose.runtime.Composition
 import kotlinx.browser.document
 import kotlinx.browser.window
 import org.jetbrains.compose.web.renderComposable
+import org.jetbrains.compose.web.dom.Table
+import org.jetbrains.compose.web.dom.Tbody
+import org.jetbrains.compose.web.dom.Tr
 import org.w3c.dom.HTMLDivElement
 import org.w3c.dom.HTMLElement
+import polyhedra.model.poly.AnyKind
 import polyhedra.model.poly.EdgeKind
 import polyhedra.model.poly.FaceKind
 import polyhedra.model.poly.VertexKind
@@ -15,6 +19,7 @@ import polyhedra.web.catalog.Transform
 import polyhedra.web.catalog.TruncateVertex
 import polyhedra.web.catalog.toTransformOrNull
 import polyhedra.web.main.ControlPane
+import polyhedra.web.main.OrbitTargetActions
 import polyhedra.web.main.Popup
 import polyhedra.web.poly.PolyParams
 import kotlin.js.Promise
@@ -23,6 +28,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class DropOrbitUiTest {
     private lateinit var host: HTMLDivElement
@@ -54,7 +60,7 @@ class DropOrbitUiTest {
     }
 
     @Test
-    fun addPopupGroupsConcreteDropsByOrbitKindAndAddsFirstTarget(): Promise<Unit> {
+    fun addPopupGroupsConcreteOrbitOperationsAndAddsFirstTarget(): Promise<Unit> {
         val params = PolyParams("", null)
         params.updateAvailableOrbitTransforms(
             listOf(
@@ -80,9 +86,9 @@ class DropOrbitUiTest {
                 "Macro" to listOf("Kis", "Join", "Needle", "Zip", "Cantellated", "Bevelled", "Ortho", "Meta", "Gyro"),
                 "Orbit-targeted" to listOf(
                     "Drop face",
-                    "Kis face",
                     "Drop edge",
                     "Drop vertex",
+                    "Kis face",
                     "Truncate vertex",
                 ),
             ),
@@ -160,6 +166,57 @@ class DropOrbitUiTest {
         }
     }
 
+    @Test
+    fun facePopupActionsFollowTransformMenuOrderAndIncludeTooltips() {
+        val params = PolyParams("", null)
+        params.updateAvailableOrbitTransforms(
+            listOf(
+                listOf(
+                    KisFace(faceAlpha),
+                    Drop(faceBeta),
+                    Drop(faceAlpha),
+                    TruncateVertex(vertexA),
+                ).map(Transform::tag),
+            ),
+        )
+        renderOrbitTargetActions(params, faceAlpha)
+
+        val actions = orbitTargetActionButtons()
+        assertEquals(listOf("Drop face orbit $faceAlpha", "Kis face orbit $faceAlpha"), actions.map(::ariaLabel))
+        assertAction(actions[0], "fa-remove")
+        assertAction(actions[1], "fa-caret-up")
+
+        actions[1].click()
+        assertEquals(listOf(KisFace(faceAlpha)), params.transforms.value)
+    }
+
+    @Test
+    fun vertexPopupActionsFollowTransformMenuOrderAndIncludeTooltips() {
+        val params = PolyParams("", null)
+        params.updateAvailableOrbitTransforms(
+            listOf(
+                listOf(
+                    TruncateVertex(vertexA),
+                    Drop(vertexB),
+                    Drop(vertexA),
+                    KisFace(faceAlpha),
+                ).map(Transform::tag),
+            ),
+        )
+        renderOrbitTargetActions(params, vertexA)
+
+        val actions = orbitTargetActionButtons()
+        assertEquals(
+            listOf("Drop vertex orbit $vertexA", "Truncate vertex orbit $vertexA"),
+            actions.map(::ariaLabel),
+        )
+        assertAction(actions[0], "fa-remove")
+        assertAction(actions[1], "fa-scissors")
+
+        actions[0].click()
+        assertEquals(listOf(Drop(vertexA)), params.transforms.value)
+    }
+
     private fun dropdownOptionsBySection(): Map<String, List<String>> {
         val rows = host.querySelectorAll(".dropdown .text-row")
         val result = linkedMapOf<String, MutableList<String>>()
@@ -177,6 +234,28 @@ class DropOrbitUiTest {
             }
         }
         return result
+    }
+
+    private fun renderOrbitTargetActions(params: PolyParams, kind: AnyKind) {
+        composition = renderComposable(host) {
+            Table { Tbody { Tr { OrbitTargetActions(params, kind) } } }
+        }
+    }
+
+    private fun orbitTargetActionButtons(): List<HTMLElement> {
+        val actions = host.querySelectorAll("button.orbit-target-action")
+        return (0 until actions.length).map { actions.item(it) as HTMLElement }
+    }
+
+    private fun ariaLabel(action: HTMLElement): String = action.getAttribute("aria-label").orEmpty()
+
+    private fun assertAction(action: HTMLElement, iconClass: String) {
+        val icon = action.querySelector("i") as HTMLElement
+        assertTrue(
+            icon.classList.contains(iconClass),
+            "Expected icon $iconClass, but action rendered ${action.outerHTML}",
+        )
+        assertEquals(ariaLabel(action), action.querySelector(".tooltip-text")?.textContent)
     }
 
     private fun dropdownItem(text: String): HTMLElement {

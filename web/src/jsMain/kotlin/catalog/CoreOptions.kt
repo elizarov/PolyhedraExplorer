@@ -126,15 +126,15 @@ enum class TransformCategory(private val displayName: String) {
     override fun toString(): String = displayName
 }
 
-enum class OrbitTargetedOperation(val optionName: String) {
-    DropFace("Drop face"),
-    KisFace("Kis face"),
-    DropEdge("Drop edge"),
-    DropVertex("Drop vertex"),
-    TruncateVertex("Truncate vertex");
-
-    val isDrop: Boolean
-        get() = this == DropFace || this == DropEdge || this == DropVertex
+enum class OrbitTargetedOperation(
+    val optionName: String,
+    val iconClass: String,
+) {
+    DropFace("Drop face", "fa-remove"),
+    DropEdge("Drop edge", "fa-remove"),
+    DropVertex("Drop vertex", "fa-remove"),
+    KisFace("Kis face", "fa-caret-up"),
+    TruncateVertex("Truncate vertex", "fa-scissors");
 }
 
 val PrimitiveTransforms: List<Transform> = listOf(

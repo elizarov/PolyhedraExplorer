@@ -385,6 +385,33 @@ tr.info:hover, tr.info.selected {
     background: var(--hover-color);
 }
 
+td.orbit-target-actions {
+    padding-left: 0.5ch;
+    text-align: right;
+}
+
+button.orbit-target-action {
+    position: relative;
+    width: 1.4em;
+    padding: 0;
+    border: 0;
+    color: inherit;
+    background: transparent;
+    font: inherit;
+    cursor: pointer;
+}
+
+button.orbit-target-action:hover {
+    color: var(--button-background-color);
+}
+
+button.orbit-target-action > aside.tooltip-text {
+    top: auto;
+    right: -0.5em;
+    bottom: 1.5em;
+    left: auto;
+}
+
 .face-attn {
     color: red;
 }
