@@ -60,7 +60,7 @@ The JS application owns DOM composition, user events, hash serialization, interp
 
 ## State and data flow
 
-`RootParams` is the authoritative UI state. Its compact serialization is stored after `#/` in the URL, so reloads and copied links reproduce the current seed, transform chain, view, lighting, animation, and export settings.
+`RootParams` is the authoritative UI state. Its compact serialization is stored after `#/` in the URL, so reloads and copied links reproduce the current seed, transform chain, view, lighting, animation, and export settings. URL parsing precedes asynchronous core startup and canvas mounting; when the WebGL `ViewContext` is later created, it eagerly initializes its model and normal matrices from the already-loaded rotation and scale instead of waiting for a non-replayable load notification.
 
 Rollover selections and orbit-target navigation memory are deliberately excluded from `RootParams` serialization. Rollovers are cleared when the pointer leaves the canvas or the active popup changes, and are recomputed on rendered animation frames while the pointer remains stationary so automatic rotation cannot leave a stale selection. The UI model keeps independent last-used face, edge, and vertex orbit targets; every targeted chain update refreshes them, while operation changes reuse the remembered target only when it is supported at that transform stage.
 

@@ -41,7 +41,12 @@ class ViewContext(params: ViewParams) : Param.Context(params) {
         mat4.translate(projectionMatrix, projectionMatrix, tmpVec3)
     }
 
-    init { setup() }
+    init {
+        setup()
+        // URL values can be loaded before this rendering context exists. Initialize eagerly because
+        // their LoadedValue notification cannot be replayed to a dependency registered afterward.
+        performUpdate(null, 0.0)
+    }
 
     override fun update() {
         modelScale.fill(2.0.pow(scale))
