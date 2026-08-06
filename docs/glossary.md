@@ -17,7 +17,7 @@
 | Kind | A rotation-orbit identifier for equivalent faces, edges, or vertices. Greek letters denote face kinds; capital Latin letters denote vertex kinds. |
 | Rotation orbit | A set of mesh elements that are interchangeable under the polyhedron's rotational symmetries. |
 | Orbit rollover | Transient selection of a face, edge, or vertex rotation orbit. Hovering either its F/E/V popup row or matching front-facing canvas geometry selects the entire orbit in both views. |
-| Orbit-targeted operation | An operation whose concrete behavior names one face, edge, or vertex rotation orbit. Drop removes an admissible orbit, Kis face pyramidalizes one face orbit, and Truncate/Rectify vertex cut one vertex orbit. The stored chain item retains the operation and exact orbit kind. |
+| Orbit-targeted operation | An operation whose concrete behavior names one face, edge, or vertex rotation orbit. Drop removes an admissible orbit, Kis face pyramidalizes one face orbit, and Truncate/Rectify vertex cut one vertex orbit. The stored chain item retains the operation and exact orbit kind; transient UI memory separately retains the last face, edge, and vertex targets when switching operation type. |
 | Topology | Connectivity of vertices, edges, and faces independent of coordinates. |
 | Same topology | Two meshes whose indexed connectivity is compatible, allowing direct WebGL interpolation. |
 | Drop | Removal of a topologically admissible face, edge, or vertex kind followed by reconstruction of the remaining boundary. A last-chain Drop exposes cyclic target controls for the valid orbits of the same element family. |

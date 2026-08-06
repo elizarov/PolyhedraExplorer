@@ -254,6 +254,28 @@ class OrbitTargetedTransformTest {
             assertTrue(animateOut.previousPoly.hasSameTopology(animateOut.targetPoly), "$transform out topology")
         }
     }
+
+    @Test
+    fun truncateAndRectifyOnSameOrbitAnimateAsOneCutDepthTransition() = runTest {
+        val seed = Seeds.first { it.poly.vertexKinds.size > 1 }
+        val kind = seed.poly.vertexKinds.keys.first()
+        val truncateState = CoreState(seed.tag, listOf(TruncateVertex(kind).tag), "c")
+        val rectifyState = CoreState(seed.tag, listOf(RectifyVertex(kind).tag), "c")
+
+        for ((previous, current) in listOf(
+            truncateState to rectifyState,
+            rectifyState to truncateState,
+        )) {
+            val animation = evaluateCore(
+                CoreRequest(current, previous, animationDuration = 0.5),
+            ).animation.single()
+
+            assertEquals(0.5, animation.duration)
+            assertTrue(animation.previousPoly.hasSameTopology(animation.targetPoly))
+            assertTrue(animation.previousFraction <= 0.001)
+            assertTrue(animation.targetFraction >= 0.999)
+        }
+    }
 }
 
 private fun Polyhedron.assertConvex() {

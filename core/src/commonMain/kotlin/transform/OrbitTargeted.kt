@@ -10,6 +10,8 @@ private const val TRUNCATE_VERTEX_TAG = "t"
 private const val RECTIFY_VERTEX_TAG = "a"
 
 internal interface OrbitTargetedAnimation {
+    val targetKind: AnyKind
+
     fun targetRatio(poly: Polyhedron): Double
 
     fun polyAtRatio(
@@ -34,6 +36,9 @@ data class KisFace(val kind: FaceKind) : Transform() {
 
 @Serializable
 data class TruncateVertex(val kind: VertexKind) : Transform(), OrbitTargetedAnimation {
+    override val targetKind: AnyKind
+        get() = kind
+
     override val tag: String
         get() = "$TRUNCATE_VERTEX_TAG[$kind]"
 
@@ -55,6 +60,9 @@ data class TruncateVertex(val kind: VertexKind) : Transform(), OrbitTargetedAnim
 
 @Serializable
 data class RectifyVertex(val kind: VertexKind) : Transform(), OrbitTargetedAnimation {
+    override val targetKind: AnyKind
+        get() = kind
+
     override val tag: String
         get() = "$RECTIFY_VERTEX_TAG[$kind]"
 

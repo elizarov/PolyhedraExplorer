@@ -135,7 +135,11 @@ order, using × for Drop, an upward caret for Kis face, scissors for Truncate
 vertex, and compress for Rectify vertex; hover tooltips name the operation and
 target orbit. Choosing one stores its first concrete target. When an orbit-targeted
 operation is the last chain item, its up/down controls cycle through all currently
-valid targets of that same operation and wrap at both ends. The URL retains the
+valid targets of that same operation and wrap at both ends. The UI remembers the
+last face, edge, and vertex target separately. Changing operation type through
+the popup or left/right controls reuses that target when the new operation
+supports it, so `Truncate B` changes to `Rectify B` instead of resetting to A.
+The URL retains the
 concrete `x[kind]`, `k[face]`, `t[vertex]`, or `a[vertex]` tag, so the selected
 orbit round-trips.
 
@@ -145,7 +149,9 @@ the corresponding full operation. Changing the target with the orbit spinner
 produces two half-duration keyframes: the old target animates out to the input
 mesh, then the new target animates in. Kis face changes are immediate: collapsing
 its apex produced unstable triangles, so the core intentionally emits no Kis-face
-animation keyframes.
+animation keyframes. Truncate vertex and Rectify vertex share the same selective
+cut topology on a common target, so switching between them interpolates the cut
+ratio directly in one full-duration step.
 
 ## Macros
 

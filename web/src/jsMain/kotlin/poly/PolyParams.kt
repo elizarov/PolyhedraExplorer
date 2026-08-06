@@ -64,6 +64,44 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
     fun availableOrbitTransformsAt(transformIndex: Int): Set<Transform> =
         orbitTransforms.getOrNull(transformIndex).orEmpty()
 
+    private var rememberedFaceOrbit: FaceKind? = null
+    private var rememberedEdgeOrbit: EdgeKind? = null
+    private var rememberedVertexOrbit: VertexKind? = null
+
+    internal fun rememberOrbitTarget(transform: Transform?) {
+        when (val kind = transform?.orbitTargetOrNull()?.kind) {
+            is FaceKind -> rememberedFaceOrbit = kind
+            is EdgeKind -> rememberedEdgeOrbit = kind
+            is VertexKind -> rememberedVertexOrbit = kind
+            null -> Unit
+            else -> Unit
+        }
+    }
+
+    internal fun reuseRememberedOrbitTarget(
+        transform: Transform,
+        supportedTransforms: Set<Transform>,
+    ): Transform {
+        val target = transform.orbitTargetOrNull() ?: return transform
+        val rememberedKind: AnyKind? = when (target.kind) {
+            is FaceKind -> rememberedFaceOrbit
+            is EdgeKind -> rememberedEdgeOrbit
+            is VertexKind -> rememberedVertexOrbit
+            else -> null
+        }
+        return supportedTransforms.firstOrNull { option ->
+            option.orbitTargetOrNull()?.let { candidate ->
+                candidate.operation == target.operation && candidate.kind == rememberedKind
+            } == true
+        } ?: transform
+    }
+
+    internal fun clearRememberedOrbitTargets() {
+        rememberedFaceOrbit = null
+        rememberedEdgeOrbit = null
+        rememberedVertexOrbit = null
+    }
+
     private var requestId = 0
     private var coreStarted = false
     private var cancelCoreRequest: (() -> Unit)? = null
@@ -90,6 +128,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
     }
 
     override fun computeDerivedTargetValues() {
+        transforms.value.forEach(::rememberOrbitTarget)
         if (!coreStarted) return
         val state = currentState()
         if (state == requestedState) return

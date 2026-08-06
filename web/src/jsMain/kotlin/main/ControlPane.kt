@@ -52,9 +52,11 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
 
     fun updateTransform(index: Int, transform: Transform) {
         togglePopup(null)
+        params.rememberOrbitTarget(transforms.getOrNull(index))
+        val selectedTransform = params.reuseRememberedOrbitTarget(transform, possibleTransformsAt(index))
         val updated = when {
-            index >= transforms.size -> transforms + transform
-            transform != Transform.None -> transforms.updatedAt(index, transform)
+            index >= transforms.size -> transforms + selectedTransform
+            selectedTransform != Transform.None -> transforms.updatedAt(index, selectedTransform)
             else -> transforms.filterIndexed { itemIndex, _ -> itemIndex != index }
         }
         params.transforms.updateValue(updated)
@@ -90,6 +92,7 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
     fun adjustLastTransform(delta: Int) {
         togglePopup(null)
         val current = transforms.lastOrNull() ?: return
+        params.rememberOrbitTarget(current)
         val currentOrbitOperation = current.orbitTargetOrNull()?.operation
         val options = operationOptionsAt(transforms.lastIndex)
         val currentIndex = options.indexOfFirst { option ->
@@ -98,7 +101,13 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
                 currentOrbitOperation != null && option.orbitTargetOrNull()?.operation == currentOrbitOperation
         }
         val replacement = options.getOrNull(currentIndex + delta) ?: return
-        if (replacement != Transform.None) params.transforms.updateValue(transforms.dropLast(1) + replacement)
+        if (replacement != Transform.None) {
+            val selected = params.reuseRememberedOrbitTarget(
+                replacement,
+                possibleTransformsAt(transforms.lastIndex),
+            )
+            params.transforms.updateValue(transforms.dropLast(1) + selected)
+        }
     }
 
     fun adjustLastOrbitTarget(delta: Int) {
@@ -262,6 +271,7 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
                 if (transforms.isNotEmpty()) params.transforms.updateValue(transforms.dropLast(1))
                 else {
                     lastFamilyN = MIN_FAMILY_SEED_N
+                    params.clearRememberedOrbitTargets()
                     params.seed.updateValue(Seed.Tetrahedron)
                 }
             }

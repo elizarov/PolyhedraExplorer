@@ -7,6 +7,7 @@ import org.jetbrains.compose.web.renderComposable
 import org.jetbrains.compose.web.dom.Table
 import org.jetbrains.compose.web.dom.Tbody
 import org.jetbrains.compose.web.dom.Tr
+import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLDivElement
 import org.w3c.dom.HTMLElement
 import polyhedra.model.poly.AnyKind
@@ -173,6 +174,57 @@ class DropOrbitUiTest {
     }
 
     @Test
+    fun modifyPopupReusesOrbitAfterPassingThroughRegularOperation(): Promise<Unit> {
+        val params = PolyParams("", null)
+        params.transforms.updateValue(listOf(TruncateVertex(vertexB)))
+        params.updateAvailableOrbitTransforms(vertexOperationTags())
+        composition = renderComposable(host) {
+            ControlPane(params, popup = Popup.ModifyTransform(0), togglePopup = {})
+        }
+
+        dropdownItem("Dual").click()
+        assertEquals(listOf(Transform.Dual), params.transforms.value)
+
+        return awaitRecomposition().then {
+            dropdownItem("Rectify vertex").click()
+            assertEquals(listOf(RectifyVertex(vertexB)), params.transforms.value)
+        }
+    }
+
+    @Test
+    fun horizontalNavigationReusesCurrentOrbitWhenChangingTargetedOperation() {
+        val params = PolyParams("", null)
+        params.transforms.updateValue(listOf(TruncateVertex(vertexB)))
+        params.updateAvailableOrbitTransforms(vertexOperationTags())
+        composition = renderComposable(host) { ControlPane(params, popup = null, togglePopup = {}) }
+
+        horizontalTransformButton(1).click()
+
+        assertEquals(listOf(RectifyVertex(vertexB)), params.transforms.value)
+    }
+
+    @Test
+    fun orbitPopupClickUpdatesRememberedOrbitForLaterOperationChanges() {
+        val params = PolyParams("", null)
+        params.updateAvailableOrbitTransforms(vertexOperationTags())
+        renderOrbitTargetActions(params, vertexB)
+
+        orbitTargetActionButtons()
+            .single { ariaLabel(it) == "Truncate vertex orbit $vertexB" }
+            .click()
+        assertEquals(listOf(TruncateVertex(vertexB)), params.transforms.value)
+
+        composition?.dispose()
+        host.textContent = ""
+        composition = renderComposable(host) {
+            ControlPane(params, popup = Popup.ModifyTransform(0), togglePopup = {})
+        }
+        dropdownItem("Rectify vertex").click()
+
+        assertEquals(listOf(RectifyVertex(vertexB)), params.transforms.value)
+    }
+
+    @Test
     fun facePopupActionsFollowTransformMenuOrderAndIncludeTooltips() {
         val params = PolyParams("", null)
         params.updateAvailableOrbitTransforms(
@@ -259,6 +311,20 @@ class DropOrbitUiTest {
         val actions = host.querySelectorAll("button.orbit-target-action")
         return (0 until actions.length).map { actions.item(it) as HTMLElement }
     }
+
+    private fun vertexOperationTags(): List<List<String>> = listOf(
+        listOf(
+            TruncateVertex(vertexA),
+            TruncateVertex(vertexB),
+            RectifyVertex(vertexA),
+            RectifyVertex(vertexB),
+        ).map(Transform::tag),
+    )
+
+    private fun horizontalTransformButton(index: Int): HTMLButtonElement =
+        generateSequence(transformNameElement().parentElement?.firstElementChild) { it.nextElementSibling }
+            .filterIsInstance<HTMLButtonElement>()
+            .elementAt(index)
 
     private fun ariaLabel(action: HTMLElement): String = action.getAttribute("aria-label").orEmpty()
 

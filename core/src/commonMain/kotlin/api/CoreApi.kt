@@ -301,12 +301,7 @@ private fun transformAnimation(
     if (previousTransform is KisFace || currentTransform is KisFace) return emptyList()
     val changesOrbitTarget = previousTransform is OrbitTargetedAnimation &&
         currentTransform is OrbitTargetedAnimation &&
-        previousTransform != currentTransform
-    if (!changesOrbitTarget && currentPoly.hasSameTopology(previousPoly)) {
-        return listOf(
-            CoreAnimationStep(duration, previousPoly.scaled(scale), 0.0, currentPoly.scaled(scale), 1.0)
-        )
-    }
+        previousTransform.targetKind != currentTransform.targetKind
 
     orbitTargetedAnimation(
         basePoly,
@@ -317,6 +312,12 @@ private fun transformAnimation(
         currentTransform,
         duration,
     )?.let { return it }
+
+    if (!changesOrbitTarget && currentPoly.hasSameTopology(previousPoly)) {
+        return listOf(
+            CoreAnimationStep(duration, previousPoly.scaled(scale), 0.0, currentPoly.scaled(scale), 1.0)
+        )
+    }
 
     val previousTruncation = previousTransform.truncationRatio(basePoly)
     val currentTruncation = currentTransform.truncationRatio(basePoly)
@@ -476,6 +477,14 @@ private fun orbitTargetedAnimation(
     val previousRatio: Double
     val currentRatio: Double
     when {
+        previousTransform is OrbitTargetedAnimation &&
+            currentTransform is OrbitTargetedAnimation &&
+            previousTransform.targetKind == currentTransform.targetKind -> {
+            animation = currentTransform
+            previousRatio = previousTransform.targetRatio(basePoly)
+            currentRatio = currentTransform.targetRatio(basePoly)
+        }
+
         previousTransform is OrbitTargetedAnimation && currentTransform == Transform.None -> {
             animation = previousTransform
             previousRatio = animation.targetRatio(basePoly)
