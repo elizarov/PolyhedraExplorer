@@ -72,6 +72,20 @@ class CoreApiTest {
     }
 
     @Test
+    fun recognizesPentagonalHexecontahedronFromDualSnubIcosahedron() {
+        runSynchronously {
+            val response = evaluateCore(
+                CoreRequest(
+                    state = CoreState("I", listOf("s", "d"), "c"),
+                    detectSeed = true,
+                )
+            )
+
+            assertEquals("dsD", response.recognizedSeedTag)
+        }
+    }
+
+    @Test
     fun skipsCatalogDetectionUnlessExplicitlyRequested() {
         runSynchronously {
             val response = evaluateCore(

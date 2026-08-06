@@ -178,9 +178,9 @@ class Chamfered : Transform() {
     override fun chamferingRatio(poly: Polyhedron) = poly.chamferingRatio()
     @Transient
     override val fev = TransformFEV(
-        1, 2, 0,
+        1, 1, 0,
         0, 4, 0,
-        0, 1, 1
+        0, 2, 1
     )
 }
 

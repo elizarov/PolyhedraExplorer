@@ -4,7 +4,7 @@
 
 | Module | Targets | Responsibility |
 | --- | --- | --- |
-| `model` | JVM, JS, WasmGC | Serializable mesh/presentation types, vector math needed for rendering and inspection, and the browser core-request/response contract. It contains no seed generator or manipulation transform. |
+| `model` | JVM, JS, WasmGC | Serializable mesh/presentation types, vector math needed for rendering and inspection, the browser core-request/response contract, and shared string-only macro definitions. It contains no seed generator or manipulation transform. |
 | `core` | JVM, JS, WasmGC | Seed construction, topology manipulation, transforms, scaling, validation, browser API evaluation, and JVM tests. The browser executes this module only as WasmGC; its JS target exists solely for the controlled baseline benchmark. |
 | `web` | JS | Compose HTML controls, URL parameter state, animation interpolation, inspection/export UI, and the WebGL renderer. It consumes completed meshes and metadata; it does not invoke manipulation transforms. |
 | `benchmarks` | JS, WasmGC | Identical production benchmark workloads over the core algorithms. |
@@ -35,7 +35,8 @@ Canonical representation invariants and the current circle-packing solver are sp
 The Wasm core owns:
 
 - seed geometry construction;
-- truncate, rectify, cantellate, dual, bevel, snub, chamfer, canonicalization (the UI's `Canonical` transform), and drop operations;
+- primitive transform and macro-expansion evaluation, including composition-aware `aa` cantellation and `at` bevel fusion;
+- truncate, rectify, cantellate, dual, bevel, snub, chamfer, canonicalization (the UI's `Canonical` transform), and drop geometry kernels;
 - size guards, applicability checks, warnings, and progress;
 - scale normalization and topology/drop analysis;
 - rotation-orbit refinement and geometric comparison with built-in seeds;
@@ -51,7 +52,9 @@ Rollover selections are deliberately excluded from `RootParams` serialization. T
 
 Every seed/transform/scale change creates a `CoreState`. Results from superseded requests are ignored. A response contains the scaled display mesh, an optional recognized catalog-seed tag, unscaled intermediate meshes, valid transform tags, per-stage droppable kinds, structured issues, and optional animation steps. Progress arrives as separate worker messages. Compose scopes subscribe directly to the relevant `Param` update types, so asynchronous results and progress invalidate only the UI that observes them.
 
-When the seed or transform chain changes, the request explicitly asks the Wasm worker to detect a catalog seed. After a complete, successful chain, the core filters catalog seeds by FEV and compares normalized local edge projection classes; catalog fingerprints are cached. When it finds a geometric match, the JS view model presents the returned tag as an optional action to the right of the transform chain. The exploratory state is preserved until the user accepts the suggestion, which atomically replaces the seed and clears the transform list. Scale-only requests, animation evaluation of the previous state, animation frames, and other view/config updates never run detection. Partial or failed chains never offer a replacement.
+When the seed or transform chain changes, the request explicitly asks the Wasm worker to detect a catalog seed. After a complete, successful chain, the core filters catalog seeds by FEV and compares circumradius-normalized local edge projection classes in both the generated orientation and a consistently reflected orientation. This treats the two handed realizations of a chiral solid as the same catalog geometry without merging their rotation orbits; catalog fingerprints are cached. When it finds a geometric match, the JS view model presents the returned tag as an optional action to the right of the transform chain. The exploratory state is preserved until the user accepts the suggestion, which atomically replaces the seed and clears the transform list. Scale-only requests, animation evaluation of the previous state, animation frames, and other view/config updates never run detection. Partial or failed chains never offer a replacement.
+
+Macro suffix detection is a separate, synchronous notation operation in the JS UI. It expands only transform tags through the shared `model` definitions, prefers the longest exact suffix, and never analyzes mesh geometry. Accepting the suggestion atomically replaces that logical suffix with one macro tag. The Wasm evaluator expands macro tags back to primitives and applies non-overlapping composition-fusion rules, so a macro and the sequence it abbreviates share the same cached final geometry.
 
 ## Build outputs
 
@@ -78,5 +81,6 @@ The site must be served over HTTP; loading it directly from the filesystem is un
 - The JS bundle contains the mesh presentation model and Wasm loader, but no seed-generation or transform implementation.
 - The UI renders with DOM + WebGL; no canvas UI toolkit owns the controls.
 - Transform order is significant and intermediate topology metadata corresponds to the same order.
+- A macro occupies one logical transform stage even though the core may execute several primitive operations for it.
 - A displayed polyhedron never exceeds 32,767 edges.
 - JS and Wasm benchmarks run the same common source and must produce the same checksum.

@@ -3,6 +3,7 @@ package polyhedra.js.catalog
 import polyhedra.common.poly.AnyKind
 import polyhedra.common.poly.toAnyKindOrNull
 import polyhedra.common.util.Tagged
+import polyhedra.core.api.TransformMacros
 
 enum class SeedType {
     Platonic,
@@ -59,6 +60,7 @@ val Seeds: List<Seed> = listOf(
 data class Transform(
     override val tag: String,
     val name: String,
+    val category: TransformCategory = TransformCategory.Transform,
 ) : Tagged {
     override fun toString(): String = name
 
@@ -66,26 +68,56 @@ data class Transform(
         val None = Transform("n", "None")
         val Truncated = Transform("t", "Truncated")
         val Rectified = Transform("a", "Rectified")
-        val Cantellated = Transform("e", "Cantellated")
         val Dual = Transform("d", "Dual")
-        val Bevelled = Transform("b", "Bevelled")
         val Snub = Transform("s", "Snub")
         val Chamfered = Transform("c", "Chamfered")
         val Canonical = Transform("o", "Canonical")
+
+        val Kis = macro("k")
+        val Join = macro("j")
+        val Needle = macro("N")
+        val Zip = macro("z")
+        val Cantellated = macro("e")
+        val Bevelled = macro("b")
+        val Ortho = macro("O")
+        val Meta = macro("m")
+        val Gyro = macro("g")
+
+        private fun macro(tag: String): Transform {
+            val macro = TransformMacros.single { it.tag == tag }
+            return Transform(macro.tag, macro.name, TransformCategory.Macro)
+        }
     }
 }
 
-val Transforms: List<Transform> = listOf(
+enum class TransformCategory {
+    Transform,
+    Macro,
+}
+
+val PrimitiveTransforms: List<Transform> = listOf(
     Transform.None,
     Transform.Truncated,
     Transform.Rectified,
-    Transform.Cantellated,
     Transform.Dual,
-    Transform.Bevelled,
     Transform.Snub,
     Transform.Chamfered,
     Transform.Canonical,
 )
+
+val MacroTransforms: List<Transform> = listOf(
+    Transform.Kis,
+    Transform.Join,
+    Transform.Needle,
+    Transform.Zip,
+    Transform.Cantellated,
+    Transform.Bevelled,
+    Transform.Ortho,
+    Transform.Meta,
+    Transform.Gyro,
+)
+
+val Transforms: List<Transform> = PrimitiveTransforms + MacroTransforms
 
 private const val DROP_TAG = "x"
 

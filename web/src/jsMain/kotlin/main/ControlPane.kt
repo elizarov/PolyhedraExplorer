@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.dom.*
 import polyhedra.common.util.updatedAt
+import polyhedra.core.api.TransformMacroSuffix
+import polyhedra.core.api.findTransformMacroSuffix
 import polyhedra.js.catalog.*
 import polyhedra.js.components.observe
 import polyhedra.js.params.Param
@@ -15,6 +17,11 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
     val transforms = params.transforms.value
     val transformError = params.transformError
     val errorIndex = transformError?.index ?: Int.MAX_VALUE
+    val macroSuggestion = if (transformError == null) {
+        findTransformMacroSuffix(transforms.map(Transform::tag))
+    } else {
+        null
+    }
 
     fun possibleTransformsAt(index: Int): Set<Transform> {
         val result = Transforms.toMutableSet()
@@ -46,6 +53,12 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
         val options = possibleTransformsAt(transforms.lastIndex).toList()
         val replacement = options.getOrNull(options.indexOf(current) + delta) ?: return
         if (replacement != Transform.None) params.transforms.updateValue(transforms.dropLast(1) + replacement)
+    }
+
+    fun acceptMacroSuggestion(suggestion: TransformMacroSuffix) {
+        togglePopup(null)
+        val macro = MacroTransforms.single { it.tag == suggestion.macro.tag }
+        params.transforms.updateValue(transforms.take(suggestion.startIndex) + macro)
     }
 
     Div(attrs = { classes("ctrl-pane") }) {
@@ -99,6 +112,9 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
                 } else {
                     params.transformWarnings.getOrNull(index)?.let { MessageButton(index, it, ::updateTransform) }
                 }
+            }
+            if (macroSuggestion?.startIndex == index) {
+                MacroSuggestion(macroSuggestion, ::acceptMacroSuggestion)
             }
         }
 
@@ -167,13 +183,36 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
 @Composable
 private fun TransformDropdown(options: Set<Transform>, onSelect: (Transform) -> Unit) {
     Aside(attrs = { classes("dropdown") }) {
-        GroupHeader("Transform")
-        for (transform in options) {
-            Div(attrs = { classes("text-row") }) {
-                Div(attrs = {
-                    classes("item")
-                    onClick { onSelect(transform) }
-                }) { Text(transform.toString()) }
+        for (category in TransformCategory.entries) {
+            val categoryOptions = options.filter { it.category == category }
+            if (categoryOptions.isNotEmpty()) {
+                GroupHeader(category.toString())
+                for (transform in categoryOptions) {
+                    Div(attrs = { classes("text-row") }) {
+                        Div(attrs = {
+                            classes("item")
+                            onClick { onSelect(transform) }
+                        }) { Text(transform.toString()) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MacroSuggestion(
+    suggestion: TransformMacroSuffix,
+    onAccept: (TransformMacroSuffix) -> Unit,
+) {
+    Div(attrs = { classes("btn", "suggestion", "macro-suggestion") }) {
+        Button(attrs = {
+            classes("txt")
+            onClick { onAccept(suggestion) }
+        }) {
+            Text("→ ${suggestion.macro.name}")
+            Aside(attrs = { classes("tooltip-text") }) {
+                Text("Replace this transform suffix with the equivalent macro")
             }
         }
     }

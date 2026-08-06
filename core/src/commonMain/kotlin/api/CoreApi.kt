@@ -7,6 +7,47 @@ import polyhedra.common.util.OperationProgressContext
 private const val MAX_DISPLAY_EDGES = (1 shl 15) - 1
 private const val ANIMATION_GAP = 1e-4
 
+private data class LogicalTransform(
+    val tag: String,
+    val name: String,
+    val primitiveTransforms: List<Transform>,
+    val animationTransform: Transform? = primitiveTransforms.singleOrNull(),
+) {
+    fun isIdentityTransform(poly: Polyhedron): Boolean =
+        primitiveTransforms.size == 1 && primitiveTransforms.single().isIdentityTransform(poly)
+
+    override fun toString(): String = name
+}
+
+private fun String.toLogicalTransformOrNull(): LogicalTransform? {
+    toTransformMacroOrNull()?.let { macro ->
+        val primitives = macro.expansionTags.map { tag ->
+            requireNotNull(tag.toTransformOrNull()) { "Unknown primitive transform tag in ${macro.name}: $tag" }
+        }
+        val animationTransform = when (macro.tag) {
+            "e" -> Transform.Cantellated
+            "b" -> Transform.Bevelled
+            else -> null
+        }
+        return LogicalTransform(macro.tag, macro.name, primitives, animationTransform)
+    }
+    return toTransformOrNull()?.let { transform ->
+        LogicalTransform(transform.tag, transform.toString(), listOf(transform))
+    }
+}
+
+private data class PendingRectification(val basePoly: Polyhedron)
+
+private sealed interface TransformApplication {
+    data class Success(
+        val poly: Polyhedron,
+        val pendingRectification: PendingRectification?,
+        val isIdentity: Boolean,
+    ) : TransformApplication
+
+    data class Failure(val issue: CoreIssue) : TransformApplication
+}
+
 suspend fun evaluateCore(
     request: CoreRequest,
     reportProgress: (Int) -> Unit = {},
@@ -30,7 +71,7 @@ private data class Evaluation(
     val state: CoreState,
     val seed: Seed,
     val scale: Scale,
-    val validTransforms: List<Transform>,
+    val validTransforms: List<LogicalTransform>,
     val rawPoly: Polyhedron,
     val response: CoreResponse,
 )
@@ -45,13 +86,14 @@ private suspend fun evaluateState(
     val scale = Scales.firstOrNull { it.tag == state.scaleTag }
         ?: error("Unknown scale tag: ${state.scaleTag}")
     val transforms = state.transformTags.map { tag ->
-        tag.toTransformOrNull() ?: error("Unknown transform tag: $tag")
+        tag.toLogicalTransformOrNull() ?: error("Unknown transform tag: $tag")
     }
 
     var poly = seed.poly
+    var pendingRectification: PendingRectification? = null
     var polyName = seed.toString()
     val transformedPolys = ArrayList<Polyhedron>()
-    val validTransforms = ArrayList<Transform>()
+    val validTransforms = ArrayList<LogicalTransform>()
     val availableDrops = ArrayList<List<String>>()
     val warnings = ArrayList<CoreIssue?>()
     var errorIndex: Int? = null
@@ -59,32 +101,21 @@ private suspend fun evaluateState(
 
     availableDrops += poly.canDrop.map(Any::toString).sorted()
     for ((index, transform) in transforms.withIndex()) {
-        if (!transform.isApplicable(poly)) {
-            errorIndex = index
-            errorIssue = CoreIssue(CoreIssueCode.TransformNotApplicable, transform.tag)
-            break
-        }
-        val expectedFev = transform.fev?.let { it * poly.fev() }
-        if (expectedFev != null && expectedFev.e > MAX_DISPLAY_EDGES) {
-            errorIndex = index
-            errorIssue = CoreIssue(CoreIssueCode.TooLarge, transform.tag, expectedFev)
-            break
-        }
-
         var warning: CoreIssue? = null
-        try {
-            poly = if (transform.isIdentityTransform(poly)) {
-                warning = CoreIssue(CoreIssueCode.TransformIsIdentity, transform.tag)
-                poly
-            } else {
-                transform.asyncTransform?.invoke(poly, OperationProgressContext(reportProgress))
-                    ?: transform.transform(poly)
+        when (val application = applyTransform(transform, poly, pendingRectification, reportProgress)) {
+            is TransformApplication.Failure -> {
+                errorIndex = index
+                errorIssue = application.issue
+                break
             }
-        } catch (cause: Throwable) {
-            cause.printStackTrace()
-            errorIndex = index
-            errorIssue = CoreIssue(CoreIssueCode.TransformFailed, transform.tag)
-            break
+
+            is TransformApplication.Success -> {
+                poly = application.poly
+                pendingRectification = application.pendingRectification
+                if (application.isIdentity) {
+                    warning = CoreIssue(CoreIssueCode.TransformIsIdentity, transform.tag)
+                }
+            }
         }
 
         if (poly.fs.any { !it.isPlanar } && index == transforms.lastIndex) {
@@ -106,13 +137,72 @@ private suspend fun evaluateState(
             null
         },
         transformedPolys = transformedPolys,
-        validTransformTags = validTransforms.map(Transform::tag),
+        validTransformTags = validTransforms.map(LogicalTransform::tag),
         availableDrops = availableDrops,
         warnings = warnings,
         errorIndex = errorIndex,
         error = errorIssue,
     )
     return Evaluation(state, seed, scale, validTransforms, poly, response)
+}
+
+private suspend fun applyTransform(
+    transform: LogicalTransform,
+    inputPoly: Polyhedron,
+    inputPendingRectification: PendingRectification?,
+    reportProgress: (Int) -> Unit,
+): TransformApplication {
+    var poly = inputPoly
+    var pendingRectification = inputPendingRectification
+    var isIdentity = false
+
+    for (primitive in transform.primitiveTransforms) {
+        if (!primitive.isApplicable(poly)) {
+            return TransformApplication.Failure(
+                CoreIssue(CoreIssueCode.TransformNotApplicable, transform.tag)
+            )
+        }
+        val expectedFev = primitive.fev?.let { it * poly.fev() }
+        if (expectedFev != null && expectedFev.e > MAX_DISPLAY_EDGES) {
+            return TransformApplication.Failure(
+                CoreIssue(CoreIssueCode.TooLarge, transform.tag, expectedFev)
+            )
+        }
+
+        val primitiveInput = poly
+        val pendingInput = pendingRectification
+        try {
+            poly = when {
+                pendingInput != null && primitive == Transform.Rectified ->
+                    pendingInput.basePoly.cantellated()
+
+                pendingInput != null && primitive == Transform.Truncated ->
+                    pendingInput.basePoly.bevelled()
+
+                primitive.isIdentityTransform(poly) -> {
+                    isIdentity = true
+                    poly
+                }
+
+                else -> primitive.asyncTransform?.invoke(poly, OperationProgressContext(reportProgress))
+                    ?: primitive.transform(poly)
+            }
+        } catch (cause: Throwable) {
+            cause.printStackTrace()
+            return TransformApplication.Failure(
+                CoreIssue(CoreIssueCode.TransformFailed, transform.tag)
+            )
+        }
+
+        pendingRectification = when {
+            pendingInput != null &&
+                (primitive == Transform.Rectified || primitive == Transform.Truncated) -> null
+            primitive == Transform.Rectified -> PendingRectification(primitiveInput)
+            else -> null
+        }
+    }
+
+    return TransformApplication.Success(poly, pendingRectification, isIdentity)
 }
 
 private fun computeAnimation(
@@ -126,13 +216,18 @@ private fun computeAnimation(
         .takeWhile { it < previous.validTransforms.size && current.validTransforms[it] == previous.validTransforms[it] }
         .count()
     if (current.validTransforms.size <= commonSize + 1 && previous.validTransforms.size <= commonSize + 1) {
+        compositionFusionAnimation(previous, current, commonSize, duration)?.let { return it }
         val basePoly = if (commonSize == 0) current.seed.poly else current.response.transformedPolys[commonSize - 1]
         val previousPoly = previous.response.transformedPolys.getOrNull(commonSize) ?: basePoly
         val currentPoly = current.response.transformedPolys.getOrNull(commonSize) ?: basePoly
         val previousTransform = previous.validTransforms.getOrNull(commonSize)
-            ?.takeIf { !it.isIdentityTransform(basePoly) } ?: Transform.None
+            ?.animationTransform
+            ?.takeIf { !it.isIdentityTransform(basePoly) }
+            ?: Transform.None
         val currentTransform = current.validTransforms.getOrNull(commonSize)
-            ?.takeIf { !it.isIdentityTransform(basePoly) } ?: Transform.None
+            ?.animationTransform
+            ?.takeIf { !it.isIdentityTransform(basePoly) }
+            ?: Transform.None
         return transformAnimation(
             basePoly,
             current.scale,
@@ -148,6 +243,41 @@ private fun computeAnimation(
     } else {
         emptyList()
     }
+}
+
+private fun compositionFusionAnimation(
+    previous: Evaluation,
+    current: Evaluation,
+    commonSize: Int,
+    duration: Double,
+): List<CoreAnimationStep>? {
+    if (commonSize == 0) return null
+    val sharedTransform = current.validTransforms[commonSize - 1]
+    if (sharedTransform.primitiveTransforms != listOf(Transform.Rectified)) return null
+
+    fun LogicalTransform?.fusedTransform(): Transform? = when (this?.primitiveTransforms) {
+        null -> Transform.Rectified
+        listOf(Transform.Rectified) -> Transform.Cantellated
+        listOf(Transform.Truncated) -> Transform.Bevelled
+        else -> null
+    }
+
+    val previousTransform = previous.validTransforms.getOrNull(commonSize).fusedTransform() ?: return null
+    val currentTransform = current.validTransforms.getOrNull(commonSize).fusedTransform() ?: return null
+    val basePoly = if (commonSize == 1) current.seed.poly else current.response.transformedPolys[commonSize - 2]
+    val previousPoly = previous.response.transformedPolys.getOrNull(commonSize)
+        ?: previous.response.transformedPolys[commonSize - 1]
+    val currentPoly = current.response.transformedPolys.getOrNull(commonSize)
+        ?: current.response.transformedPolys[commonSize - 1]
+    return transformAnimation(
+        basePoly,
+        current.scale,
+        previousPoly,
+        currentPoly,
+        previousTransform,
+        currentTransform,
+        duration,
+    )
 }
 
 private fun transformAnimation(

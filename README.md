@@ -2,7 +2,7 @@
 
 Polyhedra Explorer is an interactive browser application for constructing, transforming, inspecting, and exporting symmetric convex polyhedra. Its UI is written with Compose HTML, its renderer uses DOM + WebGL, and all seed construction and polyhedron manipulation runs in Kotlin/WasmGC.
 
-The application includes 31 Platonic, Archimedean, and Catalan seeds; nine Conway-style transforms; animated transitions; orbit-aware face, edge, and vertex inspection; URL-backed state; and STL/OpenSCAD export.
+The application includes 31 Platonic, Archimedean, and Catalan seeds; primitive polyhedron transforms plus nine Conway-style macros; animated transitions; orbit-aware face, edge, and vertex inspection; URL-backed state; and STL/OpenSCAD export.
 
 ## Build and run
 
