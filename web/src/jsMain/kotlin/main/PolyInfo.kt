@@ -19,17 +19,20 @@ fun PolyInfo(params: RenderParams, popup: Popup?, togglePopup: (Popup?) -> Unit)
     val poly = requireNotNull(params.poly.poly)
     val fev = poly.fev()
 
-    Div(attrs = { classes("fev") }) {
-        Div(attrs = { classes("btn", "left", *activeWhen(popup, Popup.Faces)) }) {
-            InfoButton("F: ${fev.f}", "Faces", popup == Popup.Faces) { togglePopup(Popup.Faces) }
-        }
-        Div(attrs = { classes("btn", "mid", *activeWhen(popup, Popup.Edges)) }) {
-            Div(attrs = { classes("sep") })
-            InfoButton("E: ${fev.e}", "Edges", popup == Popup.Edges) { togglePopup(Popup.Edges) }
-            Div(attrs = { classes("sep") })
-        }
-        Div(attrs = { classes("btn", "right", *activeWhen(popup, Popup.Vertices)) }) {
-            InfoButton("V: ${fev.v}", "Vertices", popup == Popup.Vertices) { togglePopup(Popup.Vertices) }
+    Div(attrs = { classes("bottom-inspection-controls") }) {
+        BottomFacesVisibilityControl(params.poly.hideFaces, poly.faceKinds.keys)
+        Div(attrs = { classes("fev") }) {
+            Div(attrs = { classes("btn", "left", *activeWhen(popup, Popup.Faces)) }) {
+                InfoButton("F: ${fev.f}", "Faces", popup == Popup.Faces) { togglePopup(Popup.Faces) }
+            }
+            Div(attrs = { classes("btn", "mid", *activeWhen(popup, Popup.Edges)) }) {
+                Div(attrs = { classes("sep") })
+                InfoButton("E: ${fev.e}", "Edges", popup == Popup.Edges) { togglePopup(Popup.Edges) }
+                Div(attrs = { classes("sep") })
+            }
+            Div(attrs = { classes("btn", "right", *activeWhen(popup, Popup.Vertices)) }) {
+                InfoButton("V: ${fev.v}", "Vertices", popup == Popup.Vertices) { togglePopup(Popup.Vertices) }
+            }
         }
     }
 
@@ -137,6 +140,7 @@ private fun FacesPopup(params: RenderParams, poly: Polyhedron) {
 internal fun AllFacesVisibilityControl(
     hiddenFacesParam: SetParam<FaceKind>,
     faceKinds: Set<FaceKind>,
+    floating: Boolean = false,
 ) {
     hiddenFacesParam.observe()
     val hiddenFaces = hiddenFacesParam.value
@@ -145,12 +149,27 @@ internal fun AllFacesVisibilityControl(
         hiddenFaces.containsAll(faceKinds) -> "fa-circle-o"
         else -> "fa-dot-circle-o"
     }
-    I(attrs = {
-        classes("fa", icon)
+    val tooltip = if (hiddenFaces.isEmpty()) "Hide all face orbits" else "Show all face orbits"
+    Button(attrs = {
+        classes("face-visibility-toggle", *(if (floating) arrayOf("square") else emptyArray()))
+        attr("aria-label", tooltip)
         onClick {
             hiddenFacesParam.updateValue(if (hiddenFaces.isEmpty()) faceKinds else emptySet())
         }
-    })
+    }) {
+        I(attrs = { classes("fa", icon) })
+        Aside(attrs = { classes("tooltip-text") }) { Text(tooltip) }
+    }
+}
+
+@Composable
+internal fun BottomFacesVisibilityControl(
+    hiddenFacesParam: SetParam<FaceKind>,
+    faceKinds: Set<FaceKind>,
+) {
+    Div(attrs = { classes("btn", "faces-visibility") }) {
+        AllFacesVisibilityControl(hiddenFacesParam, faceKinds, floating = true)
+    }
 }
 
 @Composable

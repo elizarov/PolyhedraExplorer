@@ -14,6 +14,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class FacesPopupTest {
@@ -62,6 +63,7 @@ class FacesPopupTest {
         val hiddenFaces = hiddenFacesParam()
         composition = renderComposable(host) { AllFacesVisibilityControl(hiddenFaces, kinds) }
         var icon = visibilityIcon()
+        assertTooltip("Hide all face orbits")
 
         icon.click()
         assertEquals(kinds, hiddenFaces.value)
@@ -69,6 +71,13 @@ class FacesPopupTest {
         return awaitRecomposition().then {
             icon = visibilityIcon()
             assertTrue(icon.classList.contains("fa-circle-o"), "The header icon must show that all faces are hidden")
+            assertTooltip("Show all face orbits")
+            hiddenFaces.updateValue(setOf(kinds.first()))
+            awaitRecomposition()
+        }.then {
+            icon = visibilityIcon()
+            assertTrue(icon.classList.contains("fa-dot-circle-o"), "The header icon must show mixed visibility")
+            assertTooltip("Show all face orbits")
             icon.click()
             assertEquals(emptySet(), hiddenFaces.value)
             awaitRecomposition()
@@ -78,9 +87,33 @@ class FacesPopupTest {
         }
     }
 
+    @Test
+    fun bottomFacesVisibilityControlIsCircularAndUsesTheSharedBehavior(): Promise<Unit> {
+        val kinds = setOf(FaceKind(0), FaceKind(1))
+        val hiddenFaces = hiddenFacesParam()
+        composition = renderComposable(host) { BottomFacesVisibilityControl(hiddenFaces, kinds) }
+
+        val wrapper = assertNotNull(host.querySelector(".btn.faces-visibility"))
+        val button = assertNotNull(wrapper.querySelector("button.face-visibility-toggle.square")) as HTMLElement
+        assertTooltip("Hide all face orbits")
+        button.click()
+        assertEquals(kinds, hiddenFaces.value)
+
+        return awaitRecomposition().then {
+            assertTrue(visibilityIcon().classList.contains("fa-circle-o"))
+            assertTooltip("Show all face orbits")
+        }
+    }
+
     private fun hiddenFacesParam() = SetParam<FaceKind>("hidden", emptySet()) { null }
 
     private fun visibilityIcon(): HTMLElement = host.querySelector("i") as HTMLElement
+
+    private fun assertTooltip(expected: String) {
+        val button = assertNotNull(host.querySelector("button.face-visibility-toggle")) as HTMLElement
+        assertEquals(expected, button.getAttribute("aria-label"))
+        assertEquals(expected, button.querySelector(".tooltip-text")?.textContent)
+    }
 
     private fun awaitRecomposition(): Promise<Unit> = Promise { resolve, _ ->
         window.requestAnimationFrame {

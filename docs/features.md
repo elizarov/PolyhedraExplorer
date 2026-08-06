@@ -32,7 +32,7 @@
 - Edge-kind table with count, midradius, local geometry, and available Drop action. Each row includes a color-coded planar net of its two adjacent faces: the named left face is placed left of a centered vertical shared edge and the named right face is placed on the right.
 - Vertex-kind table with count, circumradius, adjacency, vertex figure, and available Drop/Truncate/Rectify actions.
 - Every F/E/V orbit row places all currently available targeted actions at its right edge in the same global order as the transform popup. The ×, upward-caret, scissors, and compress icons mean Drop, Kis face, Truncate vertex, and Rectify vertex; each icon has a tooltip naming its exact operation and target orbit.
-- Hide/show all faces or individual face kinds with immediately synchronized popup controls, while retaining configurable rims and shell width.
+- Hide/show all faces or individual face kinds with immediately synchronized controls, while retaining configurable rims and shell width. The three-state all-orbit control (all visible, mixed, or all hidden) is available both in the face table header and as a discoverable circular button beside the bottom F/E/V control; both copies expose the same state-aware tooltip and action.
 
 ## Persistence and export
 

@@ -205,17 +205,26 @@ div.btn.reset {
     bottom: 1em;
 }
 
-div.fev {
+div.bottom-inspection-controls {
     position: absolute;
     left: 50%;
     bottom: 1em;
+    transform: translateX(-50%);
+    display: flex;
+    flex-flow: nowrap row;
+    align-items: center;
+    gap: 0.5em;
+}
+
+div.bottom-inspection-controls > div.fev {
     display: flex;
     flex-flow: nowrap row;
 }
 
-div.fev > div {
-    position: relative;
-    left: -50%;
+div.btn.faces-visibility > button > aside.tooltip-text {
+    top: auto;
+    bottom: 2.5em;
+    left: 0;
 }
 
 /* --------- Export/Config Drawers --------- */
@@ -456,6 +465,17 @@ aside.transform-settings button.transform-settings-reset:disabled {
 
 tr.info:hover, tr.info.selected {
     background: var(--hover-color);
+}
+
+button.face-visibility-toggle {
+    position: relative;
+    width: 1.4em;
+    padding: 0;
+    border: 0;
+    color: inherit;
+    background: transparent;
+    font: inherit;
+    cursor: pointer;
 }
 
 td.orbit-target-actions {
