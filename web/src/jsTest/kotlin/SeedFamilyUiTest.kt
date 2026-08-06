@@ -48,7 +48,7 @@ class SeedFamilyUiTest {
     }
 
     @Test
-    fun familiesAppearAfterPlatonicWithDefaultSizeThree() {
+    fun familyPopupUsesFamilyNamesAndSelectsSizeThreeByDefault() {
         val params = PolyParams("", null)
         composition = renderComposable(host) { ControlPane(params, popup = Popup.Seed, togglePopup = {}) }
 
@@ -57,7 +57,7 @@ class SeedFamilyUiTest {
             elements(".dropdown .header").map { it.textContent.orEmpty().trim() },
         )
         assertEquals(
-            listOf("Prism 3", "Antiprism 3", "Pyramid 3", "Bipyramid 3"),
+            listOf("Prism", "Antiprism", "Pyramid", "Bipyramid"),
             elements(".dropdown .header")[1].parentElement?.let { headerRow ->
                 generateSequence(headerRow.nextElementSibling) { it.nextElementSibling }
                     .takeWhile { it.querySelector(".header") == null }
@@ -65,6 +65,92 @@ class SeedFamilyUiTest {
                     .toList()
             },
         )
+
+        elements(".dropdown .item").single { it.textContent == "Prism" }.click()
+        assertEquals("P3", params.seed.value.tag)
+    }
+
+    @Test
+    fun horizontalNavigationKeepsFamilySizeAcrossFamiliesAndCatalogBoundary(): Promise<Unit> {
+        val params = PolyParams("", null)
+        params.seed.updateValue(familySeed(SeedFamily.Prism, 37))
+        composition = renderComposable(host) { ControlPane(params, popup = null, togglePopup = {}) }
+
+        (host.querySelector(".family-seed-increment") as HTMLButtonElement).click()
+        seedSpinnerButton(1).click()
+        assertEquals("A38", params.seed.value.tag)
+
+        return awaitRecomposition().then {
+            seedSpinnerButton(0).click()
+            assertEquals("P38", params.seed.value.tag)
+            awaitRecomposition()
+        }.then {
+            seedSpinnerButton(0).click()
+            assertEquals("I", params.seed.value.tag)
+            awaitRecomposition()
+        }.then {
+            seedSpinnerButton(0).click()
+            assertEquals("D", params.seed.value.tag)
+            awaitRecomposition()
+        }.then {
+            seedSpinnerButton(1).click()
+            assertEquals("I", params.seed.value.tag)
+            awaitRecomposition()
+        }.then {
+            seedSpinnerButton(1).click()
+            assertEquals("P38", params.seed.value.tag)
+        }
+    }
+
+    @Test
+    fun dropdownKeepsFamilySizeThroughFixedSeedsWithTransformsPresent(): Promise<Unit> {
+        val params = PolyParams("", null)
+        params.seed.updateValue(familySeed(SeedFamily.Prism, 23))
+        params.transforms.updateValue(listOf(Transform.Dual))
+        composition = renderComposable(host) { ControlPane(params, popup = Popup.Seed, togglePopup = {}) }
+
+        dropdownItem("Cube").click()
+        assertEquals("C", params.seed.value.tag)
+        assertEquals(listOf(Transform.Dual), params.transforms.value)
+
+        return awaitRecomposition().then {
+            dropdownItem("Pyramid").click()
+            assertEquals("Y23", params.seed.value.tag)
+            awaitRecomposition()
+        }.then {
+            dropdownItem("Octahedron").click()
+            assertEquals("O", params.seed.value.tag)
+            awaitRecomposition()
+        }.then {
+            dropdownItem("Antiprism").click()
+            assertEquals("A23", params.seed.value.tag)
+        }
+    }
+
+    @Test
+    fun onlySeedLevelResetClearsRememberedFamilySize(): Promise<Unit> {
+        val params = PolyParams("", null)
+        params.seed.updateValue(familySeed(SeedFamily.Prism, 19))
+        params.transforms.updateValue(listOf(Transform.Dual))
+        composition = renderComposable(host) { ControlPane(params, popup = null, togglePopup = {}) }
+
+        resetButton().click()
+        assertEquals(emptyList(), params.transforms.value)
+        assertEquals("P19", params.seed.value.tag)
+
+        return awaitRecomposition().then {
+            seedSpinnerButton(1).click()
+            assertEquals("A19", params.seed.value.tag)
+            awaitRecomposition()
+        }.then {
+            resetButton().click()
+            assertEquals("T", params.seed.value.tag)
+            awaitRecomposition()
+        }.then {
+            val next = seedSpinnerButton(1)
+            repeat(5) { next.click() }
+            assertEquals("P3", params.seed.value.tag)
+        }
     }
 
     @Test
@@ -134,6 +220,20 @@ class SeedFamilyUiTest {
 
     private fun seedButton(): HTMLElement = elements(".ctrl-pane > .btn > button.txt")
         .single { it.textContent.orEmpty().contains("Pyramid") }
+
+    private fun seedSpinnerButton(index: Int): HTMLButtonElement {
+        val seed = elements(".ctrl-pane > .btn > button.txt")
+            .single { button -> Seeds.any { button.textContent.orEmpty().contains(it.name) } }
+        return generateSequence(seed.parentElement?.firstElementChild) { it.nextElementSibling }
+            .filterIsInstance<HTMLButtonElement>()
+            .elementAt(index)
+    }
+
+    private fun dropdownItem(name: String): HTMLElement =
+        elements(".dropdown .item").single { it.textContent == name }
+
+    private fun resetButton(): HTMLButtonElement =
+        host.querySelector(".reset button") as HTMLButtonElement
 
     private fun elements(selector: String): List<HTMLElement> {
         val nodes = host.querySelectorAll(selector)

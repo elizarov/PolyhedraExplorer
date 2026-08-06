@@ -1,6 +1,6 @@
 package polyhedra.web.main
 
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.dom.*
 import polyhedra.model.api.MAX_FAMILY_SEED_N
@@ -16,6 +16,13 @@ import polyhedra.web.poly.*
 @Composable
 fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit) {
     params.observe(Param.TargetValue + Param.Progress)
+    var lastFamilyN by remember {
+        mutableStateOf(params.seed.value.familyId?.n ?: MIN_FAMILY_SEED_N)
+    }
+    val currentFamilyN = params.seed.value.familyId?.n
+    SideEffect {
+        if (currentFamilyN != null) lastFamilyN = currentFamilyN
+    }
     val transforms = params.transforms.value
     val transformError = params.transformError
     val errorIndex = transformError?.index ?: Int.MAX_VALUE
@@ -57,7 +64,17 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
         togglePopup(null)
         val current = params.seed.value
         val currentIndex = SeedOptions.indexOfFirst { seed -> seed.optionKey == current.optionKey }
-        SeedOptions.getOrNull(currentIndex + delta)?.let(params.seed::updateValue)
+        current.familyId?.let { lastFamilyN = it.n }
+        SeedOptions.getOrNull(currentIndex + delta)?.let { option ->
+            val seed = if (option.isFamily) option.withFamilyN(lastFamilyN) else option
+            params.seed.updateValue(seed)
+        }
+    }
+
+    fun selectSeed(option: Seed) {
+        togglePopup(null)
+        val seed = if (option.isFamily) option.withFamilyN(lastFamilyN) else option
+        params.seed.updateValue(seed)
     }
 
     fun adjustFamilyN(delta: Int) {
@@ -65,6 +82,7 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
         val current = params.seed.value
         val n = requireNotNull(current.familyId).n + delta
         if (n in MIN_FAMILY_SEED_N..MAX_FAMILY_SEED_N) {
+            lastFamilyN = n
             params.seed.updateValue(current.withFamilyN(n))
         }
     }
@@ -194,8 +212,8 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
                         Div(attrs = { classes("text-row") }) {
                             Div(attrs = {
                                 classes("item")
-                                onClick { togglePopup(null); params.seed.updateValue(seed) }
-                            }) { Text(seed.toString()) }
+                                onClick { selectSeed(seed) }
+                            }) { Text(seed.name) }
                         }
                     }
                 }
@@ -234,13 +252,18 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
     }
 
     Div(attrs = { classes("btn", "reset") }) {
-        val isReset = transforms.isEmpty() && params.seed.value == Seed.Tetrahedron
+        val isReset = transforms.isEmpty() &&
+            params.seed.value == Seed.Tetrahedron &&
+            lastFamilyN == MIN_FAMILY_SEED_N
         Button(attrs = {
             classes("square")
             if (isReset) disabled()
             onClick {
                 if (transforms.isNotEmpty()) params.transforms.updateValue(transforms.dropLast(1))
-                else params.seed.updateValue(Seed.Tetrahedron)
+                else {
+                    lastFamilyN = MIN_FAMILY_SEED_N
+                    params.seed.updateValue(Seed.Tetrahedron)
+                }
             }
         }) {
             I(attrs = { classes("fa", "fa-trash-o") })

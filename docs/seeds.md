@@ -21,10 +21,15 @@ A family is an infinite polyhedron class represented here by the finite range
 `3 <= n <= 100`, where `n` is the order of the base or equatorial polygon.
 Prisms and antiprisms use uniform coordinates; pyramids place a regular base and
 centered apex on one sphere with centroid at the origin; bipyramids use a regular
-equator and opposite spherical poles. Up/down controls beside the selected seed
-change `n` without changing family. Some low-order members coincide with fixed
-seeds and receive optional replacement suggestions: Prism 4 is Cube, Antiprism 3
-and Bipyramid 4 are Octahedron, and Pyramid 3 is Tetrahedron.
+equator and opposite spherical poles. Popup entries show only the family name.
+The remembered size starts at `n = 3`; up/down controls beside the selected seed
+change it without changing family. Popup selection and left/right seed navigation
+carry the remembered `n` to another family and retain it while navigating through
+fixed seeds, including with a transform chain. Removing transforms does not clear
+the memory; the delete/reset control clears it to 3 only when invoked with no
+transforms. Some low-order members coincide with fixed seeds and receive optional
+replacement suggestions: Prism 4 is Cube, Antiprism 3 and Bipyramid 4 are
+Octahedron, and Pyramid 3 is Tetrahedron.
 
 ### Archimedean solids
 
