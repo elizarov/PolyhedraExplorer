@@ -2,10 +2,11 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.common.poly
+package polyhedra.core.poly
 
-import polyhedra.common.transform.*
-import polyhedra.common.util.*
+import polyhedra.core.transform.*
+import polyhedra.model.poly.*
+import polyhedra.model.util.*
 
 private object ScaledKey
 

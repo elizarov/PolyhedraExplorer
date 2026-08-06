@@ -1,4 +1,4 @@
-package polyhedra.js.main
+package polyhedra.web.main
 
 import androidx.compose.runtime.Composable
 import org.jetbrains.compose.web.attributes.disabled
@@ -6,10 +6,10 @@ import org.jetbrains.compose.web.dom.Button
 import org.jetbrains.compose.web.dom.Div
 import org.jetbrains.compose.web.dom.Span
 import org.jetbrains.compose.web.dom.Text
-import polyhedra.common.util.fmt
-import polyhedra.js.components.observe
-import polyhedra.js.components.PSlider
-import polyhedra.js.poly.*
+import polyhedra.model.util.fmt
+import polyhedra.web.components.observe
+import polyhedra.web.components.PSlider
+import polyhedra.web.poly.*
 
 @Composable
 fun ExportPopup(params: RootParams, faces: FaceContext?) {

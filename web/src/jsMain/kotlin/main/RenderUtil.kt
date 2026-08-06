@@ -2,11 +2,11 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.js.main
+package polyhedra.web.main
 
 import androidx.compose.runtime.Composable
 import org.jetbrains.compose.web.dom.*
-import polyhedra.js.poly.IndicatorMessage
+import polyhedra.web.poly.IndicatorMessage
 
 @Composable
 fun <T> MessageSpan(message: IndicatorMessage<T>) {

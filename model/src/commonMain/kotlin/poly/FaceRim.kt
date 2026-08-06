@@ -1,6 +1,6 @@
-package polyhedra.common.poly
+package polyhedra.model.poly
 
-import polyhedra.common.util.*
+import polyhedra.model.util.*
 
 class FaceRim(f: Face)  {
     val maxRim: Double

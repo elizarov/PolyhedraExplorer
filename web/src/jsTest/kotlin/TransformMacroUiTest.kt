@@ -1,14 +1,16 @@
+package polyhedra.web
+
 import androidx.compose.runtime.Composition
 import kotlinx.browser.document
 import kotlinx.browser.window
 import org.jetbrains.compose.web.renderComposable
 import org.w3c.dom.HTMLDivElement
 import org.w3c.dom.HTMLElement
-import polyhedra.js.catalog.Seeds
-import polyhedra.js.catalog.Transform
-import polyhedra.js.main.ControlPane
-import polyhedra.js.main.Popup
-import polyhedra.js.poly.PolyParams
+import polyhedra.web.catalog.Seeds
+import polyhedra.web.catalog.Transform
+import polyhedra.web.main.ControlPane
+import polyhedra.web.main.Popup
+import polyhedra.web.poly.PolyParams
 import kotlin.js.Promise
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest

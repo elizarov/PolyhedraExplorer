@@ -2,7 +2,7 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.js.main
+package polyhedra.web.main
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -14,10 +14,10 @@ import org.jetbrains.compose.web.dom.Button
 import org.jetbrains.compose.web.dom.Div
 import org.jetbrains.compose.web.dom.I
 import org.jetbrains.compose.web.dom.Text
-import polyhedra.js.components.observe
-import polyhedra.js.params.Param
-import polyhedra.js.poly.FaceContext
-import polyhedra.js.poly.PolyCanvas
+import polyhedra.web.components.observe
+import polyhedra.web.params.Param
+import polyhedra.web.poly.FaceContext
+import polyhedra.web.poly.PolyCanvas
 
 @Composable
 fun RootPane(params: RootParams) {

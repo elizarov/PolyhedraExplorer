@@ -1,15 +1,15 @@
-package polyhedra.js.main
+package polyhedra.web.main
 
 import androidx.compose.runtime.Composable
 import org.jetbrains.compose.web.dom.*
-import polyhedra.common.poly.*
-import polyhedra.common.util.fmtFix
-import polyhedra.common.util.toDegrees
-import polyhedra.js.catalog.Drop
-import polyhedra.js.components.observe
-import polyhedra.js.params.SetParam
-import polyhedra.js.params.TransientParam
-import polyhedra.js.poly.*
+import polyhedra.model.poly.*
+import polyhedra.model.util.fmtFix
+import polyhedra.model.util.toDegrees
+import polyhedra.web.catalog.Drop
+import polyhedra.web.components.observe
+import polyhedra.web.params.SetParam
+import polyhedra.web.params.TransientParam
+import polyhedra.web.poly.*
 
 @Composable
 fun PolyInfo(params: RenderParams, popup: Popup?, togglePopup: (Popup?) -> Unit) {

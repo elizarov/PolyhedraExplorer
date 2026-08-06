@@ -1,7 +1,8 @@
-package polyhedra.common.transform
+package polyhedra.core.transform
 
-import polyhedra.common.poly.*
-import polyhedra.common.util.*
+import polyhedra.core.poly.*
+import polyhedra.model.poly.*
+import polyhedra.model.util.*
 import kotlin.math.*
 
 data class BevellingRatio(val cr: Double, val tr: Double) {

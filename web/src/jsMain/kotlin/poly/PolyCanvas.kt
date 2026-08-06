@@ -2,7 +2,7 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.js.poly
+package polyhedra.web.poly
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -11,12 +11,12 @@ import org.jetbrains.compose.web.dom.Canvas
 import org.jetbrains.compose.web.dom.Div
 import org.w3c.dom.*
 import org.w3c.dom.events.*
-import polyhedra.common.util.norm
-import polyhedra.js.main.Popup
-import polyhedra.js.params.Param
-import polyhedra.js.util.ResizeTracker
-import polyhedra.js.util.isLeftButtonEvent
-import polyhedra.js.util.isLeftButtonPressed
+import polyhedra.model.util.norm
+import polyhedra.web.main.Popup
+import polyhedra.web.params.Param
+import polyhedra.web.util.ResizeTracker
+import polyhedra.web.util.isLeftButtonEvent
+import polyhedra.web.util.isLeftButtonPressed
 import kotlin.math.PI
 import kotlin.math.atan2
 

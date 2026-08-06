@@ -1,7 +1,7 @@
-package polyhedra.core.api
+package polyhedra.model.api
 
-import polyhedra.common.poly.CHIRALITY_PRIME
-import polyhedra.common.poly.Chirality
+import polyhedra.model.poly.CHIRALITY_PRIME
+import polyhedra.model.poly.Chirality
 
 /** A named Conway-style abbreviation for a sequence of primitive transforms. */
 data class TransformMacro(

@@ -2,7 +2,7 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.common.util
+package polyhedra.model.util
 
 inline fun <T> Iterable<T>.avgOf(selector: (T) -> Double): Double {
     var n = 0

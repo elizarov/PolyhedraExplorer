@@ -1,10 +1,10 @@
-package polyhedra.js.components
+package polyhedra.web.components
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.NonRestartableComposable
 import androidx.compose.runtime.currentRecomposeScope
-import polyhedra.js.params.Param
+import polyhedra.web.params.Param
 
 @Composable
 @NonRestartableComposable

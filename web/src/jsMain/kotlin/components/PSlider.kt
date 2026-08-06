@@ -2,7 +2,7 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.js.components
+package polyhedra.web.components
 
 import androidx.compose.runtime.Composable
 import org.jetbrains.compose.web.attributes.InputType
@@ -11,8 +11,8 @@ import org.jetbrains.compose.web.attributes.value
 import org.jetbrains.compose.web.dom.Input
 import org.jetbrains.compose.web.dom.Span
 import org.jetbrains.compose.web.dom.Text
-import polyhedra.common.util.fmt
-import polyhedra.js.params.DoubleParam
+import polyhedra.model.util.fmt
+import polyhedra.web.params.DoubleParam
 import kotlin.math.roundToInt
 
 @Composable

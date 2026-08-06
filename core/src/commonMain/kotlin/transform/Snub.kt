@@ -1,7 +1,8 @@
-package polyhedra.common.transform
+package polyhedra.core.transform
 
-import polyhedra.common.poly.*
-import polyhedra.common.util.*
+import polyhedra.core.poly.*
+import polyhedra.model.poly.*
+import polyhedra.model.util.*
 import kotlin.math.*
 
 // a * x^2 + b * x + c = 0

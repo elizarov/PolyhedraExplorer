@@ -2,14 +2,14 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.js.poly
+package polyhedra.web.poly
 
 import org.khronos.webgl.*
-import polyhedra.common.poly.*
-import polyhedra.js.glsl.*
-import polyhedra.js.main.*
-import polyhedra.js.params.*
-import polyhedra.js.util.*
+import polyhedra.model.poly.*
+import polyhedra.web.glsl.*
+import polyhedra.web.main.*
+import polyhedra.web.params.*
+import polyhedra.web.util.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
 class EdgeContext(val gl: GL, params: RenderParams) : Param.Context(params) {

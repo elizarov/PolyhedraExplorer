@@ -2,10 +2,10 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.js.poly
+package polyhedra.web.poly
 
-import polyhedra.common.poly.*
-import polyhedra.common.util.*
+import polyhedra.model.poly.*
+import polyhedra.model.util.*
 
 interface TransformAnimation {
     val prevPoly: Polyhedron

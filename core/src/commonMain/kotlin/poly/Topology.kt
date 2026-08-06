@@ -2,7 +2,9 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.common.poly
+package polyhedra.core.poly
+
+import polyhedra.model.poly.*
 
 fun Polyhedron.hasSameTopology(other: Polyhedron): Boolean {
     val nv = vs.size

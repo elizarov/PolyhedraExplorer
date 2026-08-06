@@ -1,13 +1,13 @@
-package polyhedra.js.main
+package polyhedra.web.main
 
 import androidx.compose.runtime.Composable
 import org.jetbrains.compose.web.dom.Span
 import org.jetbrains.compose.web.dom.Text
-import polyhedra.common.util.fmt
-import polyhedra.js.components.observe
-import polyhedra.js.components.PCheckbox
-import polyhedra.js.components.PDropdown
-import polyhedra.js.components.PSlider
+import polyhedra.model.util.fmt
+import polyhedra.web.components.observe
+import polyhedra.web.components.PCheckbox
+import polyhedra.web.components.PDropdown
+import polyhedra.web.components.PSlider
 
 @Composable
 fun ConfigPopup(params: RootParams) {

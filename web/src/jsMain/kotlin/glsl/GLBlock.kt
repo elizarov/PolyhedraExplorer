@@ -2,9 +2,9 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.js.glsl
+package polyhedra.web.glsl
 
-import polyhedra.common.util.*
+import polyhedra.model.util.*
 
 class GLBlockBuilder<T : GLType<T>>(
     private val resultType: T,

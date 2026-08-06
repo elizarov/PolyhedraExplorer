@@ -2,7 +2,7 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.common.util
+package polyhedra.model.util
 
 class LexicographicListComparator<T>(val comparator: Comparator<T>) : Comparator<List<T>> {
     override fun compare(a: List<T>, b: List<T>): Int {

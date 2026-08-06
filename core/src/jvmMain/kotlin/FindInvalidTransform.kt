@@ -2,10 +2,11 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.jvm
+package polyhedra.core
 
-import polyhedra.common.poly.*
-import polyhedra.common.transform.*
+import polyhedra.core.poly.*
+import polyhedra.core.transform.*
+import polyhedra.model.poly.*
 
 fun main() {
     val seeds = Seeds.filter { it.type == SeedType.Platonic }

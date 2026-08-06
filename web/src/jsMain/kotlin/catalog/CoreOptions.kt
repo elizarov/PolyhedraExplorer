@@ -1,14 +1,14 @@
-package polyhedra.js.catalog
+package polyhedra.web.catalog
 
-import polyhedra.common.poly.AnyKind
-import polyhedra.common.poly.Chirality
-import polyhedra.common.poly.EdgeKind
-import polyhedra.common.poly.FaceKind
-import polyhedra.common.poly.VertexKind
-import polyhedra.common.poly.toAnyKindOrNull
-import polyhedra.common.poly.withChirality
-import polyhedra.common.util.Tagged
-import polyhedra.core.api.toTransformMacroOrNull
+import polyhedra.model.poly.AnyKind
+import polyhedra.model.poly.Chirality
+import polyhedra.model.poly.EdgeKind
+import polyhedra.model.poly.FaceKind
+import polyhedra.model.poly.VertexKind
+import polyhedra.model.poly.toAnyKindOrNull
+import polyhedra.model.poly.withChirality
+import polyhedra.model.util.Tagged
+import polyhedra.model.api.toTransformMacroOrNull
 
 enum class SeedType {
     Platonic,

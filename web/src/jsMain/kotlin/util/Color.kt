@@ -2,11 +2,11 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.js.util
+package polyhedra.web.util
 
 import org.khronos.webgl.*
-import polyhedra.common.util.*
-import polyhedra.js.glsl.*
+import polyhedra.model.util.*
+import polyhedra.web.glsl.*
 import kotlin.math.*
 
 data class Color(

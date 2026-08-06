@@ -1,13 +1,15 @@
-import polyhedra.common.poly.SeedType
-import polyhedra.common.poly.Seeds
-import polyhedra.common.poly.Polyhedron
-import polyhedra.common.poly.fev
-import polyhedra.common.poly.recognizedSeedOrNull
-import polyhedra.common.poly.validate
-import polyhedra.common.transform.bevelled
-import polyhedra.common.transform.cantellated
-import polyhedra.common.transform.rectified
-import polyhedra.common.transform.truncated
+package polyhedra.core
+
+import polyhedra.core.poly.SeedType
+import polyhedra.core.poly.Seeds
+import polyhedra.core.poly.recognizedSeedOrNull
+import polyhedra.core.poly.validate
+import polyhedra.model.poly.Polyhedron
+import polyhedra.model.poly.fev
+import polyhedra.core.transform.bevelled
+import polyhedra.core.transform.cantellated
+import polyhedra.core.transform.rectified
+import polyhedra.core.transform.truncated
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull

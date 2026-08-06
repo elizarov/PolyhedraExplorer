@@ -1,9 +1,11 @@
-import polyhedra.common.poly.Seeds
-import polyhedra.common.poly.TransformFEV
-import polyhedra.common.poly.fev
-import polyhedra.common.poly.times
-import polyhedra.common.transform.Transforms
-import polyhedra.common.transform.transformed
+package polyhedra.core
+
+import polyhedra.core.poly.Seeds
+import polyhedra.model.poly.TransformFEV
+import polyhedra.model.poly.fev
+import polyhedra.model.poly.times
+import polyhedra.core.transform.Transforms
+import polyhedra.core.transform.transformed
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

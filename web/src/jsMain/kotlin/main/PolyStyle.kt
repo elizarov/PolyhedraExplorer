@@ -2,11 +2,11 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.js.main
+package polyhedra.web.main
 
-import polyhedra.common.poly.*
-import polyhedra.common.util.*
-import polyhedra.js.util.*
+import polyhedra.model.poly.*
+import polyhedra.model.util.*
+import polyhedra.web.util.*
 
 private const val hue0 = 57.0 / 360
 private const val divisor = 4

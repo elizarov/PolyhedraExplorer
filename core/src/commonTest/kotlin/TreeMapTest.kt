@@ -1,4 +1,6 @@
-import polyhedra.common.util.*
+package polyhedra.core
+
+import polyhedra.core.util.TreeMap
 import kotlin.random.*
 import kotlin.test.*
 

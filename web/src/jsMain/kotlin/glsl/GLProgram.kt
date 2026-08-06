@@ -2,13 +2,12 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.js.glsl
+package polyhedra.web.glsl
 
 import org.khronos.webgl.*
-import polyhedra.common.*
-import polyhedra.common.util.*
-import polyhedra.js.poly.*
-import polyhedra.js.util.*
+import polyhedra.model.util.*
+import polyhedra.web.poly.*
+import polyhedra.web.util.*
 import kotlin.properties.*
 import kotlin.reflect.*
 import org.khronos.webgl.WebGLRenderingContext as GL

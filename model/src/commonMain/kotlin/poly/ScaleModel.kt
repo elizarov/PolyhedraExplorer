@@ -1,6 +1,6 @@
-package polyhedra.common.poly
+package polyhedra.model.poly
 
-import polyhedra.common.util.Tagged
+import polyhedra.model.util.Tagged
 
 enum class Scale(override val tag: String) : Tagged {
     Inradius("i"),

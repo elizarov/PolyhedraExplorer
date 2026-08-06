@@ -2,10 +2,10 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.js.poly
+package polyhedra.web.poly
 
-import polyhedra.common.poly.FEV
-import polyhedra.js.catalog.Transform
+import polyhedra.model.poly.FEV
+import polyhedra.web.catalog.Transform
 
 class Indicator<T>(
     val classes: String,

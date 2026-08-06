@@ -1,12 +1,13 @@
 package polyhedra.benchmarks
 
-import polyhedra.common.poly.*
-import polyhedra.common.transform.bevelled
-import polyhedra.common.transform.canonical
-import polyhedra.common.transform.cantellated
-import polyhedra.common.transform.chamfered
-import polyhedra.common.transform.snub
-import polyhedra.common.transform.truncated
+import polyhedra.core.poly.*
+import polyhedra.model.poly.*
+import polyhedra.core.transform.bevelled
+import polyhedra.core.transform.canonical
+import polyhedra.core.transform.cantellated
+import polyhedra.core.transform.chamfered
+import polyhedra.core.transform.snub
+import polyhedra.core.transform.truncated
 import kotlin.math.roundToLong
 import kotlin.time.TimeSource
 

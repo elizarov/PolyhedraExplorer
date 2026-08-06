@@ -2,9 +2,9 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.js.poly
+package polyhedra.web.poly
 
-import polyhedra.js.glsl.*
+import polyhedra.web.glsl.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
 abstract class ViewBaseProgram(gl: GL) : GLProgram(gl) {

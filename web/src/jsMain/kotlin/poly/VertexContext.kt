@@ -2,16 +2,16 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.js.poly
+package polyhedra.web.poly
 
-import polyhedra.common.poly.Polyhedron
-import polyhedra.common.util.Vec3
-import polyhedra.common.util.plus
-import polyhedra.common.util.times
-import polyhedra.js.glsl.*
-import polyhedra.js.main.PolyStyle
-import polyhedra.js.params.Param
-import polyhedra.js.util.toFloat32Array4
+import polyhedra.model.poly.Polyhedron
+import polyhedra.model.util.Vec3
+import polyhedra.model.util.plus
+import polyhedra.model.util.times
+import polyhedra.web.glsl.*
+import polyhedra.web.main.PolyStyle
+import polyhedra.web.params.Param
+import polyhedra.web.util.toFloat32Array4
 import kotlin.math.sqrt
 import org.khronos.webgl.WebGLRenderingContext as GL
 

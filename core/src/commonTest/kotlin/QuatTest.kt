@@ -2,7 +2,9 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-import polyhedra.common.util.*
+package polyhedra.core
+
+import polyhedra.model.util.*
 import kotlin.math.*
 import kotlin.random.*
 import kotlin.test.*

@@ -1,4 +1,4 @@
-package polyhedra.js.components
+package polyhedra.web
 
 import androidx.compose.runtime.Composition
 import kotlinx.browser.document
@@ -9,12 +9,13 @@ import org.w3c.dom.HTMLDivElement
 import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.HTMLSelectElement
 import org.w3c.dom.events.Event
-import polyhedra.common.util.Tagged
-import polyhedra.js.params.BooleanParam
-import polyhedra.js.params.DoubleParam
-import polyhedra.js.params.EnumParam
-import polyhedra.js.params.Param
-import polyhedra.js.params.ValueAnimationParams
+import polyhedra.model.util.Tagged
+import polyhedra.web.components.*
+import polyhedra.web.params.BooleanParam
+import polyhedra.web.params.DoubleParam
+import polyhedra.web.params.EnumParam
+import polyhedra.web.params.Param
+import polyhedra.web.params.ValueAnimationParams
 import kotlin.js.Promise
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest

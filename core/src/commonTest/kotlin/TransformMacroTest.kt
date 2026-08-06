@@ -1,11 +1,13 @@
+package polyhedra.core
+
 import kotlinx.coroutines.test.runTest
-import polyhedra.common.poly.fev
-import polyhedra.common.poly.geometryFingerprint
-import polyhedra.core.api.CoreRequest
-import polyhedra.core.api.CoreState
-import polyhedra.core.api.TransformMacros
+import polyhedra.core.poly.geometryFingerprint
+import polyhedra.model.poly.fev
 import polyhedra.core.api.evaluateCore
-import polyhedra.core.api.findTransformPrefixReplacement
+import polyhedra.model.api.CoreRequest
+import polyhedra.model.api.CoreState
+import polyhedra.model.api.TransformMacros
+import polyhedra.model.api.findTransformPrefixReplacement
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull

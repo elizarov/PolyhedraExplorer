@@ -1,7 +1,8 @@
-package polyhedra.common.transform
+package polyhedra.core.transform
 
 import kotlinx.serialization.*
-import polyhedra.common.poly.*
+import polyhedra.core.poly.*
+import polyhedra.model.poly.*
 
 const val DROP_TAG = "x"
 

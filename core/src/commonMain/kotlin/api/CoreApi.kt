@@ -1,8 +1,10 @@
 package polyhedra.core.api
 
-import polyhedra.common.poly.*
-import polyhedra.common.transform.*
-import polyhedra.common.util.OperationProgressContext
+import polyhedra.core.poly.*
+import polyhedra.core.util.OperationProgressContext
+import polyhedra.model.api.*
+import polyhedra.model.poly.*
+import polyhedra.core.transform.*
 
 private const val MAX_DISPLAY_EDGES = (1 shl 15) - 1
 private const val ANIMATION_GAP = 1e-4

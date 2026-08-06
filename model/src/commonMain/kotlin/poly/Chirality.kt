@@ -1,4 +1,4 @@
-package polyhedra.common.poly
+package polyhedra.model.poly
 
 const val CHIRALITY_PRIME = "'"
 

@@ -1,18 +1,20 @@
+package polyhedra.web
+
 import androidx.compose.runtime.Composition
 import kotlinx.browser.document
 import kotlinx.browser.window
 import org.jetbrains.compose.web.renderComposable
 import org.w3c.dom.HTMLDivElement
 import org.w3c.dom.HTMLElement
-import polyhedra.common.poly.Seed as CoreSeed
-import polyhedra.common.poly.SnubDodecahedron
-import polyhedra.core.api.CoreResponse
-import polyhedra.core.api.CoreState
-import polyhedra.js.catalog.Seeds
-import polyhedra.js.catalog.Transform
-import polyhedra.js.main.ControlPane
-import polyhedra.js.poly.PolyParams
-import polyhedra.js.poly.shouldDetectSeed
+import polyhedra.core.poly.Seed as CoreSeed
+import polyhedra.core.poly.SnubDodecahedron
+import polyhedra.model.api.CoreResponse
+import polyhedra.model.api.CoreState
+import polyhedra.web.catalog.Seeds
+import polyhedra.web.catalog.Transform
+import polyhedra.web.main.ControlPane
+import polyhedra.web.poly.PolyParams
+import polyhedra.web.poly.shouldDetectSeed
 import kotlin.js.Promise
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest

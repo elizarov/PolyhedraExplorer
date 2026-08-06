@@ -1,17 +1,19 @@
+package polyhedra.web
+
 import androidx.compose.runtime.Composition
 import kotlinx.browser.document
 import kotlinx.browser.window
 import org.jetbrains.compose.web.renderComposable
 import org.w3c.dom.HTMLDivElement
 import org.w3c.dom.HTMLElement
-import polyhedra.common.poly.EdgeKind
-import polyhedra.common.poly.FaceKind
-import polyhedra.common.poly.VertexKind
-import polyhedra.js.catalog.Drop
-import polyhedra.js.catalog.Transform
-import polyhedra.js.main.ControlPane
-import polyhedra.js.main.Popup
-import polyhedra.js.poly.PolyParams
+import polyhedra.model.poly.EdgeKind
+import polyhedra.model.poly.FaceKind
+import polyhedra.model.poly.VertexKind
+import polyhedra.web.catalog.Drop
+import polyhedra.web.catalog.Transform
+import polyhedra.web.main.ControlPane
+import polyhedra.web.main.Popup
+import polyhedra.web.poly.PolyParams
 import kotlin.js.Promise
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest

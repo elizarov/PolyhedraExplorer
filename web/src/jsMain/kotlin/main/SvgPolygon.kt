@@ -2,14 +2,14 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.js.main
+package polyhedra.web.main
 
 import androidx.compose.runtime.Composable
 import org.jetbrains.compose.web.dom.Span
-import polyhedra.common.poly.PolygonProjection
-import polyhedra.common.util.fmt
-import polyhedra.js.util.Color
-import polyhedra.js.util.toRgbString
+import polyhedra.model.poly.PolygonProjection
+import polyhedra.model.util.fmt
+import polyhedra.web.util.Color
+import polyhedra.web.util.toRgbString
 
 @Composable
 fun SvgPolygon(classes: String, figure: PolygonProjection, stroke: Color, fill: Color) {

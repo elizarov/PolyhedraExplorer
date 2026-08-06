@@ -1,9 +1,12 @@
+package polyhedra.core
+
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
-import polyhedra.common.poly.fev
-import polyhedra.common.transform.isCanonical
+import polyhedra.model.poly.fev
+import polyhedra.core.transform.isCanonical
 import polyhedra.core.api.*
+import polyhedra.model.api.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

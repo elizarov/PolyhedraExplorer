@@ -1,6 +1,6 @@
-package polyhedra.js.poly
+package polyhedra.web
 
-import polyhedra.common.util.*
+import polyhedra.model.util.*
 import kotlin.math.abs
 import kotlin.math.roundToLong
 

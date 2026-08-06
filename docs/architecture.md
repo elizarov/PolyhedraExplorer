@@ -9,6 +9,20 @@
 | `web` | JS | Compose HTML controls, URL parameter state, animation interpolation, inspection/export UI, and the WebGL renderer. It consumes completed meshes and metadata; it does not invoke manipulation transforms. |
 | `benchmarks` | JS, WasmGC | Identical production benchmark workloads over the core algorithms. |
 
+## Source layout and package names
+
+Kotlin sources use a compact directory layout. Every package starts with `polyhedra.<module>`, followed by the source file's relative directory beneath the source set's `kotlin` directory. The source-set name is not part of the package.
+
+| Source path | Package |
+| --- | --- |
+| `model/src/commonMain/kotlin/poly/Polyhedron.kt` | `polyhedra.model.poly` |
+| `core/src/commonMain/kotlin/api/CoreApi.kt` | `polyhedra.core.api` |
+| `core/src/jsMain/kotlin/util/RunSynchronously.kt` | `polyhedra.core.util` |
+| `web/src/jsMain/kotlin/main/RootPane.kt` | `polyhedra.web.main` |
+| `benchmarks/src/commonMain/kotlin/BenchmarkMain.kt` | `polyhedra.benchmarks` |
+
+A file directly under a source set's `kotlin` directory uses the module root package, such as `polyhedra.core` or `polyhedra.web`. Do not duplicate the namespace as physical `polyhedra/<module>` directories and do not use `package-info.kt` marker files. Imports across module and subpackage boundaries must name the owning package explicitly.
+
 ## Browser runtime
 
 ```mermaid

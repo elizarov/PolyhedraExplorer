@@ -1,4 +1,4 @@
-package polyhedra.js.main
+package polyhedra.web
 
 import androidx.compose.runtime.Composition
 import kotlinx.browser.document
@@ -6,8 +6,9 @@ import kotlinx.browser.window
 import org.jetbrains.compose.web.renderComposable
 import org.w3c.dom.HTMLDivElement
 import org.w3c.dom.HTMLElement
-import polyhedra.common.poly.FaceKind
-import polyhedra.js.params.SetParam
+import polyhedra.model.poly.FaceKind
+import polyhedra.web.main.*
+import polyhedra.web.params.SetParam
 import kotlin.js.Promise
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest

@@ -2,10 +2,11 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.common.transform
+package polyhedra.core.transform
 
-import polyhedra.common.poly.*
-import polyhedra.common.util.*
+import polyhedra.core.poly.*
+import polyhedra.model.poly.*
+import polyhedra.model.util.*
 
 enum class ChamferAngle {
     // chamfer normally to the plane that goes through edge and origin

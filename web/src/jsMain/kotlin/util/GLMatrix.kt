@@ -4,7 +4,7 @@
 
 @file:JsModule("gl-matrix")
 @file:JsNonModule
-package polyhedra.js.util
+package polyhedra.web.util
 
 import org.khronos.webgl.*
 

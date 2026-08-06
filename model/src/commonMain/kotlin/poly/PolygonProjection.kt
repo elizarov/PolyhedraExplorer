@@ -2,9 +2,9 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.common.poly
+package polyhedra.model.poly
 
-import polyhedra.common.util.*
+import polyhedra.model.util.*
 
 class PolygonProjection(
     val vs: List<Vec3>

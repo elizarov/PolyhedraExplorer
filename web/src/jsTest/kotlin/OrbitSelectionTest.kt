@@ -1,4 +1,4 @@
-package polyhedra.js.main
+package polyhedra.web
 
 import androidx.compose.runtime.Composition
 import kotlinx.browser.document
@@ -11,8 +11,9 @@ import org.jetbrains.compose.web.renderComposable
 import org.w3c.dom.HTMLDivElement
 import org.w3c.dom.HTMLElement
 import org.w3c.dom.events.MouseEvent
-import polyhedra.common.poly.*
-import polyhedra.js.params.TransientParam
+import polyhedra.model.poly.*
+import polyhedra.web.main.*
+import polyhedra.web.params.TransientParam
 import kotlin.js.Promise
 import kotlin.test.*
 

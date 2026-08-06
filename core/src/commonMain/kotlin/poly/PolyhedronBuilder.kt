@@ -1,6 +1,7 @@
-package polyhedra.common.poly
+package polyhedra.core.poly
 
-import polyhedra.common.util.*
+import polyhedra.model.poly.*
+import polyhedra.model.util.*
 
 private const val DEBUG_MERGE_KINDS = false
 

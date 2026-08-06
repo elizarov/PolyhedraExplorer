@@ -2,11 +2,11 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.js.poly
+package polyhedra.web.poly
 
 import org.w3c.dom.*
-import polyhedra.js.glsl.*
-import polyhedra.js.params.*
+import polyhedra.web.glsl.*
+import polyhedra.web.params.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
 class DrawContext(

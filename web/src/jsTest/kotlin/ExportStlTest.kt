@@ -1,4 +1,4 @@
-package polyhedra.js.poly
+package polyhedra.web
 
 import kotlinx.browser.document
 import kotlinx.coroutines.MainScope
@@ -6,10 +6,11 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.promise
 import org.khronos.webgl.WebGLRenderingContext
 import org.w3c.dom.HTMLCanvasElement
-import polyhedra.common.poly.FaceKind
-import polyhedra.core.api.CoreRequest
-import polyhedra.core.api.CoreState
 import polyhedra.core.api.evaluateCore
+import polyhedra.model.poly.FaceKind
+import polyhedra.model.api.CoreRequest
+import polyhedra.model.api.CoreState
+import polyhedra.web.poly.*
 import kotlin.js.Promise
 import kotlin.test.AfterTest
 import kotlin.test.Test

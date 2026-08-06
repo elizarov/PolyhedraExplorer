@@ -2,10 +2,10 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.js.params
+package polyhedra.web.params
 
 import kotlinx.browser.*
-import polyhedra.js.util.*
+import polyhedra.web.util.*
 
 private const val MAX_DT = 0.05 // 20 fps min
 

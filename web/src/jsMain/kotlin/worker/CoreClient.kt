@@ -1,13 +1,13 @@
-package polyhedra.js.worker
+package polyhedra.web.worker
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import org.w3c.dom.MessageEvent
 import org.w3c.dom.Worker
-import polyhedra.core.api.CoreJson
-import polyhedra.core.api.CoreRequest
-import polyhedra.core.api.CoreResponse
+import polyhedra.model.api.CoreJson
+import polyhedra.model.api.CoreRequest
+import polyhedra.model.api.CoreResponse
 
 private const val CORE_WORKER_URL = "./core-worker.js"
 private const val PROGRESS = "progress"

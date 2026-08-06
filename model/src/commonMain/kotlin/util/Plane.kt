@@ -2,9 +2,9 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.common.util
+package polyhedra.model.util
 
-import polyhedra.common.poly.*
+import polyhedra.model.poly.*
 
 interface Plane : Vec3 {
     val d: Double

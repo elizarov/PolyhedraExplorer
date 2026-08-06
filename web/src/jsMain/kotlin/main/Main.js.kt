@@ -2,16 +2,16 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.js.main
+package polyhedra.web.main
 
 import kotlinx.browser.window
 import org.jetbrains.compose.web.renderComposable
-import polyhedra.js.params.AnimationTracker
-import polyhedra.js.params.Param
-import polyhedra.js.params.loadFromString
-import polyhedra.js.poly.ExportParams
-import polyhedra.js.poly.RenderParams
-import polyhedra.js.poly.ViewAnimationParams
+import polyhedra.web.params.AnimationTracker
+import polyhedra.web.params.Param
+import polyhedra.web.params.loadFromString
+import polyhedra.web.poly.ExportParams
+import polyhedra.web.poly.RenderParams
+import polyhedra.web.poly.ViewAnimationParams
 
 private const val historyPushThrottle = 500
 

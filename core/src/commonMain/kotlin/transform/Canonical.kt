@@ -2,11 +2,13 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.common.transform
+package polyhedra.core.transform
 
 import kotlinx.coroutines.yield
-import polyhedra.common.poly.*
-import polyhedra.common.util.*
+import polyhedra.core.poly.*
+import polyhedra.core.util.*
+import polyhedra.model.poly.*
+import polyhedra.model.util.*
 import kotlin.math.abs
 import kotlin.math.log10
 import kotlin.math.max

@@ -2,6 +2,8 @@ package polyhedra.core.api
 
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
+import polyhedra.model.api.CoreJson
+import polyhedra.model.api.CoreRequest
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.ExperimentalWasmJsInterop
 import kotlin.js.JsExport

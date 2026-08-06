@@ -2,12 +2,12 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.common.poly
+package polyhedra.model.poly
 
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.*
-import polyhedra.common.util.*
+import polyhedra.model.util.*
 
 class PolyhedronSerializer : KSerializer<Polyhedron> {
     private val serializer = SerializedPolyhedron.serializer()

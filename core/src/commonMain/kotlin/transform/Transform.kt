@@ -2,11 +2,12 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.common.transform
+package polyhedra.core.transform
 
 import kotlinx.serialization.*
-import polyhedra.common.poly.*
-import polyhedra.common.util.*
+import polyhedra.core.util.OperationProgressContext
+import polyhedra.model.poly.*
+import polyhedra.model.util.*
 import kotlin.reflect.*
 
 val Transforms: List<Transform>

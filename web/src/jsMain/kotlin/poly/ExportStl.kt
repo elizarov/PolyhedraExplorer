@@ -1,7 +1,7 @@
-package polyhedra.js.poly
+package polyhedra.web.poly
 
-import polyhedra.common.poly.*
-import polyhedra.common.util.*
+import polyhedra.model.poly.*
+import polyhedra.model.util.*
 import kotlin.math.*
 
 private const val STL_PRECISION = 4

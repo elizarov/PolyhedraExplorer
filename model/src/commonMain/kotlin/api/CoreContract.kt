@@ -1,9 +1,9 @@
-package polyhedra.core.api
+package polyhedra.model.api
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import polyhedra.common.poly.FEV
-import polyhedra.common.poly.Polyhedron
+import polyhedra.model.poly.FEV
+import polyhedra.model.poly.Polyhedron
 
 @Serializable
 data class CoreState(

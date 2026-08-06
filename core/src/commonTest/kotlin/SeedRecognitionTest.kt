@@ -1,9 +1,11 @@
-import polyhedra.common.poly.Icosahedron
-import polyhedra.common.poly.Seed
-import polyhedra.common.poly.Seeds
-import polyhedra.common.poly.TruncatedIcosahedron
-import polyhedra.common.poly.recognizedSeedOrNull
-import polyhedra.common.transform.truncated
+package polyhedra.core
+
+import polyhedra.core.poly.Icosahedron
+import polyhedra.core.poly.Seed
+import polyhedra.core.poly.Seeds
+import polyhedra.core.poly.TruncatedIcosahedron
+import polyhedra.core.poly.recognizedSeedOrNull
+import polyhedra.core.transform.truncated
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

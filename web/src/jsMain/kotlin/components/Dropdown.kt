@@ -2,7 +2,7 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.js.components
+package polyhedra.web.components
 
 import androidx.compose.runtime.Composable
 import org.jetbrains.compose.web.attributes.disabled

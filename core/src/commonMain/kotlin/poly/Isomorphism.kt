@@ -2,9 +2,11 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.common.poly
+package polyhedra.core.poly
 
-import polyhedra.common.util.*
+import polyhedra.core.util.TreeMap
+import polyhedra.model.poly.*
+import polyhedra.model.util.*
 
 class EdgeEquivalenceClass(e: Edge) : Comparable<EdgeEquivalenceClass> {
     val pa = e.a.computeProjectionFigureAt(e.r)

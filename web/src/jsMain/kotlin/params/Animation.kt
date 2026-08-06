@@ -2,9 +2,9 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
-package polyhedra.js.params
+package polyhedra.web.params
 
-import polyhedra.common.util.*
+import polyhedra.model.util.*
 
 abstract class ValueUpdateAnimation<T : Any, P : AnimatedValueParam<T, P>>(
     protected val param: P,

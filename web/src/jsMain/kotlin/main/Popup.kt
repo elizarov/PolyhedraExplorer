@@ -1,4 +1,4 @@
-package polyhedra.js.main
+package polyhedra.web.main
 
 sealed class Popup {
     object Config : Popup()

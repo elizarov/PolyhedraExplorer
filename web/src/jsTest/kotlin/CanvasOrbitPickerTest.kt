@@ -1,7 +1,9 @@
-package polyhedra.js.poly
+package polyhedra.web
 
-import polyhedra.common.poly.*
-import polyhedra.common.util.Vec3
+import polyhedra.core.poly.*
+import polyhedra.model.poly.*
+import polyhedra.model.util.Vec3
+import polyhedra.web.poly.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

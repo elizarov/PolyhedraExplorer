@@ -1,15 +1,15 @@
-package polyhedra.js.main
+package polyhedra.web.main
 
 import androidx.compose.runtime.Composable
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.dom.*
-import polyhedra.common.util.updatedAt
-import polyhedra.core.api.TransformPrefixReplacement
-import polyhedra.core.api.findTransformPrefixReplacement
-import polyhedra.js.catalog.*
-import polyhedra.js.components.observe
-import polyhedra.js.params.Param
-import polyhedra.js.poly.*
+import polyhedra.model.util.updatedAt
+import polyhedra.model.api.TransformPrefixReplacement
+import polyhedra.model.api.findTransformPrefixReplacement
+import polyhedra.web.catalog.*
+import polyhedra.web.components.observe
+import polyhedra.web.params.Param
+import polyhedra.web.poly.*
 
 @Composable
 fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit) {
