@@ -2,6 +2,7 @@
  * Copyright 2021 Roman Elizarov. Use of this source code is governed by the Apache 2.0 license.
  */
 
+import kotlinx.coroutines.test.runTest
 import polyhedra.common.poly.*
 import polyhedra.common.transform.*
 
@@ -119,19 +120,19 @@ class ValidatePolyhedra {
     }
 
     @Test
-    fun validateTransformedCanonical() {
+    fun validateTransformedCanonical() = runTest {
         // Note: It fails on Chamfered Triakis icosahedron, so here we test only platonic & arhimedean seeds
         val seedsToTest = Seeds.filter { it.type == SeedType.Platonic || it.type == SeedType.Archimedean }
-        testParameter("seed", seedsToTest) { seed ->
-            seed.poly.canonical().validate()
-            testParameter("transform", expandingTransforms) next@{ transform ->
+        testSuspendParameter("seed", seedsToTest) { seed ->
+            seed.poly.canonical(null).validate()
+            testSuspendParameter("transform", expandingTransforms) next@{ transform ->
                 val transformed = seed.poly.transformed(transform)
                 if (transformed.isCanonical()) return@next
                 try {
                     transformed.validate()
                 } catch (e: Exception) { return@next }
                 println("Checking Canonical $transform $seed, ${transformed.fev()}")
-                transformed.canonical().validate()
+                transformed.canonical(null).validate()
             }
         }
         println("Total iterations $totalIterations")

@@ -1,8 +1,8 @@
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import polyhedra.common.poly.fev
 import polyhedra.common.transform.isCanonical
-import polyhedra.common.util.runSynchronously
 import polyhedra.core.api.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -12,178 +12,158 @@ import kotlin.test.assertTrue
 
 class CoreApiTest {
     @Test
-    fun evaluatesCompleteTransformPipeline() {
-        runSynchronously {
-            val response = evaluateCore(
-                CoreRequest(
-                    state = CoreState("C", listOf("t"), "c"),
-                )
+    fun evaluatesCompleteTransformPipeline() = runTest {
+        val response = evaluateCore(
+            CoreRequest(
+                state = CoreState("C", listOf("t"), "c"),
             )
+        )
 
-            assertEquals(14, response.poly.fs.size)
-            assertEquals(36, response.poly.es.size)
-            assertEquals(24, response.poly.vs.size)
-            assertEquals(listOf("t"), response.validTransformTags)
-            assertEquals(2, response.availableDrops.size)
-            assertEquals(null, response.error)
-        }
+        assertEquals(14, response.poly.fs.size)
+        assertEquals(36, response.poly.es.size)
+        assertEquals(24, response.poly.vs.size)
+        assertEquals(listOf("t"), response.validTransformTags)
+        assertEquals(2, response.availableDrops.size)
+        assertEquals(null, response.error)
     }
 
     @Test
-    fun recognizesTransformedPolyhedronAsCatalogSeed() {
-        runSynchronously {
+    fun recognizesTransformedPolyhedronAsCatalogSeed() = runTest {
+        val response = evaluateCore(
+            CoreRequest(
+                state = CoreState("I", listOf("t"), "c"),
+                detectSeed = true,
+            )
+        )
+
+        assertEquals("tI", response.recognizedSeedTag)
+        assertEquals("Truncated Icosahedron", response.polyName)
+    }
+
+    @Test
+    fun recognizesCatalogSeedReachedThroughEquivalentConstruction() = runTest {
+        val response = evaluateCore(
+            CoreRequest(
+                state = CoreState("O", listOf("a"), "c"),
+                detectSeed = true,
+            )
+        )
+
+        assertEquals("aC", response.recognizedSeedTag)
+    }
+
+    @Test
+    fun suggestsSnubDodecahedronForDualPentagonalHexecontahedron() = runTest {
+        val response = evaluateCore(
+            CoreRequest(
+                state = CoreState("dsD", listOf("d"), "c"),
+                detectSeed = true,
+            )
+        )
+
+        assertEquals("sD", response.recognizedSeedTag)
+    }
+
+    @Test
+    fun recognizesProperChiralityOfPentagonalHexecontahedronFromDualSnubIcosahedron() = runTest {
+        val response = evaluateCore(
+            CoreRequest(
+                state = CoreState("I", listOf("s", "d"), "c"),
+                detectSeed = true,
+            )
+        )
+
+        assertEquals("dsD'", response.recognizedSeedTag)
+
+        val flippedResponse = evaluateCore(
+            CoreRequest(
+                state = CoreState("I", listOf("s'", "d"), "c"),
+                detectSeed = true,
+            )
+        )
+        assertEquals("dsD", flippedResponse.recognizedSeedTag)
+    }
+
+    @Test
+    fun recognizesFlippedSnubTransformsAsFlippedCatalogSeeds() = runTest {
+        for ((seedTag, recognizedSeedTag, polyName) in listOf(
+            Triple("C", "sC'", "Snub' Cube"),
+            Triple("D", "sD'", "Snub' Dodecahedron"),
+        )) {
             val response = evaluateCore(
                 CoreRequest(
-                    state = CoreState("I", listOf("t"), "c"),
+                    state = CoreState(seedTag, listOf("s'"), "c"),
                     detectSeed = true,
                 )
             )
 
-            assertEquals("tI", response.recognizedSeedTag)
-            assertEquals("Truncated Icosahedron", response.polyName)
+            assertEquals(recognizedSeedTag, response.recognizedSeedTag)
+            assertEquals(polyName, response.polyName)
+            assertEquals(listOf("s'"), response.validTransformTags)
+            assertNull(response.error)
         }
     }
 
     @Test
-    fun recognizesCatalogSeedReachedThroughEquivalentConstruction() {
-        runSynchronously {
-            val response = evaluateCore(
-                CoreRequest(
-                    state = CoreState("O", listOf("a"), "c"),
-                    detectSeed = true,
-                )
+    fun skipsCatalogDetectionUnlessExplicitlyRequested() = runTest {
+        val response = evaluateCore(
+            CoreRequest(
+                state = CoreState("I", listOf("t"), "c"),
+                detectSeed = false,
             )
+        )
 
-            assertEquals("aC", response.recognizedSeedTag)
-        }
+        assertEquals(null, response.recognizedSeedTag)
     }
 
     @Test
-    fun suggestsSnubDodecahedronForDualPentagonalHexecontahedron() {
-        runSynchronously {
-            val response = evaluateCore(
-                CoreRequest(
-                    state = CoreState("dsD", listOf("d"), "c"),
-                    detectSeed = true,
-                )
+    fun producesTopologyAnimationInsideCore() = runTest {
+        val response = evaluateCore(
+            CoreRequest(
+                state = CoreState("T", listOf("t"), "c"),
+                previousState = CoreState("T", emptyList(), "c"),
+                animationDuration = 0.5,
             )
+        )
 
-            assertEquals("sD", response.recognizedSeedTag)
-        }
+        val animation = response.animation.single()
+        assertEquals(0.5, animation.duration)
+        assertTrue(animation.previousFraction <= 0.001)
+        assertTrue(animation.targetFraction >= 0.999)
     }
 
     @Test
-    fun recognizesProperChiralityOfPentagonalHexecontahedronFromDualSnubIcosahedron() {
-        runSynchronously {
-            val response = evaluateCore(
-                CoreRequest(
-                    state = CoreState("I", listOf("s", "d"), "c"),
-                    detectSeed = true,
+    fun responseRoundTripsAcrossJsonBoundary() = runTest {
+        val response = evaluateCore(CoreRequest(CoreState("O", listOf("d"), "m")))
+        val encoded = CoreJson.encodeToString(response)
+        val decoded = CoreJson.decodeFromString<CoreResponse>(encoded)
+
+        assertEquals(response.polyName, decoded.polyName)
+        assertEquals(response.poly.fev(), decoded.poly.fev())
+        assertNotNull(decoded.poly)
+    }
+
+    @Test
+    fun evaluatesCantellateChamferSnubCanonicalChain() = runTest {
+        val progress = mutableListOf<Int>()
+        val response = evaluateCore(
+            CoreRequest(
+                CoreState(
+                    seedTag = "tC",
+                    transformTags = listOf("e", "c", "s", "o"),
+                    scaleTag = "c",
                 )
-            )
+            ),
+            progress::add,
+        )
 
-            assertEquals("dsD'", response.recognizedSeedTag)
-
-            val flippedResponse = evaluateCore(
-                CoreRequest(
-                    state = CoreState("I", listOf("s'", "d"), "c"),
-                    detectSeed = true,
-                )
-            )
-            assertEquals("dsD", flippedResponse.recognizedSeedTag)
-        }
-    }
-
-    @Test
-    fun recognizesFlippedSnubTransformsAsFlippedCatalogSeeds() {
-        runSynchronously {
-            for ((seedTag, recognizedSeedTag, polyName) in listOf(
-                Triple("C", "sC'", "Snub' Cube"),
-                Triple("D", "sD'", "Snub' Dodecahedron"),
-            )) {
-                val response = evaluateCore(
-                    CoreRequest(
-                        state = CoreState(seedTag, listOf("s'"), "c"),
-                        detectSeed = true,
-                    )
-                )
-
-                assertEquals(recognizedSeedTag, response.recognizedSeedTag)
-                assertEquals(polyName, response.polyName)
-                assertEquals(listOf("s'"), response.validTransformTags)
-                assertNull(response.error)
-            }
-        }
-    }
-
-    @Test
-    fun skipsCatalogDetectionUnlessExplicitlyRequested() {
-        runSynchronously {
-            val response = evaluateCore(
-                CoreRequest(
-                    state = CoreState("I", listOf("t"), "c"),
-                    detectSeed = false,
-                )
-            )
-
-            assertEquals(null, response.recognizedSeedTag)
-        }
-    }
-
-    @Test
-    fun producesTopologyAnimationInsideCore() {
-        runSynchronously {
-            val response = evaluateCore(
-                CoreRequest(
-                    state = CoreState("T", listOf("t"), "c"),
-                    previousState = CoreState("T", emptyList(), "c"),
-                    animationDuration = 0.5,
-                )
-            )
-
-            val animation = response.animation.single()
-            assertEquals(0.5, animation.duration)
-            assertTrue(animation.previousFraction <= 0.001)
-            assertTrue(animation.targetFraction >= 0.999)
-        }
-    }
-
-    @Test
-    fun responseRoundTripsAcrossJsonBoundary() {
-        runSynchronously {
-            val response = evaluateCore(CoreRequest(CoreState("O", listOf("d"), "m")))
-            val encoded = CoreJson.encodeToString(response)
-            val decoded = CoreJson.decodeFromString<CoreResponse>(encoded)
-
-            assertEquals(response.polyName, decoded.polyName)
-            assertEquals(response.poly.fev(), decoded.poly.fev())
-            assertNotNull(decoded.poly)
-        }
-    }
-
-    @Test
-    fun evaluatesCantellateChamferSnubCanonicalChain() {
-        runSynchronously {
-            val progress = mutableListOf<Int>()
-            val response = evaluateCore(
-                CoreRequest(
-                    CoreState(
-                        seedTag = "tC",
-                        transformTags = listOf("e", "c", "s", "o"),
-                        scaleTag = "c",
-                    )
-                ),
-                progress::add,
-            )
-
-            assertEquals(null, response.error, "The complete transform chain must succeed")
-            assertEquals(listOf("e", "c", "s", "o"), response.validTransformTags)
-            assertEquals(1730, response.poly.fs.size)
-            assertEquals(2880, response.poly.es.size)
-            assertEquals(1152, response.poly.vs.size)
-            assertTrue(response.poly.isCanonical(), "The output must satisfy the canonical representation invariants")
-            assertTrue(progress.zipWithNext().all { (previous, next) -> next >= previous })
-            assertEquals(100, progress.last())
-        }
+        assertEquals(null, response.error, "The complete transform chain must succeed")
+        assertEquals(listOf("e", "c", "s", "o"), response.validTransformTags)
+        assertEquals(1730, response.poly.fs.size)
+        assertEquals(2880, response.poly.es.size)
+        assertEquals(1152, response.poly.vs.size)
+        assertTrue(response.poly.isCanonical(), "The output must satisfy the canonical representation invariants")
+        assertTrue(progress.zipWithNext().all { (previous, next) -> next >= previous })
+        assertEquals(100, progress.last())
     }
 }

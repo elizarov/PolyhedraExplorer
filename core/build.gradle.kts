@@ -8,7 +8,13 @@ kotlin {
         compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
     js {
-        nodejs()
+        nodejs {
+            testTask {
+                useMocha {
+                    timeout = "30s"
+                }
+            }
+        }
     }
     @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
     wasmJs {
@@ -27,6 +33,15 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
         }
     }
+}
+
+tasks.named<org.jetbrains.kotlin.gradle.targets.js.ir.KotlinJsIrLink>(
+    "compileTestDevelopmentExecutableKotlinWasmJs"
+) {
+    // Kotlin 2.4.10's incremental Wasm linker intermittently loses stdlib declarations
+    // while linking this multi-platform test executable.
+    incrementalWasm = false
 }

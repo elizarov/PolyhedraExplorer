@@ -21,6 +21,9 @@ Gradle manages the Node.js runtime used by Kotlin JS/Wasm tasks. No global Node 
 # Compile and run JVM tests
 ./gradlew :core:jvmTest
 
+# Run the core tests through both WasmGC Node and browser runners
+./gradlew :core:wasmJsTest
+
 # Assemble a local browser artifact
 ./gradlew browserDevelopmentDistribution
 
@@ -52,5 +55,7 @@ docs/                      live specification
 ```
 
 Build development and production distributions separately. Kotlin/JS uses a shared package directory for those webpack modes, so asking Gradle to execute both webpack tasks in one invocation is unsupported.
+
+Core tests that call suspending algorithms use `kotlinx-coroutines-test`, so the same test bodies run on JVM, JS, and Wasm without a synchronous Wasm bridge. The exhaustive browser geometry tests use a 30-second Mocha limit. Incremental Wasm linking is disabled only for the core test executable as a workaround for a Kotlin 2.4.10 linker failure; application executables retain incremental linking.
 
 When behavior or structure changes, update the relevant live-spec file. Performance changes must rerun both production benchmark targets and replace the current results in `performance.md`.

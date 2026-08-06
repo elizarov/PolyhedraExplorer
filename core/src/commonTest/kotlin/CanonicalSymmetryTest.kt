@@ -1,3 +1,4 @@
+import kotlinx.coroutines.test.runTest
 import polyhedra.common.poly.Cube
 import polyhedra.common.poly.Polyhedron
 import polyhedra.common.poly.Seed
@@ -44,7 +45,7 @@ class CanonicalSymmetryTest {
     }
 
     @Test
-    fun symmetricPackingRunsOnOrbitQuotient() {
+    fun symmetricPackingRunsOnOrbitQuotient() = runTest {
         val poly = Seed.Cube.poly.truncated(0.2)
         val stats = poly.canonicalOrbitStats()
 
@@ -52,11 +53,11 @@ class CanonicalSymmetryTest {
         assertEquals(poly.vertexKinds.size + poly.faceKinds.size, stats.faceOrbits)
         assertTrue(stats.pointOrbits < stats.points, stats.toString())
         assertTrue(stats.faceOrbits < stats.faces, stats.toString())
-        assertTrue(poly.canonical().isCanonical())
+        assertTrue(poly.canonical(null).isCanonical())
     }
 
     @Test
-    fun invalidGeometricOrbitIsSplitBeforeSolving() {
+    fun invalidGeometricOrbitIsSplitBeforeSolving() = runTest {
         val symmetric = Seed.Cube.poly.truncated(0.2)
         val perturbed = perturbFirstVertex(symmetric)
         val symmetricStats = symmetric.canonicalOrbitStats()
@@ -64,7 +65,7 @@ class CanonicalSymmetryTest {
 
         assertTrue(perturbedStats.pointOrbits > symmetricStats.pointOrbits)
         assertTrue(perturbedStats.faceOrbits > symmetricStats.faceOrbits)
-        assertTrue(perturbed.canonical().isCanonical())
+        assertTrue(perturbed.canonical(null).isCanonical())
     }
 
     private fun perturbFirstVertex(poly: Polyhedron): Polyhedron = polyhedron {
