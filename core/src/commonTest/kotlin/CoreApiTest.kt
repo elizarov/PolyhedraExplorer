@@ -26,7 +26,7 @@ class CoreApiTest {
         assertEquals(36, response.poly.es.size)
         assertEquals(24, response.poly.vs.size)
         assertEquals(listOf("t"), response.validTransformTags)
-        assertEquals(2, response.availableDrops.size)
+        assertEquals(2, response.availableOrbitTransforms.size)
         assertEquals(null, response.error)
     }
 

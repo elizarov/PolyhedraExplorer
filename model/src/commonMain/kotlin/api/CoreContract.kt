@@ -52,7 +52,7 @@ data class CoreResponse(
     val recognizedSeedTag: String? = null,
     val transformedPolys: List<Polyhedron>,
     val validTransformTags: List<String>,
-    val availableDrops: List<List<String>>,
+    val availableOrbitTransforms: List<List<String>>,
     val warnings: List<CoreIssue?>,
     val errorIndex: Int? = null,
     val error: CoreIssue? = null,

@@ -126,10 +126,15 @@ enum class TransformCategory(private val displayName: String) {
     override fun toString(): String = displayName
 }
 
-enum class DropTarget(val optionName: String) {
-    Face("Drop face"),
-    Edge("Drop edge"),
-    Vertex("Drop vertex"),
+enum class OrbitTargetedOperation(val optionName: String) {
+    DropFace("Drop face"),
+    KisFace("Kis face"),
+    DropEdge("Drop edge"),
+    DropVertex("Drop vertex"),
+    TruncateVertex("Truncate vertex");
+
+    val isDrop: Boolean
+        get() = this == DropFace || this == DropEdge || this == DropVertex
 }
 
 val PrimitiveTransforms: List<Transform> = listOf(
@@ -170,25 +175,49 @@ fun Transform.flippedChirality(): Transform {
 }
 
 private const val DROP_TAG = "x"
+private const val KIS_FACE_TAG = "k"
+private const val TRUNCATE_VERTEX_TAG = "t"
 
 fun Drop(kind: AnyKind): Transform =
     Transform("$DROP_TAG[$kind]", "Drop $kind", TransformCategory.OrbitTargeted)
 
-fun AnyKind.dropTarget(): DropTarget = when (this) {
-    is EdgeKind -> DropTarget.Edge
-    is VertexKind -> DropTarget.Vertex
-    is FaceKind -> DropTarget.Face
-    else -> error("Unsupported drop target: $this")
-}
+fun KisFace(kind: FaceKind): Transform =
+    Transform("$KIS_FACE_TAG[$kind]", "Kis $kind", TransformCategory.OrbitTargeted)
 
-fun Transform.dropKindOrNull(): AnyKind? {
-    if (!baseTag.startsWith("$DROP_TAG[") || !baseTag.endsWith("]")) return null
-    return baseTag.substring(DROP_TAG.length + 1, baseTag.length - 1).toAnyKindOrNull()
+fun TruncateVertex(kind: VertexKind): Transform =
+    Transform("$TRUNCATE_VERTEX_TAG[$kind]", "Truncate $kind", TransformCategory.OrbitTargeted)
+
+data class OrbitTarget(
+    val operation: OrbitTargetedOperation,
+    val kind: AnyKind,
+)
+
+fun Transform.orbitTargetOrNull(): OrbitTarget? {
+    if (!baseTag.endsWith("]")) return null
+    val bracket = baseTag.indexOf('[')
+    if (bracket <= 0) return null
+    val prefix = baseTag.substring(0, bracket)
+    val kind = baseTag.substring(bracket + 1, baseTag.length - 1).toAnyKindOrNull() ?: return null
+    val operation = when {
+        prefix == DROP_TAG && kind is FaceKind -> OrbitTargetedOperation.DropFace
+        prefix == KIS_FACE_TAG && kind is FaceKind -> OrbitTargetedOperation.KisFace
+        prefix == DROP_TAG && kind is EdgeKind -> OrbitTargetedOperation.DropEdge
+        prefix == DROP_TAG && kind is VertexKind -> OrbitTargetedOperation.DropVertex
+        prefix == TRUNCATE_VERTEX_TAG && kind is VertexKind -> OrbitTargetedOperation.TruncateVertex
+        else -> return null
+    }
+    return OrbitTarget(operation, kind)
 }
 
 fun String.toTransformOrNull(): Transform? {
     Transforms.firstOrNull { it.tag == this }?.let { return it }
-    if (!startsWith("$DROP_TAG[") || !endsWith("]")) return null
-    val kind = substring(DROP_TAG.length + 1, length - 1).toAnyKindOrNull() ?: return null
-    return Drop(kind)
+    val placeholder = Transform(this, "", TransformCategory.OrbitTargeted)
+    val target = placeholder.orbitTargetOrNull() ?: return null
+    return when (target.operation) {
+        OrbitTargetedOperation.DropFace,
+        OrbitTargetedOperation.DropEdge,
+        OrbitTargetedOperation.DropVertex -> Drop(target.kind)
+        OrbitTargetedOperation.KisFace -> KisFace(target.kind as FaceKind)
+        OrbitTargetedOperation.TruncateVertex -> TruncateVertex(target.kind as VertexKind)
+    }
 }

@@ -61,7 +61,7 @@ class PolyRecognitionTest {
             recognizedSeedTag = "sD'",
             transformedPolys = listOf(CoreSeed.SnubDodecahedron.poly),
             validTransformTags = listOf("d"),
-            availableDrops = emptyList(),
+            availableOrbitTransforms = emptyList(),
             warnings = listOf(null),
         )
         val params = PolyParams("", null)

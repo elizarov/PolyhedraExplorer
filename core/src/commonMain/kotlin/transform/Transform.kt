@@ -15,11 +15,7 @@ val Transforms: List<Transform>
 
 fun String.toTransformOrNull(): Transform? {
     Transforms.find { it.tag == this }?.let { return it }
-    if (startsWith("$DROP_TAG[") && endsWith("]")) {
-        val kind = substring(DROP_TAG.length + 1, length - 1).toAnyKindOrNull() ?: return null
-        return Drop(kind)
-    }
-    return null
+    return toOrbitTargetedTransformOrNull()
 }
 
 typealias AsyncTransform = suspend (poly: Polyhedron, progress: OperationProgressContext) -> Polyhedron

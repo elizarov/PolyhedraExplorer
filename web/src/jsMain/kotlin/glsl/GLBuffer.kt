@@ -20,10 +20,14 @@ fun createUint32Buffer(gl: GL): Uint32Buffer = Uint32Buffer(gl.createBuffer()!!)
 
 abstract class GLBuffer<T : GLType<T>, D : BufferDataSource>(
     val type: T,
-    val glBuffer: WebGLBuffer,
+    glBuffer: WebGLBuffer,
     initialData: D,
 ) {
+    var glBuffer: WebGLBuffer = glBuffer
+        private set
     var data: D = initialData
+    private var replaceGlBuffer = false
+    private var hasUploaded = false
 
     protected abstract val capacity: Int
     protected abstract fun allocate(capacity: Int): D
@@ -31,13 +35,24 @@ abstract class GLBuffer<T : GLType<T>, D : BufferDataSource>(
     fun ensureCapacity(length: Int) {
         val capacity = capacity
         val size = length * type.bufferSize
-        if (capacity < size) data = allocate(maxOf(size, capacity * 2))
+        if (capacity < size) {
+            // Vertex attribute pointers can retain stale allocation state when bufferData grows
+            // an existing WebGL buffer. Replace the GPU object together with its backing array.
+            data = allocate(size)
+            replaceGlBuffer = hasUploaded
+        }
     }
-}
 
-fun GLBuffer<*, *>.bindBufferData(gl: GL, target: Int = GL.ARRAY_BUFFER) {
-    gl.bindBuffer(target, glBuffer)
-    gl.bufferData(target, data, GL.STATIC_DRAW)
+    fun bindBufferData(gl: GL, target: Int = GL.ARRAY_BUFFER) {
+        if (replaceGlBuffer) {
+            gl.deleteBuffer(glBuffer)
+            glBuffer = requireNotNull(gl.createBuffer())
+            replaceGlBuffer = false
+        }
+        gl.bindBuffer(target, glBuffer)
+        gl.bufferData(target, data, GL.STATIC_DRAW)
+        hasUploaded = true
+    }
 }
 
 class Float32Buffer<T : GLType<T>>(type: T, glBuffer: WebGLBuffer) : GLBuffer<T, Float32Array>(

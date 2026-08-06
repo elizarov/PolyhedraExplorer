@@ -57,12 +57,17 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
     var transformedPolys: List<Polyhedron> = emptyList()
         private set
 
-    private var dropKinds: List<Set<AnyKind>> = emptyList()
+    private var orbitTransforms: List<Set<Transform>> = emptyList()
     val currentCanDrop: Set<AnyKind>
-        get() = dropKinds.getOrNull(transformedPolys.size).orEmpty()
+        get() = orbitTransforms.getOrNull(transformedPolys.size).orEmpty()
+            .mapNotNullTo(linkedSetOf()) { transform ->
+                transform.orbitTargetOrNull()
+                    ?.takeIf { it.operation.isDrop }
+                    ?.kind
+            }
 
-    fun availableDropsAt(transformIndex: Int): Set<AnyKind> =
-        dropKinds.getOrNull(transformIndex).orEmpty()
+    fun availableOrbitTransformsAt(transformIndex: Int): Set<Transform> =
+        orbitTransforms.getOrNull(transformIndex).orEmpty()
 
     private var requestId = 0
     private var coreStarted = false
@@ -153,7 +158,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         poly = response.poly
         polyName = response.polyName
         transformedPolys = response.transformedPolys
-        updateAvailableDrops(response.availableDrops)
+        updateAvailableOrbitTransforms(response.availableOrbitTransforms)
         transformWarnings = response.warnings.map { it?.toIndicatorMessage() }
         transformError = response.errorIndex?.let { index ->
             TransformError(index, response.error?.toIndicatorMessage())
@@ -165,9 +170,9 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         updateSuggestedSeed(state, response)
     }
 
-    internal fun updateAvailableDrops(availableDrops: List<List<String>>) {
-        dropKinds = availableDrops.map { tags ->
-            tags.mapNotNullTo(linkedSetOf(), String::toAnyKindOrNull)
+    internal fun updateAvailableOrbitTransforms(availableTransforms: List<List<String>>) {
+        orbitTransforms = availableTransforms.map { tags ->
+            tags.mapNotNullTo(linkedSetOf(), String::toTransformOrNull)
         }
     }
 

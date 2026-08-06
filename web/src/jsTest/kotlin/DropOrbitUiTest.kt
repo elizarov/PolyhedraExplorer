@@ -10,7 +10,10 @@ import polyhedra.model.poly.EdgeKind
 import polyhedra.model.poly.FaceKind
 import polyhedra.model.poly.VertexKind
 import polyhedra.web.catalog.Drop
+import polyhedra.web.catalog.KisFace
 import polyhedra.web.catalog.Transform
+import polyhedra.web.catalog.TruncateVertex
+import polyhedra.web.catalog.toTransformOrNull
 import polyhedra.web.main.ControlPane
 import polyhedra.web.main.Popup
 import polyhedra.web.poly.PolyParams
@@ -45,9 +48,28 @@ class DropOrbitUiTest {
     }
 
     @Test
+    fun concreteTargetedTagsRoundTripInTheBrowserModel() {
+        assertEquals(KisFace(faceAlpha), KisFace(faceAlpha).tag.toTransformOrNull())
+        assertEquals(TruncateVertex(vertexA), TruncateVertex(vertexA).tag.toTransformOrNull())
+    }
+
+    @Test
     fun addPopupGroupsConcreteDropsByOrbitKindAndAddsFirstTarget(): Promise<Unit> {
         val params = PolyParams("", null)
-        params.updateAvailableDrops(listOf(listOf(vertexB, faceAlpha, edge, vertexA).map(Any::toString)))
+        params.updateAvailableOrbitTransforms(
+            listOf(
+                listOf(
+                    Drop(vertexB),
+                    Drop(faceAlpha),
+                    Drop(edge),
+                    Drop(vertexA),
+                    KisFace(faceBeta),
+                    KisFace(faceAlpha),
+                    TruncateVertex(vertexB),
+                    TruncateVertex(vertexA),
+                ).map(Transform::tag),
+            ),
+        )
         composition = renderComposable(host) {
             ControlPane(params, popup = Popup.AddTransform, togglePopup = {})
         }
@@ -56,7 +78,13 @@ class DropOrbitUiTest {
             linkedMapOf(
                 "Transform" to listOf("Truncated", "Rectified", "Dual", "Snub", "Chamfered", "Canonical"),
                 "Macro" to listOf("Kis", "Join", "Needle", "Zip", "Cantellated", "Bevelled", "Ortho", "Meta", "Gyro"),
-                "Orbit-targeted" to listOf("Drop face", "Drop edge", "Drop vertex"),
+                "Orbit-targeted" to listOf(
+                    "Drop face",
+                    "Kis face",
+                    "Drop edge",
+                    "Drop vertex",
+                    "Truncate vertex",
+                ),
             ),
             dropdownOptionsBySection(),
         )
@@ -73,7 +101,9 @@ class DropOrbitUiTest {
     fun lastDropHasRightSideControlsThatCycleWithinItsOrbitKind(): Promise<Unit> {
         val params = PolyParams("", null)
         params.transforms.updateValue(listOf(Drop(vertexB)))
-        params.updateAvailableDrops(listOf(listOf(faceAlpha, vertexA, edge, vertexB).map(Any::toString)))
+        params.updateAvailableOrbitTransforms(
+            listOf(listOf(Drop(faceAlpha), Drop(vertexA), Drop(edge), Drop(vertexB)).map(Transform::tag)),
+        )
         composition = renderComposable(host) { ControlPane(params, popup = null, togglePopup = {}) }
 
         val name = transformNameElement()
@@ -94,15 +124,40 @@ class DropOrbitUiTest {
     fun orbitControlsAreOnlyShownWhenDropIsLast() {
         val params = PolyParams("", null)
         params.transforms.updateValue(listOf(Drop(vertexA), Transform.Dual))
-        params.updateAvailableDrops(
+        params.updateAvailableOrbitTransforms(
             listOf(
-                listOf(vertexA, vertexB).map(Any::toString),
+                listOf(Drop(vertexA), Drop(vertexB)).map(Transform::tag),
                 emptyList(),
             ),
         )
         composition = renderComposable(host) { ControlPane(params, popup = null, togglePopup = {}) }
 
         assertNull(host.querySelector(".drop-orbit-controls"))
+    }
+
+    @Test
+    fun kisFaceControlsCycleOnlyThroughFaceTargets(): Promise<Unit> {
+        val params = PolyParams("", null)
+        params.transforms.updateValue(listOf(KisFace(faceBeta)))
+        params.updateAvailableOrbitTransforms(
+            listOf(
+                listOf(
+                    Drop(faceAlpha),
+                    KisFace(faceAlpha),
+                    KisFace(faceBeta),
+                    TruncateVertex(vertexA),
+                ).map(Transform::tag),
+            ),
+        )
+        composition = renderComposable(host) { ControlPane(params, popup = null, togglePopup = {}) }
+
+        assertEquals("Kis $faceBeta", transformName())
+        (host.querySelector(".drop-orbit-next") as HTMLElement).click()
+        assertEquals(listOf(KisFace(faceAlpha)), params.transforms.value)
+
+        return awaitRecomposition().then {
+            assertEquals("Kis $faceAlpha", transformName())
+        }
     }
 
     private fun dropdownOptionsBySection(): Map<String, List<String>> {
@@ -135,7 +190,10 @@ class DropOrbitUiTest {
         val buttons = host.querySelectorAll(".ctrl-pane > .btn > button.txt")
         return (0 until buttons.length)
             .map { buttons.item(it) as HTMLElement }
-            .single { it.textContent.orEmpty().contains("Drop ") }
+            .single {
+                val text = it.textContent.orEmpty()
+                text.contains("Drop ") || text.contains("Kis ") || text.contains("Truncate ")
+            }
     }
 
     private fun transformName(): String = transformNameElement().textContent.orEmpty()

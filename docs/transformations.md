@@ -21,6 +21,8 @@ example, the project expansion `a -> t` is conventionally written `ta`.
 | Chamfered | Chamfer, edge chamfering | `c` | - | `F + E` | `4E` | `V + 2E` |
 | Canonical | Canonicalization | `o` | - | `F` | `E` | `V` |
 | Drop | Orbit deletion | `x[kind]` | - | input-dependent | input-dependent | input-dependent |
+| Kis face | Selective akisation | `k[face]` | - | input-dependent | input-dependent | input-dependent |
+| Truncate vertex | Selective vertex truncation | `t[vertex]` | - | input-dependent | input-dependent | input-dependent |
 | Kis | Akisation, Kleetope, cumulation, pyramid augmentation | `k` | `d -> t -> d` | `2E` | `3E` | `F + V` |
 | Join | Dual ambo | `j` | `d -> a -> d` | `E` | `2E` | `F + V` |
 | Needle | Dual truncation | `N` | `t -> d` | `2E` | `3E` | `F + V` |
@@ -95,13 +97,32 @@ otherwise become degenerate, verifies that the merged boundary is one valid face
 and rebuilds the remaining mesh. Because the selected orbit and necessary cleanup
 vary with the input, Drop has no single linear `F/E/V` formula.
 
-The transform popup presents valid Drop operations in a final `Orbit-targeted`
-section, collapsed to at most three choices. Available choices are displayed in
-standard F/E/V order: Drop face, Drop edge, then Drop vertex. Choosing one stores
-the first valid concrete target (`Drop A`, for example).
-When that Drop is the last chain item, the up/down controls to its right cycle
-through all valid targets of the same element family and wrap at both ends. The
-URL always retains the concrete `x[kind]` tag, so the selected orbit round-trips.
+### Kis face (`k[face]`)
+
+Kis face raises an apex over every face in one selected face orbit and replaces
+each selected `n`-gon with `n` triangles. Other face orbits retain their original
+topology. The apex and retained-vertex coordinates come from the same geometry
+construction as the full Kis macro; selecting every face orbit in the core
+operation is therefore exactly equivalent to Kis. The operation is offered only
+when the input has more than one face orbit and is displayed as `Kis α`, `Kis β`,
+and so on.
+
+### Truncate vertex (`t[vertex]`)
+
+Truncate vertex cuts off every vertex in one selected vertex orbit. Each selected
+vertex becomes a new face, while unselected vertices remain. Cut points use the
+same truncation ratio and edge interpolation as full Truncated; selecting every
+vertex orbit in the core operation is therefore exactly equivalent to Truncated.
+The operation is offered only when the input has more than one vertex orbit and
+is displayed as `Truncate A`, `Truncate B`, and so on.
+
+The transform popup presents valid selective operations in its final
+`Orbit-targeted` section. Entries remain in standard F/E/V order: face operations
+(Drop face, Kis face), Drop edge, then vertex operations (Drop vertex, Truncate
+vertex). Choosing one stores its first concrete target. When an orbit-targeted
+operation is the last chain item, its up/down controls cycle through all currently
+valid targets of that same operation and wrap at both ends. The URL retains the
+concrete `x[kind]`, `k[face]`, or `t[vertex]` tag, so the selected orbit round-trips.
 
 ## Macros
 

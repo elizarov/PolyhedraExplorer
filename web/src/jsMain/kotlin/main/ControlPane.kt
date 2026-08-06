@@ -25,7 +25,7 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
 
     fun possibleTransformsAt(index: Int): Set<Transform> {
         val result = TransformOptions.toMutableSet()
-        params.availableDropsAt(index).mapTo(result) { Drop(it) }
+        result += params.availableOrbitTransformsAt(index)
         transforms.getOrNull(index)?.takeIf { it !in Transforms }?.let { result += it }
         if (index == transforms.size) result -= Transform.None
         return result
@@ -34,9 +34,9 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
     fun operationOptionsAt(index: Int): List<Transform> {
         val options = possibleTransformsAt(index)
         val regular = options.filter { it.category != TransformCategory.OrbitTargeted }
-        val orbitTargeted = DropTarget.entries.mapNotNull { target ->
-            options.filter { it.dropKindOrNull()?.dropTarget() == target }
-                .minByOrNull { it.dropKindOrNull().toString() }
+        val orbitTargeted = OrbitTargetedOperation.entries.mapNotNull { operation ->
+            options.filter { it.orbitTargetOrNull()?.operation == operation }
+                .minByOrNull { it.orbitTargetOrNull()?.kind.toString() }
         }
         return regular + orbitTargeted
     }
@@ -61,35 +61,34 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
     fun adjustLastTransform(delta: Int) {
         togglePopup(null)
         val current = transforms.lastOrNull() ?: return
-        val currentDropTarget = current.dropKindOrNull()?.dropTarget()
+        val currentOrbitOperation = current.orbitTargetOrNull()?.operation
         val options = operationOptionsAt(transforms.lastIndex)
         val currentIndex = options.indexOfFirst { option ->
             option == current ||
                 current.isChiral && option.baseTag == current.baseTag ||
-                currentDropTarget != null && option.dropKindOrNull()?.dropTarget() == currentDropTarget
+                currentOrbitOperation != null && option.orbitTargetOrNull()?.operation == currentOrbitOperation
         }
         val replacement = options.getOrNull(currentIndex + delta) ?: return
         if (replacement != Transform.None) params.transforms.updateValue(transforms.dropLast(1) + replacement)
     }
 
-    fun adjustLastDropTarget(delta: Int) {
+    fun adjustLastOrbitTarget(delta: Int) {
         togglePopup(null)
         val current = transforms.lastOrNull() ?: return
-        val currentKind = current.dropKindOrNull() ?: return
-        val target = currentKind.dropTarget()
-        val supportedKinds = params.availableDropsAt(transforms.lastIndex)
-            .filter { it.dropTarget() == target }
-            .sortedBy(Any::toString)
-        if (supportedKinds.isEmpty()) return
-        val currentIndex = supportedKinds.indexOf(currentKind)
+        val currentTarget = current.orbitTargetOrNull() ?: return
+        val supportedTransforms = params.availableOrbitTransformsAt(transforms.lastIndex)
+            .filter { it.orbitTargetOrNull()?.operation == currentTarget.operation }
+            .sortedBy { it.orbitTargetOrNull()?.kind.toString() }
+        if (supportedTransforms.isEmpty()) return
+        val currentIndex = supportedTransforms.indexOf(current)
         val replacementIndex = if (currentIndex >= 0) {
-            (currentIndex + delta + supportedKinds.size) % supportedKinds.size
+            (currentIndex + delta + supportedTransforms.size) % supportedTransforms.size
         } else if (delta < 0) {
-            supportedKinds.lastIndex
+            supportedTransforms.lastIndex
         } else {
             0
         }
-        params.transforms.updateValue(transforms.dropLast(1) + Drop(supportedKinds[replacementIndex]))
+        params.transforms.updateValue(transforms.dropLast(1) + supportedTransforms[replacementIndex])
     }
 
     fun flipTransformChirality(index: Int) {
@@ -146,8 +145,8 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
                 if (index == transforms.lastIndex && transforms[index].isChiral) {
                     ChiralityFlipButton { flipTransformChirality(index) }
                 }
-                if (index == transforms.lastIndex && transforms[index].dropKindOrNull() != null) {
-                    DropOrbitControls(itemDisabled, ::adjustLastDropTarget)
+                if (index == transforms.lastIndex && transforms[index].orbitTargetOrNull() != null) {
+                    OrbitTargetControls(itemDisabled, ::adjustLastOrbitTarget)
                 }
                 if (index == errorIndex) {
                     if (transformError?.isAsync == true) {
@@ -255,10 +254,10 @@ private fun TransformDropdown(options: Set<Transform>, onSelect: (Transform) -> 
             if (categoryOptions.isNotEmpty()) {
                 GroupHeader(category.toString())
                 val displayedOptions = when (category) {
-                    TransformCategory.OrbitTargeted -> DropTarget.entries.mapNotNull { target ->
-                        categoryOptions.filter { it.dropKindOrNull()?.dropTarget() == target }
-                            .minByOrNull { it.dropKindOrNull().toString() }
-                            ?.let { it to target.optionName }
+                    TransformCategory.OrbitTargeted -> OrbitTargetedOperation.entries.mapNotNull { operation ->
+                        categoryOptions.filter { it.orbitTargetOrNull()?.operation == operation }
+                            .minByOrNull { it.orbitTargetOrNull()?.kind.toString() }
+                            ?.let { it to operation.optionName }
                     }
                     else -> categoryOptions.map { it to it.toString() }
                 }
@@ -308,17 +307,17 @@ private fun LeftRightSpinner(disabled: Boolean, onAdjust: (Int) -> Unit) {
 }
 
 @Composable
-private fun DropOrbitControls(disabled: Boolean, onAdjust: (Int) -> Unit) {
-    Div(attrs = { classes("drop-orbit-controls") }) {
+private fun OrbitTargetControls(disabled: Boolean, onAdjust: (Int) -> Unit) {
+    Div(attrs = { classes("drop-orbit-controls", "orbit-target-controls") }) {
         Button(attrs = {
             classes("drop-orbit-previous")
-            attr("aria-label", "Previous drop orbit")
+            attr("aria-label", "Previous target orbit")
             if (disabled) disabled()
             onClick { onAdjust(-1) }
         }) { I(attrs = { classes("fa", "fa-angle-up") }) }
         Button(attrs = {
             classes("drop-orbit-next")
-            attr("aria-label", "Next drop orbit")
+            attr("aria-label", "Next target orbit")
             if (disabled) disabled()
             onClick { onAdjust(1) }
         }) { I(attrs = { classes("fa", "fa-angle-down") }) }

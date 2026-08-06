@@ -96,12 +96,12 @@ private suspend fun evaluateState(
     var polyName = seed.toString()
     val transformedPolys = ArrayList<Polyhedron>()
     val validTransforms = ArrayList<LogicalTransform>()
-    val availableDrops = ArrayList<List<String>>()
+    val availableOrbitTransforms = ArrayList<List<String>>()
     val warnings = ArrayList<CoreIssue?>()
     var errorIndex: Int? = null
     var errorIssue: CoreIssue? = null
 
-    availableDrops += poly.canDrop.map(Any::toString).sorted()
+    availableOrbitTransforms += poly.availableOrbitTransforms.map(Transform::tag).sorted()
     for ((index, transform) in transforms.withIndex()) {
         var warning: CoreIssue? = null
         when (val application = applyTransform(transform, poly, pendingRectification, reportProgress)) {
@@ -127,7 +127,7 @@ private suspend fun evaluateState(
         transformedPolys += poly
         validTransforms += transform
         warnings += warning
-        availableDrops += poly.canDrop.map(Any::toString).sorted()
+        availableOrbitTransforms += poly.availableOrbitTransforms.map(Transform::tag).sorted()
     }
 
     val response = CoreResponse(
@@ -140,7 +140,7 @@ private suspend fun evaluateState(
         },
         transformedPolys = transformedPolys,
         validTransformTags = validTransforms.map(LogicalTransform::tag),
-        availableDrops = availableDrops,
+        availableOrbitTransforms = availableOrbitTransforms,
         warnings = warnings,
         errorIndex = errorIndex,
         error = errorIssue,
