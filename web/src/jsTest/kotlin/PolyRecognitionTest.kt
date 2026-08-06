@@ -50,6 +50,11 @@ class PolyRecognitionTest {
         assertEquals(false, shouldDetectSeed(transformed, transformed.copy(scaleTag = "m")))
         assertEquals(false, shouldDetectSeed(transformed, transformed))
         assertEquals(false, shouldDetectSeed(transformed, transformed.copy(transformTags = emptyList())))
+
+        val family = CoreState("P4", emptyList(), "c")
+        assertEquals(true, shouldDetectSeed(null, family))
+        assertEquals(true, shouldDetectSeed(family, family.copy(seedTag = "P5")))
+        assertEquals(false, shouldDetectSeed(family, family.copy(scaleTag = "m")))
     }
 
     @Test

@@ -64,6 +64,7 @@ class ValidatePolyhedra {
                 SeedType.Archimedean -> {
 //                    check(poly.vertexKinds.size == 1)
                 }
+                SeedType.Families,
                 SeedType.Catalan -> Unit
             }
             // check FEV counts

@@ -155,14 +155,14 @@ div.btn > button.msg {
     padding-right: 0.6em;
 }
 
-div.btn > div.drop-orbit-controls {
+div.btn > div.vertical-controls {
     width: 2em;
     height: 2em;
     display: flex;
     flex-flow: column nowrap;
 }
 
-div.btn > div.drop-orbit-controls > button {
+div.btn > div.vertical-controls > button {
     height: 1em;
     padding: 0;
     margin: 0;
@@ -173,11 +173,11 @@ div.btn > div.drop-orbit-controls > button {
     cursor: pointer;
 }
 
-div.btn > div.drop-orbit-controls > button:hover:not(:disabled) {
+div.btn > div.vertical-controls > button:hover:not(:disabled) {
     color: var(--hover-color);
 }
 
-div.btn > div.drop-orbit-controls > button:disabled {
+div.btn > div.vertical-controls > button:disabled {
     color: var(--disabled-color);
 }
 

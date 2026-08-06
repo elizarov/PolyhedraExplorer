@@ -11,6 +11,7 @@ import kotlin.math.*
 
 enum class SeedType {
     Platonic,
+    Families,
     Archimedean,
     Catalan
 }

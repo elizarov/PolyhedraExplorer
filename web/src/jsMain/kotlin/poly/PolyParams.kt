@@ -173,7 +173,10 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
 
     internal fun updateSuggestedSeed(state: CoreState, response: CoreResponse) {
         val seedTag = response.recognizedSeedTag ?: return
-        if (state.transformTags.isEmpty() || response.validTransformTags != state.transformTags) return
+        val familySeed = state.seedTag.toFamilySeedIdOrNull() != null
+        if ((!familySeed && state.transformTags.isEmpty()) ||
+            response.validTransformTags != state.transformTags
+        ) return
         val recognizedSeed = Seeds.firstOrNull { it.tag == seedTag } ?: return
 
         suggestedSeed = recognizedSeed
@@ -185,9 +188,10 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         suggestedSeed = null
         suggestedSeedKey = null
 
-        // Set both values before sending one target-value notification, so no intermediate worker request is made.
-        seed.updateValue(replacement, Param.None)
-        transforms.updateValue(emptyList())
+        // With a transform chain, set both values before sending one notification so no intermediate request is made.
+        val hasTransforms = transforms.value.isNotEmpty()
+        seed.updateValue(replacement, Param.None.takeIf { hasTransforms })
+        if (hasTransforms) transforms.updateValue(emptyList())
     }
 
     private fun currentState() = CoreState(
@@ -217,7 +221,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
 }
 
 internal fun shouldDetectSeed(previous: CoreState?, current: CoreState): Boolean =
-    current.transformTags.isNotEmpty() &&
+    (current.transformTags.isNotEmpty() || current.seedTag.toFamilySeedIdOrNull() != null) &&
         (previous == null || previous.seedTag != current.seedTag || previous.transformTags != current.transformTags)
 
 private fun CoreState.seedDetectionKey(): Pair<String, List<String>> = seedTag to transformTags

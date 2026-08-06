@@ -1,5 +1,10 @@
 package polyhedra.web.catalog
 
+import polyhedra.model.api.FamilySeedId
+import polyhedra.model.api.MAX_FAMILY_SEED_N
+import polyhedra.model.api.MIN_FAMILY_SEED_N
+import polyhedra.model.api.SeedFamily
+import polyhedra.model.api.toTransformMacroOrNull
 import polyhedra.model.poly.AnyKind
 import polyhedra.model.poly.Chirality
 import polyhedra.model.poly.EdgeKind
@@ -8,10 +13,10 @@ import polyhedra.model.poly.VertexKind
 import polyhedra.model.poly.toAnyKindOrNull
 import polyhedra.model.poly.withChirality
 import polyhedra.model.util.Tagged
-import polyhedra.model.api.toTransformMacroOrNull
 
 enum class SeedType {
     Platonic,
+    Families,
     Archimedean,
     Catalan,
 }
@@ -21,14 +26,34 @@ data class Seed(
     val name: String,
     val type: SeedType,
     val chirality: Chirality? = null,
+    val familyId: FamilySeedId? = null,
 ) : Tagged {
+    init {
+        require((type == SeedType.Families) == (familyId != null))
+        require(familyId == null || baseTag == familyId.tag)
+    }
+
     override val tag: String get() = baseTag.withChirality(chirality)
     val isChiral: Boolean get() = chirality != null
-    override fun toString(): String = name + chirality?.suffix.orEmpty()
+    val isFamily: Boolean get() = familyId != null
+    override fun toString(): String = (familyId?.toString() ?: name) + chirality?.suffix.orEmpty()
 
     companion object {
         val Tetrahedron = Seed("T", "Tetrahedron", SeedType.Platonic)
     }
+}
+
+val FamilySeeds: List<Seed> = SeedFamily.entries.flatMap { family ->
+    (MIN_FAMILY_SEED_N..MAX_FAMILY_SEED_N).map { n ->
+        val id = FamilySeedId(family, n)
+        Seed(id.tag, family.displayName, SeedType.Families, familyId = id)
+    }
+}
+private val FamilySeedsById: Map<FamilySeedId, Seed> =
+    FamilySeeds.associateBy { requireNotNull(it.familyId) }
+
+private val DefaultFamilySeedOptions: List<Seed> = SeedFamily.entries.map { family ->
+    FamilySeedsById.getValue(FamilySeedId(family, MIN_FAMILY_SEED_N))
 }
 
 val SeedOptions: List<Seed> = listOf(
@@ -37,6 +62,7 @@ val SeedOptions: List<Seed> = listOf(
     Seed("O", "Octahedron", SeedType.Platonic),
     Seed("D", "Dodecahedron", SeedType.Platonic),
     Seed("I", "Icosahedron", SeedType.Platonic),
+) + DefaultFamilySeedOptions + listOf(
     Seed("tT", "Truncated tetrahedron", SeedType.Archimedean),
     Seed("aC", "Cuboctahedron", SeedType.Archimedean),
     Seed("tC", "Truncated cube", SeedType.Archimedean),
@@ -65,9 +91,17 @@ val SeedOptions: List<Seed> = listOf(
     Seed("dsD", "Pentagonal hexecontahedron", SeedType.Catalan, Chirality.Default),
 )
 
-val Seeds: List<Seed> = SeedOptions.flatMap { seed ->
+val Seeds: List<Seed> = SeedOptions.filterNot(Seed::isFamily).flatMap { seed ->
     if (seed.isChiral) listOf(seed, seed.copy(chirality = Chirality.Flipped)) else listOf(seed)
+} + FamilySeeds
+
+fun Seed.withFamilyN(n: Int): Seed {
+    val family = requireNotNull(familyId).family
+    return FamilySeedsById.getValue(FamilySeedId(family, n))
 }
+
+val Seed.optionKey: String
+    get() = familyId?.family?.tagPrefix ?: baseTag
 
 fun Seed.flippedChirality(): Seed {
     val flipped = requireNotNull(chirality).flipped()

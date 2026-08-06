@@ -52,7 +52,7 @@ The Wasm core owns:
 - primitive transform and macro-expansion evaluation, including composition-aware `aa` cantellation and `at` bevel fusion;
 - truncate, rectify, cantellate, dual, bevel, snub, chamfer, canonicalization (the UI's `Canonical` transform), and drop geometry kernels;
 - size guards, applicability checks, warnings, and progress;
-- scale normalization and topology/drop analysis;
+- fixed and parameterized-family seed geometry, scale normalization, and topology/drop analysis;
 - rotation-orbit refinement and geometric comparison with built-in seeds;
 - topology-changing animation keyframe construction.
 

@@ -83,7 +83,7 @@ private suspend fun evaluateState(
     reportProgress: (Int) -> Unit,
     detectSeed: Boolean,
 ): Evaluation {
-    val seed = Seeds.firstOrNull { it.tag == state.seedTag }
+    val seed = state.seedTag.toSeedOrNull()
         ?: error("Unknown seed tag: ${state.seedTag}")
     val scale = Scales.firstOrNull { it.tag == state.scaleTag }
         ?: error("Unknown scale tag: ${state.scaleTag}")
@@ -133,7 +133,10 @@ private suspend fun evaluateState(
     val response = CoreResponse(
         poly = poly.scaled(scale),
         polyName = polyName,
-        recognizedSeedTag = if (detectSeed && errorIndex == null && validTransforms.isNotEmpty()) {
+        recognizedSeedTag = if (
+            detectSeed && errorIndex == null &&
+            (validTransforms.isNotEmpty() || seed.type == SeedType.Families)
+        ) {
             poly.recognizedSeedOrNull()?.tag
         } else {
             null

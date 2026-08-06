@@ -63,7 +63,7 @@ class ChiralityUiTest {
         composition = renderComposable(host) { ControlPane(params, popup = Popup.Seed, togglePopup = {}) }
 
         assertNull(host.querySelector(".chirality-flip"))
-        assertEquals(31, host.querySelectorAll(".dropdown .item").length)
+        assertEquals(35, host.querySelectorAll(".dropdown .item").length)
     }
 
     @Test

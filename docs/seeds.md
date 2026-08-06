@@ -1,9 +1,10 @@
 # Seed catalog
 
-Polyhedra Explorer contains the complete classical catalog of 31 convex seed
-types: 5 Platonic, 13 Archimedean, and 13 Catalan solids. The two chiral
-Archimedean solids and their Catalan duals also have prime-tagged mirror forms,
-so the core recognizes 35 concrete seed representations.
+Polyhedra Explorer contains the complete classical catalog of 31 convex fixed
+seed types: 5 Platonic, 13 Archimedean, and 13 Catalan solids. It also provides
+four parameterized families—Prism, Antiprism, Pyramid, and Bipyramid—for every
+`n` from 3 through 100. The two chiral Archimedean solids and their Catalan duals
+also have prime-tagged mirror forms.
 
 ## Categories
 
@@ -13,6 +14,17 @@ A Platonic solid is a convex regular polyhedron: every face is the same regular
 polygon, and the same arrangement of faces meets at every vertex. Equivalently,
 its symmetry group is transitive on faces, edges, and vertices. Exactly five
 exist.
+
+### Families
+
+A family is an infinite polyhedron class represented here by the finite range
+`3 <= n <= 100`, where `n` is the order of the base or equatorial polygon.
+Prisms and antiprisms use uniform coordinates; pyramids place a regular base and
+centered apex on one sphere with centroid at the origin; bipyramids use a regular
+equator and opposite spherical poles. Up/down controls beside the selected seed
+change `n` without changing family. Some low-order members coincide with fixed
+seeds and receive optional replacement suggestions: Prism 4 is Cube, Antiprism 3
+and Bipyramid 4 are Octahedron, and Pyramid 3 is Tetrahedron.
 
 ### Archimedean solids
 
@@ -56,6 +68,10 @@ of the two snub solids are chiral and also have two mirror realizations.
 | Platonic | Octahedron (`O`) | — | Cube | `8 / 12 / 6` | `O_h` | `1 / 1 / 1` | `C + d` |
 | Platonic | Dodecahedron (`D`) | — | Icosahedron | `12 / 30 / 20` | `I_h` | `1 / 1 / 1` | `I + d` |
 | Platonic | Icosahedron (`I`) | — | Dodecahedron | `20 / 30 / 12` | `I_h` | `1 / 1 / 1` | Base seed; `T + s` |
+| Family | Prism (`P3`–`P100`) | `n`-gonal prism | Bipyramid `n` | `n+2 / 3n / 2n` | `D_nh` | normally `2 / 2 / 1` | Family seed |
+| Family | Antiprism (`A3`–`A100`) | `n`-gonal antiprism | `n`-gonal trapezohedron | `2n+2 / 4n / 2n` | `D_nd` | normally `2 / 2 / 1` | Family seed |
+| Family | Pyramid (`Y3`–`Y100`) | `n`-gonal pyramid | Pyramid `n` | `n+1 / 2n / n+1` | `C_nv` | normally `2 / 2 / 2` | Family seed |
+| Family | Bipyramid (`B3`–`B100`) | Dipyramid; `n`-gonal bipyramid | Prism `n` | `2n / 3n / n+2` | `D_nh` | normally `1 / 2 / 2` | Family seed |
 | Archimedean | Truncated tetrahedron (`tT`) | — | Triakis tetrahedron | `8 / 18 / 12` | `T_d` | `2 / 2 / 1` | `T + t` |
 | Archimedean | Cuboctahedron (`aC`) | — | Rhombic dodecahedron | `14 / 24 / 12` | `O_h` | `2 / 1 / 1` | (`C` or `O`) + `a` |
 | Archimedean | Truncated cube (`tC`) | — | Triakis octahedron | `14 / 36 / 24` | `O_h` | `2 / 2 / 1` | `C + t` |
@@ -87,26 +103,31 @@ In rows such as (`C` or `O`) + `a`, the operation applies to either named seed.
 
 ## Completeness and validation
 
-- The catalog contains 31 unique base tags: exactly 5 Platonic, 13 Archimedean,
-  and 13 Catalan types. This matches the complete classical enumerations.
+- The fixed catalog contains 31 unique base tags: exactly 5 Platonic, 13
+  Archimedean, and 13 Catalan types. This matches the complete classical
+  enumerations. The four family selectors add 392 concrete family members.
 - The 13 Catalan rows pair one-to-one with the 13 Archimedean rows. Every pair
   has the same `E`, exchanged `F` and `V`, the same symmetry family, and exchanged
   face/vertex orbit counts, as duality requires.
 - Every row satisfies Euler's formula `F - E + V = 2`.
 - The four chiral types add `sC'`, `sD'`, `dsC'`, and `dsD'` to the core without
-  adding new solid types. Thus the UI lists 31 types while the core recognizes 35
-  handed representations.
-- `F / E / V` and orbit counts were read from each current `Seed.poly`; the core
-  validation suite independently checks the stored counts against each generated
-  mesh. All 57 recipe variants represented in the table were also evaluated by
-  the Wasm core and recognized as the stated seed, including prime chirality.
-- No Platonic, classical Archimedean, or Catalan solid is missing. Prisms,
-  antiprisms, Johnson solids, and nonconvex uniform or Kepler-Poinsot solids are
-  different classes and are intentionally outside this catalog.
+  adding new solid types. Thus the UI lists 31 fixed types plus four family
+  selectors, while the core supports 35 handed fixed representations and 392
+  family members.
+- Fixed-row `F / E / V` and orbit counts were read from each current `Seed.poly`.
+  The validation suite checks representative members of every family through
+  `n = 100` against their formulas and independently validates each generated
+  mesh. All 57 fixed-catalog recipe variants were also evaluated by the Wasm core
+  and recognized as the stated seed, including prime chirality.
+- No Platonic, classical Archimedean, or Catalan solid is missing. The prism and
+  antiprism families plus the pyramid and bipyramid families are included;
+  Johnson solids beyond pyramids and nonconvex uniform or Kepler-Poinsot solids
+  remain outside this catalog.
 
 ## Sources of truth
 
-- Project seed definitions and geometry: [`Seed.kt`](../core/src/commonMain/kotlin/poly/Seed.kt).
+- Fixed seed definitions: [`Seed.kt`](../core/src/commonMain/kotlin/poly/Seed.kt).
+- Family seed definitions and geometry: [`FamilySeed.kt`](../core/src/commonMain/kotlin/poly/FamilySeed.kt).
 - UI seed types and prime variants: [`CoreOptions.kt`](../web/src/jsMain/kotlin/catalog/CoreOptions.kt).
 - Operations used by recipes: [Transformations and macros](transformations.md).
 - [Wolfram MathWorld: Platonic Solid](https://mathworld.wolfram.com/PlatonicSolid.html).

@@ -3,6 +3,8 @@ package polyhedra.web.main
 import androidx.compose.runtime.Composable
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.dom.*
+import polyhedra.model.api.MAX_FAMILY_SEED_N
+import polyhedra.model.api.MIN_FAMILY_SEED_N
 import polyhedra.model.util.updatedAt
 import polyhedra.model.api.TransformPrefixReplacement
 import polyhedra.model.api.findTransformPrefixReplacement
@@ -54,8 +56,17 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
     fun adjustSeed(delta: Int) {
         togglePopup(null)
         val current = params.seed.value
-        val currentIndex = SeedOptions.indexOfFirst { seed -> seed.baseTag == current.baseTag }
+        val currentIndex = SeedOptions.indexOfFirst { seed -> seed.optionKey == current.optionKey }
         SeedOptions.getOrNull(currentIndex + delta)?.let(params.seed::updateValue)
+    }
+
+    fun adjustFamilyN(delta: Int) {
+        togglePopup(null)
+        val current = params.seed.value
+        val n = requireNotNull(current.familyId).n + delta
+        if (n in MIN_FAMILY_SEED_N..MAX_FAMILY_SEED_N) {
+            params.seed.updateValue(current.withFamilyN(n))
+        }
     }
 
     fun adjustLastTransform(delta: Int) {
@@ -196,6 +207,9 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
                 Text(params.seed.value.toString())
                 Aside(attrs = { classes("tooltip-text") }) { Text("Seed") }
             }
+            params.seed.value.familyId?.let { familyId ->
+                FamilySeedControls(familyId.n, ::adjustFamilyN)
+            }
             if (transforms.isEmpty() && params.seed.value.isChiral) {
                 ChiralityFlipButton(::flipSeedChirality)
             }
@@ -308,7 +322,7 @@ private fun LeftRightSpinner(disabled: Boolean, onAdjust: (Int) -> Unit) {
 
 @Composable
 private fun OrbitTargetControls(disabled: Boolean, onAdjust: (Int) -> Unit) {
-    Div(attrs = { classes("drop-orbit-controls", "orbit-target-controls") }) {
+    Div(attrs = { classes("vertical-controls", "drop-orbit-controls", "orbit-target-controls") }) {
         Button(attrs = {
             classes("drop-orbit-previous")
             attr("aria-label", "Previous target orbit")
@@ -320,6 +334,24 @@ private fun OrbitTargetControls(disabled: Boolean, onAdjust: (Int) -> Unit) {
             attr("aria-label", "Next target orbit")
             if (disabled) disabled()
             onClick { onAdjust(1) }
+        }) { I(attrs = { classes("fa", "fa-angle-down") }) }
+    }
+}
+
+@Composable
+private fun FamilySeedControls(n: Int, onAdjust: (Int) -> Unit) {
+    Div(attrs = { classes("vertical-controls", "family-seed-controls") }) {
+        Button(attrs = {
+            classes("family-seed-increment")
+            attr("aria-label", "Increase family size")
+            if (n >= MAX_FAMILY_SEED_N) disabled()
+            onClick { onAdjust(1) }
+        }) { I(attrs = { classes("fa", "fa-angle-up") }) }
+        Button(attrs = {
+            classes("family-seed-decrement")
+            attr("aria-label", "Decrease family size")
+            if (n <= MIN_FAMILY_SEED_N) disabled()
+            onClick { onAdjust(-1) }
         }) { I(attrs = { classes("fa", "fa-angle-down") }) }
     }
 }
