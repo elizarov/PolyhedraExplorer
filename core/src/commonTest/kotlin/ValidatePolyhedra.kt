@@ -169,6 +169,6 @@ private fun isOkSequence(vararg transforms: Transform): Boolean {
     if (t.getOrNull(0) == Transform.Chamfered && t.getOrNull(1) in listOf(Transform.Chamfered, Transform.Bevelled)) return false
     if (t.lastIndexOf(Transform.Chamfered) >= 0 && t.size > 1) return false // chamfering can be used only with one other
     if (t.lastIndexOf(Transform.Bevelled) > 1) return false // bevelling must be first or second
-    if (t.lastIndexOf(Transform.Snub) > 0) return false // Snub must be first
+    if (t.indexOfLast { it is Snub } > 0) return false // Snub must be first
     return true
 }

@@ -72,38 +72,45 @@ fun Polyhedron.snub(
     sr: SnubbingRatio = regularSnubbingRatio(),
     scale: Scale? = null,
     forceFaceKinds: List<FaceKindSource>? = null
-) = transformedPolyhedron(Transform.Snub, sr, scale, forceFaceKinds) {
-    val (cr, sa) = sr
-    val rr = dualReciprocationRadius
-    // vertices from the face-vertices (directed edges)
-    val fvv = fs.associateWith { f ->
-        val c = f.dualPoint(rr) // for regular polygons -- face center
-        val r = f.toRotationAroundQuat(-sa)
-        f.directedEdges.associateBy({ it.a }, { e ->
-            vertex(c + ((1 - cr) * (e.a - c)).rotated(r), VertexKind(directedEdgeKindsIndex[e.kind]!!))
-        })
+) : Polyhedron {
+    if (sr.sa < 0.0) {
+        return reflected()
+            .snub(sr.copy(sa = -sr.sa), scale, forceFaceKinds)
+            .reflected()
     }
-    // faces from the original faces
-    for (f in fs) {
-        face(fvv[f]!!.values, f.kind)
+    return transformedPolyhedron(Transform.Snub, sr, scale, forceFaceKinds) {
+        val (cr, sa) = sr
+        val rr = dualReciprocationRadius
+        // vertices from the face-vertices (directed edges)
+        val fvv = fs.associateWith { f ->
+            val c = f.dualPoint(rr) // for regular polygons -- face center
+            val r = f.toRotationAroundQuat(-sa)
+            f.directedEdges.associateBy({ it.a }, { e ->
+                vertex(c + ((1 - cr) * (e.a - c)).rotated(r), VertexKind(directedEdgeKindsIndex[e.kind]!!))
+            })
+        }
+        // faces from the original faces
+        for (f in fs) {
+            face(fvv[f]!!.values, f.kind)
+        }
+        // faces from the original vertices
+        var kindOfs = faceKinds.size
+        for (v in vs) {
+            val fvs = v.directedEdges.map { fvv[it.r]!![v]!! }
+            face(fvs, FaceKind(kindOfs + v.kind.id))
+        }
+        for (vk in vertexKinds.keys) faceKindSource(FaceKind(kindOfs + vk.id), vk)
+        // 3-faces from the directed edges
+        kindOfs += vertexKinds.size
+        for (e in directedEdges) {
+            val fvs = listOf(
+                fvv[e.l]!![e.a]!!,
+                fvv[e.l]!![e.b]!!,
+                fvv[e.r]!![e.a]!!
+            )
+            face(fvs, FaceKind(kindOfs + directedEdgeKindsIndex[e.kind]!!))
+        }
+        for ((ek, id) in directedEdgeKindsIndex) faceKindSource(FaceKind(kindOfs + id), ek)
+        mergeIndistinguishableKinds()
     }
-    // faces from the original vertices
-    var kindOfs = faceKinds.size
-    for (v in vs) {
-        val fvs = v.directedEdges.map { fvv[it.r]!![v]!! }
-        face(fvs, FaceKind(kindOfs + v.kind.id))
-    }
-    for (vk in vertexKinds.keys) faceKindSource(FaceKind(kindOfs + vk.id), vk)
-    // 3-faces from the directed edges
-    kindOfs += vertexKinds.size
-    for (e in directedEdges) {
-        val fvs = listOf(
-            fvv[e.l]!![e.a]!!,
-            fvv[e.l]!![e.b]!!,
-            fvv[e.r]!![e.a]!!
-        )
-        face(fvs, FaceKind(kindOfs + directedEdgeKindsIndex[e.kind]!!))
-    }
-    for ((ek, id) in directedEdgeKindsIndex) faceKindSource(FaceKind(kindOfs + id), ek)
-    mergeIndistinguishableKinds()
 }

@@ -117,22 +117,16 @@ fun List<IsoEdge>.groupIndistinguishable(): List<List<IsoEdge>> {
 /**
  * Builds the normalized local-geometry signature used for catalog seed recognition.
  *
- * The edge projection figures are independent of global rotation and vertex numbering. Comparing both the
- * direct and globally reflected orientations recognizes either handed realization of a catalog solid reached
- * through a different transform path, while still distinguishing solids with only matching F/E/V counts.
+ * The edge projection figures are independent of global rotation and vertex numbering but preserve handedness.
+ * Comparing their sorted multiset recognizes a specific chiral realization reached through a different
+ * transform path, while still distinguishing its reflected counterpart and solids with only matching F/E/V.
  */
 internal class PolyhedronGeometryFingerprint(
-    private val orientations: List<List<EdgeClassCount>>,
+    private val edgeClasses: List<EdgeClassCount>,
 ) {
     fun matches(other: PolyhedronGeometryFingerprint): Boolean =
-        orientations.any { edgeClasses ->
-            other.orientations.any { otherEdgeClasses ->
-                edgeClasses.size == otherEdgeClasses.size &&
-                    edgeClasses.indices.all { index ->
-                        edgeClasses[index].compareTo(otherEdgeClasses[index]) == 0
-                    }
-            }
-        }
+        edgeClasses.size == other.edgeClasses.size &&
+            edgeClasses.indices.all { index -> edgeClasses[index].compareTo(other.edgeClasses[index]) == 0 }
 }
 
 internal class EdgeClassCount(
@@ -147,12 +141,7 @@ internal class EdgeClassCount(
 
 internal fun Polyhedron.geometryFingerprint(): PolyhedronGeometryFingerprint =
     scaled(Scale.Circumradius).let { normalized ->
-        PolyhedronGeometryFingerprint(
-            listOf(
-                normalized.geometryFingerprintOrientation(),
-                normalized.reflected().geometryFingerprintOrientation(),
-            )
-        )
+        PolyhedronGeometryFingerprint(normalized.geometryFingerprintOrientation())
     }
 
 private fun Polyhedron.geometryFingerprintOrientation(): List<EdgeClassCount> {
@@ -163,7 +152,7 @@ private fun Polyhedron.geometryFingerprintOrientation(): List<EdgeClassCount> {
 }
 
 /** Reflects the geometry and reverses every face so its normal remains outward-facing. */
-private fun Polyhedron.reflected(): Polyhedron {
+internal fun Polyhedron.reflected(): Polyhedron {
     val reflectedVertices = vs.map { vertex ->
         MutableVertex(vertex.id, Vec3(-vertex.x, vertex.y, vertex.z), vertex.kind)
     }

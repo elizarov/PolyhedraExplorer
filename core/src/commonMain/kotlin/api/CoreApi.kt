@@ -29,7 +29,7 @@ private fun String.toLogicalTransformOrNull(): LogicalTransform? {
             "b" -> Transform.Bevelled
             else -> null
         }
-        return LogicalTransform(macro.tag, macro.name, primitives, animationTransform)
+        return LogicalTransform(macro.tag, macro.displayName, primitives, animationTransform)
     }
     return toTransformOrNull()?.let { transform ->
         LogicalTransform(transform.tag, transform.toString(), listOf(transform))
@@ -290,6 +290,9 @@ private fun transformAnimation(
     duration: Double,
 ): List<CoreAnimationStep> {
     if (previousTransform == Transform.None && currentTransform == Transform.None) return emptyList()
+    if (previousTransform is Snub && currentTransform is Snub &&
+        previousTransform.chirality != currentTransform.chirality
+    ) return emptyList()
     if (currentPoly.hasSameTopology(previousPoly)) {
         return listOf(
             CoreAnimationStep(duration, previousPoly.scaled(scale), 0.0, currentPoly.scaled(scale), 1.0)

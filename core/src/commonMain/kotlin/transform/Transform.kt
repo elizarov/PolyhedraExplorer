@@ -59,6 +59,7 @@ sealed class Transform : Tagged {
         val Dual: Transform by Dual()
         val Bevelled: Transform by Bevelled()
         val Snub: Transform by Snub()
+        val SnubFlipped: Transform by Snub(Chirality.Flipped)
         val Chamfered: Transform by Chamfered()
         val Canonical: Transform by Canonical()
 
@@ -157,17 +158,23 @@ class Bevelled : Transform() { // ~= Rectified, Truncated
 }
 
 @Serializable
-class Snub : Transform() {
+class Snub(
+    @Transient val chirality: Chirality = Chirality.Default,
+) : Transform() {
     @Transient
-    override val tag: String = "s"
-    override fun transform(poly: Polyhedron): Polyhedron = poly.snub()
-    override fun snubbingRatio(poly: Polyhedron) = poly.regularSnubbingRatio()
+    override val tag: String = "s".withChirality(chirality)
+    override fun transform(poly: Polyhedron): Polyhedron = poly.snub(requireNotNull(snubbingRatio(poly)))
+    override fun snubbingRatio(poly: Polyhedron) = poly.regularSnubbingRatio().let { ratio ->
+        if (chirality == Chirality.Flipped) ratio.copy(sa = -ratio.sa) else ratio
+    }
     @Transient
     override val fev = TransformFEV(
         1, 2, 1,
         0, 5, 0,
         0, 2, 0
     )
+
+    override fun toString(): String = "Snub${chirality.suffix}"
 }
 
 @Serializable

@@ -1,11 +1,17 @@
 package polyhedra.core.api
 
+import polyhedra.common.poly.CHIRALITY_PRIME
+import polyhedra.common.poly.Chirality
+
 /** A named Conway-style abbreviation for a sequence of primitive transforms. */
 data class TransformMacro(
     val tag: String,
     val name: String,
     val expansionTags: List<String>,
-)
+    val chirality: Chirality? = null,
+) {
+    val displayName: String get() = name + chirality?.suffix.orEmpty()
+}
 
 val TransformMacros: List<TransformMacro> = listOf(
     TransformMacro("k", "Kis", listOf("d", "t", "d")),
@@ -16,15 +22,29 @@ val TransformMacros: List<TransformMacro> = listOf(
     TransformMacro("b", "Bevelled", listOf("a", "t")),
     TransformMacro("O", "Ortho", listOf("d", "a", "a", "d")),
     TransformMacro("m", "Meta", listOf("d", "a", "t", "d")),
-    TransformMacro("g", "Gyro", listOf("d", "s", "d")),
+    TransformMacro("g", "Gyro", listOf("d", "s", "d"), Chirality.Default),
 )
 
-private val transformMacrosByTag = TransformMacros.associateBy(TransformMacro::tag)
-private val primitiveReplacementTags = listOf("t", "a", "d", "s", "c", "o")
+private val allTransformMacros = TransformMacros.flatMap { macro ->
+    if (macro.chirality == null) listOf(macro) else listOf(macro, macro.flipped())
+}
+private val transformMacrosByTag = allTransformMacros.associateBy(TransformMacro::tag)
+private val primitiveReplacementTags = listOf("t", "a", "d", "s", "s'", "c", "o")
 private val replacementTagsByExpansion =
-    (primitiveReplacementTags + TransformMacros.map(TransformMacro::tag)).associateBy { tag ->
+    (primitiveReplacementTags + allTransformMacros.map(TransformMacro::tag)).associateBy { tag ->
         listOf(tag).normalizedExpandedTransformTags()
     }
+
+private fun TransformMacro.flipped(): TransformMacro {
+    val flippedChirality = requireNotNull(chirality).flipped()
+    return copy(
+        tag = tag.removeSuffix(CHIRALITY_PRIME) + flippedChirality.suffix,
+        expansionTags = expansionTags.map { expansionTag ->
+            if (expansionTag == "s") "s'" else expansionTag
+        },
+        chirality = flippedChirality,
+    )
+}
 
 fun String.toTransformMacroOrNull(): TransformMacro? =
     transformMacrosByTag[this]

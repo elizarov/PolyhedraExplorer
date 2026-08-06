@@ -7,6 +7,7 @@ import polyhedra.core.api.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CoreApiTest {
@@ -72,7 +73,7 @@ class CoreApiTest {
     }
 
     @Test
-    fun recognizesPentagonalHexecontahedronFromDualSnubIcosahedron() {
+    fun recognizesProperChiralityOfPentagonalHexecontahedronFromDualSnubIcosahedron() {
         runSynchronously {
             val response = evaluateCore(
                 CoreRequest(
@@ -81,7 +82,37 @@ class CoreApiTest {
                 )
             )
 
-            assertEquals("dsD", response.recognizedSeedTag)
+            assertEquals("dsD'", response.recognizedSeedTag)
+
+            val flippedResponse = evaluateCore(
+                CoreRequest(
+                    state = CoreState("I", listOf("s'", "d"), "c"),
+                    detectSeed = true,
+                )
+            )
+            assertEquals("dsD", flippedResponse.recognizedSeedTag)
+        }
+    }
+
+    @Test
+    fun recognizesFlippedSnubTransformsAsFlippedCatalogSeeds() {
+        runSynchronously {
+            for ((seedTag, recognizedSeedTag, polyName) in listOf(
+                Triple("C", "sC'", "Snub' Cube"),
+                Triple("D", "sD'", "Snub' Dodecahedron"),
+            )) {
+                val response = evaluateCore(
+                    CoreRequest(
+                        state = CoreState(seedTag, listOf("s'"), "c"),
+                        detectSeed = true,
+                    )
+                )
+
+                assertEquals(recognizedSeedTag, response.recognizedSeedTag)
+                assertEquals(polyName, response.polyName)
+                assertEquals(listOf("s'"), response.validTransformTags)
+                assertNull(response.error)
+            }
         }
     }
 

@@ -52,25 +52,25 @@ class PolyRecognitionTest {
 
     @Test
     fun recognizedSolidIsOfferedAtRightAndOnlyReplacedOnClick(): Promise<Unit> {
-        val state = CoreState("dsD", listOf("d"), "c")
+        val state = CoreState("dsD'", listOf("d"), "c")
         val response = CoreResponse(
             poly = CoreSeed.SnubDodecahedron.poly,
             polyName = "Dual Pentagonal Hexecontahedron",
-            recognizedSeedTag = "sD",
+            recognizedSeedTag = "sD'",
             transformedPolys = listOf(CoreSeed.SnubDodecahedron.poly),
             validTransformTags = listOf("d"),
             availableDrops = emptyList(),
             warnings = listOf(null),
         )
         val params = PolyParams("", null)
-        params.seed.updateValue(Seeds.single { it.tag == "dsD" })
+        params.seed.updateValue(Seeds.single { it.tag == "dsD'" })
         params.transforms.updateValue(listOf(Transform.Dual))
 
         params.updateSuggestedSeed(state, response)
 
-        assertEquals("dsD", params.seed.value.tag, "Detection must preserve the current seed")
+        assertEquals("dsD'", params.seed.value.tag, "Detection must preserve the current seed")
         assertEquals(listOf(Transform.Dual), params.transforms.value, "Detection must preserve the transform chain")
-        assertEquals("sD", params.suggestedSeed?.tag)
+        assertEquals("sD'", params.suggestedSeed?.tag)
 
         composition = renderComposable(host) { ControlPane(params, popup = null, togglePopup = {}) }
         val controlItems = host.querySelectorAll(".ctrl-pane > .btn")
@@ -78,11 +78,11 @@ class PolyRecognitionTest {
         val suggestionButton = suggestion.querySelector("button") as HTMLElement
 
         assertTrue(controlItems.item(controlItems.length - 1) === suggestion, "Suggestion must be rightmost")
-        assertTrue(suggestionButton.textContent.orEmpty().startsWith("→ Snub dodecahedron"))
+        assertTrue(suggestionButton.textContent.orEmpty().startsWith("→ Snub dodecahedron'"))
 
         suggestionButton.click()
 
-        assertEquals("sD", params.seed.value.tag)
+        assertEquals("sD'", params.seed.value.tag)
         assertEquals(emptyList(), params.transforms.value)
         assertNull(params.suggestedSeed)
 

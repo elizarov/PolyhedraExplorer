@@ -4,11 +4,12 @@
 | --- | --- |
 | Polyhedron | An immutable vertex/edge/face mesh plus orbit-kind metadata. |
 | Seed | A built-in starting polyhedron selected before transforms. |
-| Catalog recognition | Comparison of a completed transform result with the built-in seeds after circumradius normalization. Globally reflected (opposite-handed) realizations count as the same geometry, while rotation-orbit analysis remains handedness-sensitive. A match is offered as an optional replacement; accepting it replaces the equivalent seed-plus-transform-chain state with the single catalog seed. |
+| Catalog recognition | Orientation-sensitive comparison of a completed transform result with both handed variants of the built-in seeds after circumradius normalization. A match with the proper chirality is offered as an optional replacement; accepting it replaces the equivalent seed-plus-transform-chain state with the single catalog seed. |
 | [Transform](transformations.md) | An ordered operation that derives a new polyhedron from the previous stage. |
 | Primitive transform | A directly executable transform. The fixed primitive choices are Truncated, Rectified, Dual, Snub, Chamfered, and Canonical; topology-dependent Drop operations are also primitive. |
 | Macro | One named logical transform whose implementation expands to a sequence of primitive transforms. It occupies one position in the URL and UI chain. |
-| Prefix replacement | Optional simplification of the longest displayed transform-chain prefix formally equivalent to one primitive operation or macro after macro expansion and adjacent Dual cancellation. It is only a proposal; accepting it can expose a fused regular coordinate realization. |
+| Chirality | Handedness of a shape or operation. Snub, Gyro, and four catalog seed types have two mirror-related variants; the alternate variant is written with a trailing prime (`'`). |
+| Prefix replacement | Optional simplification of the longest displayed transform-chain prefix formally equivalent—including chirality—to one primitive operation or macro after macro expansion and adjacent Dual cancellation. It is only a proposal; accepting it can expose a fused regular coordinate realization. |
 | Composition fusion | Geometry-aware execution of a primitive subsequence through an equivalent direct kernel. `aa` is fused as cantellation and `at` as bevel so repeated rectification retains the intended regular realization. |
 | Transform chain | The ordered list of transforms applied after the seed. |
 | F/E/V or FEV | Face, edge, and vertex counts, in that order. |

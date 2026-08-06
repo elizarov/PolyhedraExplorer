@@ -24,9 +24,9 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
     }
 
     fun possibleTransformsAt(index: Int): Set<Transform> {
-        val result = Transforms.toMutableSet()
+        val result = TransformOptions.toMutableSet()
         params.availableDropsAt(index).mapTo(result) { Drop(it) }
-        transforms.getOrNull(index)?.let { result += it }
+        transforms.getOrNull(index)?.takeIf { it !in Transforms }?.let { result += it }
         if (index == transforms.size) result -= Transform.None
         return result
     }
@@ -44,15 +44,29 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
     fun adjustSeed(delta: Int) {
         togglePopup(null)
         val current = params.seed.value
-        Seeds.getOrNull(Seeds.indexOf(current) + delta)?.let(params.seed::updateValue)
+        val currentIndex = SeedOptions.indexOfFirst { seed -> seed.baseTag == current.baseTag }
+        SeedOptions.getOrNull(currentIndex + delta)?.let(params.seed::updateValue)
     }
 
     fun adjustLastTransform(delta: Int) {
         togglePopup(null)
         val current = transforms.lastOrNull() ?: return
         val options = possibleTransformsAt(transforms.lastIndex).toList()
-        val replacement = options.getOrNull(options.indexOf(current) + delta) ?: return
+        val currentIndex = options.indexOfFirst { option ->
+            option == current || current.isChiral && option.baseTag == current.baseTag
+        }
+        val replacement = options.getOrNull(currentIndex + delta) ?: return
         if (replacement != Transform.None) params.transforms.updateValue(transforms.dropLast(1) + replacement)
+    }
+
+    fun flipTransformChirality(index: Int) {
+        togglePopup(null)
+        params.transforms.updateValue(transforms.updatedAt(index, transforms[index].flippedChirality()))
+    }
+
+    fun flipSeedChirality() {
+        togglePopup(null)
+        params.seed.updateValue(params.seed.value.flippedChirality())
     }
 
     fun acceptPrefixReplacement(replacement: TransformPrefixReplacement) {
@@ -96,6 +110,9 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
                     Text(transforms[index].toString())
                     Aside(attrs = { classes("tooltip-text") }) { Text("Modify transform") }
                 }
+                if (index == transforms.lastIndex && transforms[index].isChiral) {
+                    ChiralityFlipButton { flipTransformChirality(index) }
+                }
                 if (index == errorIndex) {
                     if (transformError?.isAsync == true) {
                         Button(attrs = {
@@ -123,7 +140,7 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
             if (popup == Popup.Seed) {
                 Aside(attrs = { classes("dropdown") }) {
                     var previousType: SeedType? = null
-                    for (seed in Seeds) {
+                    for (seed in SeedOptions) {
                         if (seed.type != previousType) {
                             previousType = seed.type
                             GroupHeader(seed.type.toString())
@@ -143,6 +160,9 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
             }) {
                 Text(params.seed.value.toString())
                 Aside(attrs = { classes("tooltip-text") }) { Text("Seed") }
+            }
+            if (transforms.isEmpty() && params.seed.value.isChiral) {
+                ChiralityFlipButton(::flipSeedChirality)
             }
         }
 
@@ -177,6 +197,17 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
             I(attrs = { classes("fa", "fa-trash-o") })
             Aside(attrs = { classes("tooltip-text") }) { Text("Delete transform/reset seed") }
         }
+    }
+}
+
+@Composable
+private fun ChiralityFlipButton(onFlip: () -> Unit) {
+    Button(attrs = {
+        classes("square", "chirality-flip")
+        onClick { onFlip() }
+    }) {
+        I(attrs = { classes("fa", "fa-exchange") })
+        Aside(attrs = { classes("tooltip-text") }) { Text("Flip chirality") }
     }
 }
 

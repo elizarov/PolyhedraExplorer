@@ -17,7 +17,7 @@ example, the project expansion `a -> t` is conventionally written `ta`.
 | Truncated | Truncate, vertex truncation | `t` | - | `F + V` | `3E` | `2E` |
 | Rectified | Ambo, rectification, medial graph | `a` | - | `F + V` | `2E` | `E` |
 | Dual | Dualization, reciprocal dual | `d` | - | `V` | `E` | `F` |
-| Snub | Snubbing | `s` | - | `F + 2E + V` | `5E` | `2E` |
+| Snub | Snubbing | `s`, `s'` | - | `F + 2E + V` | `5E` | `2E` |
 | Chamfered | Chamfer, edge chamfering | `c` | - | `F + E` | `4E` | `V + 2E` |
 | Canonical | Canonicalization | `o` | - | `F` | `E` | `V` |
 | Drop | Orbit deletion | `x[kind]` | - | input-dependent | input-dependent | input-dependent |
@@ -29,11 +29,12 @@ example, the project expansion `a -> t` is conventionally written `ta`.
 | Bevelled | Bevel, omnitruncation | `b` | `a -> t` | `F + E + V` | `6E` | `4E` |
 | Ortho | Dual expand, double join | `O` | `d -> a -> a -> d` | `2E` | `4E` | `F + E + V` |
 | Meta | Dual bevel, kis-join | `m` | `d -> a -> t -> d` | `4E` | `6E` | `F + E + V` |
-| Gyro | Dual snub | `g` | `d -> s -> d` | `2E` | `5E` | `F + 2E + V` |
+| Gyro | Dual snub | `g`, `g'` | `d -> s -> d` / `d -> s' -> d` | `2E` | `5E` | `F + 2E + V` |
 
 Tags are case-sensitive. The project uses `n` for None and `o` for Canonical,
 so Needle and Ortho use `N` and `O`; their conventional Conway symbols are `n`
-and `o`.
+and `o`. A trailing prime selects alternate chirality: `s'` is flipped Snub and
+`g' = d -> s' -> d` is flipped Gyro.
 
 ## Primitive transformations
 
@@ -69,7 +70,7 @@ original topology.
 Snubbing separates and consistently twists the original faces. It keeps one face
 for every original face and vertex, then fills the gap around every original edge
 with two triangles. The consistent twist makes Snub chiral: reversing the twist
-produces its mirror form.
+produces its mirror form. The UI writes this alternate operation as `Snub'` (`s'`).
 
 ### Chamfered (`c`)
 
@@ -106,7 +107,8 @@ The UI can simplify the longest applied-end prefix to one primitive or macro. It
 expands macros and cancels adjacent Dual pairs before comparison; for example,
 displayed `Dual Needle` is offered as `Truncated`. Replacement is always explicit;
 accepting it can expose a fused `aa`/`at` kernel and select its regular coordinate
-realization.
+realization. Snub primes remain attached during expansion, so `d -> s' -> d` is
+offered as `Gyro'`, never unprimed Gyro.
 
 ### Kis (`k`)
 
@@ -165,6 +167,7 @@ four triangular faces per original edge.
 Gyro is the dual of Snub. It uses a consistent handed twist to divide the surface
 into two pentagonal faces per original edge. Like Snub, it preserves rotational
 symmetry while discarding reflection symmetry and therefore has mirror forms.
+The alternate form is written `Gyro'` (`g'`) and expands to `d -> s' -> d`.
 
 ## Sources of truth
 

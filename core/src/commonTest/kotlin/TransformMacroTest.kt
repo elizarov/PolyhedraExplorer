@@ -97,4 +97,23 @@ class TransformMacroTest {
         assertEquals("b", replacement?.replacementTag)
         assertEquals(0, replacement?.startIndex)
     }
+
+    @Test
+    fun prefixReplacementPreservesSnubAndGyroChirality() {
+        val flippedGyro = findTransformPrefixReplacement(listOf("d", "s'", "d"))
+        val flippedSnub = findTransformPrefixReplacement(listOf("d", "g'", "d"))
+
+        assertEquals("g'", flippedGyro?.replacementTag)
+        assertEquals("s'", flippedSnub?.replacementTag)
+
+        runSynchronously {
+            val macro = evaluateCore(CoreRequest(CoreState("C", listOf("g'"), "c")))
+            val expanded = evaluateCore(CoreRequest(CoreState("C", listOf("d", "s'", "d"), "c")))
+            assertEquals("Gyro' Cube", macro.polyName)
+            assertTrue(
+                macro.poly.geometryFingerprint().matches(expanded.poly.geometryFingerprint()),
+                "Flipped Gyro must match its chirality-preserving expansion",
+            )
+        }
+    }
 }

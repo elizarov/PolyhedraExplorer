@@ -24,12 +24,13 @@ class Seed(
     val type: SeedType,
     val fev: FEV,
     val wikiName: String,
+    val chirality: Chirality? = null,
     private val producer: SC.() -> Polyhedron
 ) : Tagged {
     val poly: Polyhedron by lazy { producer().scaled(seedScale) }
     internal val geometryFingerprint: PolyhedronGeometryFingerprint by lazy { poly.geometryFingerprint() }
     fun wikiURL(): String = "https://en.wikipedia.org/wiki/${wikiName.replace(' ', '_')}"
-    override fun toString(): String = name
+    override fun toString(): String = name + chirality?.suffix.orEmpty()
     companion object
 }
 
@@ -46,7 +47,14 @@ fun Polyhedron.recognizedSeedOrNull(): Seed? {
 @Suppress("ObjectPropertyName")
 private val _seeds = ArrayList<Seed>()
 
-private fun seed(tag: String, type: SeedType, fev: FEV, wikiName: String? = null, producer: SC.() -> Polyhedron) =
+private fun seed(
+    tag: String,
+    type: SeedType,
+    fev: FEV,
+    wikiName: String? = null,
+    chirality: Chirality? = null,
+    producer: SC.() -> Polyhedron,
+) =
     DelegateProvider { propertyName ->
         val name = buildString {
             for ((i, c) in propertyName.withIndex()) {
@@ -58,7 +66,7 @@ private fun seed(tag: String, type: SeedType, fev: FEV, wikiName: String? = null
                 }
             }
         }
-        val seed = Seed(tag, name, type,fev, wikiName ?: name, producer)
+        val seed = Seed(tag, name, type, fev, wikiName ?: name, chirality, producer)
         _seeds += seed
         ValueDelegate(seed)
     }
@@ -66,13 +74,24 @@ private fun seed(tag: String, type: SeedType, fev: FEV, wikiName: String? = null
 private fun seed(tag: String, type: SeedType, poly: Polyhedron) =
     seed(tag, type, poly.fev()) { poly }
 
-private fun seed(tag: String, type: SeedType, transform: Transform, base: Seed, wikiName: String? = null) =
-    seed(tag, type, transform.fev!! * base.fev, wikiName) {
-        base.poly.transformed(transform)
-    }
+private fun seed(
+    tag: String,
+    type: SeedType,
+    transform: Transform,
+    base: Seed,
+    wikiName: String? = null,
+    chirality: Chirality? = null,
+) = seed(tag, type, transform.fev!! * base.fev, wikiName, chirality) {
+    base.poly.transformed(transform)
+}
 
-private fun seed(type: SeedType, transform: Transform, base: Seed, wikiName: String? = null) =
-    seed(transform.tag + base.tag, type, transform, base, wikiName)
+private fun seed(
+    type: SeedType,
+    transform: Transform,
+    base: Seed,
+    wikiName: String? = null,
+    chirality: Chirality? = null,
+) = seed(transform.tag + base.tag, type, transform, base, wikiName, chirality)
 
 // --------------------- Basic platonic geometry ---------------------
 
@@ -158,13 +177,19 @@ val SC.TruncatedCube by seed("tC", SeedType.Archimedean, Transform.Truncated, SC
 val SC.TruncatedOctahedron by seed("tO", SeedType.Archimedean, Transform.Truncated, SC.Octahedron)
 val SC.Rhombicuboctahedron by seed("eC", SeedType.Archimedean, Transform.Cantellated, SC.Cube)
 val SC.RhombitruncatedCuboctahedron by seed("bC", SeedType.Archimedean, Transform.Bevelled, SC.Cube, "Truncated cuboctahedron")
-val SC.SnubCube by seed("sC", SeedType.Archimedean, Transform.Snub, SC.Cube)
+val SC.SnubCube by seed("sC", SeedType.Archimedean, Transform.Snub, SC.Cube, chirality = Chirality.Default)
 val SC.Icosidodecahedron by seed("aD", SeedType.Archimedean, Transform.Rectified, SC.Dodecahedron)
 val SC.TruncatedDodecahedron by seed("tD", SeedType.Archimedean, Transform.Truncated, SC.Dodecahedron)
 val SC.TruncatedIcosahedron by seed("tI", SeedType.Archimedean, Transform.Truncated, SC.Icosahedron)
 val SC.Rhombicosidodecahedron by seed("eD", SeedType.Archimedean, Transform.Cantellated, SC.Dodecahedron)
 val SC.RhombitruncatedIcosidodecahedron by seed("bD", SeedType.Archimedean, Transform.Bevelled, SC.Dodecahedron, "Truncated icosidodecahedron")
-val SC.SnubDodecahedron by seed("sD", SeedType.Archimedean, Transform.Snub, SC.Dodecahedron)
+val SC.SnubDodecahedron by seed(
+    "sD",
+    SeedType.Archimedean,
+    Transform.Snub,
+    SC.Dodecahedron,
+    chirality = Chirality.Default,
+)
 
 // --------------------- 13 Catalan Solids ---------------------
 
@@ -174,10 +199,39 @@ val SC.TriakisOctahedron by seed(SeedType.Catalan, Transform.Dual, SC.TruncatedC
 val SC.TetrakisHexahedron by seed(SeedType.Catalan, Transform.Dual, SC.TruncatedOctahedron)
 val SC.DeltoidalIcositetrahedron by seed(SeedType.Catalan, Transform.Dual, SC.Rhombicuboctahedron)
 val SC.DisdyakisDodecahedron by seed(SeedType.Catalan, Transform.Dual, SC.RhombitruncatedCuboctahedron)
-val SC.PentagonalIcositetrahedron by seed(SeedType.Catalan, Transform.Dual, SC.SnubCube)
+val SC.PentagonalIcositetrahedron by seed(
+    SeedType.Catalan,
+    Transform.Dual,
+    SC.SnubCube,
+    chirality = Chirality.Default,
+)
 val SC.RhombicTriacontahedron by seed(SeedType.Catalan, Transform.Dual, SC.Icosidodecahedron)
 val SC.TriakisIcosahedron by seed(SeedType.Catalan, Transform.Dual, SC.TruncatedDodecahedron)
 val SC.PentakisDodecahedron by seed(SeedType.Catalan, Transform.Dual, SC.TruncatedIcosahedron)
 val SC.DeltoidalHexecontahedron by seed(SeedType.Catalan, Transform.Dual, SC.Rhombicosidodecahedron)
 val SC.DisdyakisTriacontahedron by seed(SeedType.Catalan, Transform.Dual, SC.RhombitruncatedIcosidodecahedron)
-val SC.PentagonalHexecontahedron by seed(SeedType.Catalan, Transform.Dual, SC.SnubDodecahedron)
+val SC.PentagonalHexecontahedron by seed(
+    SeedType.Catalan,
+    Transform.Dual,
+    SC.SnubDodecahedron,
+    chirality = Chirality.Default,
+)
+
+@Suppress("unused")
+private val flippedChiralSeeds = listOf(
+    SC.SnubCube,
+    SC.SnubDodecahedron,
+    SC.PentagonalIcositetrahedron,
+    SC.PentagonalHexecontahedron,
+).mapTo(_seeds) { seed ->
+    Seed(
+        tag = seed.tag.withChirality(Chirality.Flipped),
+        name = seed.name,
+        type = seed.type,
+        fev = seed.fev,
+        wikiName = seed.wikiName,
+        chirality = Chirality.Flipped,
+    ) {
+        seed.poly.reflected()
+    }
+}
