@@ -7,6 +7,18 @@ import polyhedra.model.util.*
 
 private const val KIS_FACE_TAG = "k"
 private const val TRUNCATE_VERTEX_TAG = "t"
+private const val RECTIFY_VERTEX_TAG = "a"
+
+internal interface OrbitTargetedAnimation {
+    fun targetRatio(poly: Polyhedron): Double
+
+    fun polyAtRatio(
+        poly: Polyhedron,
+        ratio: Double,
+        scale: Scale?,
+        forceFaceKinds: List<FaceKindSource>?,
+    ): Polyhedron
+}
 
 @Serializable
 data class KisFace(val kind: FaceKind) : Transform() {
@@ -21,7 +33,7 @@ data class KisFace(val kind: FaceKind) : Transform() {
 }
 
 @Serializable
-data class TruncateVertex(val kind: VertexKind) : Transform() {
+data class TruncateVertex(val kind: VertexKind) : Transform(), OrbitTargetedAnimation {
     override val tag: String
         get() = "$TRUNCATE_VERTEX_TAG[$kind]"
 
@@ -29,7 +41,37 @@ data class TruncateVertex(val kind: VertexKind) : Transform() {
 
     override fun isApplicable(poly: Polyhedron): Boolean = kind in poly.vertexKinds
 
+    override fun targetRatio(poly: Polyhedron): Double = poly.regularTruncationRatio()
+
+    override fun polyAtRatio(
+        poly: Polyhedron,
+        ratio: Double,
+        scale: Scale?,
+        forceFaceKinds: List<FaceKindSource>?,
+    ): Polyhedron = poly.truncateVertices(setOf(kind), ratio, scale, forceFaceKinds)
+
     override fun toString(): String = "Truncate $kind"
+}
+
+@Serializable
+data class RectifyVertex(val kind: VertexKind) : Transform(), OrbitTargetedAnimation {
+    override val tag: String
+        get() = "$RECTIFY_VERTEX_TAG[$kind]"
+
+    override fun transform(poly: Polyhedron): Polyhedron = poly.rectifyVertices(setOf(kind))
+
+    override fun isApplicable(poly: Polyhedron): Boolean = kind in poly.vertexKinds
+
+    override fun targetRatio(poly: Polyhedron): Double = 1.0
+
+    override fun polyAtRatio(
+        poly: Polyhedron,
+        ratio: Double,
+        scale: Scale?,
+        forceFaceKinds: List<FaceKindSource>?,
+    ): Polyhedron = poly.truncateVertices(setOf(kind), ratio, scale, forceFaceKinds)
+
+    override fun toString(): String = "Rectify $kind"
 }
 
 internal fun String.toOrbitTargetedTransformOrNull(): Transform? {
@@ -42,6 +84,7 @@ internal fun String.toOrbitTargetedTransformOrNull(): Transform? {
         prefix == DROP_TAG -> Drop(kind)
         prefix == KIS_FACE_TAG && kind is FaceKind -> KisFace(kind)
         prefix == TRUNCATE_VERTEX_TAG && kind is VertexKind -> TruncateVertex(kind)
+        prefix == RECTIFY_VERTEX_TAG && kind is VertexKind -> RectifyVertex(kind)
         else -> null
     }
 }
@@ -50,11 +93,16 @@ val Polyhedron.availableOrbitTransforms: Set<Transform>
     get() = buildSet {
         canDrop.mapTo(this, ::Drop)
         if (faceKinds.size > 1) faceKinds.keys.mapTo(this, ::KisFace)
-        if (vertexKinds.size > 1) vertexKinds.keys.mapTo(this, ::TruncateVertex)
+        if (vertexKinds.size > 1) {
+            vertexKinds.keys.mapTo(this, ::TruncateVertex)
+            vertexKinds.keys.mapTo(this, ::RectifyVertex)
+        }
     }
 
 /** Kises the selected face orbits. Selecting every orbit is exactly the Kis macro geometry. */
-internal fun Polyhedron.kisFaces(kinds: Set<FaceKind>): Polyhedron {
+internal fun Polyhedron.kisFaces(
+    kinds: Set<FaceKind>,
+): Polyhedron {
     require(kinds.isNotEmpty() && kinds.all { it in faceKinds })
     val fullKis = dual().truncated().dual()
     if (kinds.size == faceKinds.size && kinds.containsAll(faceKinds.keys)) return fullKis
@@ -92,11 +140,22 @@ internal fun Polyhedron.kisFaces(kinds: Set<FaceKind>): Polyhedron {
 
 /** Truncates the selected vertex orbits. Selecting every orbit is exactly full truncation. */
 internal fun Polyhedron.truncateVertices(kinds: Set<VertexKind>): Polyhedron {
-    require(kinds.isNotEmpty() && kinds.all { it in vertexKinds })
-    if (kinds.size == vertexKinds.size && kinds.containsAll(vertexKinds.keys)) return truncated()
-    val truncationRatio = regularTruncationRatio()
+    return truncateVertices(kinds, regularTruncationRatio())
+}
 
-    return transformedPolyhedron(TruncateVertex::class, kinds) {
+internal fun Polyhedron.truncateVertices(
+    kinds: Set<VertexKind>,
+    ratio: Double,
+    scale: Scale? = null,
+    forceFaceKinds: List<FaceKindSource>? = null,
+): Polyhedron {
+    require(kinds.isNotEmpty() && kinds.all { it in vertexKinds })
+    require(ratio in 0.0..1.0)
+    if (kinds.size == vertexKinds.size && kinds.containsAll(vertexKinds.keys)) {
+        return truncated(ratio, scale, forceFaceKinds)
+    }
+
+    return transformedPolyhedron(TruncateVertex::class, kinds to ratio, scale, forceFaceKinds) {
         val retainedVertices = vs
             .filter { it.kind !in kinds }
             .associateWith { vertex(it) }
@@ -104,9 +163,9 @@ internal fun Polyhedron.truncateVertices(kinds: Set<VertexKind>): Polyhedron {
         val truncatedVertices = directedEdges
             .filter { it.a.kind in kinds }
             .associateWith { edge ->
-                val ratio = truncationRatio * edge.midPointFraction(edgesMidPointDefault)
+                val edgeRatio = ratio * edge.midPointFraction(edgesMidPointDefault)
                 vertex(
-                    ratio.atSegment(edge.a, edge.b),
+                    edgeRatio.atSegment(edge.a, edge.b),
                     VertexKind(newVertexKindOffset + directedEdgeKindsIndex.getValue(edge.kind)),
                 )
             }
@@ -133,6 +192,73 @@ internal fun Polyhedron.truncateVertices(kinds: Set<VertexKind>): Polyhedron {
             val kind = FaceKind(newFaceKindOffset + vertex.kind.id)
             face(vertex.directedEdges.map(truncatedVertices::getValue), kind)
             faceKindSource(kind, vertex.kind)
+        }
+        mergeIndistinguishableKinds()
+    }
+}
+
+/** Rectifies the selected vertex orbits, sharing one midpoint when both edge ends are selected. */
+internal fun Polyhedron.rectifyVertices(kinds: Set<VertexKind>): Polyhedron {
+    require(kinds.isNotEmpty() && kinds.all { it in vertexKinds })
+    if (kinds.size == vertexKinds.size && kinds.containsAll(vertexKinds.keys)) return rectified()
+
+    return transformedPolyhedron(RectifyVertex::class, kinds) {
+        val retainedVertices = vs
+            .filter { it.kind !in kinds }
+            .associateWith { vertex(it) }
+        val midpointKinds = linkedMapOf<AnyKind, VertexKind>()
+        val midpointVertices = linkedMapOf<Edge, Vertex>()
+
+        fun selectedDirection(edge: Edge): Edge =
+            if (edge.a.kind in kinds) edge else edge.reversed
+
+        fun midpointKey(edge: Edge): Edge {
+            val selected = selectedDirection(edge)
+            return if (selected.b.kind in kinds) selected.normalizedDirection() else selected
+        }
+
+        fun midpointVertex(edge: Edge): Vertex {
+            val key = midpointKey(edge)
+            return midpointVertices.getOrPut(key) {
+                val sourceKind: AnyKind = key.kind
+                val kind = midpointKinds.getOrPut(sourceKind) {
+                    VertexKind(vertexKinds.size + midpointKinds.size)
+                }
+                vertex(key.midPoint(edgesMidPointDefault), kind)
+            }
+        }
+
+        for (edge in directedEdges) {
+            if (edge.a.kind in kinds) midpointVertex(edge)
+        }
+
+        for (sourceFace in fs) {
+            val output = ArrayList<Vertex>(sourceFace.size * 2)
+            for (index in sourceFace.directedEdges.indices) {
+                val outgoing = sourceFace.directedEdges[index]
+                val sourceVertex = outgoing.a
+                if (sourceVertex.kind in kinds) {
+                    val incoming = sourceFace.directedEdges[(index + sourceFace.size - 1) % sourceFace.size]
+                    output += midpointVertex(incoming)
+                    output += midpointVertex(outgoing)
+                } else {
+                    output += retainedVertices.getValue(sourceVertex)
+                }
+            }
+            val compact = output.filterIndexed { index, vertex ->
+                index == 0 || vertex != output[index - 1]
+            }.let { vertices ->
+                if (vertices.size > 1 && vertices.first() == vertices.last()) vertices.dropLast(1) else vertices
+            }
+            face(compact, sourceFace.kind)
+        }
+
+        val newFaceKindOffset = faceKinds.size
+        for (sourceVertex in vs) {
+            if (sourceVertex.kind !in kinds) continue
+            val kind = FaceKind(newFaceKindOffset + sourceVertex.kind.id)
+            face(sourceVertex.directedEdges.map(::midpointVertex), kind)
+            faceKindSource(kind, sourceVertex.kind)
         }
         mergeIndistinguishableKinds()
     }

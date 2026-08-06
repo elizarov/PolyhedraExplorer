@@ -23,6 +23,7 @@ example, the project expansion `a -> t` is conventionally written `ta`.
 | Drop | Orbit deletion | `x[kind]` | - | input-dependent | input-dependent | input-dependent |
 | Kis face | Selective akisation | `k[face]` | - | input-dependent | input-dependent | input-dependent |
 | Truncate vertex | Selective vertex truncation | `t[vertex]` | - | input-dependent | input-dependent | input-dependent |
+| Rectify vertex | Selective vertex rectification | `a[vertex]` | - | input-dependent | input-dependent | input-dependent |
 | Kis | Akisation, Kleetope, cumulation, pyramid augmentation | `k` | `d -> t -> d` | `2E` | `3E` | `F + V` |
 | Join | Dual ambo | `j` | `d -> a -> d` | `E` | `2E` | `F + V` |
 | Needle | Dual truncation | `N` | `t -> d` | `2E` | `3E` | `F + V` |
@@ -116,16 +117,35 @@ vertex orbit in the core operation is therefore exactly equivalent to Truncated.
 The operation is offered only when the input has more than one vertex orbit and
 is displayed as `Truncate A`, `Truncate B`, and so on.
 
+### Rectify vertex (`a[vertex]`)
+
+Rectify vertex moves the edges incident to one selected vertex orbit to their
+midpoints. Every selected vertex becomes a new face, while unselected vertices
+remain. When both ends of an edge are selected, they share one midpoint rather
+than producing coincident duplicate vertices. Selecting every vertex orbit is
+therefore exactly equivalent to full Rectified. The operation is offered only
+when the input has more than one vertex orbit and is displayed as `Rectify A`,
+`Rectify B`, and so on.
+
 The transform popup presents valid selective operations in its final
 `Orbit-targeted` section. Entries use one global order: Drop face, Drop edge, Drop
-vertex, Kis face, Truncate vertex. The F/E/V orbit rows show every operation
-currently available for that exact orbit at the right edge in the same order,
-using × for Drop, an upward caret for Kis face, and scissors for Truncate vertex;
-hover tooltips name the operation and target orbit. Choosing one stores its first
-concrete target. When an orbit-targeted
+vertex, Kis face, Truncate vertex, Rectify vertex. The F/E/V orbit rows show every
+operation currently available for that exact orbit at the right edge in the same
+order, using × for Drop, an upward caret for Kis face, scissors for Truncate
+vertex, and compress for Rectify vertex; hover tooltips name the operation and
+target orbit. Choosing one stores its first concrete target. When an orbit-targeted
 operation is the last chain item, its up/down controls cycle through all currently
 valid targets of that same operation and wrap at both ends. The URL retains the
-concrete `x[kind]`, `k[face]`, or `t[vertex]` tag, so the selected orbit round-trips.
+concrete `x[kind]`, `k[face]`, `t[vertex]`, or `a[vertex]` tag, so the selected
+orbit round-trips.
+
+Truncate vertex and Rectify vertex expose parameterized cut-depth animation
+kernels. Adding and removing one uses the same collapsed-topology technique as
+the corresponding full operation. Changing the target with the orbit spinner
+produces two half-duration keyframes: the old target animates out to the input
+mesh, then the new target animates in. Kis face changes are immediate: collapsing
+its apex produced unstable triangles, so the core intentionally emits no Kis-face
+animation keyframes.
 
 ## Macros
 

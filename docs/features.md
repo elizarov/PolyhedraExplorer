@@ -3,8 +3,8 @@
 ## Polyhedra
 
 - 31 fixed convex seed types: 5 Platonic, 13 Archimedean, and 13 Catalan solids. A Families category immediately after Platonic adds Prism, Antiprism, Pyramid, and Bipyramid for every `n` from 3 to 100. Popup rows show family names without a number; the initially remembered size is 3. The selected seed displays its concrete `n`, and adjacent up/down controls change it within the bounds. Both popup selection and left/right seed navigation reuse the last family `n` across family and fixed-seed changes, including while transforms are present. Deleting transforms retains it; resetting from a seed-only state clears it back to 3.
-- Transform chains containing the primitive Truncated, Rectified, Dual, Snub, Chamfered, `Canonical` (the canonicalization operation), and topology-dependent orbit-targeted operations. None removes an existing stage. The transform popup lists fixed primitives under Transform, combinations under Macro, and available orbit-targeted operations under a final section in the global order Drop face, Drop edge, Drop vertex, Kis face, Truncate vertex.
-- Kis face is offered for inputs with multiple face orbits and replaces every face in one selected orbit with pyramidal triangles. Truncate vertex is offered for inputs with multiple vertex orbits and cuts every vertex in one selected orbit. Applying either core operation to all corresponding orbits produces exactly the same geometry as the existing full Kis or Truncated implementation.
+- Transform chains containing the primitive Truncated, Rectified, Dual, Snub, Chamfered, `Canonical` (the canonicalization operation), and topology-dependent orbit-targeted operations. None removes an existing stage. The transform popup lists fixed primitives under Transform, combinations under Macro, and available orbit-targeted operations under a final section in the global order Drop face, Drop edge, Drop vertex, Kis face, Truncate vertex, Rectify vertex.
+- Kis face is offered for inputs with multiple face orbits and replaces every face in one selected orbit with pyramidal triangles. Truncate vertex and Rectify vertex are offered for inputs with multiple vertex orbits; they cut one orbit at the regular truncation depth or at shared edge midpoints. Applying any selective operation to all corresponding orbits produces exactly the same geometry as its full Kis, Truncated, or Rectified counterpart.
 - A newly added orbit-targeted operation selects its first valid orbit and is displayed with its concrete target, such as `Kis α` or `Truncate A`. While it is the last chain item, compact up/down controls to its right cycle and wrap through the currently valid orbits of that same operation.
 - Conway-style macros for Kis (Dual → Truncated → Dual), Join (Dual → Rectified → Dual), Needle (Truncated → Dual), Zip (Dual → Truncated), Cantellated (Rectified → Rectified), Bevelled (Rectified → Truncated, conventionally `ta`), Ortho (Dual → Rectified → Rectified → Dual), Meta (Dual → Rectified → Truncated → Dual), and Gyro (Dual → Snub → Dual). Macros are stored as one chain item but execute as their primitive sequence in the Wasm core.
 - Snub and Gyro, and the four chiral seed types, have a prime-tagged alternate handedness. A flip button appears immediately to the right of a chiral item only while that item is last in the applied chain; flipped names and URL tags end in `'`.
@@ -21,7 +21,7 @@
 - Two-way orbit rollover between the F/E/V popup rows and the canvas. Canvas picking considers front-facing geometry; manually hidden face orbits retain their full virtual picking surfaces. Selected faces are highlighted, selected edges receive a contrasting overlay, and selected vertices are marked with small shaded balls.
 - Configurable automatic rotation, view scale, face expansion, transparency, width, rim, display mode, lighting, and shininess.
 - Configuration sliders, checkboxes, and dropdowns stay synchronized in both directions with programmatic and URL-driven parameter changes.
-- Smooth geometry transitions and topology-aware keyframe animations returned by the Wasm core.
+- Smooth geometry transitions and topology-aware keyframe animations returned by the Wasm core. Selective Truncate vertex and Rectify vertex animate with cut-depth kernels. Changing their target orbit animates the old target completely out before animating the new target in, avoiding interpolation between unrelated mesh indices. Selective Kis face changes are intentionally immediate because collapsed-apex interpolation does not produce a stable visual transition.
 - Rotation-orbit classification with orbit-based coloring and selection highlighting.
 - Live face/edge/vertex counts and frames-per-second display.
 
@@ -29,8 +29,8 @@
 
 - Face-kind table with count, inradius, adjacency, vertex figure, planarity, visibility, and available Drop/Kis actions.
 - Edge-kind table with count, midradius, adjacency, local geometry, and available Drop action.
-- Vertex-kind table with count, circumradius, adjacency, vertex figure, and available Drop/Truncate actions.
-- Every F/E/V orbit row places all currently available targeted actions at its right edge in the same global order as the transform popup. The ×, upward-caret, and scissors icons mean Drop, Kis face, and Truncate vertex; each icon has a tooltip naming its exact operation and target orbit.
+- Vertex-kind table with count, circumradius, adjacency, vertex figure, and available Drop/Truncate/Rectify actions.
+- Every F/E/V orbit row places all currently available targeted actions at its right edge in the same global order as the transform popup. The ×, upward-caret, scissors, and compress icons mean Drop, Kis face, Truncate vertex, and Rectify vertex; each icon has a tooltip naming its exact operation and target orbit.
 - Hide/show all faces or individual face kinds with immediately synchronized popup controls, while retaining configurable rims and shell width.
 
 ## Persistence and export

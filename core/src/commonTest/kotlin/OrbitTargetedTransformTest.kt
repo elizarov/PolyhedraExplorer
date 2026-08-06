@@ -4,10 +4,12 @@ import kotlinx.coroutines.test.runTest
 import polyhedra.core.api.evaluateCore
 import polyhedra.core.poly.*
 import polyhedra.core.transform.KisFace
+import polyhedra.core.transform.RectifyVertex
 import polyhedra.core.transform.Transform
 import polyhedra.core.transform.TruncateVertex
 import polyhedra.core.transform.availableOrbitTransforms
 import polyhedra.core.transform.kisFaces
+import polyhedra.core.transform.rectifyVertices
 import polyhedra.core.transform.toTransformOrNull
 import polyhedra.core.transform.transformed
 import polyhedra.core.transform.truncateVertices
@@ -30,6 +32,7 @@ class OrbitTargetedTransformTest {
     fun parsesConcreteTargetTagsAndReportsTheirNames() {
         val kis = "k[${FaceKind(1)}]".toTransformOrNull()
         val truncate = "t[${VertexKind(1)}]".toTransformOrNull()
+        val rectify = "a[${VertexKind(1)}]".toTransformOrNull()
 
         assertIs<KisFace>(kis)
         assertEquals(FaceKind(1), kis.kind)
@@ -37,14 +40,18 @@ class OrbitTargetedTransformTest {
         assertIs<TruncateVertex>(truncate)
         assertEquals(VertexKind(1), truncate.kind)
         assertEquals("Truncate B", truncate.toString())
+        assertIs<RectifyVertex>(rectify)
+        assertEquals(VertexKind(1), rectify.kind)
+        assertEquals("Rectify B", rectify.toString())
         assertNull("k[A]".toTransformOrNull())
         assertNull("t[${FaceKind(0)}]".toTransformOrNull())
+        assertNull("a[${FaceKind(0)}]".toTransformOrNull())
     }
 
     @Test
     fun exposesTargetedKisAndTruncateOnlyForMultipleOrbits() {
         val regular = Seed.Cube.poly.availableOrbitTransforms
-        assertFalse(regular.any { it is KisFace || it is TruncateVertex })
+        assertFalse(regular.any { it is KisFace || it is TruncateVertex || it is RectifyVertex })
 
         val multiFace = Seeds.first { it.poly.faceKinds.size > 1 }.poly
         val kisFaces = multiFace.availableOrbitTransforms.filterIsInstance<KisFace>()
@@ -53,6 +60,8 @@ class OrbitTargetedTransformTest {
         val multiVertex = Seeds.first { it.poly.vertexKinds.size > 1 }.poly
         val truncateVertices = multiVertex.availableOrbitTransforms.filterIsInstance<TruncateVertex>()
         assertEquals(multiVertex.vertexKinds.keys, truncateVertices.mapTo(linkedSetOf(), TruncateVertex::kind))
+        val rectifyVertices = multiVertex.availableOrbitTransforms.filterIsInstance<RectifyVertex>()
+        assertEquals(multiVertex.vertexKinds.keys, rectifyVertices.mapTo(linkedSetOf(), RectifyVertex::kind))
     }
 
     @Test
@@ -86,6 +95,21 @@ class OrbitTargetedTransformTest {
     }
 
     @Test
+    fun rectifyingOneVertexOrbitMovesItsIncidentEdgesToSharedMidpoints() {
+        val input = Seeds.first { it.poly.vertexKinds.size > 1 }.poly
+        val kind = input.vertexKinds.keys.first()
+        val selectedVertices = input.vs.filter { it.kind == kind }
+        val incidentEdges = input.es.filter { it.a.kind == kind || it.b.kind == kind }
+
+        val result = input.transformed(RectifyVertex(kind))
+        result.validate()
+
+        assertEquals(input.vs.size - selectedVertices.size + incidentEdges.size, result.vs.size)
+        assertEquals(input.fs.size + selectedVertices.size, result.fs.size)
+        assertEquals(result.fs.size + result.vs.size - 2, result.es.size)
+    }
+
+    @Test
     fun targetingEveryOrbitMatchesTheExistingFullTransformGeometry() {
         val input = Seed.TruncatedCube.poly
         val targetedKis = input.kisFaces(input.faceKinds.keys)
@@ -97,6 +121,11 @@ class OrbitTargetedTransformTest {
         val fullTruncation = input.transformed(Transform.Truncated)
         assertEquals(fullTruncation.fev(), targetedTruncation.fev())
         assertTrue(fullTruncation.geometryFingerprint().matches(targetedTruncation.geometryFingerprint()))
+
+        val targetedRectification = input.rectifyVertices(input.vertexKinds.keys)
+        val fullRectification = input.transformed(Transform.Rectified)
+        assertEquals(fullRectification.fev(), targetedRectification.fev())
+        assertTrue(fullRectification.geometryFingerprint().matches(targetedRectification.geometryFingerprint()))
     }
 
     @Test
@@ -111,6 +140,9 @@ class OrbitTargetedTransformTest {
             if (poly.vertexKinds.size > 1) {
                 testParameter("$seed truncate vertex", poly.vertexKinds.keys) { kind ->
                     poly.transformed(TruncateVertex(kind)).validate()
+                }
+                testParameter("$seed rectify vertex", poly.vertexKinds.keys) { kind ->
+                    poly.transformed(RectifyVertex(kind)).validate()
                 }
             }
         }
@@ -152,22 +184,75 @@ class OrbitTargetedTransformTest {
     }
 
     @Test
-    fun growingTargetedKisMeshDoesNotInterpolateUnrelatedMeshIndices() = runTest {
-        val baseTags = listOf("k", "s", "o")
-        val baseState = CoreState("sD", baseTags, "c")
-        val previousTag = "k[${FaceKind(4)}]"
-        val currentTag = "k[${FaceKind(5)}]"
-        val response = evaluateCore(
-            CoreRequest(
-                state = baseState.copy(transformTags = baseTags + currentTag),
-                previousState = baseState.copy(transformTags = baseTags + previousTag),
-                animationDuration = 0.5,
-            ),
+    fun changingTargetOrbitAnimatesOldTargetOutThenNewTargetIn() = runTest {
+        val vertexSeed = Seeds.first { it.poly.vertexKinds.size > 1 }
+        val vertexKinds = vertexSeed.poly.vertexKinds.keys.toList()
+        val cases = listOf(
+            vertexSeed to listOf(TruncateVertex(vertexKinds[0]), TruncateVertex(vertexKinds[1])),
+            vertexSeed to listOf(RectifyVertex(vertexKinds[0]), RectifyVertex(vertexKinds[1])),
         )
-        assertTrue(
-            response.animation.isEmpty(),
-            "$previousTag -> $currentTag must not pair unrelated vertices by index",
+
+        for ((seed, transforms) in cases) {
+            val baseState = CoreState(seed.tag, emptyList(), "c")
+            val response = evaluateCore(
+                CoreRequest(
+                    state = baseState.copy(transformTags = listOf(transforms[1].tag)),
+                    previousState = baseState.copy(transformTags = listOf(transforms[0].tag)),
+                    animationDuration = 0.5,
+                ),
+            )
+
+            assertEquals(2, response.animation.size, transforms.joinToString(" -> "))
+            assertEquals(listOf(0.25, 0.25), response.animation.map { it.duration })
+            assertTrue(response.animation.all { it.previousPoly.hasSameTopology(it.targetPoly) })
+            assertTrue(response.animation[0].targetFraction >= 0.999, "old target must animate out")
+            assertTrue(response.animation[1].previousFraction <= 0.001, "new target must animate in")
+        }
+    }
+
+    @Test
+    fun targetedKisNeverProducesAnimationKeyframes() = runTest {
+        val seed = Seed.TruncatedCube
+        val kinds = seed.poly.faceKinds.keys.toList()
+        val baseState = CoreState(seed.tag, emptyList(), "c")
+        val firstState = baseState.copy(transformTags = listOf(KisFace(kinds[0]).tag))
+        val secondState = baseState.copy(transformTags = listOf(KisFace(kinds[1]).tag))
+
+        for ((previous, current) in listOf(
+            baseState to firstState,
+            firstState to baseState,
+            firstState to secondState,
+        )) {
+            val response = evaluateCore(
+                CoreRequest(current, previous, animationDuration = 0.5),
+            )
+            assertTrue(response.animation.isEmpty(), "$previous -> $current")
+        }
+    }
+
+    @Test
+    fun selectiveTruncateAndRectifyAnimateInAndOut() = runTest {
+        val vertexSeed = Seeds.first { it.poly.vertexKinds.size > 1 }
+        val cases = listOf(
+            vertexSeed to TruncateVertex(vertexSeed.poly.vertexKinds.keys.first()),
+            vertexSeed to RectifyVertex(vertexSeed.poly.vertexKinds.keys.first()),
         )
+
+        for ((seed, transform) in cases) {
+            val baseState = CoreState(seed.tag, emptyList(), "c")
+            val transformedState = baseState.copy(transformTags = listOf(transform.tag))
+            val animateIn = evaluateCore(
+                CoreRequest(transformedState, baseState, animationDuration = 0.5),
+            ).animation.single()
+            val animateOut = evaluateCore(
+                CoreRequest(baseState, transformedState, animationDuration = 0.5),
+            ).animation.single()
+
+            assertEquals(0.5, animateIn.duration, "$transform in")
+            assertEquals(0.5, animateOut.duration, "$transform out")
+            assertTrue(animateIn.previousPoly.hasSameTopology(animateIn.targetPoly), "$transform in topology")
+            assertTrue(animateOut.previousPoly.hasSameTopology(animateOut.targetPoly), "$transform out topology")
+        }
     }
 }
 

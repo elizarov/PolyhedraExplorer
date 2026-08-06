@@ -168,7 +168,8 @@ enum class OrbitTargetedOperation(
     DropEdge("Drop edge", "fa-remove"),
     DropVertex("Drop vertex", "fa-remove"),
     KisFace("Kis face", "fa-caret-up"),
-    TruncateVertex("Truncate vertex", "fa-scissors");
+    TruncateVertex("Truncate vertex", "fa-scissors"),
+    RectifyVertex("Rectify vertex", "fa-compress");
 }
 
 val PrimitiveTransforms: List<Transform> = listOf(
@@ -211,6 +212,7 @@ fun Transform.flippedChirality(): Transform {
 private const val DROP_TAG = "x"
 private const val KIS_FACE_TAG = "k"
 private const val TRUNCATE_VERTEX_TAG = "t"
+private const val RECTIFY_VERTEX_TAG = "a"
 
 fun Drop(kind: AnyKind): Transform =
     Transform("$DROP_TAG[$kind]", "Drop $kind", TransformCategory.OrbitTargeted)
@@ -220,6 +222,9 @@ fun KisFace(kind: FaceKind): Transform =
 
 fun TruncateVertex(kind: VertexKind): Transform =
     Transform("$TRUNCATE_VERTEX_TAG[$kind]", "Truncate $kind", TransformCategory.OrbitTargeted)
+
+fun RectifyVertex(kind: VertexKind): Transform =
+    Transform("$RECTIFY_VERTEX_TAG[$kind]", "Rectify $kind", TransformCategory.OrbitTargeted)
 
 data class OrbitTarget(
     val operation: OrbitTargetedOperation,
@@ -238,6 +243,7 @@ fun Transform.orbitTargetOrNull(): OrbitTarget? {
         prefix == DROP_TAG && kind is EdgeKind -> OrbitTargetedOperation.DropEdge
         prefix == DROP_TAG && kind is VertexKind -> OrbitTargetedOperation.DropVertex
         prefix == TRUNCATE_VERTEX_TAG && kind is VertexKind -> OrbitTargetedOperation.TruncateVertex
+        prefix == RECTIFY_VERTEX_TAG && kind is VertexKind -> OrbitTargetedOperation.RectifyVertex
         else -> return null
     }
     return OrbitTarget(operation, kind)
@@ -253,5 +259,6 @@ fun String.toTransformOrNull(): Transform? {
         OrbitTargetedOperation.DropVertex -> Drop(target.kind)
         OrbitTargetedOperation.KisFace -> KisFace(target.kind as FaceKind)
         OrbitTargetedOperation.TruncateVertex -> TruncateVertex(target.kind as VertexKind)
+        OrbitTargetedOperation.RectifyVertex -> RectifyVertex(target.kind as VertexKind)
     }
 }

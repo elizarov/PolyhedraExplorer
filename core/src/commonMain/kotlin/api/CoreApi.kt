@@ -298,11 +298,25 @@ private fun transformAnimation(
     if (previousTransform is Snub && currentTransform is Snub &&
         previousTransform.chirality != currentTransform.chirality
     ) return emptyList()
-    if (currentPoly.hasSameTopology(previousPoly)) {
+    if (previousTransform is KisFace || currentTransform is KisFace) return emptyList()
+    val changesOrbitTarget = previousTransform is OrbitTargetedAnimation &&
+        currentTransform is OrbitTargetedAnimation &&
+        previousTransform != currentTransform
+    if (!changesOrbitTarget && currentPoly.hasSameTopology(previousPoly)) {
         return listOf(
             CoreAnimationStep(duration, previousPoly.scaled(scale), 0.0, currentPoly.scaled(scale), 1.0)
         )
     }
+
+    orbitTargetedAnimation(
+        basePoly,
+        scale,
+        previousPoly,
+        currentPoly,
+        previousTransform,
+        currentTransform,
+        duration,
+    )?.let { return it }
 
     val previousTruncation = previousTransform.truncationRatio(basePoly)
     val currentTruncation = currentTransform.truncationRatio(basePoly)
@@ -447,6 +461,57 @@ private fun transformAnimation(
 
         else -> emptyList()
     }
+}
+
+private fun orbitTargetedAnimation(
+    basePoly: Polyhedron,
+    scale: Scale,
+    previousPoly: Polyhedron,
+    currentPoly: Polyhedron,
+    previousTransform: Transform,
+    currentTransform: Transform,
+    duration: Double,
+): List<CoreAnimationStep>? {
+    val animation: OrbitTargetedAnimation
+    val previousRatio: Double
+    val currentRatio: Double
+    when {
+        previousTransform is OrbitTargetedAnimation && currentTransform == Transform.None -> {
+            animation = previousTransform
+            previousRatio = animation.targetRatio(basePoly)
+            currentRatio = 0.0
+        }
+
+        previousTransform == Transform.None && currentTransform is OrbitTargetedAnimation -> {
+            animation = currentTransform
+            previousRatio = 0.0
+            currentRatio = animation.targetRatio(basePoly)
+        }
+
+        else -> return null
+    }
+
+    val previousFraction = previousFractionGap(previousRatio)
+    val targetFraction = targetFractionGap(currentRatio)
+    return listOf(
+        CoreAnimationStep(
+            duration,
+            animation.polyAtRatio(
+                basePoly,
+                previousFraction.interpolate(previousRatio, currentRatio),
+                scale,
+                previousPoly.faceKindSources,
+            ),
+            previousFraction,
+            animation.polyAtRatio(
+                basePoly,
+                targetFraction.interpolate(previousRatio, currentRatio),
+                scale,
+                currentPoly.faceKindSources,
+            ),
+            targetFraction,
+        )
+    )
 }
 
 private fun previousFractionGap(ratio: Double): Double =
