@@ -383,7 +383,7 @@ tr.info {
 
 .figure.edge-figure, .figure.edge-figure > svg {
     width: 2em;
-    height: 1.25em;
+    height: 1em;
 }
 
 tr.info:hover, tr.info.selected {
