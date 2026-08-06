@@ -149,7 +149,7 @@ class CoreApiTest {
 
     @Test
     fun evaluatesNewConwayTransformsWithChiralityAndMonotonicProgress() = runTest {
-        val progress = mutableListOf<Int>()
+        val progress = mutableListOf<CoreProgress>()
         val response = evaluateCore(
             CoreRequest(CoreState("T", listOf("p'", "w'", "q"), "c")),
             progress::add,
@@ -160,8 +160,7 @@ class CoreApiTest {
         assertEquals("Quinto Whirl' Propeller' Tetrahedron", response.polyName)
         assertEquals(FEV(496, 1260, 766), response.poly.fev())
         assertTrue(response.poly.isCanonical())
-        assertTrue(progress.zipWithNext().all { (previous, next) -> next >= previous })
-        assertEquals(100, progress.last())
+        assertStageProgress(progress, lastTransformIndex = 2)
     }
 
     @Test
@@ -182,7 +181,7 @@ class CoreApiTest {
 
     @Test
     fun evaluatesCantellateChamferSnubCanonicalChain() = runTest {
-        val progress = mutableListOf<Int>()
+        val progress = mutableListOf<CoreProgress>()
         val response = evaluateCore(
             CoreRequest(
                 CoreState(
@@ -200,7 +199,23 @@ class CoreApiTest {
         assertEquals(2880, response.poly.es.size)
         assertEquals(1152, response.poly.vs.size)
         assertTrue(response.poly.isCanonical(), "The output must satisfy the canonical representation invariants")
-        assertTrue(progress.zipWithNext().all { (previous, next) -> next >= previous })
-        assertEquals(100, progress.last())
+        assertStageProgress(progress, lastTransformIndex = 3)
+        assertTrue(
+            progress.any { it.transformIndex == 3 && it.done in 1..99 },
+            "Canonicalization must report intermediate progress on the Canonical stage",
+        )
+    }
+
+    private fun assertStageProgress(progress: List<CoreProgress>, lastTransformIndex: Int) {
+        assertEquals((0..lastTransformIndex).toList(), progress.map(CoreProgress::transformIndex).distinct())
+        for (transformIndex in 0..lastTransformIndex) {
+            val stageProgress = progress.filter { it.transformIndex == transformIndex }.map(CoreProgress::done)
+            assertEquals(0, stageProgress.first(), "Stage $transformIndex must announce itself before starting")
+            assertEquals(100, stageProgress.last(), "Stage $transformIndex must report completion")
+            assertTrue(
+                stageProgress.zipWithNext().all { (previous, next) -> next >= previous },
+                "Stage $transformIndex progress must be monotonic: $stageProgress",
+            )
+        }
     }
 }

@@ -44,6 +44,8 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         private set
     var coreError: String? = null
         private set
+    var coreLoaded: Boolean = false
+        private set
     var transformProgress: Int = 0
         private set
     var transformAnimation: TransformAnimation? = null
@@ -156,10 +158,9 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
                 animationDuration = duration,
                 detectSeed = detectSeed,
             ),
-            reportProgress = progress@{ done ->
+            reportProgress = progress@{ progress ->
                 if (requestId != activeRequestId) return@progress
-                transformProgress = done
-                notifyUpdated(Progress)
+                updateTransformProgress(progress)
             },
             onSuccess = success@{ response ->
                 if (requestId != activeRequestId || requestedState != state) return@success
@@ -186,6 +187,17 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         if (coreStarted) return
         coreStarted = true
         computeDerivedTargetValues()
+    }
+
+    internal fun updateTransformProgress(progress: CoreProgress) {
+        val lastTransformIndex = transforms.value.lastIndex.coerceAtLeast(0)
+        coreLoaded = true
+        transformProgress = progress.done.coerceIn(0, 100)
+        transformError = TransformError(
+            index = progress.transformIndex.coerceIn(0, lastTransformIndex),
+            isAsync = true,
+        )
+        notifyUpdated(Progress)
     }
 
     private fun applyResponse(state: CoreState, response: CoreResponse) {

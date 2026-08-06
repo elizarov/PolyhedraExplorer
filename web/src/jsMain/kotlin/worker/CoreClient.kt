@@ -6,6 +6,7 @@ import kotlinx.serialization.encodeToString
 import org.w3c.dom.MessageEvent
 import org.w3c.dom.Worker
 import polyhedra.model.api.CoreJson
+import polyhedra.model.api.CoreProgress
 import polyhedra.model.api.CoreRequest
 import polyhedra.model.api.CoreResponse
 
@@ -24,6 +25,7 @@ private data class WorkerRequest(
 private data class WorkerMessage(
     val id: Int,
     val type: String,
+    val transformIndex: Int? = null,
     val done: Int? = null,
     val responseJson: String? = null,
     val error: String? = null,
@@ -31,7 +33,7 @@ private data class WorkerMessage(
 
 private data class ActiveRequest(
     val id: Int,
-    val reportProgress: (Int) -> Unit,
+    val reportProgress: (CoreProgress) -> Unit,
     val onSuccess: (CoreResponse) -> Unit,
     val onFailure: (Throwable) -> Unit,
 )
@@ -48,7 +50,7 @@ private var lastRequestId = 0
  */
 fun evaluateInWasm(
     request: CoreRequest,
-    reportProgress: (Int) -> Unit,
+    reportProgress: (CoreProgress) -> Unit,
     onSuccess: (CoreResponse) -> Unit,
     onFailure: (Throwable) -> Unit,
 ): () -> Unit {
@@ -93,7 +95,12 @@ private fun onWorkerMessage(source: Worker, event: MessageEvent) {
 
     when (message.type) {
         PROGRESS -> runCatching {
-            active.reportProgress(requireNotNull(message.done) { "Missing progress value" })
+            active.reportProgress(
+                CoreProgress(
+                    transformIndex = requireNotNull(message.transformIndex) { "Missing progress transform index" },
+                    done = requireNotNull(message.done) { "Missing progress value" },
+                )
+            )
         }.onFailure(::failWorker)
 
         SUCCESS -> {

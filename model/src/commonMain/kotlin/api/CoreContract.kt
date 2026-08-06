@@ -20,6 +20,11 @@ data class CoreRequest(
     val detectSeed: Boolean = false,
 )
 
+data class CoreProgress(
+    val transformIndex: Int,
+    val done: Int,
+)
+
 @Serializable
 enum class CoreIssueCode {
     TransformFailed,

@@ -16,10 +16,14 @@ import kotlin.coroutines.startCoroutine
 
 @OptIn(ExperimentalJsExport::class, ExperimentalWasmJsInterop::class)
 @JsExport
-fun evaluateCoreJson(requestJson: String, reportProgress: (Int) -> Unit): Promise<JsString> = Promise { resolve, reject ->
+fun evaluateCoreJson(requestJson: String, reportProgress: (Int, Int) -> Unit): Promise<JsString> = Promise { resolve, reject ->
     suspend {
         val request = CoreJson.decodeFromString<CoreRequest>(requestJson)
-        CoreJson.encodeToString(evaluateCore(request, reportProgress)).toJsString()
+        CoreJson.encodeToString(
+            evaluateCore(request) { progress ->
+                reportProgress(progress.transformIndex, progress.done)
+            }
+        ).toJsString()
     }.startCoroutine(object : Continuation<JsString> {
         override val context = EmptyCoroutineContext
 

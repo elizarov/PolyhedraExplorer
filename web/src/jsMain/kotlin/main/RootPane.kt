@@ -41,10 +41,10 @@ fun RootPane(params: RootParams) {
                 popup = null
             },
         )
-    } else {
+    } else if (!params.render.poly.coreLoaded || params.render.poly.coreError != null) {
         Div(attrs = { classes("core-status") }) {
             params.render.poly.coreError?.let { Text("Wasm core error: $it") }
-                ?: Text("Loading Wasm core… ${params.render.poly.transformProgress}%")
+                ?: Text("Loading Wasm core…")
         }
     }
     ControlPane(params.render.poly, popup, togglePopup)

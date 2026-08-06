@@ -52,21 +52,33 @@ private sealed interface TransformApplication {
 
 suspend fun evaluateCore(
     request: CoreRequest,
-    reportProgress: (Int) -> Unit = {},
+    reportProgress: (CoreProgress) -> Unit = {},
 ): CoreResponse {
-    reportProgress(1)
+    reportProgress(CoreProgress(transformIndex = 0, done = 0))
     val current = evaluateState(request.state, reportProgress, detectSeed = request.detectSeed)
     val duration = request.animationDuration?.takeIf { it > 0.0 }
     val previousState = request.previousState
     if (duration == null || previousState == null || previousState == request.state) {
-        reportProgress(100)
+        reportCompletion(current, reportProgress)
+        return current.response
+    }
+
+    // A seed change cannot be animated, so evaluating the old transform chain would only repeat
+    // potentially expensive operations such as canonicalization before returning no animation.
+    if (previousState.seedTag != request.state.seedTag) {
+        reportCompletion(current, reportProgress)
         return current.response
     }
 
     val previous = evaluateState(previousState, {}, detectSeed = false)
     val animation = computeAnimation(previous, current, duration)
-    reportProgress(100)
+    reportCompletion(current, reportProgress)
     return current.response.copy(animation = animation)
+}
+
+private fun reportCompletion(evaluation: Evaluation, reportProgress: (CoreProgress) -> Unit) {
+    if (evaluation.response.errorIndex != null) return
+    reportProgress(CoreProgress(evaluation.validTransforms.lastIndex.coerceAtLeast(0), 100))
 }
 
 private data class Evaluation(
@@ -80,7 +92,7 @@ private data class Evaluation(
 
 private suspend fun evaluateState(
     state: CoreState,
-    reportProgress: (Int) -> Unit,
+    reportProgress: (CoreProgress) -> Unit,
     detectSeed: Boolean,
 ): Evaluation {
     val seed = state.seedTag.toSeedOrNull()
@@ -105,9 +117,9 @@ private suspend fun evaluateState(
     for ((index, transform) in transforms.withIndex()) {
         var warning: CoreIssue? = null
         val reportTransformProgress: (Int) -> Unit = { done ->
-            val span = 98
-            reportProgress(1 + (index * span + done.coerceIn(0, 100) * span / 100) / transforms.size)
+            reportProgress(CoreProgress(index, done.coerceIn(0, 100)))
         }
+        reportTransformProgress(0)
         when (val application = applyTransform(transform, poly, pendingRectification, reportTransformProgress)) {
             is TransformApplication.Failure -> {
                 errorIndex = index
@@ -165,7 +177,12 @@ private suspend fun applyTransform(
     var pendingRectification = inputPendingRectification
     var isIdentity = false
 
-    for (primitive in transform.primitiveTransforms) {
+    val primitiveCount = transform.primitiveTransforms.size
+    for ((primitiveIndex, primitive) in transform.primitiveTransforms.withIndex()) {
+        val reportPrimitiveProgress: (Int) -> Unit = { done ->
+            reportProgress((primitiveIndex * 100 + done.coerceIn(0, 100)) / primitiveCount)
+        }
+        reportPrimitiveProgress(0)
         if (!primitive.isApplicable(poly)) {
             return TransformApplication.Failure(
                 CoreIssue(CoreIssueCode.TransformNotApplicable, transform.tag)
@@ -193,7 +210,7 @@ private suspend fun applyTransform(
                     poly
                 }
 
-                else -> primitive.asyncTransform?.invoke(poly, OperationProgressContext(reportProgress))
+                else -> primitive.asyncTransform?.invoke(poly, OperationProgressContext(reportPrimitiveProgress))
                     ?: primitive.transform(poly)
             }
         } catch (cause: Throwable) {
@@ -209,6 +226,7 @@ private suspend fun applyTransform(
             primitive == Transform.Rectified -> PendingRectification(primitiveInput)
             else -> null
         }
+        reportPrimitiveProgress(100)
     }
 
     return TransformApplication.Success(poly, pendingRectification, isIdentity)
