@@ -3,6 +3,7 @@ package polyhedra.core
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
+import polyhedra.model.poly.FEV
 import polyhedra.model.poly.fev
 import polyhedra.core.transform.isCanonical
 import polyhedra.core.api.*
@@ -144,6 +145,39 @@ class CoreApiTest {
         assertEquals(response.polyName, decoded.polyName)
         assertEquals(response.poly.fev(), decoded.poly.fev())
         assertNotNull(decoded.poly)
+    }
+
+    @Test
+    fun evaluatesNewConwayTransformsWithChiralityAndMonotonicProgress() = runTest {
+        val progress = mutableListOf<Int>()
+        val response = evaluateCore(
+            CoreRequest(CoreState("T", listOf("p'", "w'", "q"), "c")),
+            progress::add,
+        )
+
+        assertNull(response.error)
+        assertEquals(listOf("p'", "w'", "q"), response.validTransformTags)
+        assertEquals("Quinto Whirl' Propeller' Tetrahedron", response.polyName)
+        assertEquals(FEV(496, 1260, 766), response.poly.fev())
+        assertTrue(response.poly.isCanonical())
+        assertTrue(progress.zipWithNext().all { (previous, next) -> next >= previous })
+        assertEquals(100, progress.last())
+    }
+
+    @Test
+    fun chiralityFlipDoesNotInterpolateThroughCollapsedGeometry() = runTest {
+        for ((defaultTag, flippedTag) in listOf("p" to "p'", "w" to "w'")) {
+            val response = evaluateCore(
+                CoreRequest(
+                    state = CoreState("C", listOf(flippedTag), "c"),
+                    previousState = CoreState("C", listOf(defaultTag), "c"),
+                    animationDuration = 0.5,
+                )
+            )
+
+            assertNull(response.error)
+            assertTrue(response.animation.isEmpty(), "$defaultTag -> $flippedTag")
+        }
     }
 
     @Test

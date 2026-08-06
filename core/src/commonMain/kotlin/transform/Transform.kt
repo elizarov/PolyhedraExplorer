@@ -53,6 +53,11 @@ sealed class Transform : Tagged {
         val Bevelled: Transform by Bevelled()
         val Snub: Transform by Snub()
         val SnubFlipped: Transform by Snub(Chirality.Flipped)
+        val Propeller: Transform by Propeller()
+        val PropellerFlipped: Transform by Propeller(Chirality.Flipped)
+        val Whirl: Transform by Whirl()
+        val WhirlFlipped: Transform by Whirl(Chirality.Flipped)
+        val Quinto: Transform by Quinto()
         val Chamfered: Transform by Chamfered()
         val Canonical: Transform by Canonical()
 
@@ -170,6 +175,59 @@ class Snub(
     )
 
     override fun toString(): String = "Snub${chirality.suffix}"
+}
+
+@Serializable
+class Propeller(
+    @Transient val chirality: Chirality = Chirality.Default,
+) : Transform() {
+    @Transient
+    override val tag: String = "p".withChirality(chirality)
+    override fun transform(poly: Polyhedron): Polyhedron = poly.propeller(chirality)
+    @Transient
+    override val asyncTransform: AsyncTransform = { poly, progress -> poly.propeller(chirality, progress) }
+    @Transient
+    override val fev = TransformFEV(
+        1, 2, 0,
+        0, 5, 0,
+        0, 2, 1,
+    )
+
+    override fun toString(): String = "Propeller${chirality.suffix}"
+}
+
+@Serializable
+class Whirl(
+    @Transient val chirality: Chirality = Chirality.Default,
+) : Transform() {
+    @Transient
+    override val tag: String = "w".withChirality(chirality)
+    override fun transform(poly: Polyhedron): Polyhedron = poly.whirl(chirality)
+    @Transient
+    override val asyncTransform: AsyncTransform = { poly, progress -> poly.whirl(chirality, progress) }
+    @Transient
+    override val fev = TransformFEV(
+        1, 2, 0,
+        0, 7, 0,
+        0, 4, 1,
+    )
+
+    override fun toString(): String = "Whirl${chirality.suffix}"
+}
+
+@Serializable
+class Quinto : Transform() {
+    @Transient
+    override val tag: String = "q"
+    override fun transform(poly: Polyhedron): Polyhedron = poly.quinto()
+    @Transient
+    override val asyncTransform: AsyncTransform = { poly, progress -> poly.quinto(progress) }
+    @Transient
+    override val fev = TransformFEV(
+        1, 2, 0,
+        0, 6, 0,
+        0, 3, 1,
+    )
 }
 
 @Serializable

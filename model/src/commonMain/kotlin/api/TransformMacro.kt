@@ -29,7 +29,9 @@ private val allTransformMacros = TransformMacros.flatMap { macro ->
     if (macro.chirality == null) listOf(macro) else listOf(macro, macro.flipped())
 }
 private val transformMacrosByTag = allTransformMacros.associateBy(TransformMacro::tag)
-private val primitiveReplacementTags = listOf("t", "a", "d", "s", "s'", "c", "o")
+private val primitiveReplacementTags = listOf(
+    "t", "a", "d", "s", "s'", "p", "p'", "w", "w'", "q", "c", "o",
+)
 private val replacementTagsByExpansion =
     (primitiveReplacementTags + allTransformMacros.map(TransformMacro::tag)).associateBy { tag ->
         listOf(tag).normalizedExpandedTransformTags()

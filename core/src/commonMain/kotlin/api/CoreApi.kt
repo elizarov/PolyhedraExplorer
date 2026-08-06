@@ -104,7 +104,11 @@ private suspend fun evaluateState(
     availableOrbitTransforms += poly.availableOrbitTransforms.map(Transform::tag).sorted()
     for ((index, transform) in transforms.withIndex()) {
         var warning: CoreIssue? = null
-        when (val application = applyTransform(transform, poly, pendingRectification, reportProgress)) {
+        val reportTransformProgress: (Int) -> Unit = { done ->
+            val span = 98
+            reportProgress(1 + (index * span + done.coerceIn(0, 100) * span / 100) / transforms.size)
+        }
+        when (val application = applyTransform(transform, poly, pendingRectification, reportTransformProgress)) {
             is TransformApplication.Failure -> {
                 errorIndex = index
                 errorIssue = application.issue
@@ -296,6 +300,12 @@ private fun transformAnimation(
 ): List<CoreAnimationStep> {
     if (previousTransform == Transform.None && currentTransform == Transform.None) return emptyList()
     if (previousTransform is Snub && currentTransform is Snub &&
+        previousTransform.chirality != currentTransform.chirality
+    ) return emptyList()
+    if (previousTransform is Propeller && currentTransform is Propeller &&
+        previousTransform.chirality != currentTransform.chirality
+    ) return emptyList()
+    if (previousTransform is Whirl && currentTransform is Whirl &&
         previousTransform.chirality != currentTransform.chirality
     ) return emptyList()
     if (previousTransform is KisFace || currentTransform is KisFace) return emptyList()

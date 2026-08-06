@@ -125,6 +125,11 @@ data class Transform(
         val Dual = Transform("d", "Dual")
         val Snub = Transform("s", "Snub", chirality = Chirality.Default)
         val SnubFlipped = Snub.copy(chirality = Chirality.Flipped)
+        val Propeller = Transform("p", "Propeller", chirality = Chirality.Default)
+        val PropellerFlipped = Propeller.copy(chirality = Chirality.Flipped)
+        val Whirl = Transform("w", "Whirl", chirality = Chirality.Default)
+        val WhirlFlipped = Whirl.copy(chirality = Chirality.Flipped)
+        val Quinto = Transform("q", "Quinto")
         val Chamfered = Transform("c", "Chamfered")
         val Canonical = Transform("o", "Canonical")
 
@@ -178,6 +183,9 @@ val PrimitiveTransforms: List<Transform> = listOf(
     Transform.Rectified,
     Transform.Dual,
     Transform.Snub,
+    Transform.Propeller,
+    Transform.Whirl,
+    Transform.Quinto,
     Transform.Chamfered,
     Transform.Canonical,
 )

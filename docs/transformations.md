@@ -18,6 +18,9 @@ example, the project expansion `a -> t` is conventionally written `ta`.
 | Rectified | Ambo, rectification, medial graph | `a` | - | `F + V` | `2E` | `E` |
 | Dual | Dualization, reciprocal dual | `d` | - | `V` | `E` | `F` |
 | Snub | Snubbing | `s`, `s'` | - | `F + 2E + V` | `5E` | `2E` |
+| Propeller | Propellor | `p`, `p'` | - | `F + 2E` | `5E` | `V + 2E` |
+| Whirl | - | `w`, `w'` | - | `F + 2E` | `7E` | `V + 4E` |
+| Quinto | - | `q` | - | `F + 2E` | `6E` | `V + 3E` |
 | Chamfered | Chamfer, edge chamfering | `c` | - | `F + E` | `4E` | `V + 2E` |
 | Canonical | Canonicalization | `o` | - | `F` | `E` | `V` |
 | Drop | Orbit deletion | `x[kind]` | - | input-dependent | input-dependent | input-dependent |
@@ -36,8 +39,9 @@ example, the project expansion `a -> t` is conventionally written `ta`.
 
 Tags are case-sensitive. The project uses `n` for None and `o` for Canonical,
 so Needle and Ortho use `N` and `O`; their conventional Conway symbols are `n`
-and `o`. A trailing prime selects alternate chirality: `s'` is flipped Snub and
-`g' = d -> s' -> d` is flipped Gyro.
+and `o`. A trailing prime selects alternate chirality: `s'`, `p'`, and `w'`
+are flipped Snub, Propeller, and Whirl, while `g' = d -> s' -> d` is flipped
+Gyro.
 
 ## Primitive transformations
 
@@ -74,6 +78,33 @@ Snubbing separates and consistently twists the original faces. It keeps one face
 for every original face and vertex, then fills the gap around every original edge
 with two triangles. The consistent twist makes Snub chiral: reversing the twist
 produces its mirror form. The UI writes this alternate operation as `Snub'` (`s'`).
+
+### Propeller (`p`)
+
+Propeller keeps every original vertex and inserts two points at the thirds of
+each original edge. Within every source face, one point from each boundary edge
+forms a smaller, consistently rotated copy of that face. A quadrilateral fills
+the region at every original face corner. Choosing the opposite rotation gives
+the mirror operation, written `Propeller'` (`p'`). After building this incidence
+structure, the core finds its canonical convex realization so a later transform
+does not encounter the coplanar faces of the literal subdivision.
+
+### Whirl (`w`)
+
+Whirl starts with the same original vertices and directed one-third edge points
+as Propeller, then adds an inner point for every face-edge incidence. The inner
+points form the new central face, and a hexagon fills each original face corner.
+Its consistent winding makes it chiral; the reverse winding is `Whirl'` (`w'`).
+The returned geometry is the canonical convex realization of this topology.
+
+### Quinto (`q`)
+
+Quinto places one midpoint on every original edge and, on each side of that
+edge, another point halfway from the midpoint to the source face center. Those
+inner points form a central face, while every original face corner becomes a
+pentagon. The construction has reflection symmetry, so Quinto has no alternate
+chirality. As with Propeller and Whirl, the returned coordinates are canonicalized
+to keep subsequent operations geometrically well-defined.
 
 ### Chamfered (`c`)
 
@@ -236,3 +267,5 @@ The alternate form is written `Gyro'` (`g'`) and expands to `d -> s' -> d`.
 - Conway operator terminology and identities: [George W. Hart's Conway Notation
   for Polyhedra](https://www.georgehart.com/virtual-polyhedra/conway_notation.html)
   and [Antiprism's Conway documentation](https://www.antiprism.com/programs/conway.html).
+- Propeller geometry and handedness: [George W. Hart's Propellor
+  Polyhedra](https://georgehart.com/propello/propello.html).

@@ -94,7 +94,12 @@ class EdgeKindEssence(
 
 fun Edge.essence(): EdgeKindEssence {
     val dist = midPoint(MidPoint.Closest).norm
-    val dihedralAngle = PI - acos(l * r)
+    val normalDot = (l * r).coerceIn(-1.0, 1.0)
+    val dihedralAngle = when {
+        normalDot approx 1.0 -> PI
+        normalDot approx -1.0 -> 0.0
+        else -> PI - acos(normalDot)
+    }
     return EdgeKindEssence(kind, dist, len, dihedralAngle)
 }
 

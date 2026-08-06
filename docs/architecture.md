@@ -42,6 +42,8 @@ flowchart LR
 
 `CoreClient.kt` is the browser-to-core invocation boundary. It owns a dedicated Web Worker, sends a serialized `CoreRequest`, receives progress messages, and decodes `CoreResponse`. The small `core-worker.js` shim dynamically imports the generated Wasm module and relays JSON messages; it contains no manipulation logic. Canonicalization and every other core operation therefore execute as WasmGC off the browser's main thread. Starting a newer request terminates an in-progress worker so stale expensive work cannot block the next result.
 
+Propeller, Whirl, and Quinto first build their exact local Conway incidence structure, apply a small orbit-preserving radial perturbation to avoid a degenerate circle-packing start, and then use the same progress-capable canonical solver to return a convex realization. Their final geometry is cached by input polyhedron and chirality. Progress from multiple background transforms is mapped into nondecreasing per-stage ranges before it reaches the UI.
+
 The generated Kotlin loader and the worker's dynamic-import expression are the only JavaScript interop required for core execution. The production web bundle depends on `model`, not `core`, so it cannot contain a JavaScript fallback copy of the manipulation engine.
 
 Canonical representation invariants and the current circle-packing solver are specified in [Canonicalization](canonicalization.md). The solver validates rotational kind groups, relaxes only one edge point and face plane per symmetry orbit, and expands the converged vertex planes through precomputed proper rotations once during final reconstruction.
@@ -50,7 +52,7 @@ The Wasm core owns:
 
 - seed geometry construction;
 - primitive transform and macro-expansion evaluation, including composition-aware `aa` cantellation and `at` bevel fusion;
-- truncate, rectify, cantellate, dual, bevel, snub, chamfer, canonicalization (the UI's `Canonical` transform), drop, and orbit-targeted Kis/Truncate/Rectify geometry kernels;
+- truncate, rectify, cantellate, dual, bevel, snub, propeller, whirl, quinto, chamfer, canonicalization (the UI's `Canonical` transform), drop, and orbit-targeted Kis/Truncate/Rectify geometry kernels;
 - size guards, applicability checks, warnings, and progress;
 - fixed and parameterized-family seed geometry, scale normalization, and topology/drop analysis;
 - rotation-orbit refinement and geometric comparison with built-in seeds;

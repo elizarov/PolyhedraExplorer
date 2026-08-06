@@ -56,6 +56,39 @@ class ChiralityUiTest {
     }
 
     @Test
+    fun lastPropellerTransformHasFlipControl() {
+        val params = PolyParams("", null)
+        params.transforms.updateValue(listOf(Transform.Propeller))
+        composition = renderComposable(host) { ControlPane(params, popup = null, togglePopup = {}) }
+
+        (host.querySelector(".chirality-flip") as HTMLElement).click()
+
+        assertEquals(listOf("p'"), params.transforms.value.map { it.tag })
+        assertEquals("Propeller'", params.transforms.value.single().toString())
+    }
+
+    @Test
+    fun lastWhirlTransformHasFlipControl() {
+        val params = PolyParams("", null)
+        params.transforms.updateValue(listOf(Transform.Whirl))
+        composition = renderComposable(host) { ControlPane(params, popup = null, togglePopup = {}) }
+
+        (host.querySelector(".chirality-flip") as HTMLElement).click()
+
+        assertEquals(listOf("w'"), params.transforms.value.map { it.tag })
+        assertEquals("Whirl'", params.transforms.value.single().toString())
+    }
+
+    @Test
+    fun quintoHasNoFlipControl() {
+        val params = PolyParams("", null)
+        params.transforms.updateValue(listOf(Transform.Quinto))
+        composition = renderComposable(host) { ControlPane(params, popup = null, togglePopup = {}) }
+
+        assertNull(host.querySelector(".chirality-flip"))
+    }
+
+    @Test
     fun flipControlOnlyAppearsForTheLastChainItem() {
         val params = PolyParams("", null)
         params.seed.updateValue(Seeds.single { it.tag == "sC" })
@@ -100,6 +133,19 @@ class ChiralityUiTest {
             assertEquals("sC'", restored.render.poly.seed.value.tag)
             assertEquals(listOf("g'"), restored.render.poly.transforms.value.map { it.tag })
         }
+    }
+
+    @Test
+    fun newConwayTransformTagsRoundTripInUrlState() {
+        val source = RootParams()
+        source.render.poly.transforms.updateValue(
+            listOf(Transform.PropellerFlipped, Transform.WhirlFlipped, Transform.Quinto),
+        )
+        val restored = RootParams()
+
+        restored.loadFromString(source.toString())
+
+        assertEquals(listOf("p'", "w'", "q"), restored.render.poly.transforms.value.map { it.tag })
     }
 
     private fun awaitRecomposition(): Promise<Unit> = Promise { resolve, _ ->
