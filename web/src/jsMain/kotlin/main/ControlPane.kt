@@ -31,6 +31,16 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
         return result
     }
 
+    fun operationOptionsAt(index: Int): List<Transform> {
+        val options = possibleTransformsAt(index)
+        val regular = options.filter { it.category != TransformCategory.OrbitTargeted }
+        val orbitTargeted = DropTarget.entries.mapNotNull { target ->
+            options.filter { it.dropKindOrNull()?.dropTarget() == target }
+                .minByOrNull { it.dropKindOrNull().toString() }
+        }
+        return regular + orbitTargeted
+    }
+
     fun updateTransform(index: Int, transform: Transform) {
         togglePopup(null)
         val updated = when {
@@ -51,12 +61,35 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
     fun adjustLastTransform(delta: Int) {
         togglePopup(null)
         val current = transforms.lastOrNull() ?: return
-        val options = possibleTransformsAt(transforms.lastIndex).toList()
+        val currentDropTarget = current.dropKindOrNull()?.dropTarget()
+        val options = operationOptionsAt(transforms.lastIndex)
         val currentIndex = options.indexOfFirst { option ->
-            option == current || current.isChiral && option.baseTag == current.baseTag
+            option == current ||
+                current.isChiral && option.baseTag == current.baseTag ||
+                currentDropTarget != null && option.dropKindOrNull()?.dropTarget() == currentDropTarget
         }
         val replacement = options.getOrNull(currentIndex + delta) ?: return
         if (replacement != Transform.None) params.transforms.updateValue(transforms.dropLast(1) + replacement)
+    }
+
+    fun adjustLastDropTarget(delta: Int) {
+        togglePopup(null)
+        val current = transforms.lastOrNull() ?: return
+        val currentKind = current.dropKindOrNull() ?: return
+        val target = currentKind.dropTarget()
+        val supportedKinds = params.availableDropsAt(transforms.lastIndex)
+            .filter { it.dropTarget() == target }
+            .sortedBy(Any::toString)
+        if (supportedKinds.isEmpty()) return
+        val currentIndex = supportedKinds.indexOf(currentKind)
+        val replacementIndex = if (currentIndex >= 0) {
+            (currentIndex + delta + supportedKinds.size) % supportedKinds.size
+        } else if (delta < 0) {
+            supportedKinds.lastIndex
+        } else {
+            0
+        }
+        params.transforms.updateValue(transforms.dropLast(1) + Drop(supportedKinds[replacementIndex]))
     }
 
     fun flipTransformChirality(index: Int) {
@@ -112,6 +145,9 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
                 }
                 if (index == transforms.lastIndex && transforms[index].isChiral) {
                     ChiralityFlipButton { flipTransformChirality(index) }
+                }
+                if (index == transforms.lastIndex && transforms[index].dropKindOrNull() != null) {
+                    DropOrbitControls(itemDisabled, ::adjustLastDropTarget)
                 }
                 if (index == errorIndex) {
                     if (transformError?.isAsync == true) {
@@ -218,12 +254,20 @@ private fun TransformDropdown(options: Set<Transform>, onSelect: (Transform) -> 
             val categoryOptions = options.filter { it.category == category }
             if (categoryOptions.isNotEmpty()) {
                 GroupHeader(category.toString())
-                for (transform in categoryOptions) {
+                val displayedOptions = when (category) {
+                    TransformCategory.OrbitTargeted -> DropTarget.entries.mapNotNull { target ->
+                        categoryOptions.filter { it.dropKindOrNull()?.dropTarget() == target }
+                            .minByOrNull { it.dropKindOrNull().toString() }
+                            ?.let { it to target.optionName }
+                    }
+                    else -> categoryOptions.map { it to it.toString() }
+                }
+                for ((transform, name) in displayedOptions) {
                     Div(attrs = { classes("text-row") }) {
                         Div(attrs = {
                             classes("item")
                             onClick { onSelect(transform) }
-                        }) { Text(transform.toString()) }
+                        }) { Text(name) }
                     }
                 }
             }
@@ -261,6 +305,24 @@ private fun LeftRightSpinner(disabled: Boolean, onAdjust: (Int) -> Unit) {
         if (disabled) disabled()
         onClick { onAdjust(1) }
     }) { Text("❯") }
+}
+
+@Composable
+private fun DropOrbitControls(disabled: Boolean, onAdjust: (Int) -> Unit) {
+    Div(attrs = { classes("drop-orbit-controls") }) {
+        Button(attrs = {
+            classes("drop-orbit-previous")
+            attr("aria-label", "Previous drop orbit")
+            if (disabled) disabled()
+            onClick { onAdjust(-1) }
+        }) { I(attrs = { classes("fa", "fa-angle-up") }) }
+        Button(attrs = {
+            classes("drop-orbit-next")
+            attr("aria-label", "Next drop orbit")
+            if (disabled) disabled()
+            onClick { onAdjust(1) }
+        }) { I(attrs = { classes("fa", "fa-angle-down") }) }
+    }
 }
 
 @Composable

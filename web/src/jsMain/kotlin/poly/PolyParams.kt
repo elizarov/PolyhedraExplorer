@@ -153,9 +153,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         poly = response.poly
         polyName = response.polyName
         transformedPolys = response.transformedPolys
-        dropKinds = response.availableDrops.map { tags ->
-            tags.mapNotNullTo(linkedSetOf(), String::toAnyKindOrNull)
-        }
+        updateAvailableDrops(response.availableDrops)
         transformWarnings = response.warnings.map { it?.toIndicatorMessage() }
         transformError = response.errorIndex?.let { index ->
             TransformError(index, response.error?.toIndicatorMessage())
@@ -165,6 +163,12 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         appliedState = state
         updateAnimation(response.animation.toUiAnimation())
         updateSuggestedSeed(state, response)
+    }
+
+    internal fun updateAvailableDrops(availableDrops: List<List<String>>) {
+        dropKinds = availableDrops.map { tags ->
+            tags.mapNotNullTo(linkedSetOf(), String::toAnyKindOrNull)
+        }
     }
 
     internal fun updateSuggestedSeed(state: CoreState, response: CoreResponse) {

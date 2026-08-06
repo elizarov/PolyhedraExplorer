@@ -16,9 +16,10 @@
 | Kind | A rotation-orbit identifier for equivalent faces, edges, or vertices. Greek letters denote face kinds; capital Latin letters denote vertex kinds. |
 | Rotation orbit | A set of mesh elements that are interchangeable under the polyhedron's rotational symmetries. |
 | Orbit rollover | Transient selection of a face, edge, or vertex rotation orbit. Hovering either its F/E/V popup row or matching front-facing canvas geometry selects the entire orbit in both views. |
+| Orbit-targeted operation | An operation whose concrete behavior names one face, edge, or vertex rotation orbit. The transform popup groups valid Drop targets by element family; the stored chain item retains the exact orbit kind. |
 | Topology | Connectivity of vertices, edges, and faces independent of coordinates. |
 | Same topology | Two meshes whose indexed connectivity is compatible, allowing direct WebGL interpolation. |
-| Drop | Removal of a topologically admissible face, edge, or vertex kind followed by reconstruction of the remaining boundary. |
+| Drop | Removal of a topologically admissible face, edge, or vertex kind followed by reconstruction of the remaining boundary. A last-chain Drop exposes cyclic target controls for the valid orbits of the same element family. |
 | Canonical representation | The normalized geometric representation targeted by the application for a polyhedron topology: its edge tangency points are centered at the origin, its faces are planar, and every edge is tangent to one common midsphere within project tolerances. It is unique up to rotation and reflection. This term names the resulting form, not the procedure used to find it. |
 | [Canonicalization](canonicalization.md) | The iterative edge-nearpoint/circle-packing algorithm used to find a canonical representation. The UI exposes this operation as the `Canonical` transform and reports its convergence progress. |
 | Planar face | A face whose vertices lie in one plane within the project tolerance. |

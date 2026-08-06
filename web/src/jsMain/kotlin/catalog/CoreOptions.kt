@@ -2,6 +2,9 @@ package polyhedra.js.catalog
 
 import polyhedra.common.poly.AnyKind
 import polyhedra.common.poly.Chirality
+import polyhedra.common.poly.EdgeKind
+import polyhedra.common.poly.FaceKind
+import polyhedra.common.poly.VertexKind
 import polyhedra.common.poly.toAnyKindOrNull
 import polyhedra.common.poly.withChirality
 import polyhedra.common.util.Tagged
@@ -114,9 +117,19 @@ data class Transform(
     }
 }
 
-enum class TransformCategory {
-    Transform,
-    Macro,
+enum class TransformCategory(private val displayName: String) {
+    Transform("Transform"),
+    Macro("Macro"),
+    OrbitTargeted("Orbit-targeted"),
+    ;
+
+    override fun toString(): String = displayName
+}
+
+enum class DropTarget(val optionName: String) {
+    Edge("Drop edge"),
+    Vertex("Drop vertex"),
+    Face("Drop face"),
 }
 
 val PrimitiveTransforms: List<Transform> = listOf(
@@ -158,7 +171,20 @@ fun Transform.flippedChirality(): Transform {
 
 private const val DROP_TAG = "x"
 
-fun Drop(kind: AnyKind): Transform = Transform("$DROP_TAG[$kind]", "Drop $kind")
+fun Drop(kind: AnyKind): Transform =
+    Transform("$DROP_TAG[$kind]", "Drop $kind", TransformCategory.OrbitTargeted)
+
+fun AnyKind.dropTarget(): DropTarget = when (this) {
+    is EdgeKind -> DropTarget.Edge
+    is VertexKind -> DropTarget.Vertex
+    is FaceKind -> DropTarget.Face
+    else -> error("Unsupported drop target: $this")
+}
+
+fun Transform.dropKindOrNull(): AnyKind? {
+    if (!baseTag.startsWith("$DROP_TAG[") || !baseTag.endsWith("]")) return null
+    return baseTag.substring(DROP_TAG.length + 1, baseTag.length - 1).toAnyKindOrNull()
+}
 
 fun String.toTransformOrNull(): Transform? {
     Transforms.firstOrNull { it.tag == this }?.let { return it }

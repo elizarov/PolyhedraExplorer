@@ -95,6 +95,13 @@ otherwise become degenerate, verifies that the merged boundary is one valid face
 and rebuilds the remaining mesh. Because the selected orbit and necessary cleanup
 vary with the input, Drop has no single linear `F/E/V` formula.
 
+The transform popup presents valid Drop operations in a final `Orbit-targeted`
+section, collapsed to at most three choices: Drop edge, Drop vertex, and Drop
+face. Choosing one stores the first valid concrete target (`Drop A`, for example).
+When that Drop is the last chain item, the up/down controls to its right cycle
+through all valid targets of the same element family and wrap at both ends. The
+URL always retains the concrete `x[kind]` tag, so the selected orbit round-trips.
+
 ## Macros
 
 A macro occupies one logical position in the UI and URL, but the Wasm core expands
