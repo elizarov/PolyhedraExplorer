@@ -5,6 +5,7 @@
 package polyhedra.model.poly
 
 import polyhedra.model.util.*
+import kotlin.math.abs
 
 class PolygonProjection(
     val vs: List<Vec3>
@@ -16,6 +17,16 @@ class PolygonProjection(
         val Empty = PolygonProjection(emptyList())
     }
 }
+
+data class ProjectedFace(
+    val face: Face,
+    val figure: PolygonProjection,
+)
+
+data class EdgeNetProjection(
+    val left: ProjectedFace,
+    val right: ProjectedFace,
+)
 
 infix fun PolygonProjection.approx(other: PolygonProjection) =
     vs.size == other.vs.size &&
@@ -50,6 +61,49 @@ fun Face.computeProjectionFigure() =
 
 fun Face.computeProjectionFigureAt(v: Vertex) =
     computeProjectionFigureAt(this, fvs, fvs.indexOf(v))
+
+/**
+ * Unfolds the two faces adjacent to this edge into a shared plane. The edge is vertical, centered
+ * at the origin, with [Edge.l] on the left and [Edge.r] on the right.
+ */
+fun Edge.computeNetProjection(): EdgeNetProjection {
+    val center = 0.5.atSegment(a, b)
+    val vertical = vec.unit
+    return EdgeNetProjection(
+        ProjectedFace(l, l.computeEdgeProjection(center, vertical, -1.0)),
+        ProjectedFace(r, r.computeEdgeProjection(center, vertical, 1.0)),
+    )
+}
+
+private fun Face.computeEdgeProjection(
+    edgeCenter: Vec3,
+    vertical: Vec3,
+    targetSide: Double,
+): PolygonProjection {
+    var horizontal = this cross vertical
+    if (horizontal.norm < EPS) {
+        horizontal = fvs
+            .map { vertex ->
+                val offset = vertex - edgeCenter
+                offset - vertical * (offset * vertical)
+            }
+            .maxBy { it.norm }
+    }
+    horizontal = horizontal.unit
+    var side = fvs.sumOf { (it - edgeCenter) * horizontal }
+    if (abs(side) < EPS) {
+        side = fvs
+            .map { (it - edgeCenter) * horizontal }
+            .maxBy { abs(it) }
+    }
+    if (side * targetSide < 0.0) horizontal = -horizontal
+    return PolygonProjection(
+        fvs.map { vertex ->
+            val offset = vertex - edgeCenter
+            Vec3(offset * horizontal, offset * vertical, 0.0)
+        },
+    )
+}
 
 // use dual to compute vertex figure
 fun Vertex.computeProjectFigure() =

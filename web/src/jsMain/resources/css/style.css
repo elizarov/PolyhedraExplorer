@@ -381,6 +381,11 @@ tr.info {
     height: 1em;
 }
 
+.figure.edge-figure, .figure.edge-figure > svg {
+    width: 2em;
+    height: 1.25em;
+}
+
 tr.info:hover, tr.info.selected {
     background: var(--hover-color);
 }

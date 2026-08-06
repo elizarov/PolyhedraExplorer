@@ -180,13 +180,14 @@ private fun EdgesPopup(params: RenderParams, poly: Polyhedron) {
     Aside(attrs = { classes("fev") }) {
         Table {
             Tbody {
-                InfoHeader("Edges", poly.es.size, poly.midradius, "midradius", 7)
+                InfoHeader("Edges", poly.es.size, poly.midradius, "midradius", 8)
                 for ((kind, edge) in poly.edgeKinds) {
                     val essence = edge.essence()
                     OrbitInfoRow(kind, params.poly.selectedEdge) {
                         Td(attrs = { classes("rt"); attr("colspan", "2") }) { Text(kind.toString()) }
                         Td { Text(poly.edgeKindCount[kind].toString()) }
                         Td { Text(essence.dist.fmtFix) }
+                        Td { SvgEdgeNet("figure edge-figure", edge, PolyStyle.edgeColor) }
                         Td { Text("len ${essence.len.fmtFix}") }
                         Td(attrs = { classes("fill") }) { Text("∠ ${essence.dihedralAngle.toDegrees().fmtFix(2)}°") }
                         OrbitTargetActions(params.poly, kind)

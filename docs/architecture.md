@@ -56,7 +56,7 @@ The Wasm core owns:
 - rotation-orbit refinement and geometric comparison with built-in seeds;
 - topology-changing animation keyframe construction.
 
-The JS application owns DOM composition, user events, hash serialization, interpolation between returned keyframes, render-buffer generation, WebGL drawing, and file download. F/E/V rollover is transient JS state: popup rows and CPU-side front-face canvas picking update the same orbit-kind selection. Face picking uses the full virtual polygon independently of manual visibility, while excluding non-planar faces that have no reliable surface. WebGL consumes that selection through face modes, a selected-edge index overlay, or generated vertex-marker geometry.
+The JS application owns DOM composition, user events, hash serialization, interpolation between returned keyframes, render-buffer generation, WebGL drawing, and file download. F/E/V rollover is transient JS state: popup rows and CPU-side front-face canvas picking update the same orbit-kind selection. Face picking uses the full virtual polygon independently of manual visibility, while excluding non-planar faces that have no reliable surface. WebGL consumes that selection through face modes, a selected-edge index overlay, or generated vertex-marker geometry. Edge-popup figures unfold each representative edge's adjacent faces around a centered vertical shared edge; the model projection preserves the edge's directed `l`/`r` ordering and the DOM renderer applies the corresponding face-orbit colors.
 
 ## State and data flow
 
