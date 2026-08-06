@@ -193,10 +193,14 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         val lastTransformIndex = transforms.value.lastIndex.coerceAtLeast(0)
         coreLoaded = true
         transformProgress = progress.done.coerceIn(0, 100)
-        transformError = TransformError(
-            index = progress.transformIndex.coerceIn(0, lastTransformIndex),
-            isAsync = true,
-        )
+        transformError = if (transformProgress < 100) {
+            TransformError(
+                index = progress.transformIndex.coerceIn(0, lastTransformIndex),
+                isAsync = true,
+            )
+        } else {
+            null
+        }
         notifyUpdated(Progress)
     }
 

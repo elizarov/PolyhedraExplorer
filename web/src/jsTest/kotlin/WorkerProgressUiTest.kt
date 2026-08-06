@@ -72,6 +72,24 @@ class WorkerProgressUiTest {
         }
     }
 
+    @Test
+    fun completedStageRemovesProgressFromTheNewLastPill(): Promise<Unit> {
+        val params = PolyParams("", null)
+        params.transforms.updateValue(listOf(Transform.Cantellated, Transform.Chamfered))
+        composition = renderComposable(host) { ControlPane(params, popup = null, togglePopup = {}) }
+
+        params.updateTransformProgress(CoreProgress(transformIndex = 1, done = 99))
+        return awaitRecomposition().then {
+            assertProgressPill(transformName = "Chamfered", progress = "99%")
+
+            params.performUpdate(source = null, dt = 0.0)
+            params.updateTransformProgress(CoreProgress(transformIndex = 1, done = 100))
+            awaitRecomposition()
+        }.then {
+            assertEquals(0, host.querySelectorAll("button.msg").length)
+        }
+    }
+
     private fun assertProgressPill(transformName: String, progress: String) {
         val progressButton = host.querySelector("button.msg") as HTMLElement
         assertEquals(progress, progressButton.querySelector("span:last-of-type")?.textContent)
