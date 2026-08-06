@@ -96,8 +96,9 @@ and rebuilds the remaining mesh. Because the selected orbit and necessary cleanu
 vary with the input, Drop has no single linear `F/E/V` formula.
 
 The transform popup presents valid Drop operations in a final `Orbit-targeted`
-section, collapsed to at most three choices: Drop edge, Drop vertex, and Drop
-face. Choosing one stores the first valid concrete target (`Drop A`, for example).
+section, collapsed to at most three choices. Available choices are displayed in
+standard F/E/V order: Drop face, Drop edge, then Drop vertex. Choosing one stores
+the first valid concrete target (`Drop A`, for example).
 When that Drop is the last chain item, the up/down controls to its right cycle
 through all valid targets of the same element family and wrap at both ends. The
 URL always retains the concrete `x[kind]` tag, so the selected orbit round-trips.

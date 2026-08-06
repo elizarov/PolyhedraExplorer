@@ -54,7 +54,7 @@ class DropOrbitUiTest {
             linkedMapOf(
                 "Transform" to listOf("Truncated", "Rectified", "Dual", "Snub", "Chamfered", "Canonical"),
                 "Macro" to listOf("Kis", "Join", "Needle", "Zip", "Cantellated", "Bevelled", "Ortho", "Meta", "Gyro"),
-                "Orbit-targeted" to listOf("Drop edge", "Drop vertex", "Drop face"),
+                "Orbit-targeted" to listOf("Drop face", "Drop edge", "Drop vertex"),
             ),
             dropdownOptionsBySection(),
         )

@@ -127,9 +127,9 @@ enum class TransformCategory(private val displayName: String) {
 }
 
 enum class DropTarget(val optionName: String) {
+    Face("Drop face"),
     Edge("Drop edge"),
     Vertex("Drop vertex"),
-    Face("Drop face"),
 }
 
 val PrimitiveTransforms: List<Transform> = listOf(
