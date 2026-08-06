@@ -5,7 +5,7 @@ import polyhedra.core.api.CoreRequest
 import polyhedra.core.api.CoreState
 import polyhedra.core.api.TransformMacros
 import polyhedra.core.api.evaluateCore
-import polyhedra.core.api.findTransformMacroSuffix
+import polyhedra.core.api.findTransformPrefixReplacement
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -48,16 +48,53 @@ class TransformMacroTest {
     }
 
     @Test
-    fun findsTheLongestMacroAtTheEndOfTheLogicalChain() {
+    fun findsEquivalentSingleOperationsAtTheDisplayedPrefix() {
         for (macro in TransformMacros) {
-            val match = findTransformMacroSuffix(listOf("c") + macro.expansionTags)
-            assertEquals(macro, match?.macro, macro.name)
+            val match = findTransformPrefixReplacement(listOf("c") + macro.expansionTags)
+            assertEquals(macro.tag, match?.replacementTag, macro.name)
             assertEquals(1, match?.startIndex, macro.name)
-            assertNull(findTransformMacroSuffix(listOf(macro.tag)), "Do not suggest an existing ${macro.name} macro")
+            assertNull(
+                findTransformPrefixReplacement(listOf(macro.tag)),
+                "Do not suggest an existing ${macro.name} macro",
+            )
         }
 
-        val nestedOrtho = findTransformMacroSuffix(listOf("t", "d", "e", "d"))
-        assertEquals("O", nestedOrtho?.macro?.tag)
+        val nestedOrtho = findTransformPrefixReplacement(listOf("t", "d", "e", "d"))
+        assertEquals("O", nestedOrtho?.replacementTag)
         assertEquals(1, nestedOrtho?.startIndex)
+    }
+
+    @Test
+    fun simplifiesDualNeedleToTruncated() {
+        // Logical order is reversed for display, so these tags render as "Dual Needle".
+        val replacement = findTransformPrefixReplacement(listOf("N", "d"))
+
+        assertEquals("t", replacement?.replacementTag)
+        assertEquals(0, replacement?.startIndex)
+
+        runSynchronously {
+            val dualNeedle = evaluateCore(CoreRequest(CoreState("C", listOf("N", "d"), "c")))
+            val truncated = evaluateCore(CoreRequest(CoreState("C", listOf("t"), "c")))
+            assertTrue(
+                dualNeedle.poly.geometryFingerprint().matches(truncated.poly.geometryFingerprint()),
+                "Dual Needle and Truncated should be geometrically congruent",
+            )
+        }
+    }
+
+    @Test
+    fun prefersTheLongestReplaceableDisplayedPrefix() {
+        val replacement = findTransformPrefixReplacement(listOf("c", "d", "d", "t"))
+
+        assertEquals("t", replacement?.replacementTag)
+        assertEquals(1, replacement?.startIndex)
+    }
+
+    @Test
+    fun prefersTheLongestFormalReplacementEvenWhenItExposesCompositionFusion() {
+        val replacement = findTransformPrefixReplacement(listOf("a", "d", "d", "t"))
+
+        assertEquals("b", replacement?.replacementTag)
+        assertEquals(0, replacement?.startIndex)
     }
 }

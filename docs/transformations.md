@@ -102,6 +102,12 @@ direct cantellation and bevel geometry kernels. Consequently, expanded chains an
 their macro replacements have identical regular geometry without running the
 iterative canonicalization algorithm.
 
+The UI can simplify the longest applied-end prefix to one primitive or macro. It
+expands macros and cancels adjacent Dual pairs before comparison; for example,
+displayed `Dual Needle` is offered as `Truncated`. Replacement is always explicit;
+accepting it can expose a fused `aa`/`at` kernel and select its regular coordinate
+realization.
+
 ### Kis (`k`)
 
 Kis adds a new vertex over the center of every face and connects it to every

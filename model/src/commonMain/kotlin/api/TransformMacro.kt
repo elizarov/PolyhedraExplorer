@@ -20,8 +20,11 @@ val TransformMacros: List<TransformMacro> = listOf(
 )
 
 private val transformMacrosByTag = TransformMacros.associateBy(TransformMacro::tag)
-private val transformMacrosByDescendingExpansionSize =
-    TransformMacros.sortedByDescending { it.expansionTags.size }
+private val primitiveReplacementTags = listOf("t", "a", "d", "s", "c", "o")
+private val replacementTagsByExpansion =
+    (primitiveReplacementTags + TransformMacros.map(TransformMacro::tag)).associateBy { tag ->
+        listOf(tag).normalizedExpandedTransformTags()
+    }
 
 fun String.toTransformMacroOrNull(): TransformMacro? =
     transformMacrosByTag[this]
@@ -29,26 +32,34 @@ fun String.toTransformMacroOrNull(): TransformMacro? =
 fun String.expandedTransformTags(): List<String> =
     toTransformMacroOrNull()?.expansionTags ?: listOf(this)
 
-data class TransformMacroSuffix(
-    val macro: TransformMacro,
+data class TransformPrefixReplacement(
+    val replacementTag: String,
     val startIndex: Int,
 )
 
 /**
- * Finds the longest known macro expansion at the applied end of a logical transform chain.
- * Existing macros in the suffix are expanded before comparison, which lets `Dual Cantellated
- * Dual` be folded to `Ortho` as well as the fully primitive spelling.
+ * Finds the longest applied-end suffix, displayed as the transform chain's left prefix, that is
+ * algebraically equivalent to one primitive transform or macro. Macros are expanded and adjacent
+ * Dual operations cancel before comparison, so displayed `Dual Needle` is reduced to `Truncated`.
  */
-fun findTransformMacroSuffix(tags: List<String>): TransformMacroSuffix? {
-    if (tags.isEmpty()) return null
-    for (macro in transformMacrosByDescendingExpansionSize) {
-        for (startIndex in tags.indices) {
-            if (startIndex == tags.lastIndex && tags[startIndex] == macro.tag) continue
-            val expandedSuffix = tags.subList(startIndex, tags.size).flatMap(String::expandedTransformTags)
-            if (expandedSuffix == macro.expansionTags) {
-                return TransformMacroSuffix(macro, startIndex)
+fun findTransformPrefixReplacement(tags: List<String>): TransformPrefixReplacement? {
+    for (startIndex in tags.indices) {
+        val prefix = tags.subList(startIndex, tags.size)
+        val replacementTag = replacementTagsByExpansion[prefix.normalizedExpandedTransformTags()] ?: continue
+        if (prefix.size == 1 && prefix.single() == replacementTag) continue
+        return TransformPrefixReplacement(replacementTag, startIndex)
+    }
+    return null
+}
+
+private fun List<String>.normalizedExpandedTransformTags(): List<String> = buildList {
+    for (tag in this@normalizedExpandedTransformTags) {
+        for (primitiveTag in tag.expandedTransformTags()) {
+            if (primitiveTag == "d" && lastOrNull() == "d") {
+                removeAt(lastIndex)
+            } else {
+                add(primitiveTag)
             }
         }
     }
-    return null
 }

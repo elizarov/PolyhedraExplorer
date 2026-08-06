@@ -8,7 +8,7 @@
 | [Transform](transformations.md) | An ordered operation that derives a new polyhedron from the previous stage. |
 | Primitive transform | A directly executable transform. The fixed primitive choices are Truncated, Rectified, Dual, Snub, Chamfered, and Canonical; topology-dependent Drop operations are also primitive. |
 | Macro | One named logical transform whose implementation expands to a sequence of primitive transforms. It occupies one position in the URL and UI chain. |
-| Macro folding | Optional replacement of a matching transform-chain suffix with its named macro. Folding changes notation, not the resulting geometry. |
+| Prefix replacement | Optional simplification of the longest displayed transform-chain prefix formally equivalent to one primitive operation or macro after macro expansion and adjacent Dual cancellation. It is only a proposal; accepting it can expose a fused regular coordinate realization. |
 | Composition fusion | Geometry-aware execution of a primitive subsequence through an equivalent direct kernel. `aa` is fused as cantellation and `at` as bevel so repeated rectification retains the intended regular realization. |
 | Transform chain | The ordered list of transforms applied after the seed. |
 | F/E/V or FEV | Face, edge, and vertex counts, in that order. |

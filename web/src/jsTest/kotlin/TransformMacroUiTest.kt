@@ -67,13 +67,13 @@ class TransformMacroUiTest {
     }
 
     @Test
-    fun equivalentSuffixIsOfferedInPlaceAndReplacedOnlyOnClick(): Promise<Unit> {
+    fun equivalentPrefixIsOfferedInPlaceAndReplacedOnlyOnClick(): Promise<Unit> {
         val params = PolyParams("", null)
         params.seed.updateValue(Seeds.single { it.tag == "C" })
         params.transforms.updateValue(listOf(Transform.Dual, Transform.Truncated, Transform.Dual))
         composition = renderComposable(host) { ControlPane(params, popup = null, togglePopup = {}) }
 
-        val suggestion = host.querySelector(".macro-suggestion") as HTMLDivElement
+        val suggestion = host.querySelector(".prefix-replacement-suggestion") as HTMLDivElement
         val button = suggestion.querySelector("button") as HTMLElement
         assertTrue(
             button.textContent.orEmpty().startsWith("→ Kis"),
@@ -81,7 +81,7 @@ class TransformMacroUiTest {
         )
         assertTrue(
             suggestion.previousElementSibling?.textContent.orEmpty().contains("Dual"),
-            "Suggestion must follow the displayed Dual Truncated Dual suffix",
+            "Suggestion must follow the displayed Dual Truncated Dual prefix",
         )
         assertTrue(
             suggestion.nextElementSibling?.textContent.orEmpty().contains("Cube"),
@@ -93,7 +93,30 @@ class TransformMacroUiTest {
 
         assertEquals(listOf(Transform.Kis), params.transforms.value)
         return awaitRecomposition().then {
-            assertNull(host.querySelector(".macro-suggestion"))
+            assertNull(host.querySelector(".prefix-replacement-suggestion"))
+        }
+    }
+
+    @Test
+    fun dualNeedlePrefixIsOfferedAsTruncated(): Promise<Unit> {
+        val params = PolyParams("", null)
+        params.seed.updateValue(Seeds.single { it.tag == "C" })
+        params.transforms.updateValue(listOf(Transform.Needle, Transform.Dual))
+        composition = renderComposable(host) { ControlPane(params, popup = null, togglePopup = {}) }
+
+        val suggestion = host.querySelector(".prefix-replacement-suggestion") as HTMLDivElement
+        val button = suggestion.querySelector("button") as HTMLElement
+        assertTrue(
+            button.textContent.orEmpty().startsWith("→ Truncated"),
+            "Unexpected suggestion text: ${button.textContent}",
+        )
+        assertEquals(listOf(Transform.Needle, Transform.Dual), params.transforms.value)
+
+        button.click()
+
+        assertEquals(listOf(Transform.Truncated), params.transforms.value)
+        return awaitRecomposition().then {
+            assertNull(host.querySelector(".prefix-replacement-suggestion"))
         }
     }
 

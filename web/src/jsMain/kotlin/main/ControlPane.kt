@@ -4,8 +4,8 @@ import androidx.compose.runtime.Composable
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.dom.*
 import polyhedra.common.util.updatedAt
-import polyhedra.core.api.TransformMacroSuffix
-import polyhedra.core.api.findTransformMacroSuffix
+import polyhedra.core.api.TransformPrefixReplacement
+import polyhedra.core.api.findTransformPrefixReplacement
 import polyhedra.js.catalog.*
 import polyhedra.js.components.observe
 import polyhedra.js.params.Param
@@ -17,8 +17,8 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
     val transforms = params.transforms.value
     val transformError = params.transformError
     val errorIndex = transformError?.index ?: Int.MAX_VALUE
-    val macroSuggestion = if (transformError == null) {
-        findTransformMacroSuffix(transforms.map(Transform::tag))
+    val prefixReplacement = if (transformError == null) {
+        findTransformPrefixReplacement(transforms.map(Transform::tag))
     } else {
         null
     }
@@ -55,10 +55,10 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
         if (replacement != Transform.None) params.transforms.updateValue(transforms.dropLast(1) + replacement)
     }
 
-    fun acceptMacroSuggestion(suggestion: TransformMacroSuffix) {
+    fun acceptPrefixReplacement(replacement: TransformPrefixReplacement) {
         togglePopup(null)
-        val macro = MacroTransforms.single { it.tag == suggestion.macro.tag }
-        params.transforms.updateValue(transforms.take(suggestion.startIndex) + macro)
+        val transform = Transforms.single { it.tag == replacement.replacementTag }
+        params.transforms.updateValue(transforms.take(replacement.startIndex) + transform)
     }
 
     Div(attrs = { classes("ctrl-pane") }) {
@@ -113,8 +113,8 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
                     params.transformWarnings.getOrNull(index)?.let { MessageButton(index, it, ::updateTransform) }
                 }
             }
-            if (macroSuggestion?.startIndex == index) {
-                MacroSuggestion(macroSuggestion, ::acceptMacroSuggestion)
+            if (prefixReplacement?.startIndex == index) {
+                PrefixReplacementSuggestion(prefixReplacement, ::acceptPrefixReplacement)
             }
         }
 
@@ -201,18 +201,19 @@ private fun TransformDropdown(options: Set<Transform>, onSelect: (Transform) -> 
 }
 
 @Composable
-private fun MacroSuggestion(
-    suggestion: TransformMacroSuffix,
-    onAccept: (TransformMacroSuffix) -> Unit,
+private fun PrefixReplacementSuggestion(
+    replacement: TransformPrefixReplacement,
+    onAccept: (TransformPrefixReplacement) -> Unit,
 ) {
-    Div(attrs = { classes("btn", "suggestion", "macro-suggestion") }) {
+    val transform = Transforms.single { it.tag == replacement.replacementTag }
+    Div(attrs = { classes("btn", "suggestion", "prefix-replacement-suggestion") }) {
         Button(attrs = {
             classes("txt")
-            onClick { onAccept(suggestion) }
+            onClick { onAccept(replacement) }
         }) {
-            Text("→ ${suggestion.macro.name}")
+            Text("→ ${transform.name}")
             Aside(attrs = { classes("tooltip-text") }) {
-                Text("Replace this transform suffix with the equivalent macro")
+                Text("Replace this transform prefix with the algebraically equivalent operation")
             }
         }
     }
