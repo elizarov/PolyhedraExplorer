@@ -3,7 +3,7 @@
 | Term | Meaning |
 | --- | --- |
 | Polyhedron | An immutable vertex/edge/face mesh plus orbit-kind metadata. |
-| Seed | A built-in starting polyhedron selected before transforms. |
+| [Seed](seeds.md) | A built-in starting polyhedron selected before transforms. The catalog contains 31 solid types and four additional prime-tagged chiral representations. |
 | Catalog recognition | Orientation-sensitive comparison of a completed transform result with both handed variants of the built-in seeds after circumradius normalization. A match with the proper chirality is offered as an optional replacement; accepting it replaces the equivalent seed-plus-transform-chain state with the single catalog seed. |
 | [Transform](transformations.md) | An ordered operation that derives a new polyhedron from the previous stage. |
 | Primitive transform | A directly executable transform. The fixed primitive choices are Truncated, Rectified, Dual, Snub, Chamfered, and Canonical; topology-dependent Drop operations are also primitive. |
