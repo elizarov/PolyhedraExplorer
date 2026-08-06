@@ -206,7 +206,7 @@ class TreeMap<K, V>(
             get() = this@TreeMap.size
 
         override fun add(element: R): Boolean {
-            TODO("not implemented")
+            throw UnsupportedOperationException("Entries cannot be added through a map view")
         }
 
         override fun iterator(): MutableIterator<R> =
@@ -226,7 +226,7 @@ class TreeMap<K, V>(
         }
 
         override fun remove() {
-            TODO("not implemented")
+            throw UnsupportedOperationException("Iterator removal is not supported")
         }
     }
 }

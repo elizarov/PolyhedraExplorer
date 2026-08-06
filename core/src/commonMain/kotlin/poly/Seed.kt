@@ -34,9 +34,6 @@ class Seed(
     companion object
 }
 
-val Seeds: List<Seed>
-    get() = _seeds
-
 fun Polyhedron.recognizedSeedOrNull(): Seed? {
     val candidates = Seeds.filter { seed -> seed.fev == fev() }
     if (candidates.isEmpty()) return null
@@ -44,8 +41,7 @@ fun Polyhedron.recognizedSeedOrNull(): Seed? {
     return candidates.firstOrNull { seed -> geometryFingerprint.matches(seed.geometryFingerprint) }
 }
 
-@Suppress("ObjectPropertyName")
-private val _seeds = ArrayList<Seed>()
+private val registeredSeeds = mutableListOf<Seed>()
 
 private fun seed(
     tag: String,
@@ -67,7 +63,7 @@ private fun seed(
             }
         }
         val seed = Seed(tag, name, type, fev, wikiName ?: name, chirality, producer)
-        _seeds += seed
+        registeredSeeds += seed
         ValueDelegate(seed)
     }
 
@@ -95,8 +91,7 @@ private fun seed(
 
 // --------------------- Basic platonic geometry ---------------------
 
-@Suppress("ObjectPropertyName")
-private val _tetrahedron = polyhedron {
+private val tetrahedronGeometry = polyhedron {
     val t = 1 / sqrt(2.0)
     vertex(-1.0, 0.0, -t) // 0
     vertex(1.0, 0.0, -t) // 1
@@ -108,7 +103,7 @@ private val _tetrahedron = polyhedron {
     face(1, 2, 3)
 }
 
-private val _cube = polyhedron {
+private val cubeGeometry = polyhedron {
     vertex(1.0, 1.0, -1.0) // 0
     vertex(-1.0, 1.0, -1.0) // 1
     vertex(-1.0, -1.0, -1.0) // 2
@@ -125,7 +120,7 @@ private val _cube = polyhedron {
     face(4, 7, 6, 5)
 }
 
-private val _icosahedron = polyhedron {
+private val icosahedronGeometry = polyhedron {
     val phi = (sqrt(5.0) + 1) / 2
     vertex(0.0, -1.0, -phi) // 0
     vertex(0.0, 1.0, -phi) // 1
@@ -163,11 +158,11 @@ private val _icosahedron = polyhedron {
 
 // --------------------- 5 Platonic Solids ---------------------
 
-val SC.Tetrahedron by seed("T", SeedType.Platonic, _tetrahedron)
-val SC.Cube by seed("C", SeedType.Platonic, _cube)
-val SC.Octahedron by seed("O", SeedType.Platonic, _cube.dual())
-val SC.Dodecahedron by seed("D", SeedType.Platonic, _icosahedron.dual())
-val SC.Icosahedron by seed("I", SeedType.Platonic, _icosahedron)
+val SC.Tetrahedron by seed("T", SeedType.Platonic, tetrahedronGeometry)
+val SC.Cube by seed("C", SeedType.Platonic, cubeGeometry)
+val SC.Octahedron by seed("O", SeedType.Platonic, cubeGeometry.dual())
+val SC.Dodecahedron by seed("D", SeedType.Platonic, icosahedronGeometry.dual())
+val SC.Icosahedron by seed("I", SeedType.Platonic, icosahedronGeometry)
 
 // --------------------- 13 Archimedean Solids ---------------------
 
@@ -217,13 +212,12 @@ val SC.PentagonalHexecontahedron by seed(
     chirality = Chirality.Default,
 )
 
-@Suppress("unused")
-private val flippedChiralSeeds = listOf(
+val Seeds: List<Seed> = registeredSeeds + listOf(
     SC.SnubCube,
     SC.SnubDodecahedron,
     SC.PentagonalIcositetrahedron,
     SC.PentagonalHexecontahedron,
-).mapTo(_seeds) { seed ->
+).map { seed ->
     Seed(
         tag = seed.tag.withChirality(Chirality.Flipped),
         name = seed.name,

@@ -14,7 +14,6 @@ private const val CACHE_SIZE_LIMIT = HASH_CAPACITY / 2
 private const val HASH_MASK = (1 shl POW2) - 1
 private const val MAGIC = 2654435769L.toInt() // golden ratio
 
-@Suppress("RESULT_CLASS_IN_RETURN_TYPE")
 object TransformCache {
     private val hash = arrayOfNulls<Entry?>(HASH_CAPACITY)
     private var hashSize = 0
@@ -87,7 +86,7 @@ object TransformCache {
 
     operator fun get(poly: Polyhedron, key: Any, param: Any? = null): Polyhedron? {
         var i = hashIndex0(poly, key, param)
-        while(true) {
+        while (true) {
             val e = hash[i] ?: return null
             if (e.poly == poly && e.key == key && e.param == param) {
                 pullUpLru(e)
@@ -100,7 +99,7 @@ object TransformCache {
 
     operator fun set(poly: Polyhedron, key: Any, param: Any? = null, result: Result<Polyhedron>) {
         var i = hashIndex0(poly, key, param)
-        while(true) {
+        while (true) {
             val e = hash[i] ?: break
             if (e.poly == poly && e.key == key && e.param == param) {
                 e.result = result

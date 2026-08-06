@@ -180,8 +180,7 @@ abstract class Param(val tag: String) {
                 delegates += it
             }
 
-        @Suppress("NOTHING_TO_INLINE")
-        inline operator fun <T> (() -> T).provideDelegate(thisRef: Context, prop: KProperty<*>): Delegate<T> =
+        operator fun <T> (() -> T).provideDelegate(thisRef: Context, prop: KProperty<*>): Delegate<T> =
             addDelegate(this)
 
         private object UNINITIALIZED
@@ -202,8 +201,7 @@ abstract class Param(val tag: String) {
                 return value as T
             }
 
-            @Suppress("NOTHING_TO_INLINE")
-            inline operator fun getValue(thisRef: Context, prop: KProperty<*>): T = lazyValue()
+            operator fun getValue(thisRef: Context, prop: KProperty<*>): T = lazyValue()
         }
     }
 

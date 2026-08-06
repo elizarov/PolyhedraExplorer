@@ -21,11 +21,11 @@ fun uint16Of(vararg a: Int) = Uint16Array(a.size).apply {
     for (i in a.indices) this[i] = a[i].toShort()
 }
 
-inline operator fun Uint8Array.set(i: Int, x: Int) {
+operator fun Uint8Array.set(i: Int, x: Int) {
     set(i, x.toByte())
 }
 
-inline operator fun Float32Array.set(i: Int, x: Double) {
+operator fun Float32Array.set(i: Int, x: Double) {
     set(i, x.toFloat())
 }
 
@@ -51,7 +51,7 @@ fun Vec3.toFloat32Array(): Float32Array = Float32Array(3).apply {
     set(2, z)
 }
 
-inline operator fun Uint16Array.set(i: Int, x: Int) {
+operator fun Uint16Array.set(i: Int, x: Int) {
     set(i, x.toShort())
 }
 

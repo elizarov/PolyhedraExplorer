@@ -15,7 +15,7 @@ inline fun <T, K : Id, V : Any> Iterable<T>.associateById(keyTransform: (T) -> K
 }
 
 inline fun <T : Any, K : Id> Iterable<T>.associateById(keyTransform: (T) -> K): IdMap<K, T> =
-    associateById(keyTransform, { it })
+    associateById(keyTransform) { it }
 
 inline fun <T, K : Id, V> Iterable<T>.groupById(keyTransform: (T) -> K, valueTransform: (T) -> V): IdMap<K, ArrayList<V>> {
     val result = ArrayIdMap<K, ArrayList<V>>()
@@ -28,9 +28,9 @@ inline fun <T, K : Id, V> Iterable<T>.groupById(keyTransform: (T) -> K, valueTra
 }
 
 inline fun <T, K : Id> Iterable<T>.groupById(keyTransform: (T) -> K): IdMap<K, ArrayList<T>> =
-    groupById(keyTransform, { it })
+    groupById(keyTransform) { it }
 
-public inline fun <K : Id, V : Any, R : Any> IdMap<out K, V>.mapValues(transform: (Map.Entry<K, V>) -> R): IdMap<K, R> {
+inline fun <K : Id, V : Any, R : Any> IdMap<out K, V>.mapValues(transform: (Map.Entry<K, V>) -> R): IdMap<K, R> {
     val result = ArrayIdMap<K, R>()
     for (e in entries) {
         result[e.key] = transform(e)
@@ -42,7 +42,7 @@ interface IdMap<K : Id, out V : Any> : Map<K, V>
 
 @Suppress("UNCHECKED_CAST")
 class ArrayIdMap<K : Id, V : Any>(capacity: Int = 8) : AbstractMutableMap<K, V>(), IdMap<K, V> {
-    public override var size: Int = 0
+    override var size: Int = 0
         private set
     private var ks = arrayOfNulls<Any?>(capacity)
     private var vs = arrayOfNulls<Any?>(capacity)

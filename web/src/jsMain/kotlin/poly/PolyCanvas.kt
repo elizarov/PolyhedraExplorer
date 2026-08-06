@@ -11,7 +11,6 @@ import org.jetbrains.compose.web.dom.Canvas
 import org.jetbrains.compose.web.dom.Div
 import org.w3c.dom.*
 import org.w3c.dom.events.*
-import polyhedra.common.poly.Polyhedron
 import polyhedra.common.util.norm
 import polyhedra.js.main.Popup
 import polyhedra.js.params.Param
@@ -27,7 +26,6 @@ private const val MIN_MOUSE_MOVE_DISTANCE = 3.0
 fun PolyCanvas(
     classes: String? = null,
     params: RenderParams,
-    @Suppress("UNUSED_PARAMETER") poly: Polyhedron,
     popup: Popup?,
     faceContextSink: (FaceContext) -> Unit,
     resetPopup: () -> Unit,
@@ -311,8 +309,7 @@ private class PolyCanvasController(private val params: RenderParams) {
 }
 
 private fun HTMLCanvasElement.addTouchListener(type: String, handler: (TouchEvent) -> Unit) {
-    @Suppress("UNCHECKED_CAST")
-    addEventListener(type, handler as (Event) -> Unit)
+    addEventListener(type, { event -> handler(event as TouchEvent) })
 }
 
 private class OngoingTouch(val id: Int, var x: Int, var y: Int)

@@ -131,12 +131,12 @@ fun Vec3.anglesToQuat(): Quat =
     anglesToQuat(x, y, z)
 
 fun anglesToQuat(x: Double, y: Double, z: Double): Quat {
-    val cy = cos(z * 0.5);
-    val sy = sin(z * 0.5);
-    val cp = cos(y * 0.5);
-    val sp = sin(y * 0.5);
-    val cr = cos(x * 0.5);
-    val sr = sin(x * 0.5);
+    val cy = cos(z * 0.5)
+    val sy = sin(z * 0.5)
+    val cp = cos(y * 0.5)
+    val sp = sin(y * 0.5)
+    val cr = cos(x * 0.5)
+    val sr = sin(x * 0.5)
     return Quat(
         sr * cp * cy - cr * sp * sy,
         cr * sp * cy + sr * cp * sy,

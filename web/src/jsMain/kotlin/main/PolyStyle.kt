@@ -38,7 +38,7 @@ enum class Display(override val tag: String) : Tagged {
     Edges("e")
 }
 
-val Displays = Display.values().toList()
+val Displays: List<Display> = Display.entries
 
 fun Display.hasFaces() = this != Display.Edges
 fun Display.hasEdges() = this != Display.Faces

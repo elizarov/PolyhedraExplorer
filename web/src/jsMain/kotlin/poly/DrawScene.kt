@@ -19,7 +19,7 @@ class DrawContext(
     val gl: GL = canvas.getContext("webgl", js("({ premultipliedAlpha: false })") as Any) as GL
 
     val view = ViewContext(params.view)
-    val lightning = LightningContext(params.lighting)
+    val lighting = LightingContext(params.lighting)
     val faces = FaceContext(gl, params)
     val edges = EdgeContext(gl, params)
     val vertices = VertexContext(gl, params)
@@ -35,7 +35,7 @@ class DrawContext(
 }
 
 private fun DrawContext.initGL() {
-    gl.blendFunc(GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA);
+    gl.blendFunc(GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA)
     gl.depthFunc(GL.LEQUAL)
     gl.clearColor(0.0f, 0.0f, 0.0f, 0.0f)
     gl.clearDepth(1.0f)
@@ -57,13 +57,13 @@ fun DrawContext.drawScene() {
     gl[GL.BLEND] = transparentFaces
     if (transparentFaces) {
         // special code for transparent faces - draw back "front faces", then front "front faces"
-        faces.draw(view, lightning, 1)
+        faces.draw(view, lighting, 1)
         edges.draw(view, 1)
-        faces.draw(view, lightning, -1)
+        faces.draw(view, lighting, -1)
         edges.draw(view, -1)
     } else {
         // regular draw faces
-        faces.draw(view, lightning)
+        faces.draw(view, lighting)
         edges.draw(view)
     }
     gl[GL.DEPTH_TEST] = true

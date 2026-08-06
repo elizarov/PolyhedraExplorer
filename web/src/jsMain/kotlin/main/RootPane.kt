@@ -34,7 +34,6 @@ fun RootPane(params: RootParams) {
         PolyCanvas(
             classes = "poly",
             params = params.render,
-            poly = poly,
             popup = popup,
             faceContextSink = { faces = it },
             resetPopup = {

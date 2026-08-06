@@ -102,7 +102,7 @@ fun List<IsoEdge>.groupIndistinguishable(): List<List<IsoEdge>> {
             val newBlock = Block(newEs)
             blocks += newBlock
             for (e in newEs) edgeBlock[e] = newBlock
-            for (dir in IsoDir.values()) {
+            for (dir in IsoDir.entries) {
                 when {
                     b[dir] -> enqueue(newBlock, dir)
                     newEs.size <= b.es.size -> enqueue(newBlock, dir)

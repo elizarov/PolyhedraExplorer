@@ -13,7 +13,7 @@ enum class GLDeclKind(val isGlobal: Boolean = false) {
     varying(true),
     function(true),
     parameter,
-    local;
+    local,
 }
 
 open class GLDecl<T : GLType<T>, SELF: GLDecl<T, SELF>>(

@@ -7,7 +7,7 @@ package polyhedra.js.poly
 import polyhedra.js.glsl.*
 import polyhedra.js.params.*
 
-class LightningContext(params: LightingParams) : Param.Context(params) {
+class LightingContext(params: LightingParams) : Param.Context(params) {
     private val ambientLight by { params.ambientLight.value }
     private val diffuseLight by { params.diffuseLight.value }
     private val specularLight by { params.specularLight.value }

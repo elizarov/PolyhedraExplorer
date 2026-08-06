@@ -294,18 +294,18 @@ data class FaceExportParams(
 )
 
 // cullMode: 0 - no, 1 - cull front, -1 - cull back
-fun FaceContext.draw(view: ViewContext, lightning: LightningContext, cullMode: Int = 0) {
+fun FaceContext.draw(view: ViewContext, lighting: LightingContext, cullMode: Int = 0) {
     if (!drawFaces) return
     val animation = animation
     val prevOrTarget = if (animation != null) prev else target
     program.use {
         assignView(view, cullMode)
 
-        uAmbientLightColor by lightning.ambientLightColor
-        uDiffuseLightColor by lightning.diffuseLightColor
-        uSpecularLightColor by lightning.specularLightColor
-        uSpecularLightPower by lightning.specularLightPower
-        uLightPosition by lightning.lightPosition
+        uAmbientLightColor by lighting.ambientLightColor
+        uDiffuseLightColor by lighting.diffuseLightColor
+        uSpecularLightColor by lighting.specularLightColor
+        uSpecularLightPower by lighting.specularLightPower
+        uLightPosition by lighting.lightPosition
 
         uTargetFraction by (animation?.targetFraction ?: 1.0)
         uPrevFraction by (animation?.prevFraction ?: 0.0)

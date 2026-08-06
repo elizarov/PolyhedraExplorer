@@ -46,11 +46,7 @@ sealed class Transform : Tagged {
     open val asyncTransform: AsyncTransform? = null
 
     companion object {
-        @Suppress("ObjectPropertyName")
-        private val _transforms = ArrayList<Transform>()
-
-        val Transforms: List<Transform>
-            get() = _transforms
+        private val registeredTransforms = mutableListOf<Transform>()
 
         val None: Transform by None()
         val Truncated: Transform by Truncated()
@@ -63,8 +59,10 @@ sealed class Transform : Tagged {
         val Chamfered: Transform by Chamfered()
         val Canonical: Transform by Canonical()
 
+        val Transforms: List<Transform> = registeredTransforms.toList()
+
         private operator fun Transform.provideDelegate(thisRef: Any?, prop: KProperty<*>): Transform {
-            _transforms += this
+            registeredTransforms += this
             return this
         }
 
