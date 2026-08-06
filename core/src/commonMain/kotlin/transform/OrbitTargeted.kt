@@ -1,6 +1,9 @@
 package polyhedra.core.transform
 
 import kotlinx.serialization.Serializable
+import polyhedra.model.api.TransformTweak
+import polyhedra.model.api.encodeTransformTag
+import polyhedra.model.api.parseTransformTag
 import polyhedra.core.poly.*
 import polyhedra.model.poly.*
 import polyhedra.model.util.*
@@ -8,6 +11,22 @@ import polyhedra.model.util.*
 private const val KIS_FACE_TAG = "k"
 private const val TRUNCATE_VERTEX_TAG = "t"
 private const val RECTIFY_VERTEX_TAG = "a"
+
+internal data class KisAll(val height: Double = 1.0) : Transform() {
+    override val tag: String
+        get() = encodeTransformTag("k", mapOf(TransformTweak.Height to height))
+
+    override val fev = TransformFEV(
+        0, 2, 0,
+        0, 3, 0,
+        1, 0, 1,
+    )
+
+    override fun transform(poly: Polyhedron): Polyhedron =
+        poly.kisFaces(poly.faceKinds.keys, height)
+
+    override fun toString(): String = "Kis"
+}
 
 internal interface OrbitTargetedAnimation {
     val targetKind: AnyKind
@@ -23,11 +42,11 @@ internal interface OrbitTargetedAnimation {
 }
 
 @Serializable
-data class KisFace(val kind: FaceKind) : Transform() {
+data class KisFace(val kind: FaceKind, val height: Double = 1.0) : Transform() {
     override val tag: String
-        get() = "$KIS_FACE_TAG[$kind]"
+        get() = encodeTransformTag("$KIS_FACE_TAG[$kind]", mapOf(TransformTweak.Height to height))
 
-    override fun transform(poly: Polyhedron): Polyhedron = poly.kisFaces(setOf(kind))
+    override fun transform(poly: Polyhedron): Polyhedron = poly.kisFaces(setOf(kind), height)
 
     override fun isApplicable(poly: Polyhedron): Boolean = kind in poly.faceKinds
 
@@ -35,18 +54,19 @@ data class KisFace(val kind: FaceKind) : Transform() {
 }
 
 @Serializable
-data class TruncateVertex(val kind: VertexKind) : Transform(), OrbitTargetedAnimation {
+data class TruncateVertex(val kind: VertexKind, val depth: Double = 1.0) : Transform(), OrbitTargetedAnimation {
     override val targetKind: AnyKind
         get() = kind
 
     override val tag: String
-        get() = "$TRUNCATE_VERTEX_TAG[$kind]"
+        get() = encodeTransformTag("$TRUNCATE_VERTEX_TAG[$kind]", mapOf(TransformTweak.Depth to depth))
 
-    override fun transform(poly: Polyhedron): Polyhedron = poly.truncateVertices(setOf(kind))
+    override fun transform(poly: Polyhedron): Polyhedron =
+        poly.truncateVertices(setOf(kind), targetRatio(poly))
 
     override fun isApplicable(poly: Polyhedron): Boolean = kind in poly.vertexKinds
 
-    override fun targetRatio(poly: Polyhedron): Double = poly.regularTruncationRatio()
+    override fun targetRatio(poly: Polyhedron): Double = poly.regularTruncationRatio() * depth
 
     override fun polyAtRatio(
         poly: Polyhedron,
@@ -59,18 +79,19 @@ data class TruncateVertex(val kind: VertexKind) : Transform(), OrbitTargetedAnim
 }
 
 @Serializable
-data class RectifyVertex(val kind: VertexKind) : Transform(), OrbitTargetedAnimation {
+data class RectifyVertex(val kind: VertexKind, val depth: Double = 1.0) : Transform(), OrbitTargetedAnimation {
     override val targetKind: AnyKind
         get() = kind
 
     override val tag: String
-        get() = "$RECTIFY_VERTEX_TAG[$kind]"
+        get() = encodeTransformTag("$RECTIFY_VERTEX_TAG[$kind]", mapOf(TransformTweak.Depth to depth))
 
-    override fun transform(poly: Polyhedron): Polyhedron = poly.rectifyVertices(setOf(kind))
+    override fun transform(poly: Polyhedron): Polyhedron =
+        if (depth == 1.0) poly.rectifyVertices(setOf(kind)) else poly.truncateVertices(setOf(kind), depth)
 
     override fun isApplicable(poly: Polyhedron): Boolean = kind in poly.vertexKinds
 
-    override fun targetRatio(poly: Polyhedron): Double = 1.0
+    override fun targetRatio(poly: Polyhedron): Double = depth
 
     override fun polyAtRatio(
         poly: Polyhedron,
@@ -83,16 +104,21 @@ data class RectifyVertex(val kind: VertexKind) : Transform(), OrbitTargetedAnima
 }
 
 internal fun String.toOrbitTargetedTransformOrNull(): Transform? {
-    if (!endsWith("]")) return null
-    val bracket = indexOf('[')
+    val parsed = parseTransformTag() ?: return null
+    val operationTag = parsed.operationTag
+    if (!operationTag.endsWith("]")) return null
+    val bracket = operationTag.indexOf('[')
     if (bracket <= 0) return null
-    val prefix = substring(0, bracket)
-    val kind = substring(bracket + 1, length - 1).toAnyKindOrNull() ?: return null
+    val prefix = operationTag.substring(0, bracket)
+    val kind = operationTag.substring(bracket + 1, operationTag.length - 1).toAnyKindOrNull() ?: return null
     return when {
-        prefix == DROP_TAG -> Drop(kind)
-        prefix == KIS_FACE_TAG && kind is FaceKind -> KisFace(kind)
-        prefix == TRUNCATE_VERTEX_TAG && kind is VertexKind -> TruncateVertex(kind)
-        prefix == RECTIFY_VERTEX_TAG && kind is VertexKind -> RectifyVertex(kind)
+        prefix == DROP_TAG && parsed.tweaks.isEmpty() -> Drop(kind)
+        prefix == KIS_FACE_TAG && kind is FaceKind && parsed.tweaks.keys.all { it == TransformTweak.Height } ->
+            KisFace(kind, parsed.tweaks[TransformTweak.Height] ?: 1.0)
+        prefix == TRUNCATE_VERTEX_TAG && kind is VertexKind && parsed.tweaks.keys.all { it == TransformTweak.Depth } ->
+            TruncateVertex(kind, parsed.tweaks[TransformTweak.Depth] ?: 1.0)
+        prefix == RECTIFY_VERTEX_TAG && kind is VertexKind && parsed.tweaks.keys.all { it == TransformTweak.Depth } ->
+            RectifyVertex(kind, parsed.tweaks[TransformTweak.Depth] ?: 1.0)
         else -> null
     }
 }
@@ -110,12 +136,13 @@ val Polyhedron.availableOrbitTransforms: Set<Transform>
 /** Kises the selected face orbits. Selecting every orbit is exactly the Kis macro geometry. */
 internal fun Polyhedron.kisFaces(
     kinds: Set<FaceKind>,
+    height: Double = 1.0,
 ): Polyhedron {
     require(kinds.isNotEmpty() && kinds.all { it in faceKinds })
     val fullKis = dual().truncated().dual()
-    if (kinds.size == faceKinds.size && kinds.containsAll(faceKinds.keys)) return fullKis
+    if (height == 1.0 && kinds.size == faceKinds.size && kinds.containsAll(faceKinds.keys)) return fullKis
 
-    return transformedPolyhedron(KisFace::class, kinds) {
+    return transformedPolyhedron(KisFace::class, kinds to height) {
         // Full Kis retains one vertex for each input vertex, followed by one apex per input face.
         check(fullKis.vs.size == vs.size + fs.size)
         val outputVertices = HashMap<Vertex, Vertex>()
@@ -125,7 +152,16 @@ internal fun Polyhedron.kisFaces(
         for (sourceFace in fs) {
             if (sourceFace.kind in kinds) {
                 val apex = fullKis.vs[vs.size + sourceFace.id]
-                outputVertices[apex] = vertex(apex)
+                outputVertices[apex] = if (height == 1.0) {
+                    vertex(apex)
+                } else {
+                    val center = MutableVec3()
+                    // Measure height from the actual Kis base, whose retained vertices use the
+                    // dual-truncate-dual realization rather than the input face coordinates.
+                    for (sourceVertex in sourceFace.fvs) center += fullKis.vs[sourceVertex.id]
+                    center /= sourceFace.size.toDouble()
+                    vertex(center + height * (apex - center), apex.kind)
+                }
             } else {
                 face(sourceFace.fvs.map { outputVertices.getValue(fullKis.vs[it.id]) }, sourceFace.kind)
             }

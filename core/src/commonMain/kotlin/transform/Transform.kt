@@ -5,6 +5,9 @@
 package polyhedra.core.transform
 
 import kotlinx.serialization.*
+import polyhedra.model.api.TransformTweak
+import polyhedra.model.api.encodeTransformTag
+import polyhedra.model.api.parseTransformTag
 import polyhedra.core.util.OperationProgressContext
 import polyhedra.model.poly.*
 import polyhedra.model.util.*
@@ -14,7 +17,11 @@ val Transforms: List<Transform>
     get() = Transform.Transforms
 
 fun String.toTransformOrNull(): Transform? {
-    Transforms.find { it.tag == this }?.let { return it }
+    val parsed = parseTransformTag() ?: return null
+    Transforms.find { it.tag == parsed.operationTag }?.let { transform ->
+        if (!transform.supportsTweaks(parsed.tweaks.keys)) return null
+        return transform.withTweaks(parsed.tweaks)
+    }
     return toOrbitTargetedTransformOrNull()
 }
 
@@ -175,6 +182,74 @@ class Snub(
     )
 
     override fun toString(): String = "Snub${chirality.suffix}"
+}
+
+internal fun Transform.withTweaks(tweaks: Map<TransformTweak, Double>): Transform =
+    if (tweaks.isEmpty()) this else TweakedTransform(this, tweaks)
+
+private fun Transform.supportsTweaks(tweaks: Set<TransformTweak>): Boolean {
+    val supported = when (this) {
+        is Truncated -> setOf(TransformTweak.Depth)
+        is Cantellated -> setOf(TransformTweak.Distance)
+        is Bevelled -> setOf(TransformTweak.Distance, TransformTweak.Depth)
+        is Snub -> setOf(TransformTweak.Inset, TransformTweak.Twist)
+        is Chamfered -> setOf(TransformTweak.Width)
+        else -> emptySet()
+    }
+    return tweaks.all { it in supported }
+}
+
+private data class TweakedTransform(
+    val base: Transform,
+    val tweaks: Map<TransformTweak, Double>,
+) : Transform() {
+    override val tag: String
+        get() = encodeTransformTag(base.tag, tweaks)
+
+    override val fev: TransformFEV?
+        get() = base.fev
+
+    override fun isApplicable(poly: Polyhedron): Boolean = base.isApplicable(poly)
+
+    override fun transform(poly: Polyhedron): Polyhedron = when (base) {
+        is Truncated -> poly.truncated(requireNotNull(truncationRatio(poly)))
+        is Cantellated -> poly.cantellated(requireNotNull(cantellationRatio(poly)))
+        is Bevelled -> poly.bevelled(requireNotNull(bevellingRatio(poly)))
+        is Snub -> poly.snub(requireNotNull(snubbingRatio(poly)))
+        is Chamfered -> poly.chamfered(requireNotNull(chamferingRatio(poly)))
+        else -> error("Transform ${base.tag} has no continuous parameters")
+    }
+
+    override fun truncationRatio(poly: Polyhedron): Double? = when (base) {
+        is Truncated -> poly.regularTruncationRatio() * factor(TransformTweak.Depth)
+        else -> null
+    }
+
+    override fun cantellationRatio(poly: Polyhedron): Double? =
+        if (base is Cantellated) poly.regularCantellationRatio() * factor(TransformTweak.Distance) else null
+
+    override fun bevellingRatio(poly: Polyhedron): BevellingRatio? =
+        if (base is Bevelled) poly.regularBevellingRatio().let { regular ->
+            BevellingRatio(
+                regular.cr * factor(TransformTweak.Distance),
+                regular.tr * factor(TransformTweak.Depth),
+            )
+        } else null
+
+    override fun snubbingRatio(poly: Polyhedron): SnubbingRatio? =
+        if (base is Snub) base.snubbingRatio(poly).let { regular ->
+            SnubbingRatio(
+                regular.cr * factor(TransformTweak.Inset),
+                regular.sa * factor(TransformTweak.Twist),
+            )
+        } else null
+
+    override fun chamferingRatio(poly: Polyhedron): Double? =
+        if (base is Chamfered) poly.chamferingRatio() * factor(TransformTweak.Width) else null
+
+    private fun factor(tweak: TransformTweak): Double = tweaks[tweak] ?: 1.0
+
+    override fun toString(): String = base.toString()
 }
 
 @Serializable

@@ -3,18 +3,169 @@ package polyhedra.core
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
+import polyhedra.core.api.*
+import polyhedra.core.poly.Cube
+import polyhedra.core.poly.Seed
+import polyhedra.core.poly.hasSameTopology
+import polyhedra.core.poly.validateGeometry
+import polyhedra.core.transform.*
+import polyhedra.model.api.*
 import polyhedra.model.poly.FEV
 import polyhedra.model.poly.fev
-import polyhedra.core.transform.isCanonical
-import polyhedra.core.api.*
-import polyhedra.model.api.*
+import polyhedra.model.util.norm
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CoreApiTest {
+    @Test
+    fun largerContinuousValuesMoveEveryNamedConstructionFurther() {
+        val poly = Seed.Cube.poly
+
+        fun transform(tag: String) = requireNotNull(tag.toTransformOrNull())
+        fun assertIncreases(label: String, low: Double?, high: Double?) {
+            assertTrue(requireNotNull(high) > requireNotNull(low), "$label must increase: $low -> $high")
+        }
+
+        assertIncreases(
+            "Truncation depth",
+            transform("t~d=0.5").truncationRatio(poly),
+            transform("t~d=1.5").truncationRatio(poly),
+        )
+        assertIncreases(
+            "Cantellation distance",
+            transform("e~c=0.5").cantellationRatio(poly),
+            transform("e~c=1.5").cantellationRatio(poly),
+        )
+        assertIncreases(
+            "Bevel distance",
+            transform("b~c=0.5").bevellingRatio(poly)?.cr,
+            transform("b~c=1.5").bevellingRatio(poly)?.cr,
+        )
+        assertIncreases(
+            "Bevel depth",
+            transform("b~d=0.5").bevellingRatio(poly)?.tr,
+            transform("b~d=1.5").bevellingRatio(poly)?.tr,
+        )
+        assertIncreases(
+            "Snub inset",
+            transform("s~i=0.5").snubbingRatio(poly)?.cr,
+            transform("s~i=1.5").snubbingRatio(poly)?.cr,
+        )
+        assertIncreases(
+            "Snub twist",
+            transform("s~r=0.5").snubbingRatio(poly)?.sa,
+            transform("s~r=1.5").snubbingRatio(poly)?.sa,
+        )
+        assertIncreases(
+            "Chamfer width",
+            transform("c~w=0.5").chamferingRatio(poly),
+            transform("c").chamferingRatio(poly),
+        )
+        val vertexKind = poly.vertexKinds.keys.first()
+        assertIncreases(
+            "Targeted truncation depth",
+            TruncateVertex(vertexKind, 0.5).targetRatio(poly),
+            TruncateVertex(vertexKind, 1.0).targetRatio(poly),
+        )
+        assertIncreases(
+            "Targeted rectification depth",
+            RectifyVertex(vertexKind, 0.5).targetRatio(poly),
+            RectifyVertex(vertexKind, 1.0).targetRatio(poly),
+        )
+    }
+
+    @Test
+    fun largerKisHeightProducesLargerSpikes() = runTest {
+        val input = evaluateCore(CoreRequest(CoreState("I", emptyList(), "c"))).poly
+        val low = evaluateCore(CoreRequest(CoreState("I", listOf("k~h=0.5"), "c")))
+            .transformedPolys.single()
+        val high = evaluateCore(CoreRequest(CoreState("I", listOf("k~h=1.5"), "c")))
+            .transformedPolys.single()
+
+        fun averageApexRadius(poly: polyhedra.model.poly.Polyhedron): Double =
+            poly.vs.drop(input.vs.size).map { it.norm }.average()
+
+        assertTrue(
+            averageApexRadius(high) > averageApexRadius(low),
+            "Increasing Kis height must move the apexes farther out",
+        )
+    }
+
+    @Test
+    fun lowGyroInsetIsRejectedWithoutExposingInvalidGeometry() = runTest {
+        val response = evaluateCore(CoreRequest(CoreState("I", listOf("g~i=0.23"), "c")))
+
+        assertEquals(CoreIssueCode.InvalidGeometry, response.error?.code)
+        assertEquals(0, response.errorIndex)
+        assertTrue(response.validTransformTags.isEmpty())
+        response.poly.validateGeometry()
+        val insetRange = response.transformTweakRanges.single()
+            .single { it.tweak == TransformTweak.Inset }
+        assertTrue(insetRange.min > 0.23, "Unsafe Gyro inset must be outside $insetRange")
+    }
+
+    @Test
+    fun evaluatesAndAnimatesNonDefaultContinuousTransformParameters() = runTest {
+        val defaultResponse = evaluateCore(CoreRequest(CoreState("C", listOf("t"), "c")))
+        val tweakedResponse = evaluateCore(
+            CoreRequest(
+                state = CoreState("C", listOf("t~d=0.7"), "c"),
+                previousState = CoreState("C", listOf("t"), "c"),
+                animationDuration = 0.5,
+            )
+        )
+
+        assertEquals(defaultResponse.poly.fev(), tweakedResponse.poly.fev())
+        assertNotEquals(defaultResponse.poly.vs.first().x, tweakedResponse.poly.vs.first().x)
+        assertEquals(listOf("t~d=0.7"), tweakedResponse.validTransformTags)
+        assertEquals(1, tweakedResponse.animation.size)
+        assertTrue(tweakedResponse.animation.single().previousPoly.hasSameTopology(
+            tweakedResponse.animation.single().targetPoly
+        ))
+    }
+
+    @Test
+    fun evaluatesParameterizedMacrosAndPreservesTheirLogicalTags() = runTest {
+        for (tag in listOf("k~h=0.8", "e~c=0.8", "b~d=0.8~c=0.9", "g'~i=0.9~r=0.8")) {
+            val response = evaluateCore(CoreRequest(CoreState("C", listOf(tag), "c")))
+
+            assertNull(response.error, tag)
+            assertEquals(listOf(tag), response.validTransformTags)
+        }
+    }
+
+    @Test
+    fun animatesHeightChangesForOneKisFaceOrbit() = runTest {
+        val initial = evaluateCore(CoreRequest(CoreState("tC", emptyList(), "c")))
+        val kisTag = initial.availableOrbitTransforms.first().first { it.startsWith("k[") }
+        val defaultKis = evaluateCore(CoreRequest(CoreState("tC", listOf(kisTag), "c")))
+        val response = evaluateCore(
+            CoreRequest(
+                state = CoreState("tC", listOf("$kisTag~h=0.7"), "c"),
+                previousState = CoreState("tC", listOf(kisTag), "c"),
+                animationDuration = 0.5,
+            )
+        )
+
+        assertNull(response.error)
+        assertEquals(listOf("$kisTag~h=0.7"), response.validTransformTags)
+        assertTrue(defaultKis.poly.vs.indices.any { index ->
+            val defaultVertex = defaultKis.poly.vs[index]
+            val tweakedVertex = response.poly.vs[index]
+            defaultVertex.x != tweakedVertex.x ||
+                defaultVertex.y != tweakedVertex.y ||
+                defaultVertex.z != tweakedVertex.z
+        })
+        assertEquals(1, response.animation.size)
+        assertTrue(response.animation.single().previousPoly.hasSameTopology(
+            response.animation.single().targetPoly
+        ))
+    }
+
     @Test
     fun evaluatesCompleteTransformPipeline() = runTest {
         val response = evaluateCore(
@@ -165,7 +316,12 @@ class CoreApiTest {
 
     @Test
     fun chiralityFlipDoesNotInterpolateThroughCollapsedGeometry() = runTest {
-        for ((defaultTag, flippedTag) in listOf("p" to "p'", "w" to "w'")) {
+        for ((defaultTag, flippedTag) in listOf(
+            "p" to "p'",
+            "w" to "w'",
+            "s~r=0.8" to "s'~r=0.8",
+            "g~r=0.8" to "g'~r=0.8",
+        )) {
             val response = evaluateCore(
                 CoreRequest(
                     state = CoreState("C", listOf(flippedTag), "c"),

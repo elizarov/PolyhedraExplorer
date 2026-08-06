@@ -1,13 +1,17 @@
 package polyhedra.core.api
 
 import polyhedra.core.poly.*
+import polyhedra.core.transform.*
 import polyhedra.core.util.OperationProgressContext
 import polyhedra.model.api.*
 import polyhedra.model.poly.*
-import polyhedra.core.transform.*
+import kotlin.math.abs
 
 private const val MAX_DISPLAY_EDGES = (1 shl 15) - 1
 private const val ANIMATION_GAP = 1e-4
+// Eight bisections resolve even the widest envelope more finely than the UI's 0.01 step.
+private const val SAFE_RANGE_SEARCH_STEPS = 8
+private const val SAFE_RANGE_ANCHOR_SAMPLES = 20
 
 private data class LogicalTransform(
     val tag: String,
@@ -22,18 +26,86 @@ private data class LogicalTransform(
 }
 
 private fun String.toLogicalTransformOrNull(): LogicalTransform? {
-    toTransformMacroOrNull()?.let { macro ->
-        val primitives = macro.expansionTags.map { tag ->
-            requireNotNull(tag.toTransformOrNull()) { "Unknown primitive transform tag in ${macro.name}: $tag" }
+    val parsed = parseTransformTag() ?: return null
+    parsed.operationTag.toTransformMacroOrNull()?.let { macro ->
+        fun remap(vararg mappings: Pair<TransformTweak, TransformTweak>): Map<TransformTweak, Double>? {
+            val sources = mappings.mapTo(hashSetOf()) { it.first }
+            if (!parsed.tweaks.keys.all { it in sources }) return null
+            return mappings.mapNotNull { (source, target) ->
+                parsed.tweaks[source]?.let { target to it }
+            }.toMap()
         }
-        val animationTransform = when (macro.tag) {
-            "e" -> Transform.Cantellated
-            "b" -> Transform.Bevelled
-            else -> null
+
+        val primitives = when (macro.tag.removeSuffix("'")) {
+            "k" -> listOf(
+                KisAll(
+                    (remap(TransformTweak.Height to TransformTweak.Height) ?: return null)[TransformTweak.Height]
+                        ?: 1.0
+                )
+            )
+            "j" -> {
+                if (parsed.tweaks.isNotEmpty()) return null
+                listOf(Transform.Dual, Transform.Rectified, Transform.Dual)
+            }
+            "N" -> listOf(
+                Transform.Truncated.withTweaks(remap(TransformTweak.Depth to TransformTweak.Depth) ?: return null),
+                Transform.Dual,
+            )
+            "z" -> listOf(
+                Transform.Dual,
+                Transform.Truncated.withTweaks(remap(TransformTweak.Depth to TransformTweak.Depth) ?: return null),
+            )
+            "e" -> listOf(
+                Transform.Cantellated.withTweaks(
+                    remap(TransformTweak.Distance to TransformTweak.Distance) ?: return null
+                )
+            )
+            "b" -> listOf(
+                Transform.Bevelled.withTweaks(
+                    remap(
+                        TransformTweak.Distance to TransformTweak.Distance,
+                        TransformTweak.Depth to TransformTweak.Depth,
+                    ) ?: return null
+                )
+            )
+            "O" -> listOf(
+                Transform.Dual,
+                Transform.Cantellated.withTweaks(
+                    remap(TransformTweak.Distance to TransformTweak.Distance) ?: return null
+                ),
+                Transform.Dual,
+            )
+            "m" -> listOf(
+                Transform.Dual,
+                Transform.Bevelled.withTweaks(
+                    remap(
+                        TransformTweak.Distance to TransformTweak.Distance,
+                        TransformTweak.Depth to TransformTweak.Depth,
+                    ) ?: return null
+                ),
+                Transform.Dual,
+            )
+            "g" -> listOf(
+                Transform.Dual,
+                (if (macro.chirality == Chirality.Flipped) Transform.SnubFlipped else Transform.Snub).withTweaks(
+                    remap(
+                        TransformTweak.Inset to TransformTweak.Inset,
+                        TransformTweak.Twist to TransformTweak.Twist,
+                    ) ?: return null
+                ),
+                Transform.Dual,
+            )
+            else -> return null
         }
-        return LogicalTransform(macro.tag, macro.displayName, primitives, animationTransform)
+        val animationTransform = primitives.singleOrNull()
+        return LogicalTransform(
+            encodeTransformTag(macro.tag, parsed.tweaks),
+            macro.displayName,
+            primitives,
+            animationTransform,
+        )
     }
-    return toTransformOrNull()?.let { transform ->
+    return encodeTransformTag(parsed.operationTag, parsed.tweaks).toTransformOrNull()?.let { transform ->
         LogicalTransform(transform.tag, transform.toString(), listOf(transform))
     }
 }
@@ -55,7 +127,12 @@ suspend fun evaluateCore(
     reportProgress: (CoreProgress) -> Unit = {},
 ): CoreResponse {
     reportProgress(CoreProgress(transformIndex = 0, done = 0))
-    val current = evaluateState(request.state, reportProgress, detectSeed = request.detectSeed)
+    val current = evaluateState(
+        request.state,
+        reportProgress,
+        detectSeed = request.detectSeed,
+        computeTweakRanges = request.calculateTweakRanges,
+    )
     val duration = request.animationDuration?.takeIf { it > 0.0 }
     val previousState = request.previousState
     if (duration == null || previousState == null || previousState == request.state) {
@@ -70,7 +147,7 @@ suspend fun evaluateCore(
         return current.response
     }
 
-    val previous = evaluateState(previousState, {}, detectSeed = false)
+    val previous = evaluateState(previousState, {}, detectSeed = false, computeTweakRanges = false)
     val animation = computeAnimation(previous, current, duration)
     reportCompletion(current, reportProgress)
     return current.response.copy(animation = animation)
@@ -94,6 +171,7 @@ private suspend fun evaluateState(
     state: CoreState,
     reportProgress: (CoreProgress) -> Unit,
     detectSeed: Boolean,
+    computeTweakRanges: Boolean = true,
 ): Evaluation {
     val seed = state.seedTag.toSeedOrNull()
         ?: error("Unknown seed tag: ${state.seedTag}")
@@ -110,6 +188,7 @@ private suspend fun evaluateState(
     val validTransforms = ArrayList<LogicalTransform>()
     val availableOrbitTransforms = ArrayList<List<String>>()
     val warnings = ArrayList<CoreIssue?>()
+    val transformTweakRanges = ArrayList<List<CoreTransformTweakRange>>()
     var errorIndex: Int? = null
     var errorIssue: CoreIssue? = null
 
@@ -120,7 +199,18 @@ private suspend fun evaluateState(
             reportProgress(CoreProgress(index, done.coerceIn(0, 100)))
         }
         reportTransformProgress(0)
-        when (val application = applyTransform(transform, poly, pendingRectification, reportTransformProgress)) {
+        if (computeTweakRanges) {
+            transformTweakRanges += transform.safeTweakRanges(poly, pendingRectification, scale)
+        }
+        when (
+            val application = applyTransform(
+                transform,
+                poly,
+                pendingRectification,
+                reportTransformProgress,
+                outputScale = scale,
+            )
+        ) {
             is TransformApplication.Failure -> {
                 errorIndex = index
                 errorIssue = application.issue
@@ -161,10 +251,83 @@ private suspend fun evaluateState(
         validTransformTags = validTransforms.map(LogicalTransform::tag),
         availableOrbitTransforms = availableOrbitTransforms,
         warnings = warnings,
+        transformTweakRanges = transformTweakRanges,
         errorIndex = errorIndex,
         error = errorIssue,
     )
     return Evaluation(state, seed, scale, validTransforms, poly, response)
+}
+
+private suspend fun LogicalTransform.safeTweakRanges(
+    inputPoly: Polyhedron,
+    inputPendingRectification: PendingRectification?,
+    outputScale: Scale,
+): List<CoreTransformTweakRange> {
+    val parsed = tag.parseTransformTag() ?: return emptyList()
+    val envelopes = parsed.operationTag.transformTweakRanges()
+    if (envelopes.isEmpty()) return emptyList()
+
+    val result = ArrayList<CoreTransformTweakRange>(envelopes.size)
+    for ((tweak, envelope) in envelopes) {
+        safeTweakRange(parsed, tweak, envelope, inputPoly, inputPendingRectification, outputScale)
+            ?.let(result::add)
+    }
+    return result
+}
+
+private suspend fun safeTweakRange(
+    parsed: ParsedTransformTag,
+    tweak: TransformTweak,
+    envelope: TransformTweakRange,
+    inputPoly: Polyhedron,
+    inputPendingRectification: PendingRectification?,
+    outputScale: Scale,
+): CoreTransformTweakRange? {
+    suspend fun isValid(value: Double): Boolean {
+        val tweaks = parsed.tweaks.toMutableMap().apply {
+            if (value == 1.0) remove(tweak) else put(tweak, value)
+        }
+        val candidate = encodeTransformTag(parsed.operationTag, tweaks).toLogicalTransformOrNull() ?: return false
+        return applyTransform(
+            candidate,
+            inputPoly,
+            inputPendingRectification,
+            reportProgress = {},
+            validateResultGeometry = true,
+            outputScale = outputScale,
+        ) is TransformApplication.Success
+    }
+
+    val current = (parsed.tweaks[tweak] ?: 1.0).coerceIn(envelope.min, envelope.max)
+    val anchors = buildList {
+        add(current)
+        if (current != 1.0 && 1.0 in envelope.min..envelope.max) add(1.0)
+        addAll(
+            (0..SAFE_RANGE_ANCHOR_SAMPLES)
+                .map { index ->
+                    envelope.min + (envelope.max - envelope.min) * index / SAFE_RANGE_ANCHOR_SAMPLES
+                }
+                .sortedBy { value -> abs(value - current) }
+        )
+    }.distinct()
+    val anchor = anchors.firstOrNull { isValid(it) } ?: return null
+
+    suspend fun findBoundary(extreme: Double): Double {
+        if (isValid(extreme)) return extreme
+        var valid = anchor
+        var invalid = extreme
+        repeat(SAFE_RANGE_SEARCH_STEPS) {
+            val candidate = (valid + invalid) / 2.0
+            if (isValid(candidate)) valid = candidate else invalid = candidate
+        }
+        return valid
+    }
+
+    return CoreTransformTweakRange(
+        tweak = tweak,
+        min = findBoundary(envelope.min),
+        max = findBoundary(envelope.max),
+    )
 }
 
 private suspend fun applyTransform(
@@ -172,6 +335,10 @@ private suspend fun applyTransform(
     inputPoly: Polyhedron,
     inputPendingRectification: PendingRectification?,
     reportProgress: (Int) -> Unit,
+    validateResultGeometry: Boolean = transform.tag.parseTransformTag()?.let { parsed ->
+        parsed.tweaks.isNotEmpty() || parsed.operationTag.transformTweakRanges().isNotEmpty()
+    } == true,
+    outputScale: Scale? = null,
 ): TransformApplication {
     var poly = inputPoly
     var pendingRectification = inputPendingRectification
@@ -229,6 +396,17 @@ private suspend fun applyTransform(
         reportPrimitiveProgress(100)
     }
 
+    if (validateResultGeometry) {
+        try {
+            poly.validateMeshGeometry()
+            outputScale?.let { poly.scaled(it).validateMeshGeometry() }
+        } catch (cause: IllegalArgumentException) {
+            return TransformApplication.Failure(
+                CoreIssue(CoreIssueCode.InvalidGeometry, transform.tag)
+            )
+        }
+    }
+
     return TransformApplication.Success(poly, pendingRectification, isIdentity)
 }
 
@@ -247,11 +425,38 @@ private fun computeAnimation(
         val basePoly = if (commonSize == 0) current.seed.poly else current.response.transformedPolys[commonSize - 1]
         val previousPoly = previous.response.transformedPolys.getOrNull(commonSize) ?: basePoly
         val currentPoly = current.response.transformedPolys.getOrNull(commonSize) ?: basePoly
-        val previousTransform = previous.validTransforms.getOrNull(commonSize)
+        val previousLogicalTransform = previous.validTransforms.getOrNull(commonSize)
+        val currentLogicalTransform = current.validTransforms.getOrNull(commonSize)
+        val previousOperationTag = previousLogicalTransform?.tag?.withoutTransformTweaks()
+        val currentOperationTag = currentLogicalTransform?.tag?.withoutTransformTweaks()
+        if (
+            previousOperationTag != currentOperationTag &&
+            previousOperationTag?.removeSuffix("'") == currentOperationTag?.removeSuffix("'") &&
+            previousOperationTag?.removeSuffix("'") in setOf("s", "p", "w", "g")
+        ) {
+            return emptyList()
+        }
+        if (
+            previousLogicalTransform != null && currentLogicalTransform != null &&
+            previousLogicalTransform.tag != currentLogicalTransform.tag &&
+            previousOperationTag == currentOperationTag &&
+            currentPoly.hasSameTopology(previousPoly)
+        ) {
+            return listOf(
+                CoreAnimationStep(
+                    duration,
+                    previousPoly.scaled(current.scale),
+                    0.0,
+                    currentPoly.scaled(current.scale),
+                    1.0,
+                )
+            )
+        }
+        val previousTransform = previousLogicalTransform
             ?.animationTransform
             ?.takeIf { !it.isIdentityTransform(basePoly) }
             ?: Transform.None
-        val currentTransform = current.validTransforms.getOrNull(commonSize)
+        val currentTransform = currentLogicalTransform
             ?.animationTransform
             ?.takeIf { !it.isIdentityTransform(basePoly) }
             ?: Transform.None

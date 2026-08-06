@@ -4,7 +4,11 @@ import polyhedra.model.api.FamilySeedId
 import polyhedra.model.api.MAX_FAMILY_SEED_N
 import polyhedra.model.api.MIN_FAMILY_SEED_N
 import polyhedra.model.api.SeedFamily
+import polyhedra.model.api.TransformTweak
+import polyhedra.model.api.encodeTransformTag
+import polyhedra.model.api.parseTransformTag
 import polyhedra.model.api.toTransformMacroOrNull
+import polyhedra.model.api.transformTweakRanges
 import polyhedra.model.poly.AnyKind
 import polyhedra.model.poly.Chirality
 import polyhedra.model.poly.EdgeKind
@@ -113,8 +117,9 @@ data class Transform(
     val name: String,
     val category: TransformCategory = TransformCategory.Transform,
     val chirality: Chirality? = null,
+    val tweaks: Map<TransformTweak, Double> = emptyMap(),
 ) : Tagged {
-    override val tag: String get() = baseTag.withChirality(chirality)
+    override val tag: String get() = encodeTransformTag(baseTag.withChirality(chirality), tweaks)
     val isChiral: Boolean get() = chirality != null
     override fun toString(): String = name + chirality?.suffix.orEmpty()
 
@@ -215,7 +220,37 @@ val Transforms: List<Transform> = TransformOptions.flatMap { transform ->
 fun Transform.flippedChirality(): Transform {
     val flipped = requireNotNull(chirality).flipped()
     return Transforms.single { transform -> transform.baseTag == baseTag && transform.chirality == flipped }
+        .copy(tweaks = tweaks)
 }
+
+data class TransformSetting(
+    val tweak: TransformTweak,
+    val label: String,
+    val min: Double,
+    val max: Double,
+    val step: Double = 0.01,
+)
+
+val Transform.settings: List<TransformSetting>
+    get() = baseTag.transformTweakRanges().map { (tweak, range) ->
+        TransformSetting(tweak, tweak.name, range.min, range.max)
+    }
+
+fun Transform.withTweak(tweak: TransformTweak, value: Double): Transform =
+    copy(tweaks = tweaks.toMutableMap().apply {
+        val setting = this@withTweak.settings.single { it.tweak == tweak }
+        val boundedValue = value.coerceIn(setting.min, setting.max)
+        if (boundedValue == 1.0) remove(tweak) else put(tweak, boundedValue)
+    })
+
+fun Transform.withoutTweaks(): Transform =
+    if (tweaks.isEmpty()) this else copy(tweaks = emptyMap())
+
+fun Transform.withDefaultSettings(): Transform =
+    copy(
+        chirality = chirality?.let { Chirality.Default },
+        tweaks = emptyMap(),
+    )
 
 private const val DROP_TAG = "x"
 private const val KIS_FACE_TAG = "k"
@@ -258,10 +293,16 @@ fun Transform.orbitTargetOrNull(): OrbitTarget? {
 }
 
 fun String.toTransformOrNull(): Transform? {
-    Transforms.firstOrNull { it.tag == this }?.let { return it }
-    val placeholder = Transform(this, "", TransformCategory.OrbitTargeted)
+    val parsed = parseTransformTag() ?: return null
+    Transforms.firstOrNull { it.tag == parsed.operationTag }?.let { transform ->
+        if (transform.accepts(parsed.tweaks)) {
+            return transform.copy(tweaks = parsed.tweaks)
+        }
+        return null
+    }
+    val placeholder = Transform(parsed.operationTag, "", TransformCategory.OrbitTargeted)
     val target = placeholder.orbitTargetOrNull() ?: return null
-    return when (target.operation) {
+    val transform = when (target.operation) {
         OrbitTargetedOperation.DropFace,
         OrbitTargetedOperation.DropEdge,
         OrbitTargetedOperation.DropVertex -> Drop(target.kind)
@@ -269,4 +310,11 @@ fun String.toTransformOrNull(): Transform? {
         OrbitTargetedOperation.TruncateVertex -> TruncateVertex(target.kind as VertexKind)
         OrbitTargetedOperation.RectifyVertex -> RectifyVertex(target.kind as VertexKind)
     }
+    if (!transform.accepts(parsed.tweaks)) return null
+    return transform.copy(tweaks = parsed.tweaks)
 }
+
+private fun Transform.accepts(tweaks: Map<TransformTweak, Double>): Boolean =
+    tweaks.all { (tweak, value) ->
+        settings.singleOrNull { it.tweak == tweak }?.let { value in it.min..it.max } == true
+    }

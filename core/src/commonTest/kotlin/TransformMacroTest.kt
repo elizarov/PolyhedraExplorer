@@ -15,6 +15,12 @@ import kotlin.test.assertTrue
 
 class TransformMacroTest {
     @Test
+    fun parameterOnlyChangeDoesNotSuggestReplacingAnOperationWithItself() {
+        assertNull(findTransformPrefixReplacement(listOf("t~d=0.7")))
+        assertNull(findTransformPrefixReplacement(listOf("g'~r=0.8")))
+    }
+
+    @Test
     fun everyMacroMatchesItsExpandedTransformSequence() = runTest {
         for (macro in TransformMacros) {
             val macroResponse = evaluateCore(CoreRequest(CoreState("C", listOf(macro.tag), "c")))

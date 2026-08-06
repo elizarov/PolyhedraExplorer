@@ -381,6 +381,74 @@ tr.info {
     height: 1em;
 }
 
+aside.transform-settings {
+    display: block;
+    position: absolute;
+    top: 2.5em;
+    left: -0.5em;
+    min-width: 13em;
+    background-color: var(--popup-background-color);
+    color: var(--text-color);
+    border: var(--border);
+    border-radius: calc(0.5 * var(--row-height));
+    box-shadow: var(--shadow);
+    z-index: 2;
+}
+
+aside.transform-settings > div.text-row:first-child > div.header {
+    border-radius: calc(0.5 * var(--row-height)) calc(0.5 * var(--row-height)) 0 0;
+}
+
+aside.transform-settings input[type="range"] {
+    width: 7em;
+    vertical-align: middle;
+}
+
+aside.transform-settings .transform-setting-value {
+    display: inline-block;
+    min-width: 4ch;
+    margin-left: 0.5ch;
+    text-align: right;
+}
+
+aside.transform-settings button.chirality-flip {
+    position: relative;
+    min-width: 2em;
+    height: 1.5em;
+    padding: 0;
+    border: 0;
+    color: var(--button-background-color);
+    background: transparent;
+    cursor: pointer;
+}
+
+aside.transform-settings .transform-settings-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0.25em 0.5em 0.5em;
+}
+
+aside.transform-settings button.transform-settings-reset {
+    position: relative;
+    width: 2em;
+    height: 1.5em;
+    padding: 0;
+    border: 0;
+    border-radius: 0.75em;
+    color: var(--button-color);
+    background-color: var(--button-background-color);
+    cursor: pointer;
+}
+
+aside.transform-settings button.transform-settings-reset:hover:not(:disabled) {
+    color: var(--hover-color);
+}
+
+aside.transform-settings button.transform-settings-reset:disabled {
+    color: var(--disabled-color);
+    cursor: default;
+}
+
 .figure.edge-figure, .figure.edge-figure > svg {
     width: 2em;
     height: 1em;

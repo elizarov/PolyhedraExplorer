@@ -13,6 +13,21 @@ fun Polyhedron.validate() {
 }
 
 fun Polyhedron.validateGeometry() {
+    validateMeshGeometry()
+    for (f in fs) {
+        require(f.isPlanar) {
+            "Face is not planar: $f"
+        }
+    }
+}
+
+/** Validates the mesh properties required for safe rendering, while allowing non-planar faces. */
+fun Polyhedron.validateMeshGeometry() {
+    for (v in vs) {
+        require(v.x.isFinite() && v.y.isFinite() && v.z.isFinite()) {
+            "$v has non-finite coordinates"
+        }
+    }
     // Validate edges
     for (e in es) {
         require((e.a - e.b).norm > EPS) {
@@ -24,16 +39,14 @@ fun Polyhedron.validateGeometry() {
         require(f.d > 0) {
             "Face normal does not point outwards: $f $f "
         }
-        for (v in f.fvs)
-            require(f.isPlanar) {
-                "Face is not planar: $f"
-            }
         for (i in 0 until f.size) {
             val a = f[i]
             val b = f[(i + 1) % f.size]
             val c = f[(i + 2) % f.size]
             val rot = (c - a) cross (b - a)
-            require(rot * f > -EPS) {
+            // Compare angular direction, not absolute triangle area. High-order family faces can
+            // contain very small local triangles even when their winding is perfectly valid.
+            require(rot * f > -EPS * rot.norm) {
                 "Face is not clockwise: $f, vertices $a $b $c"
             }
         }

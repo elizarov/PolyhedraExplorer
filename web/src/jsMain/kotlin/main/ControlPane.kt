@@ -1,17 +1,24 @@
 package polyhedra.web.main
 
 import androidx.compose.runtime.*
+import org.jetbrains.compose.web.attributes.InputType
 import org.jetbrains.compose.web.attributes.disabled
+import org.jetbrains.compose.web.attributes.value
 import org.jetbrains.compose.web.dom.*
+import polyhedra.model.api.CoreTransformTweakRange
 import polyhedra.model.api.MAX_FAMILY_SEED_N
 import polyhedra.model.api.MIN_FAMILY_SEED_N
-import polyhedra.model.util.updatedAt
+import polyhedra.model.api.TransformTweak
 import polyhedra.model.api.TransformPrefixReplacement
 import polyhedra.model.api.findTransformPrefixReplacement
+import polyhedra.model.util.updatedAt
 import polyhedra.web.catalog.*
 import polyhedra.web.components.observe
 import polyhedra.web.params.Param
 import polyhedra.web.poly.*
+import kotlin.math.ceil
+import kotlin.math.floor
+import kotlin.math.roundToInt
 
 @Composable
 fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit) {
@@ -35,7 +42,7 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
     fun possibleTransformsAt(index: Int): Set<Transform> {
         val result = TransformOptions.toMutableSet()
         result += params.availableOrbitTransformsAt(index)
-        transforms.getOrNull(index)?.takeIf { it !in Transforms }?.let { result += it }
+        transforms.getOrNull(index)?.withoutTweaks()?.takeIf { it !in result }?.let { result += it }
         if (index == transforms.size) result -= Transform.None
         return result
     }
@@ -53,7 +60,15 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
     fun updateTransform(index: Int, transform: Transform) {
         togglePopup(null)
         params.rememberOrbitTarget(transforms.getOrNull(index))
-        val selectedTransform = params.reuseRememberedOrbitTarget(transform, possibleTransformsAt(index))
+        val current = transforms.getOrNull(index)
+        val selectedTransform = params
+            .reuseRememberedOrbitTarget(transform, possibleTransformsAt(index))
+            .let { selected ->
+                if (
+                    current != null && selected.baseTag == current.baseTag &&
+                    selected.chirality == current.chirality
+                ) selected.copy(tweaks = current.tweaks) else selected
+            }
         val updated = when {
             index >= transforms.size -> transforms + selectedTransform
             selectedTransform != Transform.None -> transforms.updatedAt(index, selectedTransform)
@@ -96,8 +111,7 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
         val currentOrbitOperation = current.orbitTargetOrNull()?.operation
         val options = operationOptionsAt(transforms.lastIndex)
         val currentIndex = options.indexOfFirst { option ->
-            option == current ||
-                current.isChiral && option.baseTag == current.baseTag ||
+            (option.baseTag == current.baseTag && option.chirality == current.chirality) ||
                 currentOrbitOperation != null && option.orbitTargetOrNull()?.operation == currentOrbitOperation
         }
         val replacement = options.getOrNull(currentIndex + delta) ?: return
@@ -130,8 +144,19 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
     }
 
     fun flipTransformChirality(index: Int) {
-        togglePopup(null)
         params.transforms.updateValue(transforms.updatedAt(index, transforms[index].flippedChirality()))
+    }
+
+    fun updateTransformTweak(index: Int, setting: TransformSetting, value: Double) {
+        params.transforms.updateValue(
+            transforms.updatedAt(index, transforms[index].withTweak(setting.tweak, value))
+        )
+    }
+
+    fun resetTransformSettings(index: Int) {
+        params.transforms.updateValue(
+            transforms.updatedAt(index, transforms[index].withDefaultSettings())
+        )
     }
 
     fun flipSeedChirality() {
@@ -165,12 +190,26 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
         for (index in transforms.lastIndex downTo 0) {
             val itemDisabled = index > errorIndex
             val itemPopup = Popup.ModifyTransform(index)
-            Div(attrs = { classes("btn", *activeWhen(popup, itemPopup)) }) {
+            val settingsPopup = Popup.TransformSettings(index)
+            val hasSettings = index == transforms.lastIndex &&
+                (transforms[index].settings.isNotEmpty() || transforms[index].isChiral)
+            val itemActive = popup == itemPopup || popup == settingsPopup
+            Div(attrs = { classes("btn", *(if (itemActive) arrayOf("active") else emptyArray())) }) {
                 if (index == transforms.lastIndex) {
                     LeftRightSpinner(itemDisabled) { adjustLastTransform(it) }
                 }
                 if (popup == itemPopup && !itemDisabled) {
                     TransformDropdown(possibleTransformsAt(index)) { updateTransform(index, it) }
+                }
+                if (popup == settingsPopup && hasSettings && !itemDisabled) {
+                    TransformSettingsPopup(
+                        transform = transforms[index],
+                        safeRanges = params.transformTweakRangesAt(index),
+                        canFlipChirality = index == transforms.lastIndex && transforms[index].isChiral,
+                        onChange = { setting, value -> updateTransformTweak(index, setting, value) },
+                        onFlipChirality = { flipTransformChirality(index) },
+                        onReset = { resetTransformSettings(index) },
+                    )
                 }
                 Button(attrs = {
                     classes("txt", *activeWhen(popup, itemPopup))
@@ -180,8 +219,15 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
                     Text(transforms[index].toString())
                     Aside(attrs = { classes("tooltip-text") }) { Text("Modify transform") }
                 }
-                if (index == transforms.lastIndex && transforms[index].isChiral) {
-                    ChiralityFlipButton { flipTransformChirality(index) }
+                if (hasSettings) {
+                    Button(attrs = {
+                        classes("square", "transform-settings-button", *activeWhen(popup, settingsPopup))
+                        if (itemDisabled) disabled()
+                        onClick { togglePopup(settingsPopup) }
+                    }) {
+                        I(attrs = { classes("fa", "fa-cog") })
+                        Aside(attrs = { classes("tooltip-text") }) { Text("Transform settings") }
+                    }
                 }
                 if (index == transforms.lastIndex && transforms[index].orbitTargetOrNull() != null) {
                     OrbitTargetControls(itemDisabled, ::adjustLastOrbitTarget)
@@ -283,9 +329,71 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
 }
 
 @Composable
+private fun TransformSettingsPopup(
+    transform: Transform,
+    safeRanges: Map<TransformTweak, CoreTransformTweakRange>?,
+    canFlipChirality: Boolean,
+    onChange: (TransformSetting, Double) -> Unit,
+    onFlipChirality: () -> Unit,
+    onReset: () -> Unit,
+) {
+    Aside(attrs = { classes("transform-settings") }) {
+        GroupHeader("$transform settings")
+        TableBody {
+            for (setting in transform.settings) {
+                val currentValue = transform.tweaks[setting.tweak] ?: 1.0
+                val safeRange = safeRanges?.get(setting.tweak)
+                val minimum = safeRange?.min ?: setting.min
+                val maximum = safeRange?.max ?: setting.max
+                val minTick = ceil(minimum / setting.step - 1e-9).toInt()
+                val maxTick = floor(maximum / setting.step + 1e-9).toInt()
+                val rangeAvailable = safeRanges == null || safeRange != null && minTick <= maxTick
+                ControlRow(setting.label) {
+                    Input(type = InputType.Range, attrs = {
+                        classes("transform-setting-slider")
+                        attr("aria-label", setting.label)
+                        attr("min", minTick.toString())
+                        attr("max", maxTick.coerceAtLeast(minTick).toString())
+                        value(
+                            (currentValue / setting.step).roundToInt()
+                                .coerceIn(minTick, maxTick.coerceAtLeast(minTick))
+                                .toString()
+                        )
+                        if (!rangeAvailable) disabled()
+                        onInput { event ->
+                            event.value?.toDouble()?.let { sliderValue ->
+                                onChange(setting, sliderValue * setting.step)
+                            }
+                        }
+                    })
+                    Span(attrs = { classes("transform-setting-value") }) {
+                        Text("${(currentValue * 100).roundToInt()}%")
+                    }
+                }
+            }
+            if (canFlipChirality) {
+                ControlRow("Chirality") { ChiralityFlipButton(onFlipChirality) }
+            }
+        }
+        Div(attrs = { classes("transform-settings-actions") }) {
+            Button(attrs = {
+                classes("transform-settings-reset")
+                attr("aria-label", "Reset transform settings")
+                if (transform == transform.withDefaultSettings()) disabled()
+                onClick { onReset() }
+            }) {
+                I(attrs = { classes("fa", "fa-undo") })
+                Aside(attrs = { classes("tooltip-text") }) { Text("Reset transform settings") }
+            }
+        }
+    }
+}
+
+@Composable
 private fun ChiralityFlipButton(onFlip: () -> Unit) {
     Button(attrs = {
         classes("square", "chirality-flip")
+        attr("aria-label", "Flip chirality")
         onClick { onFlip() }
     }) {
         I(attrs = { classes("fa", "fa-exchange") })
@@ -399,7 +507,7 @@ private fun MessageButton(
         classes("msg")
         onClick {
             when (message.indicator) {
-                TransformFailed, TransformNotApplicable, TransformIsId, TooLarge ->
+                TransformFailed, InvalidGeometry, TransformNotApplicable, TransformIsId, TooLarge ->
                     updateTransform(index, Transform.None)
                 SomeFacesNotPlanar -> updateTransform(index + 1, Transform.Canonical)
             }

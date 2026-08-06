@@ -52,7 +52,7 @@ fun String.toTransformMacroOrNull(): TransformMacro? =
     transformMacrosByTag[this]
 
 fun String.expandedTransformTags(): List<String> =
-    toTransformMacroOrNull()?.expansionTags ?: listOf(this)
+    withoutTransformTweaks().let { tag -> tag.toTransformMacroOrNull()?.expansionTags ?: listOf(tag) }
 
 data class TransformPrefixReplacement(
     val replacementTag: String,
@@ -68,7 +68,7 @@ fun findTransformPrefixReplacement(tags: List<String>): TransformPrefixReplaceme
     for (startIndex in tags.indices) {
         val prefix = tags.subList(startIndex, tags.size)
         val replacementTag = replacementTagsByExpansion[prefix.normalizedExpandedTransformTags()] ?: continue
-        if (prefix.size == 1 && prefix.single() == replacementTag) continue
+        if (prefix.size == 1 && prefix.single().withoutTransformTweaks() == replacementTag) continue
         return TransformPrefixReplacement(replacementTag, startIndex)
     }
     return null

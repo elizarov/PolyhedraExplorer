@@ -22,6 +22,7 @@ operator fun <T> Indicator<T>.invoke(value: T) = IndicatorMessage(this, value)
 operator fun Indicator<Unit>.invoke() = IndicatorMessage(this, Unit)
 
 val TransformFailed = Indicator<Transform>("emoji", "❌", "{} transformation has failed")
+val InvalidGeometry = Indicator<Unit>("emoji", "⚠️", "This setting produces invalid geometry")
 val SomeFacesNotPlanar = Indicator<Unit>("emoji", "⚠️", "Some faces are not planar, apply canonical transformation")
 val FaceNotPlanar = Indicator<Unit>("emoji", "⚠️", "Face is not planar")
 val TransformIsId = Indicator<Transform>("fa fa-recycle", "", "{} transformation is not doing anything here")

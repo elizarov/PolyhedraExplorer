@@ -4,6 +4,7 @@
 
 package polyhedra.web.poly
 
+import kotlinx.browser.window
 import polyhedra.model.poly.*
 import polyhedra.model.util.*
 import polyhedra.model.api.*
@@ -24,6 +25,7 @@ class RenderParams(tag: String, val animationParams: ViewAnimationParams?) : Par
 
 private val defaultSeed = Seed.Tetrahedron
 private val defaultScale = Scale.Circumradius
+internal const val WORKER_PROGRESS_GRACE_MS = 500
 
 class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param.Composite(tag) {
     val seed = using(EnumParam("s", defaultSeed, Seeds))
@@ -58,6 +60,17 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
 
     var transformedPolys: List<Polyhedron> = emptyList()
         private set
+
+    private var transformTweakRanges: List<Map<TransformTweak, CoreTransformTweakRange>> = emptyList()
+
+    fun transformTweakRangesAt(transformIndex: Int): Map<TransformTweak, CoreTransformTweakRange>? =
+        transformTweakRanges.getOrNull(transformIndex)
+
+    internal fun updateTransformTweakRanges(rangesByTransform: List<List<CoreTransformTweakRange>>) {
+        transformTweakRanges = rangesByTransform.map { ranges ->
+            ranges.associateBy(CoreTransformTweakRange::tweak)
+        }
+    }
 
     private var orbitTransforms: List<Set<Transform>> = emptyList()
     val currentOrbitTransforms: Set<Transform>
@@ -107,6 +120,9 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
     private var requestId = 0
     private var coreStarted = false
     private var cancelCoreRequest: (() -> Unit)? = null
+    private var progressStageIndex: Int? = null
+    private var progressGraceTimeout = 0
+    private var progressVisible = false
 
     fun clearRolloverSelection() {
         selectedFace.updateValue(null)
@@ -143,8 +159,9 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
 
         requestedState = state
         coreError = null
+        resetTransformProgress()
         transformProgress = 0
-        transformError = TransformError(firstChangedTransform(appliedState, state), isAsync = true)
+        transformError = null
         val previousState = appliedState
         val duration = animationParams?.animateValueUpdatesDuration
         val detectSeed = shouldDetectSeed(previousState, state)
@@ -165,6 +182,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
             onSuccess = success@{ response ->
                 if (requestId != activeRequestId || requestedState != state) return@success
                 cancelCoreRequest = null
+                resetTransformProgress()
                 applyResponse(state, response)
                 notifyUpdated(TargetValue)
                 performUpdate(null, 0.0)
@@ -172,6 +190,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
             onFailure = failure@{ cause ->
                 if (requestId != activeRequestId || requestedState != state) return@failure
                 cancelCoreRequest = null
+                resetTransformProgress()
                 coreError = cause.message ?: cause.toString()
                 console.error("Wasm core request failed", cause)
                 transformError = state.transformTags.firstOrNull()?.toTransformOrNull()?.let {
@@ -191,23 +210,59 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
 
     internal fun updateTransformProgress(progress: CoreProgress) {
         val lastTransformIndex = transforms.value.lastIndex.coerceAtLeast(0)
+        val stageIndex = progress.transformIndex.coerceIn(0, lastTransformIndex)
         coreLoaded = true
         transformProgress = progress.done.coerceIn(0, 100)
-        transformError = if (transformProgress < 100) {
-            TransformError(
-                index = progress.transformIndex.coerceIn(0, lastTransformIndex),
-                isAsync = true,
-            )
+        if (progressStageIndex != stageIndex) startTransformProgressStage(stageIndex)
+
+        if (transformProgress >= 100) {
+            resetTransformProgress()
+            transformError = null
+        } else if (progressVisible) {
+            transformError = TransformError(stageIndex, isAsync = true)
         } else {
-            null
+            scheduleTransformProgress(stageIndex)
         }
         notifyUpdated(Progress)
+    }
+
+    private fun startTransformProgressStage(stageIndex: Int) {
+        resetTransformProgress()
+        progressStageIndex = stageIndex
+        transformError = null
+    }
+
+    private fun scheduleTransformProgress(stageIndex: Int) {
+        if (progressGraceTimeout != 0) return
+        val activeRequestId = requestId
+        progressGraceTimeout = window.setTimeout({
+            progressGraceTimeout = 0
+            if (
+                requestId == activeRequestId &&
+                progressStageIndex == stageIndex &&
+                transformProgress < 100
+            ) {
+                progressVisible = true
+                transformError = TransformError(stageIndex, isAsync = true)
+                notifyUpdated(Progress)
+            }
+        }, WORKER_PROGRESS_GRACE_MS)
+    }
+
+    private fun resetTransformProgress() {
+        if (progressGraceTimeout != 0) {
+            window.clearTimeout(progressGraceTimeout)
+            progressGraceTimeout = 0
+        }
+        progressStageIndex = null
+        progressVisible = false
     }
 
     private fun applyResponse(state: CoreState, response: CoreResponse) {
         poly = response.poly
         polyName = response.polyName
         transformedPolys = response.transformedPolys
+        updateTransformTweakRanges(response.transformTweakRanges)
         updateAvailableOrbitTransforms(response.availableOrbitTransforms)
         transformWarnings = response.warnings.map { it?.toIndicatorMessage() }
         transformError = response.errorIndex?.let { index ->
@@ -255,12 +310,6 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         scaleTag = baseScale.value.tag,
     )
 
-    private fun firstChangedTransform(previous: CoreState?, current: CoreState): Int {
-        if (previous == null || previous.seedTag != current.seedTag) return 0
-        val common = previous.transformTags.zip(current.transformTags).takeWhile { (a, b) -> a == b }.size
-        return common.coerceAtMost(current.transformTags.lastIndex.coerceAtLeast(0))
-    }
-
     fun updateAnimation(animation: TransformAnimation?) {
         if (transformAnimation == animation) return
         transformAnimation = animation
@@ -269,6 +318,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
 
     override fun destroy() {
         requestId++
+        resetTransformProgress()
         cancelCoreRequest?.invoke()
         cancelCoreRequest = null
         super.destroy()
@@ -277,7 +327,10 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
 
 internal fun shouldDetectSeed(previous: CoreState?, current: CoreState): Boolean =
     (current.transformTags.isNotEmpty() || current.seedTag.toFamilySeedIdOrNull() != null) &&
-        (previous == null || previous.seedTag != current.seedTag || previous.transformTags != current.transformTags)
+        current.transformTags.all { it == it.withoutTransformTweaks() } &&
+        (previous == null || previous.seedTag != current.seedTag ||
+            previous.transformTags.map(String::withoutTransformTweaks) !=
+            current.transformTags.map(String::withoutTransformTweaks))
 
 private fun CoreState.seedDetectionKey(): Pair<String, List<String>> = seedTag to transformTags
 
@@ -300,6 +353,7 @@ private fun CoreIssue.toIndicatorMessage(): IndicatorMessage<*> {
     val transform = transformTag?.toTransformOrNull() ?: Transform.None
     return when (code) {
         CoreIssueCode.TransformFailed -> TransformFailed(transform)
+        CoreIssueCode.InvalidGeometry -> InvalidGeometry()
         CoreIssueCode.TransformNotApplicable -> TransformNotApplicable(transform)
         CoreIssueCode.TransformIsIdentity -> TransformIsId(transform)
         CoreIssueCode.TooLarge -> TooLarge(requireNotNull(fev))

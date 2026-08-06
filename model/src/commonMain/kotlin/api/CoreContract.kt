@@ -18,6 +18,7 @@ data class CoreRequest(
     val previousState: CoreState? = null,
     val animationDuration: Double? = null,
     val detectSeed: Boolean = false,
+    val calculateTweakRanges: Boolean = true,
 )
 
 data class CoreProgress(
@@ -28,6 +29,7 @@ data class CoreProgress(
 @Serializable
 enum class CoreIssueCode {
     TransformFailed,
+    InvalidGeometry,
     TransformNotApplicable,
     TransformIsIdentity,
     TooLarge,
@@ -51,6 +53,13 @@ data class CoreAnimationStep(
 )
 
 @Serializable
+data class CoreTransformTweakRange(
+    val tweak: TransformTweak,
+    val min: Double,
+    val max: Double,
+)
+
+@Serializable
 data class CoreResponse(
     val poly: Polyhedron,
     val polyName: String,
@@ -59,6 +68,8 @@ data class CoreResponse(
     val validTransformTags: List<String>,
     val availableOrbitTransforms: List<List<String>>,
     val warnings: List<CoreIssue?>,
+    /** Geometry-safe tweak ranges for each logical transform, including a failing transform. */
+    val transformTweakRanges: List<List<CoreTransformTweakRange>> = emptyList(),
     val errorIndex: Int? = null,
     val error: CoreIssue? = null,
     val animation: List<CoreAnimationStep> = emptyList(),

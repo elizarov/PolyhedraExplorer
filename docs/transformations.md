@@ -43,6 +43,43 @@ and `o`. A trailing prime selects alternate chirality: `s'`, `p'`, and `w'`
 are flipped Snub, Propeller, and Whirl, while `g' = d -> s' -> d` is flipped
 Gyro.
 
+## Continuous parameters
+
+The last transform has a gear button when it has a meaningful coordinate degree
+of freedom; earlier pills do not show or open settings. Slider values are
+dimensionless percentages of the operation's
+regular construction: `100%` is the existing default, while lower or higher
+values move continuously away from it without changing the operation's
+topology. Default values are omitted from the URL. Non-default values follow the
+operation tag as `~key=value`, for example `t~d=0.7` for 70% truncation depth.
+The reset button in the popup's lower-right corner restores all controls to
+`100%` and restores the operation's standard chirality.
+The bounds shown by a slider are not universal constants: the Wasm worker starts
+from a broad exploration envelope, applies the transform to the actual mesh at
+that chain position, and narrows it to the connected interval with finite,
+non-degenerate, consistently wound geometry. With multiple controls, each range
+is recomputed while the other selected values are held fixed. The UI rounds the
+limits inward to its 1% step. Unsafe values supplied directly in a URL are
+rejected with a warning while the last valid mesh remains displayed.
+
+| Operations | Controls | URL keys |
+| --- | --- | --- |
+| Truncated, Needle, Zip | Depth | `d` |
+| Kis, Kis face | Height | `h` |
+| Cantellated, Ortho | Distance | `c` |
+| Bevelled, Meta | Distance, depth | `c`, `d` |
+| Snub, Gyro | Inset, twist | `i`, `r` |
+| Chamfered | Width | `w` |
+| Truncate vertex, Rectify vertex | Depth | `d` |
+
+The chiral Snub, Gyro, Propeller, and Whirl settings also contain their chirality
+flip while they are the last chain item. Propeller and Whirl have no stable
+continuous coordinate control because their preliminary construction is
+canonicalized; their gear therefore contains only chirality. Rectified and Join
+are also fixed because moving a shared edge midpoint splits it into two vertices
+and becomes truncation rather than a coordinate variation of rectification.
+Dual, Drop, Quinto, Canonical, and None have no continuous geometric setting.
+
 ## Primitive transformations
 
 ### None (`n`)
@@ -56,14 +93,15 @@ chain. It changes neither topology nor geometry.
 Truncation cuts off every original vertex. Each original face remains with twice
 as many sides, and each original vertex produces one new face. Two output
 vertices lie on every original edge, which produces three output edge segments.
-The cut depth is chosen from the representative regular-face geometry.
+The default cut depth is chosen from the representative regular-face geometry;
+the Depth setting scales it continuously.
 
 ### Rectified (`a`)
 
 Rectification, or ambo, places one output vertex at every original edge midpoint.
 Every original face becomes a face through its edge midpoints, and every original
 vertex becomes a face through the midpoints of its incident edges. It is the full
-midpoint limit of truncation.
+midpoint limit of truncation and has no independent continuous parameter.
 
 ### Dual (`d`)
 
@@ -77,7 +115,8 @@ original topology.
 Snubbing separates and consistently twists the original faces. It keeps one face
 for every original face and vertex, then fills the gap around every original edge
 with two triangles. The consistent twist makes Snub chiral: reversing the twist
-produces its mirror form. The UI writes this alternate operation as `Snub'` (`s'`).
+produces its mirror form. Inset and Twist can be varied independently. The UI
+writes this alternate operation as `Snub'` (`s'`).
 
 ### Propeller (`p`)
 
@@ -112,7 +151,7 @@ Chamfering moves the boundary of each original face inward and inserts one
 hexagonal face along every original edge. Original vertices remain, and two new
 vertices are introduced for every original edge. The current geometry uses
 bisector planes and stops when the limiting new edges reach the regular target
-length.
+length. The Width setting scales the regular limiting distance.
 
 ### Canonical (`o`)
 
@@ -137,7 +176,8 @@ topology. The apex and retained-vertex coordinates come from the same geometry
 construction as the full Kis macro; selecting every face orbit in the core
 operation is therefore exactly equivalent to Kis. The operation is offered only
 when the input has more than one face orbit and is displayed as `Kis α`, `Kis β`,
-and so on.
+and so on. Height moves the generated apex along the line from the source face
+center to its regular Kis position.
 
 ### Truncate vertex (`t[vertex]`)
 
@@ -146,7 +186,8 @@ vertex becomes a new face, while unselected vertices remain. Cut points use the
 same truncation ratio and edge interpolation as full Truncated; selecting every
 vertex orbit in the core operation is therefore exactly equivalent to Truncated.
 The operation is offered only when the input has more than one vertex orbit and
-is displayed as `Truncate A`, `Truncate B`, and so on.
+is displayed as `Truncate A`, `Truncate B`, and so on. Depth scales the regular
+cut position.
 
 ### Rectify vertex (`a[vertex]`)
 
@@ -156,7 +197,7 @@ remain. When both ends of an edge are selected, they share one midpoint rather
 than producing coincident duplicate vertices. Selecting every vertex orbit is
 therefore exactly equivalent to full Rectified. The operation is offered only
 when the input has more than one vertex orbit and is displayed as `Rectify A`,
-`Rectify B`, and so on.
+`Rectify B`, and so on. Depth explores shallower cuts up to the midpoint limit.
 
 The transform popup presents valid selective operations in its final
 `Orbit-targeted` section. Entries use one global order: Drop face, Drop edge, Drop

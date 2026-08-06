@@ -5,6 +5,7 @@ import kotlinx.browser.document
 import kotlinx.browser.window
 import org.jetbrains.compose.web.renderComposable
 import org.w3c.dom.HTMLDivElement
+import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLElement
 import polyhedra.web.catalog.Seeds
 import polyhedra.web.catalog.Transform
@@ -42,16 +43,16 @@ class ChiralityUiTest {
     fun lastSnubTransformHasFlipControlAndDisplaysPrimeAfterClick(): Promise<Unit> {
         val params = PolyParams("", null)
         params.transforms.updateValue(listOf(Transform.Dual, Transform.Snub))
-        composition = renderComposable(host) { ControlPane(params, popup = null, togglePopup = {}) }
+        composition = renderComposable(host) { ControlPane(params, popup = Popup.TransformSettings(1), togglePopup = {}) }
 
         val flip = host.querySelector(".chirality-flip") as HTMLElement
-        assertTrue(flip.previousElementSibling?.textContent.orEmpty().contains("Snub"))
+        assertTrue(host.querySelector(".transform-settings")?.textContent.orEmpty().contains("Snub settings"))
 
         flip.click()
 
         assertEquals(listOf("d", "s'"), params.transforms.value.map { it.tag })
         return awaitRecomposition().then {
-            assertTrue(flip.parentElement?.textContent.orEmpty().contains("Snub'"))
+            assertTrue(host.textContent.orEmpty().contains("Snub'"))
         }
     }
 
@@ -59,7 +60,7 @@ class ChiralityUiTest {
     fun lastPropellerTransformHasFlipControl() {
         val params = PolyParams("", null)
         params.transforms.updateValue(listOf(Transform.Propeller))
-        composition = renderComposable(host) { ControlPane(params, popup = null, togglePopup = {}) }
+        composition = renderComposable(host) { ControlPane(params, popup = Popup.TransformSettings(0), togglePopup = {}) }
 
         (host.querySelector(".chirality-flip") as HTMLElement).click()
 
@@ -68,10 +69,25 @@ class ChiralityUiTest {
     }
 
     @Test
+    fun resetRestoresDefaultChirality() {
+        val params = PolyParams("", null)
+        params.transforms.updateValue(listOf(Transform.PropellerFlipped))
+        composition = renderComposable(host) {
+            ControlPane(params, popup = Popup.TransformSettings(0), togglePopup = {})
+        }
+
+        val reset = host.querySelector(".transform-settings-reset") as HTMLButtonElement
+        assertTrue(!reset.disabled)
+        reset.click()
+
+        assertEquals(listOf("p"), params.transforms.value.map { it.tag })
+    }
+
+    @Test
     fun lastWhirlTransformHasFlipControl() {
         val params = PolyParams("", null)
         params.transforms.updateValue(listOf(Transform.Whirl))
-        composition = renderComposable(host) { ControlPane(params, popup = null, togglePopup = {}) }
+        composition = renderComposable(host) { ControlPane(params, popup = Popup.TransformSettings(0), togglePopup = {}) }
 
         (host.querySelector(".chirality-flip") as HTMLElement).click()
 
@@ -83,7 +99,7 @@ class ChiralityUiTest {
     fun quintoHasNoFlipControl() {
         val params = PolyParams("", null)
         params.transforms.updateValue(listOf(Transform.Quinto))
-        composition = renderComposable(host) { ControlPane(params, popup = null, togglePopup = {}) }
+        composition = renderComposable(host) { ControlPane(params, popup = Popup.TransformSettings(0), togglePopup = {}) }
 
         assertNull(host.querySelector(".chirality-flip"))
     }
@@ -103,7 +119,7 @@ class ChiralityUiTest {
     fun lastGyroMacroCanBeFlipped() {
         val params = PolyParams("", null)
         params.transforms.updateValue(listOf(Transform.Gyro))
-        composition = renderComposable(host) { ControlPane(params, popup = null, togglePopup = {}) }
+        composition = renderComposable(host) { ControlPane(params, popup = Popup.TransformSettings(0), togglePopup = {}) }
 
         (host.querySelector(".chirality-flip") as HTMLElement).click()
 
