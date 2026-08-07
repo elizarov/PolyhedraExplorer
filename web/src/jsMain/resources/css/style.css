@@ -240,7 +240,9 @@ aside.drawer {
     display: block;
     position: absolute;
     right: 0.5em;
-    width: calc(min(17em, 100vw - 1em));
+    width: max-content;
+    min-width: min(17em, calc(100vw - 1em));
+    max-width: calc(100vw - 1em);
     background-color: var(--popup-background-color);
     border: var(--border);
     border-radius: calc(0.5 * var(--row-height));
