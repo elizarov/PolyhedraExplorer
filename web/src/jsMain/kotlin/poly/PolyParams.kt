@@ -333,8 +333,7 @@ internal fun shouldDetectSeed(previous: CoreState?, current: CoreState): Boolean
     (current.transformTags.isNotEmpty() || current.seedTag.toFamilySeedIdOrNull() != null) &&
         current.transformTags.all { it == it.withoutTransformTweaks() } &&
         (previous == null || previous.seedTag != current.seedTag ||
-            previous.transformTags.map(String::withoutTransformTweaks) !=
-            current.transformTags.map(String::withoutTransformTweaks))
+            previous.transformTags != current.transformTags)
 
 private fun CoreState.seedDetectionKey(): Pair<String, List<String>> = seedTag to transformTags
 

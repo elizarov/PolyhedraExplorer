@@ -60,6 +60,19 @@ class PolyRecognitionTest {
     }
 
     @Test
+    fun resettingSnubSettingsToDefaultRerunsRecognition() {
+        val regularSnubCube = CoreState("C", listOf("s"), "c")
+        val tweakedSnubCube = regularSnubCube.copy(transformTags = listOf("s~i=0.9"))
+
+        assertEquals(false, shouldDetectSeed(regularSnubCube, tweakedSnubCube))
+        assertEquals(
+            true,
+            shouldDetectSeed(tweakedSnubCube, regularSnubCube),
+            "Resetting Snub to regular coordinates must restore its catalog suggestion",
+        )
+    }
+
+    @Test
     fun recognizedSolidIsOfferedAtRightAndOnlyReplacedOnClick(): Promise<Unit> {
         val state = CoreState("dsD'", listOf("d"), "c")
         val response = CoreResponse(
