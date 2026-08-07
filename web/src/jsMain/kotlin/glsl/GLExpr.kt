@@ -134,6 +134,8 @@ fun <T : GLType.NonMatrixFloats<T>> min(a: GLExpr<T>, b: Double): GLExpr<T> = mi
 fun <T : GLType.NonMatrixFloats<T>> max(a: GLExpr<T>, b: Double): GLExpr<T> = max(a, b.literal)
 
 // conversions & constructors
+fun vec3(value: GLExpr<GLType.float>): GLExpr<GLType.vec3> = Call(GLType.vec3, "vec3", value)
+fun vec3(value: Double): GLExpr<GLType.vec3> = vec3(value.literal)
 fun vec4(xyz: GLExpr<GLType.vec3>, w: GLExpr<GLType.float>): GLExpr<GLType.vec4> = Call(GLType.vec4, "vec4", xyz, w)
 fun vec4(xyz: GLExpr<GLType.vec3>, w: Double): GLExpr<GLType.vec4> = vec4(xyz, w.literal)
 fun vec4(x: GLExpr<GLType.float>, y: GLExpr<GLType.float>, z: GLExpr<GLType.float>, w: GLExpr<GLType.float>): GLExpr<GLType.vec4> =

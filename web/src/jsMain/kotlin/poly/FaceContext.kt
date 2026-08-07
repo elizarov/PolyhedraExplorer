@@ -301,11 +301,13 @@ fun FaceContext.draw(view: ViewContext, lighting: LightingContext, cullMode: Int
     program.use {
         assignView(view, cullMode)
 
-        uAmbientLightColor by lighting.ambientLightColor
-        uDiffuseLightColor by lighting.diffuseLightColor
-        uSpecularLightColor by lighting.specularLightColor
-        uSpecularLightPower by lighting.specularLightPower
+        uLightColor by lighting.lightColor
+        uFillColor by lighting.fillColor
         uLightPosition by lighting.lightPosition
+        uKeyLightIntensity by lighting.keyLightIntensity
+        uFillLightIntensity by lighting.fillLightIntensity
+        uRoughness by lighting.roughness
+        uFresnelF0 by lighting.fresnelF0
 
         uTargetFraction by (animation?.targetFraction ?: 1.0)
         uPrevFraction by (animation?.prevFraction ?: 0.0)

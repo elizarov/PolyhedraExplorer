@@ -405,10 +405,10 @@ class ViewParams(
 }
 
 class LightingParams(tag: String, animationParams: ViewAnimationParams?) : Param.Composite(tag) {
-    val ambientLight = using(DoubleParam("a", 0.25, 0.0, 1.0, 0.01, animationParams))
-    val diffuseLight = using(DoubleParam("d", 1.0, 0.0, 1.0, 0.01, animationParams))
-    val specularLight = using(DoubleParam("s", 1.0, 0.0, 1.0, 0.01, animationParams))
-    val specularPower = using(DoubleParam("sp", 30.0, 0.0, 100.0, 1.0, animationParams))
+    val keyLight = using(DoubleParam("d", 2.5, 0.0, 5.0, 0.05, animationParams))
+    val fillLight = using(DoubleParam("a", 0.22, 0.0, 1.0, 0.01, animationParams))
+    val roughness = using(DoubleParam("r", 0.45, 0.15, 1.0, 0.01, animationParams))
+    val ior = using(DoubleParam("i", 1.46, 1.3, 1.7, 0.01, animationParams))
 }
 
 class ExportParams(tag: String) : Param.Composite(tag) {

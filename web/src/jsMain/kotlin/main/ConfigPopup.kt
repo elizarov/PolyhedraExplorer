@@ -59,9 +59,13 @@ fun ConfigPopup(params: RootParams) {
 
     GroupHeader("Lighting")
     TableBody {
-        ControlRow("Ambient") { PSlider(params.render.lighting.ambientLight, !hasFaces) }
-        ControlRow("Diffuse") { PSlider(params.render.lighting.diffuseLight, !hasFaces) }
-        ControlRow("Specular") { PSlider(params.render.lighting.specularLight, !hasFaces) }
-        ControlRow("Shininess") { PSlider(params.render.lighting.specularPower, !hasFaces) }
+        ControlRow("Key light") { PSlider(params.render.lighting.keyLight, !hasFaces) }
+        ControlRow("Fill light") { PSlider(params.render.lighting.fillLight, !hasFaces) }
+    }
+
+    GroupHeader("Material")
+    TableBody {
+        ControlRow("Roughness") { PSlider(params.render.lighting.roughness, !hasFaces) }
+        ControlRow("IOR") { PSlider(params.render.lighting.ior, !hasFaces) }
     }
 }

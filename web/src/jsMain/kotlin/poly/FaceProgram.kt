@@ -5,14 +5,17 @@
 package polyhedra.web.poly
 
 import polyhedra.web.glsl.*
+import kotlin.math.PI
 import org.khronos.webgl.WebGLRenderingContext as GL
 
 class FaceProgram(gl: GL) : ViewBaseProgram(gl) {
-    val uAmbientLightColor by uniform(GLType.vec3)
-    val uDiffuseLightColor by uniform(GLType.vec3)
-    val uSpecularLightColor by uniform(GLType.vec3)
-    val uSpecularLightPower by uniform(GLType.float)
+    val uLightColor by uniform(GLType.vec3)
+    val uFillColor by uniform(GLType.vec3)
     val uLightPosition by uniform(GLType.vec3)
+    val uKeyLightIntensity by uniform(GLType.float)
+    val uFillLightIntensity by uniform(GLType.float)
+    val uRoughness by uniform(GLType.float)
+    val uFresnelF0 by uniform(GLType.float)
 
     val uTargetFraction by uniform(GLType.float)
     val uPrevFraction by uniform(GLType.float)
@@ -39,6 +42,28 @@ class FaceProgram(gl: GL) : ViewBaseProgram(gl) {
     private val vToLight by varying(GLType.vec3)
     private val vColor by varying(GLType.vec3, GLPrecision.lowp)
     private val vColorAlpha by varying(GLType.float, GLPrecision.lowp)
+
+    /** Schlick's inexpensive approximation of dielectric Fresnel reflectance. */
+    private val fSchlickFresnel by function(
+        GLType.float,
+        "cosTheta", GLType.float,
+        "f0", GLType.float,
+    ) { cosTheta, f0 ->
+        val oneMinusCosine by 1.0.literal - cosTheta
+        f0 + (1.0.literal - f0) * pow(oneMinusCosine, 5.0)
+    }
+
+    /** Isotropic Trowbridge-Reitz/GGX microfacet normal distribution. */
+    private val fGgxDistribution by function(
+        GLType.float,
+        "roughness", GLType.float,
+        "noH", GLType.float,
+    ) { roughness, noH ->
+        val alpha by roughness * roughness
+        val alphaSquared by alpha * alpha
+        val denominator by noH * noH * (alphaSquared - 1.0.literal) + 1.0.literal
+        alphaSquared / (PI.literal * denominator * denominator)
+    }
 
     val fInterpolatedPosition by function(GLType.vec3) {
         val pos by aPosition * uTargetFraction + aPrevPosition * uPrevFraction
@@ -84,12 +109,43 @@ class FaceProgram(gl: GL) : ViewBaseProgram(gl) {
     }
 
     override val fragmentShader = shader(ShaderType.Fragment) {
-        val normToCamera by normalize(vToCamera)
-        val normToLight by normalize(vToLight)
-        val halfVector by normalize(normToCamera + normToLight)
-        val light by uAmbientLightColor + uDiffuseLightColor * max(dot(vNormal, normToLight), 0.0)
-        val specular by uSpecularLightColor * pow(max(dot(vNormal, halfVector), 0.0), uSpecularLightPower)
-        gl_FragColor by vec4(vColor * light + specular, vColorAlpha)
+        val normal by normalize(vNormal)
+        val toCamera by normalize(vToCamera)
+        val toLight by normalize(vToLight)
+        val halfVector by normalize(toCamera + toLight)
+        val noV by max(dot(normal, toCamera), 0.0001)
+        val noL by max(dot(normal, toLight), 0.0)
+        val noH by max(dot(normal, halfVector), 0.0)
+        val voH by max(dot(toCamera, halfVector), 0.0)
+
+        val alpha by uRoughness * uRoughness
+        val alphaSquared by alpha * alpha
+        val ggxV by noL * sqrt(noV * noV * (1.0.literal - alphaSquared) + alphaSquared)
+        val ggxL by noV * sqrt(noL * noL * (1.0.literal - alphaSquared) + alphaSquared)
+        val visibility by 0.5.literal / max(ggxV + ggxL, 0.0001)
+        val distribution by fGgxDistribution(uRoughness, noH)
+        val fresnel by fSchlickFresnel(voH, uFresnelF0)
+
+        // Face colors are authored as sRGB; evaluate the BRDF in linear light.
+        val baseColor by pow(max(vColor, 0.0), vec3(2.2))
+        val diffuseBrdf by baseColor * ((1.0.literal - fresnel) / PI.literal)
+        val specularBrdf by vec3(distribution * visibility * fresnel)
+        // Normalize inverse-square falloff at the model origin, so the control remains intuitive.
+        val keyAttenuation by dot(uLightPosition, uLightPosition) / max(dot(vToLight, vToLight), 0.01)
+        val directLight by (diffuseBrdf + specularBrdf) * uLightColor * (
+            noL * uKeyLightIntensity * keyAttenuation
+        )
+
+        // One constant environment term gives printed plastic visible fill and grazing reflection
+        // without an environment texture or another rendering pass.
+        val viewFresnel by fSchlickFresnel(noV, uFresnelF0)
+        val fillDiffuse by (baseColor * uFillColor) * ((1.0.literal - viewFresnel) * uFillLightIntensity)
+        val fillSpecular by uFillColor * (
+            viewFresnel * uFillLightIntensity * (1.0.literal - uRoughness * 0.5.literal)
+        )
+        val linearColor by directLight + fillDiffuse + fillSpecular
+        val displayColor by pow(max(linearColor, 0.0), vec3(1.0 / 2.2))
+        gl_FragColor by vec4(displayColor, vColorAlpha)
     }
 }
 
