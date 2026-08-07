@@ -63,6 +63,7 @@ data class CoreTransformTweakRange(
 data class CoreResponse(
     val poly: Polyhedron,
     val polyName: String,
+    val symmetry: CoreSymmetry,
     val recognizedSeedTag: String? = null,
     val transformedPolys: List<Polyhedron>,
     val validTransformTags: List<String>,

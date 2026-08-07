@@ -8,6 +8,7 @@ import org.w3c.dom.HTMLDivElement
 import org.w3c.dom.HTMLElement
 import polyhedra.core.poly.Seed as CoreSeed
 import polyhedra.core.poly.SnubDodecahedron
+import polyhedra.core.poly.analyzeSymmetry
 import polyhedra.model.api.CoreResponse
 import polyhedra.model.api.CoreState
 import polyhedra.web.catalog.Seeds
@@ -64,6 +65,7 @@ class PolyRecognitionTest {
         val response = CoreResponse(
             poly = CoreSeed.SnubDodecahedron.poly,
             polyName = "Dual Pentagonal Hexecontahedron",
+            symmetry = CoreSeed.SnubDodecahedron.poly.analyzeSymmetry(),
             recognizedSeedTag = "sD'",
             transformedPolys = listOf(CoreSeed.SnubDodecahedron.poly),
             validTransformTags = listOf("d"),

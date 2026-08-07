@@ -26,6 +26,8 @@ private fun paletteColor(id: Int): Color {
 object PolyStyle {
     val edgeColor = hslColor(0.0, 0.0, 0.1)
     val selectionColor = hslColor(0.92, 0.95, 0.55)
+    val symmetryPlaneColor = hslColor(0.53, 0.9, 0.55, 0.22)
+    val symmetryAxisColor = hslColor(0.0, 0.0, 0.0)
     fun faceColor(f: Face): Color =
         paletteColor(f.kind.id)
     fun vertexColor(v: Vertex): Color =

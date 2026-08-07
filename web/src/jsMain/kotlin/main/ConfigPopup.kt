@@ -40,6 +40,12 @@ fun ConfigPopup(params: RootParams) {
         }
     }
 
+    GroupHeader("Symmetry")
+    TableBody {
+        ControlRow("Plane size") { PSlider(params.render.view.symmetryPlaneSize) }
+        ControlRow("Axis size") { PSlider(params.render.view.symmetryAxisSize) }
+    }
+
     GroupHeader("Animation")
     TableBody {
         ControlRow2("Rotation", { PCheckbox(params.animationParams.animatedRotation) }) {

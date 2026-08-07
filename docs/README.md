@@ -4,6 +4,7 @@ This directory describes the current behavior and structure of Polyhedra Explore
 
 - [Transformations and macros](transformations.md) - names, notation, expansions, count formulas, and operation summaries.
 - [Seed catalog](seeds.md) — category definitions, complete seed table, symmetry and orbit counts, duals, and construction recipes.
+- [Symmetries](symmetries.md) — compact notation, axis/plane exploration, rotation orbits, and possible symmetry strengthening.
 - [Architecture](architecture.md) — module boundaries, runtime flow, and invariants.
 - [Features](features.md) — user-visible capabilities and supported operations.
 - [Glossary](glossary.md) — project terminology and notation.

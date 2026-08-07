@@ -31,7 +31,7 @@ flowchart LR
     C --> B["JSON core request"]
     B --> Q["Dedicated Web Worker"]
     Q --> W["Kotlin/WasmGC core"]
-    W --> R["Mesh, catalog match, topology, issues, animation keyframes"]
+    W --> R["Mesh, symmetry, catalog match, topology, issues, animation keyframes"]
     W -. "canonicalization progress" .-> Q
     Q -. "progress messages" .-> C
     R --> V["JS view model"]
@@ -40,7 +40,7 @@ flowchart LR
     V --> E["STL / OpenSCAD export"]
 ```
 
-`CoreClient.kt` is the browser-to-core invocation boundary. It owns a dedicated Web Worker, sends a serialized `CoreRequest`, receives progress messages, and decodes `CoreResponse`. The small `core-worker.js` shim dynamically imports the generated Wasm module and relays JSON messages; it contains no manipulation logic. Canonicalization and every other core operation therefore execute as WasmGC off the browser's main thread. Starting a newer request terminates an in-progress worker so stale expensive work cannot block the next result.
+`CoreClient.kt` is the browser-to-core invocation boundary. It owns a dedicated Web Worker, sends a serialized `CoreRequest`, receives progress messages, and decodes `CoreResponse`. The small versioned `core-worker-v<n>.js` shim dynamically imports the generated Wasm module and relays JSON messages; it contains no manipulation logic. The worker filename and complete `core-v<n>/` directory advance together whenever the serialized core contract changes, preventing a cached core from returning an incompatible response to a newer JS client. Canonicalization and every other core operation therefore execute as WasmGC off the browser's main thread. Starting a newer request terminates an in-progress worker so stale expensive work cannot block the next result.
 
 Propeller, Whirl, and Quinto first build their exact local Conway incidence structure, apply a small orbit-preserving radial perturbation to avoid a degenerate circle-packing start, and then use the same progress-capable canonical solver to return a convex realization. Their final geometry is cached by input polyhedron and chirality. Progress identifies the active logical transform index and reports a stage-local percentage; multiple primitive operations inside one macro are mapped into a monotonic `0…100` range for that macro pill.
 
@@ -56,6 +56,7 @@ The Wasm core owns:
 - size guards, applicability checks, warnings, and progress;
 - fixed and parameterized-family seed geometry, scale normalization, and topology/drop analysis;
 - rotation-orbit refinement and geometric comparison with built-in seeds;
+- geometric proper/improper symmetry analysis, actual F/E/V rotation orbits, and reflection-plane normals;
 - topology-changing animation keyframe construction.
 
 Continuous transform settings are stored as dimensionless multipliers in the
@@ -74,7 +75,7 @@ inward to its 1% step, and the core rejects any parameterized result that fails
 finite-coordinate, edge-degeneracy, outward-normal, or winding validation before
 it can reach WebGL.
 
-The JS application owns DOM composition, user events, hash serialization, interpolation between returned keyframes, render-buffer generation, WebGL drawing, and file download. F/E/V rollover is transient JS state: popup rows and CPU-side front-face canvas picking update the same orbit-kind selection. Face picking uses the full virtual polygon independently of manual visibility, while excluding non-planar faces that have no reliable surface. WebGL consumes that selection through face modes, a selected-edge index overlay, or generated vertex-marker geometry. Edge-popup figures unfold each representative edge's adjacent faces around a centered vertical shared edge; the model projection preserves the edge's directed `l`/`r` ordering and the DOM renderer applies the corresponding face-orbit colors.
+The JS application owns DOM composition, user events, hash serialization, interpolation between returned keyframes, render-buffer generation, WebGL drawing, and file download. F/E/V rollover is transient JS state: popup rows and CPU-side front-face canvas picking update the same orbit-kind selection. Face picking uses the full virtual polygon independently of manual visibility, while excluding non-planar faces that have no reliable surface. WebGL consumes that selection through face modes, a selected-edge index overlay, or generated vertex-marker geometry. The symmetry overlay triangulates core-provided reflection-plane normals into translucent circular disks and expands rotation-axis directions into thin black lines through the origin. Its serialized visibility parameter and View size parameters preserve the toggle and scale disk radii and axis half-lengths relative to the current circumradius. Edge-popup figures unfold each representative edge's adjacent faces around a centered vertical shared edge; the model projection preserves the edge's directed `l`/`r` ordering and the DOM renderer applies the corresponding face-orbit colors.
 
 ## State and data flow
 
@@ -82,7 +83,7 @@ The JS application owns DOM composition, user events, hash serialization, interp
 
 Rollover selections and orbit-target navigation memory are deliberately excluded from `RootParams` serialization. Rollovers are cleared when the pointer leaves the canvas or the active popup changes, and are recomputed on rendered animation frames while the pointer remains stationary so automatic rotation cannot leave a stale selection. The UI model keeps independent last-used face, edge, and vertex orbit targets; every targeted chain update refreshes them, while operation changes reuse the remembered target only when it is supported at that transform stage.
 
-Every seed/transform/scale change creates a `CoreState`. Results from superseded requests are ignored. A response contains the scaled display mesh, an optional recognized catalog-seed tag, unscaled intermediate meshes, valid transform tags, per-stage available orbit-targeted transforms, per-stage geometry-safe continuous-control ranges, structured issues, and optional animation steps. Selective Truncate vertex and Rectify vertex build topology-compatible parameterized keyframes; changing their target returns an old-target-out step followed by a new-target-in step, while changing between those operations on one target interpolates the shared cut ratio directly. Continuous settings with matching topology interpolate directly; orbit-targeted cut settings reuse their parameterized keyframes. Changing the target of selective Kis remains immediate, while changing Height on the same target is safe to interpolate. The first progress message can only arrive after the worker has imported the Wasm module, so it ends the central loading state. Each newly reported logical transform stage starts its own 500 ms visibility timer; its latest percentage is retained but the pill stays unchanged until the timer elapses. Stage completion, replacement, or request cancellation clears the timer, so fast work cannot leave a stale flash. Subsequent progress messages carry the active logical transform index and its percentage, making the spinner follow the pill whose operation is running; reaching `100%` clears that pill before response and animation post-processing. A seed change cannot animate, so the worker does not reevaluate the old seed's transform chain merely to produce an empty animation. Compose scopes subscribe directly to the relevant `Param` update types, so asynchronous results and progress invalidate only the UI that observes them.
+Every seed/transform/scale change creates a `CoreState`. Results from superseded requests are ignored. A response contains the scaled display mesh, actual proper-rotation class and F/E/V orbits, distinct rotation-axis directions, reflection-plane normals, an optional recognized catalog-seed tag, unscaled intermediate meshes, valid transform tags, per-stage available orbit-targeted transforms, per-stage geometry-safe continuous-control ranges, structured issues, and optional animation steps. The core builds a directed-edge orthonormal frame, enumerates candidate orientation-preserving and orientation-reversing mappings, and accepts only mappings whose vertex permutation preserves every edge. Proper mappings classify `C<n>`, `D<n>`, `T`, `O`, or `I`, form element orbits, and yield the unoriented fixed axes of every non-identity rotation; improper involutions with a two-dimensional fixed set provide the reflection planes. Selective Truncate vertex and Rectify vertex build topology-compatible parameterized keyframes; changing their target returns an old-target-out step followed by a new-target-in step, while changing between those operations on one target interpolates the shared cut ratio directly. Continuous settings with matching topology interpolate directly; orbit-targeted cut settings reuse their parameterized keyframes. Changing the target of selective Kis remains immediate, while changing Height on the same target is safe to interpolate. The first progress message can only arrive after the worker has imported the Wasm module, so it ends the central loading state. Each newly reported logical transform stage starts its own 500 ms visibility timer; its latest percentage is retained but the pill stays unchanged until the timer elapses. Stage completion, replacement, or request cancellation clears the timer, so fast work cannot leave a stale flash. Subsequent progress messages carry the active logical transform index and its percentage, making the spinner follow the pill whose operation is running; reaching `100%` clears that pill before response and animation post-processing. A seed change cannot animate, so the worker does not reevaluate the old seed's transform chain merely to produce an empty animation. Compose scopes subscribe directly to the relevant `Param` update types, so asynchronous results and progress invalidate only the UI that observes them.
 
 When the seed or operation sequence changes at its regular defaults, the request explicitly asks the Wasm worker to detect a catalog seed. After a complete, successful chain, the core filters catalog seeds by FEV and compares circumradius-normalized, orientation-sensitive local edge projection classes; catalog fingerprints for both handed variants are cached. A chiral match therefore returns the exact base or prime-suffixed seed tag. The JS view model presents that tag as an optional action to the right of the transform chain. The exploratory state is preserved until the user accepts the suggestion, which atomically replaces the seed and clears the transform list. Continuous parameter, scale-only, animation, and other view/config updates never run detection; moving away from a default clears any stale suggestion. Partial or failed chains never offer a replacement.
 
@@ -96,9 +97,9 @@ Prefix-replacement detection is a separate, synchronous notation operation in th
 build/dist/browser/<mode>/
 ├── index.html
 ├── PolyhedraExplorer.js
-├── core-worker.js
+├── core-worker-v<n>.js
 ├── css/
-└── core/
+└── core-v<n>/
     ├── PolyhedraExplorer-core.mjs
     ├── PolyhedraExplorer-core.wasm
     └── generated Kotlin/Wasm support modules
@@ -109,6 +110,7 @@ The site must be served over HTTP; loading it directly from the filesystem is un
 ## Invariants
 
 - Browser manipulation algorithms execute through `evaluateCoreJson` in WasmGC inside a dedicated worker.
+- A breaking serialized core-contract change increments both the worker filename and its Wasm asset directory.
 - CPU-intensive transforms cannot block DOM/WebGL interaction, and worker messages repaint progress on the main thread.
 - The JS bundle contains the mesh presentation model and Wasm loader, but no seed-generation or transform implementation.
 - The UI renders with DOM + WebGL; no canvas UI toolkit owns the controls.

@@ -10,7 +10,9 @@ import polyhedra.model.api.CoreProgress
 import polyhedra.model.api.CoreRequest
 import polyhedra.model.api.CoreResponse
 
-private const val CORE_WORKER_URL = "./core-worker.js"
+// Increment together with the worker filename and distribution directory whenever the serialized
+// core contract changes, so a cached Wasm module cannot answer a newer JS client.
+private const val CORE_WORKER_URL = "./core-worker-v2.js"
 private const val PROGRESS = "progress"
 private const val SUCCESS = "success"
 private const val FAILURE = "failure"

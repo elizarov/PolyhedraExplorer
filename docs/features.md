@@ -20,10 +20,11 @@
 
 - Interactive WebGL face and edge rendering with mouse and touch rotation and zoom.
 - Two-way orbit rollover between the F/E/V popup rows and the canvas. Canvas picking considers front-facing geometry; manually hidden face orbits retain their full virtual picking surfaces. Selected faces are highlighted, selected edges receive a contrasting overlay, and selected vertices are marked with small shaded balls.
-- Configurable automatic rotation, view scale, face expansion, transparency, width, rim, display mode, lighting, and shininess.
+- Configurable automatic rotation, view scale, face expansion, transparency, width, rim, display mode, symmetry plane/axis size, lighting, and shininess.
 - Configuration sliders, checkboxes, and dropdowns stay synchronized in both directions with programmatic and URL-driven parameter changes.
 - Smooth geometry transitions and topology-aware keyframe animations returned by the Wasm core. Selective Truncate vertex and Rectify vertex animate with cut-depth kernels. Changing their target orbit animates the old target completely out before animating the new target in, avoiding interpolation between unrelated mesh indices. Changing Truncate vertex to Rectify vertex on the same remembered orbit uses one direct cut-depth transition. Selective Kis face changes are intentionally immediate because collapsed-apex interpolation does not produce a stable visual transition.
-- Rotation-orbit classification with orbit-based coloring and selection highlighting.
+- Rotation-orbit classification with orbit-based coloring and selection highlighting. Bottom F/E/V labels append the actual geometric orbit count only when it exceeds one, such as `F: 38/3`, while one-orbit labels remain compact.
+- A separate bottom symmetry pill reports the current proper-rotation class (`C<n>`, `D<n>`, `T`, `O`, or `I`) with its full name in a tooltip. The same toggle draws every distinct proper-rotation axis as a thin black line and every reflection plane as a translucent circular disk; chiral geometries retain the axis overlay and explicitly report that they have no reflection planes. Config sliders scale plane radii and axis half-lengths from `1.0` to `2.0` times the circumradius, defaulting to `1.1` and `1.2` respectively. Overlay visibility and non-default sizes are encoded in the URL.
 - Live face/edge/vertex counts and frames-per-second display.
 
 ## Inspection

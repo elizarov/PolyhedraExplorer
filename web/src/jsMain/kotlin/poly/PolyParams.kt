@@ -35,6 +35,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
     val selectedFace = using(TransientParam<FaceKind?>(null))
     val selectedEdge = using(TransientParam<EdgeKind?>(null))
     val selectedVertex = using(TransientParam<VertexKind?>(null))
+    val showSymmetry = using(BooleanParam("sym", false))
 
     var poly: Polyhedron? = null
         private set
@@ -53,6 +54,8 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
     var transformAnimation: TransformAnimation? = null
         private set
     var suggestedSeed: Seed? = null
+        private set
+    var symmetry: CoreSymmetry? = null
         private set
 
     val targetPoly: Polyhedron
@@ -261,6 +264,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
     private fun applyResponse(state: CoreState, response: CoreResponse) {
         poly = response.poly
         polyName = response.polyName
+        symmetry = response.symmetry
         transformedPolys = response.transformedPolys
         updateTransformTweakRanges(response.transformTweakRanges)
         updateAvailableOrbitTransforms(response.availableOrbitTransforms)
@@ -396,6 +400,8 @@ class ViewParams(
     val transparentFaces = using(DoubleParam("t", 0.0, 0.0, 1.0, 0.01, animationParams))
     val faceWidth = using(DoubleParam("fw", 0.10, 0.0, 0.2, 0.001, animationParams))
     val faceRim = using(DoubleParam("fr", 0.05, 0.0, 0.2, 0.001, animationParams))
+    val symmetryPlaneSize = using(DoubleParam("ps", 1.1, 1.0, 2.0, 0.01))
+    val symmetryAxisSize = using(DoubleParam("as", 1.2, 1.0, 2.0, 0.01))
     val display = using(EnumParam("d", Display.All, Displays))
 }
 

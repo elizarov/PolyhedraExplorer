@@ -147,7 +147,15 @@ suspend fun evaluateCore(
         return current.response
     }
 
-    val previous = evaluateState(previousState, {}, detectSeed = false, computeTweakRanges = false)
+    // The previous response is internal animation input; none of its symmetry metadata is consumed.
+    // Reuse the current payload instead of running a second geometric automorphism search.
+    val previous = evaluateState(
+        previousState,
+        {},
+        detectSeed = false,
+        computeTweakRanges = false,
+        symmetryOverride = current.response.symmetry,
+    )
     val animation = computeAnimation(previous, current, duration)
     reportCompletion(current, reportProgress)
     return current.response.copy(animation = animation)
@@ -172,6 +180,7 @@ private suspend fun evaluateState(
     reportProgress: (CoreProgress) -> Unit,
     detectSeed: Boolean,
     computeTweakRanges: Boolean = true,
+    symmetryOverride: CoreSymmetry? = null,
 ): Evaluation {
     val seed = state.seedTag.toSeedOrNull()
         ?: error("Unknown seed tag: ${state.seedTag}")
@@ -239,6 +248,7 @@ private suspend fun evaluateState(
     val response = CoreResponse(
         poly = poly.scaled(scale),
         polyName = polyName,
+        symmetry = symmetryOverride ?: poly.analyzeSymmetry(),
         recognizedSeedTag = if (
             detectSeed && errorIndex == null &&
             (validTransforms.isNotEmpty() || seed.type == SeedType.Families)

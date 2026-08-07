@@ -227,6 +227,13 @@ div.btn.faces-visibility > button > aside.tooltip-text {
     left: 0;
 }
 
+div.btn.symmetry > button > aside.tooltip-text {
+    top: auto;
+    right: 0;
+    bottom: 2.5em;
+    left: auto;
+}
+
 /* --------- Export/Config Drawers --------- */
 
 aside.drawer {

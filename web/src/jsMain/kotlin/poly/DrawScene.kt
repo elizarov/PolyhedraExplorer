@@ -23,6 +23,7 @@ class DrawContext(
     val faces = FaceContext(gl, params)
     val edges = EdgeContext(gl, params)
     val vertices = VertexContext(gl, params)
+    val symmetryOverlay = SymmetryOverlayContext(gl, params)
 
     init {
         setup()
@@ -68,6 +69,7 @@ fun DrawContext.drawScene() {
     }
     gl[GL.DEPTH_TEST] = true
     gl[GL.BLEND] = false
+    symmetryOverlay.draw(view)
     vertices.draw(view)
 }
 

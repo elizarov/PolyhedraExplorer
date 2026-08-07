@@ -21,7 +21,10 @@ fun registerBrowserDistribution(
     dependsOn(webTask, wasmTask)
     from(project(":web").layout.buildDirectory.dir("dist/js/${mode}Executable"))
     from(project(":core").layout.buildDirectory.dir("compileSync/wasmJs/main/${mode}Executable/kotlin")) {
-        into("core")
+        // Keep the directory version in sync with CoreClient and the worker resource whenever
+        // the serialized CoreRequest/CoreResponse contract changes. A distinct directory also
+        // cache-busts every generated Wasm support module, not only the entry point.
+        into("core-v2")
     }
     into(layout.buildDirectory.dir("dist/browser/$mode"))
 }

@@ -9,6 +9,7 @@ import org.w3c.dom.HTMLDivElement
 import org.w3c.dom.HTMLElement
 import polyhedra.core.poly.Cube
 import polyhedra.core.poly.Seed as CoreSeed
+import polyhedra.core.poly.analyzeSymmetry
 import polyhedra.model.api.CoreResponse
 import polyhedra.model.api.CoreState
 import polyhedra.model.api.FamilySeedId
@@ -193,6 +194,7 @@ class SeedFamilyUiTest {
         val response = CoreResponse(
             poly = CoreSeed.Cube.poly,
             polyName = "Prism 4",
+            symmetry = CoreSeed.Cube.poly.analyzeSymmetry(),
             recognizedSeedTag = "C",
             transformedPolys = emptyList(),
             validTransformTags = emptyList(),

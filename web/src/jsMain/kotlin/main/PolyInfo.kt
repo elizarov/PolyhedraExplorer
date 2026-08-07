@@ -2,6 +2,7 @@ package polyhedra.web.main
 
 import androidx.compose.runtime.Composable
 import org.jetbrains.compose.web.dom.*
+import polyhedra.model.api.CoreSymmetry
 import polyhedra.model.poly.*
 import polyhedra.model.util.fmtFix
 import polyhedra.model.util.toDegrees
@@ -9,6 +10,7 @@ import polyhedra.web.catalog.OrbitTargetedOperation
 import polyhedra.web.catalog.Transform
 import polyhedra.web.catalog.orbitTargetOrNull
 import polyhedra.web.components.observe
+import polyhedra.web.params.BooleanParam
 import polyhedra.web.params.SetParam
 import polyhedra.web.params.TransientParam
 import polyhedra.web.poly.*
@@ -18,22 +20,36 @@ fun PolyInfo(params: RenderParams, popup: Popup?, togglePopup: (Popup?) -> Unit)
     params.poly.observe()
     val poly = requireNotNull(params.poly.poly)
     val fev = poly.fev()
+    val symmetry = requireNotNull(params.poly.symmetry)
 
     Div(attrs = { classes("bottom-inspection-controls") }) {
         BottomFacesVisibilityControl(params.poly.hideFaces, poly.faceKinds.keys)
         Div(attrs = { classes("fev") }) {
             Div(attrs = { classes("btn", "left", *activeWhen(popup, Popup.Faces)) }) {
-                InfoButton("F: ${fev.f}", "Faces", popup == Popup.Faces) { togglePopup(Popup.Faces) }
+                InfoButton(
+                    "F: ${elementCount(fev.f, symmetry.orbitCounts.f)}",
+                    "Faces",
+                    popup == Popup.Faces,
+                ) { togglePopup(Popup.Faces) }
             }
             Div(attrs = { classes("btn", "mid", *activeWhen(popup, Popup.Edges)) }) {
                 Div(attrs = { classes("sep") })
-                InfoButton("E: ${fev.e}", "Edges", popup == Popup.Edges) { togglePopup(Popup.Edges) }
+                InfoButton(
+                    "E: ${elementCount(fev.e, symmetry.orbitCounts.e)}",
+                    "Edges",
+                    popup == Popup.Edges,
+                ) { togglePopup(Popup.Edges) }
                 Div(attrs = { classes("sep") })
             }
             Div(attrs = { classes("btn", "right", *activeWhen(popup, Popup.Vertices)) }) {
-                InfoButton("V: ${fev.v}", "Vertices", popup == Popup.Vertices) { togglePopup(Popup.Vertices) }
+                InfoButton(
+                    "V: ${elementCount(fev.v, symmetry.orbitCounts.v)}",
+                    "Vertices",
+                    popup == Popup.Vertices,
+                ) { togglePopup(Popup.Vertices) }
             }
         }
+        SymmetryControl(symmetry, params.poly.showSymmetry)
     }
 
     when (popup) {
@@ -41,6 +57,36 @@ fun PolyInfo(params: RenderParams, popup: Popup?, togglePopup: (Popup?) -> Unit)
         Popup.Edges -> EdgesPopup(params, poly)
         Popup.Vertices -> VerticesPopup(params, poly)
         else -> Unit
+    }
+}
+
+internal fun elementCount(total: Int, orbits: Int): String =
+    if (orbits > 1) "$total/$orbits" else total.toString()
+
+@Composable
+internal fun SymmetryControl(symmetry: CoreSymmetry, showSymmetry: BooleanParam) {
+    showSymmetry.observe()
+    val planes = symmetry.reflectionPlaneNormals.size
+    val axes = symmetry.rotationAxisDirections.size
+    val showingSymmetry = showSymmetry.value
+    val elements = buildList {
+        add("$axes rotation ${if (axes == 1) "axis" else "axes"}")
+        if (planes > 0) add("$planes reflection ${if (planes == 1) "plane" else "planes"}")
+        else add("no reflection planes")
+    }.joinToString(" and ")
+    val action = "${if (showingSymmetry) "hide" else "show"} $elements"
+    val tooltip = "${symmetry.group.fullName}; $action"
+    Div(attrs = {
+        classes("btn", "symmetry", *(if (showingSymmetry) arrayOf("active") else emptyArray()))
+    }) {
+        Button(attrs = {
+            classes("txt")
+            attr("aria-label", tooltip)
+            onClick { showSymmetry.updateValue(!showingSymmetry) }
+        }) {
+            Text(symmetry.group.compactName)
+            Aside(attrs = { classes("tooltip-text") }) { Text(tooltip) }
+        }
     }
 }
 
