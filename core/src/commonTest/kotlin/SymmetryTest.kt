@@ -7,15 +7,16 @@ package polyhedra.core
 import polyhedra.core.poly.*
 import polyhedra.core.transform.Transform
 import polyhedra.core.transform.transformed
-import polyhedra.model.api.SymmetryFamily
-import polyhedra.model.api.SymmetryGroup
+import polyhedra.model.api.PointGroup
+import polyhedra.model.api.PointGroupFamily
+import polyhedra.model.api.PointGroupSuffix
 import polyhedra.model.poly.FEV
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class SymmetryTest {
     @Test
-    fun catalogSymmetryMatchesDeclaredClassesAndKinds() {
+    fun catalogSymmetryMatchesDeclaredPointGroupsAndKinds() {
         val tetrahedralTags = setOf("T", "tT", "dtT")
         val octahedralTags = setOf(
             "C", "O", "aC", "tC", "tO", "eC", "bC", "sC", "sC'",
@@ -23,50 +24,99 @@ class SymmetryTest {
         )
         for (seed in Seeds) {
             val expectedFamily = when (seed.tag) {
-                in tetrahedralTags -> SymmetryFamily.Tetrahedral
-                in octahedralTags -> SymmetryFamily.Octahedral
-                else -> SymmetryFamily.Icosahedral
+                in tetrahedralTags -> PointGroupFamily.Tetrahedral
+                in octahedralTags -> PointGroupFamily.Octahedral
+                else -> PointGroupFamily.Icosahedral
             }
             val symmetry = seed.poly.analyzeSymmetry()
             val expectedPlanes = when {
                 seed.chirality != null -> 0
-                expectedFamily == SymmetryFamily.Tetrahedral -> 6
-                expectedFamily == SymmetryFamily.Octahedral -> 9
+                expectedFamily == PointGroupFamily.Tetrahedral -> 6
+                expectedFamily == PointGroupFamily.Octahedral -> 9
                 else -> 15
             }
+            val expectedSuffix = when {
+                seed.chirality != null -> null
+                expectedFamily == PointGroupFamily.Tetrahedral -> PointGroupSuffix.Diagonal
+                else -> PointGroupSuffix.Horizontal
+            }
+            val expectedPointGroup = PointGroup(expectedFamily, suffix = expectedSuffix)
 
-            assertEquals(SymmetryGroup(expectedFamily), symmetry.group, seed.tag)
+            assertEquals(expectedPointGroup, symmetry.pointGroup, seed.tag)
             assertEquals(
                 FEV(seed.poly.faceKinds.size, seed.poly.edgeKinds.size, seed.poly.vertexKinds.size),
                 symmetry.orbitCounts,
                 seed.tag,
             )
             assertEquals(expectedPlanes, symmetry.reflectionPlaneNormals.size, seed.tag)
-            assertEquals(expectedAxisCount(symmetry.group), symmetry.rotationAxisDirections.size, seed.tag)
+            assertEquals(expectedAxisCount(symmetry.pointGroup), symmetry.rotationAxisDirections.size, seed.tag)
         }
     }
 
     @Test
     fun classifiesPolyhedralSymmetriesAndMirrorPlanes() {
-        assertSymmetry(Seed.Tetrahedron.tag, SymmetryGroup(SymmetryFamily.Tetrahedral), 6, FEV(1, 1, 1))
-        assertSymmetry(Seed.Cube.tag, SymmetryGroup(SymmetryFamily.Octahedral), 9, FEV(1, 1, 1))
-        assertSymmetry(Seed.Icosahedron.tag, SymmetryGroup(SymmetryFamily.Icosahedral), 15, FEV(1, 1, 1))
-        assertSymmetry(Seed.SnubCube.tag, SymmetryGroup(SymmetryFamily.Octahedral), 0, FEV(3, 3, 1))
+        assertSymmetry(
+            Seed.Tetrahedron.tag,
+            PointGroup(PointGroupFamily.Tetrahedral, suffix = PointGroupSuffix.Diagonal),
+            6,
+            FEV(1, 1, 1),
+        )
+        assertSymmetry(
+            Seed.Cube.tag,
+            PointGroup(PointGroupFamily.Octahedral, suffix = PointGroupSuffix.Horizontal),
+            9,
+            FEV(1, 1, 1),
+        )
+        assertSymmetry(
+            Seed.Icosahedron.tag,
+            PointGroup(PointGroupFamily.Icosahedral, suffix = PointGroupSuffix.Horizontal),
+            15,
+            FEV(1, 1, 1),
+        )
+        assertSymmetry(
+            Seed.SnubCube.tag,
+            PointGroup(PointGroupFamily.Octahedral),
+            0,
+            FEV(3, 3, 1),
+        )
     }
 
     @Test
     fun classifiesAxialFamilySymmetriesAndMirrorPlanes() {
-        assertSymmetry("P7", SymmetryGroup(SymmetryFamily.Dihedral, 7), 8, FEV(2, 2, 1))
-        assertSymmetry("A7", SymmetryGroup(SymmetryFamily.Dihedral, 7), 7, FEV(2, 3, 1))
-        assertSymmetry("Y7", SymmetryGroup(SymmetryFamily.Cyclic, 7), 7, FEV(2, 2, 2))
-        assertSymmetry("B7", SymmetryGroup(SymmetryFamily.Dihedral, 7), 8, FEV(1, 2, 2))
+        assertSymmetry(
+            "P7",
+            PointGroup(PointGroupFamily.Dihedral, 7, PointGroupSuffix.Horizontal),
+            8,
+            FEV(2, 2, 1),
+        )
+        assertSymmetry(
+            "A7",
+            PointGroup(PointGroupFamily.Dihedral, 7, PointGroupSuffix.Diagonal),
+            7,
+            FEV(2, 3, 1),
+        )
+        assertSymmetry(
+            "Y7",
+            PointGroup(PointGroupFamily.Cyclic, 7, PointGroupSuffix.Vertical),
+            7,
+            FEV(2, 2, 2),
+        )
+        assertSymmetry(
+            "B7",
+            PointGroup(PointGroupFamily.Dihedral, 7, PointGroupSuffix.Horizontal),
+            8,
+            FEV(1, 2, 2),
+        )
     }
 
     @Test
     fun reportsStrengthenedGeometryInsteadOfInheritedKinds() {
         val symmetry = Seed.Tetrahedron.poly.transformed(Transform.Snub).analyzeSymmetry()
 
-        assertEquals(SymmetryGroup(SymmetryFamily.Icosahedral), symmetry.group)
+        assertEquals(
+            PointGroup(PointGroupFamily.Icosahedral, suffix = PointGroupSuffix.Horizontal),
+            symmetry.pointGroup,
+        )
         assertEquals(FEV(1, 1, 1), symmetry.orbitCounts)
         assertEquals(15, symmetry.reflectionPlaneNormals.size)
         assertEquals(31, symmetry.rotationAxisDirections.size)
@@ -74,22 +124,22 @@ class SymmetryTest {
 
     private fun assertSymmetry(
         seedTag: String,
-        group: SymmetryGroup,
+        pointGroup: PointGroup,
         reflectionPlanes: Int,
         orbitCounts: FEV,
     ) {
         val symmetry = requireNotNull(seedTag.toSeedOrNull()).poly.analyzeSymmetry()
-        assertEquals(group, symmetry.group, seedTag)
+        assertEquals(pointGroup, symmetry.pointGroup, seedTag)
         assertEquals(orbitCounts, symmetry.orbitCounts, seedTag)
         assertEquals(reflectionPlanes, symmetry.reflectionPlaneNormals.size, seedTag)
-        assertEquals(expectedAxisCount(group), symmetry.rotationAxisDirections.size, seedTag)
+        assertEquals(expectedAxisCount(pointGroup), symmetry.rotationAxisDirections.size, seedTag)
     }
 
-    private fun expectedAxisCount(group: SymmetryGroup): Int = when (group.family) {
-        SymmetryFamily.Cyclic -> 1
-        SymmetryFamily.Dihedral -> requireNotNull(group.fold) + 1
-        SymmetryFamily.Tetrahedral -> 7
-        SymmetryFamily.Octahedral -> 13
-        SymmetryFamily.Icosahedral -> 31
+    private fun expectedAxisCount(pointGroup: PointGroup): Int = when (pointGroup.family) {
+        PointGroupFamily.Cyclic -> 1
+        PointGroupFamily.Dihedral -> requireNotNull(pointGroup.fold) + 1
+        PointGroupFamily.Tetrahedral -> 7
+        PointGroupFamily.Octahedral -> 13
+        PointGroupFamily.Icosahedral -> 31
     }
 }

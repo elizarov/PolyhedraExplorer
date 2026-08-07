@@ -5,8 +5,9 @@
 package polyhedra.core.poly
 
 import polyhedra.model.api.CoreSymmetry
-import polyhedra.model.api.SymmetryFamily
-import polyhedra.model.api.SymmetryGroup
+import polyhedra.model.api.PointGroup
+import polyhedra.model.api.PointGroupFamily
+import polyhedra.model.api.PointGroupSuffix
 import polyhedra.model.poly.Edge
 import polyhedra.model.poly.FEV
 import polyhedra.model.poly.Polyhedron
@@ -52,21 +53,22 @@ fun Polyhedron.analyzeSymmetry(): CoreSymmetry {
     }
     check(proper.isNotEmpty()) { "Every polyhedron must have the identity symmetry" }
 
-    val group = classifyRotationGroup(proper.map { it.transform })
+    val rotationGroup = classifyRotationGroup(proper.map { it.transform })
     val axisDirections = proper.asSequence()
         .mapNotNull { operation -> operation.transform.rotationAxisOrNull() }
         .distinctDirections()
         .map(Vec3::toMutableDirection)
         .toList()
-    val planeNormals = improperSeed?.let { reversing ->
-        proper.asSequence().map { operation -> operation.transform * reversing }
+    val reversingTransforms = improperSeed?.let { reversing ->
+        proper.map { operation -> operation.transform * reversing }
     }.orEmpty()
+    val planeNormals = reversingTransforms.asSequence()
         .mapNotNull(OrthogonalTransform::reflectionPlaneNormalOrNull)
         .distinctDirections()
         .map(Vec3::toMutableDirection)
         .toList()
     return CoreSymmetry(
-        group = group,
+        pointGroup = classifyPointGroup(rotationGroup, reversingTransforms.isNotEmpty(), planeNormals.size),
         orbitCounts = symmetryOrbitCounts(proper),
         reflectionPlaneNormals = planeNormals,
         rotationAxisDirections = axisDirections,
@@ -201,16 +203,57 @@ private class OrthogonalTransform(
     }
 }
 
-private fun classifyRotationGroup(transforms: List<OrthogonalTransform>): SymmetryGroup {
+private data class RotationGroup(
+    val family: PointGroupFamily,
+    val fold: Int? = null,
+)
+
+private fun classifyRotationGroup(transforms: List<OrthogonalTransform>): RotationGroup {
     val maxOrder = transforms.maxOf(OrthogonalTransform::rotationOrder)
     return when {
-        transforms.size == 60 && maxOrder == 5 -> SymmetryGroup(SymmetryFamily.Icosahedral)
-        transforms.size == 24 && maxOrder == 4 -> SymmetryGroup(SymmetryFamily.Octahedral)
-        transforms.size == 12 && maxOrder == 3 -> SymmetryGroup(SymmetryFamily.Tetrahedral)
-        transforms.size == 2 * maxOrder -> SymmetryGroup(SymmetryFamily.Dihedral, maxOrder)
-        transforms.size == maxOrder -> SymmetryGroup(SymmetryFamily.Cyclic, maxOrder)
+        transforms.size == 60 && maxOrder == 5 -> RotationGroup(PointGroupFamily.Icosahedral)
+        transforms.size == 24 && maxOrder == 4 -> RotationGroup(PointGroupFamily.Octahedral)
+        transforms.size == 12 && maxOrder == 3 -> RotationGroup(PointGroupFamily.Tetrahedral)
+        transforms.size == 2 * maxOrder -> RotationGroup(PointGroupFamily.Dihedral, maxOrder)
+        transforms.size == maxOrder -> RotationGroup(PointGroupFamily.Cyclic, maxOrder)
         else -> error("Unsupported rotation group: ${transforms.size} operations, maximum order $maxOrder")
     }
+}
+
+private fun classifyPointGroup(
+    rotationGroup: RotationGroup,
+    hasOrientationReversingOperations: Boolean,
+    reflectionPlanes: Int,
+): PointGroup {
+    if (!hasOrientationReversingOperations) {
+        return PointGroup(rotationGroup.family, rotationGroup.fold)
+    }
+    val fold = rotationGroup.fold
+    val suffix = when (rotationGroup.family) {
+        PointGroupFamily.Cyclic -> when (reflectionPlanes) {
+            0 -> PointGroupSuffix.ImproperRotation
+            1 -> PointGroupSuffix.Horizontal
+            fold -> PointGroupSuffix.Vertical
+            else -> error("Unsupported cyclic point group: $reflectionPlanes reflection planes")
+        }
+        PointGroupFamily.Dihedral -> when (reflectionPlanes) {
+            fold -> PointGroupSuffix.Diagonal
+            requireNotNull(fold) + 1 -> PointGroupSuffix.Horizontal
+            else -> error("Unsupported dihedral point group: $reflectionPlanes reflection planes")
+        }
+        PointGroupFamily.Tetrahedral -> when (reflectionPlanes) {
+            3 -> PointGroupSuffix.Horizontal
+            6 -> PointGroupSuffix.Diagonal
+            else -> error("Unsupported tetrahedral point group: $reflectionPlanes reflection planes")
+        }
+        PointGroupFamily.Octahedral -> PointGroupSuffix.Horizontal.also {
+            check(reflectionPlanes == 9) { "Unsupported octahedral point group: $reflectionPlanes reflection planes" }
+        }
+        PointGroupFamily.Icosahedral -> PointGroupSuffix.Horizontal.also {
+            check(reflectionPlanes == 15) { "Unsupported icosahedral point group: $reflectionPlanes reflection planes" }
+        }
+    }
+    return PointGroup(rotationGroup.family, fold, suffix)
 }
 
 private fun OrthogonalTransform.rotationOrder(): Int {

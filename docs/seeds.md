@@ -31,7 +31,7 @@ transforms. Some low-order members coincide with fixed seeds and receive optiona
 replacement suggestions: Prism 4 is Cube, Antiprism 3 and Bipyramid 4 are
 Octahedron, and Pyramid 3 is Tetrahedron. Those coincident members display the
 stronger polyhedral symmetry and its actual orbit counts rather than the
-family's normal axial class.
+family's normal axial point group.
 
 ### Archimedean solids
 
@@ -54,12 +54,12 @@ of the two snub solids are chiral and also have two mirror realizations.
 - Orbit counts are the project's proper-rotation orbits. Reflections are not
   used, so an achiral solid can have two mirror-related rotational orbits that
   its full symmetry group would merge.
-- Symmetry class uses the compact proper-rotation notation shown in the UI:
-  cyclic `C<n>`, dihedral `D<n>`, tetrahedral `T`, octahedral `O`, or
-  icosahedral `I`. See [Symmetries](symmetries.md).
-- `T_d`, `O_h`, and `I_h` are the full tetrahedral, octahedral, and icosahedral
-  point groups, of orders 24, 48, and 120. Bare `T`, `O`, and `I` are chiral
-  proper-rotation groups and have no reflection planes.
+- Point groups use the full Schoenflies notation shown in the UI. Subscripts
+  encode orientation-reversing symmetry: `C_nv` has vertical mirrors, `D_nh`
+  has vertical and horizontal mirrors, and `D_nd` has diagonal mirrors.
+  `T_d`, `O_h`, and `I_h` are the full tetrahedral, octahedral, and icosahedral
+  point groups. Bare `T`, `O`, and `I` are chiral and have no reflection
+  planes. See [Symmetries](symmetries.md).
 - A recipe `Cube + t` means: select Cube, then apply Truncated (`t`). Names and
   tags link to the complete [transformation reference](transformations.md).
 - A slash in a chiral recipe gives the unprimed/prime operation respectively.
@@ -71,43 +71,43 @@ of the two snub solids are chiral and also have two mirror realizations.
 
 ## Catalog summary
 
-| Class | Seed (tag) | Common alternative names | Dual | `F / E / V` | Symmetry class | Full point group | `F / E / V` orbits | Canonical building recipe |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Platonic | Tetrahedron (`T`) | Regular triangular pyramid | Tetrahedron | `4 / 6 / 4` | `T` | `T_d` | `1 / 1 / 1` | Base seed |
-| Platonic | Cube (`C`) | Regular hexahedron | Octahedron | `6 / 12 / 8` | `O` | `O_h` | `1 / 1 / 1` | Base seed |
-| Platonic | Octahedron (`O`) | — | Cube | `8 / 12 / 6` | `O` | `O_h` | `1 / 1 / 1` | `C + d` |
-| Platonic | Dodecahedron (`D`) | — | Icosahedron | `12 / 30 / 20` | `I` | `I_h` | `1 / 1 / 1` | `I + d` |
-| Platonic | Icosahedron (`I`) | — | Dodecahedron | `20 / 30 / 12` | `I` | `I_h` | `1 / 1 / 1` | Base seed; `T + s` |
-| Family | Prism (`P3`–`P100`) | `n`-gonal prism | Bipyramid `n` | `n+2 / 3n / 2n` | `D<n>` | `D_nh` | normally `2 / 2 / 1` | Family seed |
-| Family | Antiprism (`A3`–`A100`) | `n`-gonal antiprism | `n`-gonal trapezohedron | `2n+2 / 4n / 2n` | `D<n>` | `D_nd` | normally `2 / 3 / 1` | Family seed |
-| Family | Pyramid (`Y3`–`Y100`) | `n`-gonal pyramid | Pyramid `n` | `n+1 / 2n / n+1` | `C<n>` | `C_nv` | normally `2 / 2 / 2` | Family seed |
-| Family | Bipyramid (`B3`–`B100`) | Dipyramid; `n`-gonal bipyramid | Prism `n` | `2n / 3n / n+2` | `D<n>` | `D_nh` | normally `1 / 2 / 2` | Family seed |
-| Archimedean | Truncated tetrahedron (`tT`) | — | Triakis tetrahedron | `8 / 18 / 12` | `T` | `T_d` | `2 / 2 / 1` | `T + t` |
-| Archimedean | Cuboctahedron (`aC`) | — | Rhombic dodecahedron | `14 / 24 / 12` | `O` | `O_h` | `2 / 1 / 1` | (`C` or `O`) + `a` |
-| Archimedean | Truncated cube (`tC`) | — | Triakis octahedron | `14 / 36 / 24` | `O` | `O_h` | `2 / 2 / 1` | `C + t` |
-| Archimedean | Truncated octahedron (`tO`) | — | Tetrakis hexahedron | `14 / 36 / 24` | `O` | `O_h` | `2 / 2 / 1` | `O + t` |
-| Archimedean | Rhombicuboctahedron (`eC`) | Small rhombicuboctahedron | Deltoidal icositetrahedron | `26 / 48 / 24` | `O` | `O_h` | `3 / 2 / 1` | (`C` or `O`) + `e` |
-| Archimedean | Rhombitruncated cuboctahedron (`bC`) | Truncated cuboctahedron; great rhombicuboctahedron | Disdyakis dodecahedron | `26 / 72 / 48` | `O` | `O_h` | `3 / 3 / 2` | (`C` or `O`) + `b` |
-| Archimedean | Snub cube (`sC`, `sC'`) | — | Pentagonal icositetrahedron | `38 / 60 / 24` | `O` | `O` | `3 / 3 / 1` | `C + s/s'`; `O + s'/s` |
-| Archimedean | Icosidodecahedron (`aD`) | — | Rhombic triacontahedron | `32 / 60 / 30` | `I` | `I_h` | `2 / 1 / 1` | (`D` or `I`) + `a` |
-| Archimedean | Truncated dodecahedron (`tD`) | — | Triakis icosahedron | `32 / 90 / 60` | `I` | `I_h` | `2 / 2 / 1` | `D + t` |
-| Archimedean | Truncated icosahedron (`tI`) | Soccer-ball solid; buckyball shape | Pentakis dodecahedron | `32 / 90 / 60` | `I` | `I_h` | `2 / 2 / 1` | `I + t` |
-| Archimedean | Rhombicosidodecahedron (`eD`) | Small rhombicosidodecahedron | Deltoidal hexecontahedron | `62 / 120 / 60` | `I` | `I_h` | `3 / 2 / 1` | (`D` or `I`) + `e` |
-| Archimedean | Rhombitruncated icosidodecahedron (`bD`) | Truncated icosidodecahedron; great rhombicosidodecahedron | Disdyakis triacontahedron | `62 / 180 / 120` | `I` | `I_h` | `3 / 3 / 2` | (`D` or `I`) + `b` |
-| Archimedean | Snub dodecahedron (`sD`, `sD'`) | — | Pentagonal hexecontahedron | `92 / 150 / 60` | `I` | `I` | `3 / 3 / 1` | `D + s/s'`; `I + s'/s` |
-| Catalan | Triakis tetrahedron (`dtT`) | Tristetrahedron | Truncated tetrahedron | `12 / 18 / 8` | `T` | `T_d` | `1 / 2 / 2` | `T + Needle (N)` |
-| Catalan | Rhombic dodecahedron (`daC`) | — | Cuboctahedron | `12 / 24 / 14` | `O` | `O_h` | `1 / 1 / 2` | (`C` or `O`) + Join (`j`) |
-| Catalan | Triakis octahedron (`dtC`) | Small triakis octahedron; trisoctahedron | Truncated cube | `24 / 36 / 14` | `O` | `O_h` | `1 / 2 / 2` | `C + Needle (N)`; `O + Kis (k)` |
-| Catalan | Tetrakis hexahedron (`dtO`) | Tetrahexahedron | Truncated octahedron | `24 / 36 / 14` | `O` | `O_h` | `1 / 2 / 2` | `O + Needle (N)`; `C + Kis (k)` |
-| Catalan | Deltoidal icositetrahedron (`deC`) | Trapezoidal icositetrahedron; strombic icositetrahedron | Rhombicuboctahedron | `24 / 48 / 26` | `O` | `O_h` | `1 / 2 / 3` | (`C` or `O`) + Ortho (`O`) |
-| Catalan | Disdyakis dodecahedron (`dbC`) | Hexakis octahedron; hexoctahedron | Rhombitruncated cuboctahedron | `48 / 72 / 26` | `O` | `O_h` | `2 / 3 / 3` | (`C` or `O`) + Meta (`m`) |
-| Catalan | Pentagonal icositetrahedron (`dsC`, `dsC'`) | — | Snub cube | `24 / 60 / 38` | `O` | `O` | `1 / 3 / 3` | `C + g'/g`; `O + g/g'` |
-| Catalan | Rhombic triacontahedron (`daD`) | — | Icosidodecahedron | `30 / 60 / 32` | `I` | `I_h` | `1 / 1 / 2` | (`D` or `I`) + Join (`j`) |
-| Catalan | Triakis icosahedron (`dtD`) | — | Truncated dodecahedron | `60 / 90 / 32` | `I` | `I_h` | `1 / 2 / 2` | `D + Needle (N)`; `I + Kis (k)` |
-| Catalan | Pentakis dodecahedron (`dtI`) | — | Truncated icosahedron | `60 / 90 / 32` | `I` | `I_h` | `1 / 2 / 2` | `I + Needle (N)`; `D + Kis (k)` |
-| Catalan | Deltoidal hexecontahedron (`deD`) | Trapezoidal hexecontahedron; strombic hexecontahedron | Rhombicosidodecahedron | `60 / 120 / 62` | `I` | `I_h` | `1 / 2 / 3` | (`D` or `I`) + Ortho (`O`) |
-| Catalan | Disdyakis triacontahedron (`dbD`) | Hexakis icosahedron | Rhombitruncated icosidodecahedron | `120 / 180 / 62` | `I` | `I_h` | `2 / 3 / 3` | (`D` or `I`) + Meta (`m`) |
-| Catalan | Pentagonal hexecontahedron (`dsD`, `dsD'`) | — | Snub dodecahedron | `60 / 150 / 92` | `I` | `I` | `1 / 3 / 3` | `D + g'/g`; `I + g/g'` |
+| Category | Seed (tag) | Common alternative names | Dual | `F / E / V` | Full point group | `F / E / V` orbits | Canonical building recipe |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Platonic | Tetrahedron (`T`) | Regular triangular pyramid | Tetrahedron | `4 / 6 / 4` | `T_d` | `1 / 1 / 1` | Base seed |
+| Platonic | Cube (`C`) | Regular hexahedron | Octahedron | `6 / 12 / 8` | `O_h` | `1 / 1 / 1` | Base seed |
+| Platonic | Octahedron (`O`) | — | Cube | `8 / 12 / 6` | `O_h` | `1 / 1 / 1` | `C + d` |
+| Platonic | Dodecahedron (`D`) | — | Icosahedron | `12 / 30 / 20` | `I_h` | `1 / 1 / 1` | `I + d` |
+| Platonic | Icosahedron (`I`) | — | Dodecahedron | `20 / 30 / 12` | `I_h` | `1 / 1 / 1` | Base seed; `T + s` |
+| Family | Prism (`P3`–`P100`) | `n`-gonal prism | Bipyramid `n` | `n+2 / 3n / 2n` | `D_nh` | normally `2 / 2 / 1` | Family seed |
+| Family | Antiprism (`A3`–`A100`) | `n`-gonal antiprism | `n`-gonal trapezohedron | `2n+2 / 4n / 2n` | `D_nd` | normally `2 / 3 / 1` | Family seed |
+| Family | Pyramid (`Y3`–`Y100`) | `n`-gonal pyramid | Pyramid `n` | `n+1 / 2n / n+1` | `C_nv` | normally `2 / 2 / 2` | Family seed |
+| Family | Bipyramid (`B3`–`B100`) | Dipyramid; `n`-gonal bipyramid | Prism `n` | `2n / 3n / n+2` | `D_nh` | normally `1 / 2 / 2` | Family seed |
+| Archimedean | Truncated tetrahedron (`tT`) | — | Triakis tetrahedron | `8 / 18 / 12` | `T_d` | `2 / 2 / 1` | `T + t` |
+| Archimedean | Cuboctahedron (`aC`) | — | Rhombic dodecahedron | `14 / 24 / 12` | `O_h` | `2 / 1 / 1` | (`C` or `O`) + `a` |
+| Archimedean | Truncated cube (`tC`) | — | Triakis octahedron | `14 / 36 / 24` | `O_h` | `2 / 2 / 1` | `C + t` |
+| Archimedean | Truncated octahedron (`tO`) | — | Tetrakis hexahedron | `14 / 36 / 24` | `O_h` | `2 / 2 / 1` | `O + t` |
+| Archimedean | Rhombicuboctahedron (`eC`) | Small rhombicuboctahedron | Deltoidal icositetrahedron | `26 / 48 / 24` | `O_h` | `3 / 2 / 1` | (`C` or `O`) + `e` |
+| Archimedean | Rhombitruncated cuboctahedron (`bC`) | Truncated cuboctahedron; great rhombicuboctahedron | Disdyakis dodecahedron | `26 / 72 / 48` | `O_h` | `3 / 3 / 2` | (`C` or `O`) + `b` |
+| Archimedean | Snub cube (`sC`, `sC'`) | — | Pentagonal icositetrahedron | `38 / 60 / 24` | `O` | `3 / 3 / 1` | `C + s/s'`; `O + s'/s` |
+| Archimedean | Icosidodecahedron (`aD`) | — | Rhombic triacontahedron | `32 / 60 / 30` | `I_h` | `2 / 1 / 1` | (`D` or `I`) + `a` |
+| Archimedean | Truncated dodecahedron (`tD`) | — | Triakis icosahedron | `32 / 90 / 60` | `I_h` | `2 / 2 / 1` | `D + t` |
+| Archimedean | Truncated icosahedron (`tI`) | Soccer-ball solid; buckyball shape | Pentakis dodecahedron | `32 / 90 / 60` | `I_h` | `2 / 2 / 1` | `I + t` |
+| Archimedean | Rhombicosidodecahedron (`eD`) | Small rhombicosidodecahedron | Deltoidal hexecontahedron | `62 / 120 / 60` | `I_h` | `3 / 2 / 1` | (`D` or `I`) + `e` |
+| Archimedean | Rhombitruncated icosidodecahedron (`bD`) | Truncated icosidodecahedron; great rhombicosidodecahedron | Disdyakis triacontahedron | `62 / 180 / 120` | `I_h` | `3 / 3 / 2` | (`D` or `I`) + `b` |
+| Archimedean | Snub dodecahedron (`sD`, `sD'`) | — | Pentagonal hexecontahedron | `92 / 150 / 60` | `I` | `3 / 3 / 1` | `D + s/s'`; `I + s'/s` |
+| Catalan | Triakis tetrahedron (`dtT`) | Tristetrahedron | Truncated tetrahedron | `12 / 18 / 8` | `T_d` | `1 / 2 / 2` | `T + Needle (N)` |
+| Catalan | Rhombic dodecahedron (`daC`) | — | Cuboctahedron | `12 / 24 / 14` | `O_h` | `1 / 1 / 2` | (`C` or `O`) + Join (`j`) |
+| Catalan | Triakis octahedron (`dtC`) | Small triakis octahedron; trisoctahedron | Truncated cube | `24 / 36 / 14` | `O_h` | `1 / 2 / 2` | `C + Needle (N)`; `O + Kis (k)` |
+| Catalan | Tetrakis hexahedron (`dtO`) | Tetrahexahedron | Truncated octahedron | `24 / 36 / 14` | `O_h` | `1 / 2 / 2` | `O + Needle (N)`; `C + Kis (k)` |
+| Catalan | Deltoidal icositetrahedron (`deC`) | Trapezoidal icositetrahedron; strombic icositetrahedron | Rhombicuboctahedron | `24 / 48 / 26` | `O_h` | `1 / 2 / 3` | (`C` or `O`) + Ortho (`O`) |
+| Catalan | Disdyakis dodecahedron (`dbC`) | Hexakis octahedron; hexoctahedron | Rhombitruncated cuboctahedron | `48 / 72 / 26` | `O_h` | `2 / 3 / 3` | (`C` or `O`) + Meta (`m`) |
+| Catalan | Pentagonal icositetrahedron (`dsC`, `dsC'`) | — | Snub cube | `24 / 60 / 38` | `O` | `1 / 3 / 3` | `C + g'/g`; `O + g/g'` |
+| Catalan | Rhombic triacontahedron (`daD`) | — | Icosidodecahedron | `30 / 60 / 32` | `I_h` | `1 / 1 / 2` | (`D` or `I`) + Join (`j`) |
+| Catalan | Triakis icosahedron (`dtD`) | — | Truncated dodecahedron | `60 / 90 / 32` | `I_h` | `1 / 2 / 2` | `D + Needle (N)`; `I + Kis (k)` |
+| Catalan | Pentakis dodecahedron (`dtI`) | — | Truncated icosahedron | `60 / 90 / 32` | `I_h` | `1 / 2 / 2` | `I + Needle (N)`; `D + Kis (k)` |
+| Catalan | Deltoidal hexecontahedron (`deD`) | Trapezoidal hexecontahedron; strombic hexecontahedron | Rhombicosidodecahedron | `60 / 120 / 62` | `I_h` | `1 / 2 / 3` | (`D` or `I`) + Ortho (`O`) |
+| Catalan | Disdyakis triacontahedron (`dbD`) | Hexakis icosahedron | Rhombitruncated icosidodecahedron | `120 / 180 / 62` | `I_h` | `2 / 3 / 3` | (`D` or `I`) + Meta (`m`) |
+| Catalan | Pentagonal hexecontahedron (`dsD`, `dsD'`) | — | Snub dodecahedron | `60 / 150 / 92` | `I` | `1 / 3 / 3` | `D + g'/g`; `I + g/g'` |
 
 In rows such as (`C` or `O`) + `a`, the operation applies to either named seed.
 
@@ -117,7 +117,7 @@ In rows such as (`C` or `O`) + `a`, the operation applies to either named seed.
   Archimedean, and 13 Catalan types. This matches the complete classical
   enumerations. The four family selectors add 392 concrete family members.
 - The 13 Catalan rows pair one-to-one with the 13 Archimedean rows. Every pair
-  has the same `E`, exchanged `F` and `V`, the same symmetry family, and exchanged
+  has the same `E`, exchanged `F` and `V`, the same point group, and exchanged
   face/vertex orbit counts, as duality requires.
 - Every row satisfies Euler's formula `F - E + V = 2`.
 - The four chiral types add `sC'`, `sD'`, `dsC'`, and `dsD'` to the core without
@@ -129,9 +129,9 @@ In rows such as (`C` or `O`) + `a`, the operation applies to either named seed.
   `n = 100` against their formulas and independently validates each generated
   mesh. All 57 fixed-catalog recipe variants were also evaluated by the Wasm core
   and recognized as the stated seed, including prime chirality.
-- Runtime symmetry tests independently recover the class, proper-rotation orbit
-  counts, and mirror-plane counts of every fixed seed plus representative
-  `C<n>` and `D<n>` families directly from geometry, including chiral and
+- Runtime symmetry tests independently recover the full point group,
+  proper-rotation orbit counts, and mirror-plane counts of every fixed seed plus
+  representative axial families directly from geometry, including chiral and
   strengthened cases.
 - No Platonic, classical Archimedean, or Catalan solid is missing. The prism and
   antiprism families plus the pyramid and bipyramid families are included;

@@ -17,7 +17,7 @@
 | F/E/V or FEV | Face, edge, and vertex counts, in that order. |
 | Kind | A rotation-orbit identifier for equivalent faces, edges, or vertices. Greek letters denote face kinds; capital Latin letters denote vertex kinds. |
 | Rotation orbit | A set of mesh elements that are interchangeable under the polyhedron's rotational symmetries. |
-| [Symmetry class](symmetries.md) | The proper-rotation group derived from the current geometry: cyclic `C<n>`, dihedral `D<n>`, tetrahedral `T`, octahedral `O`, or icosahedral `I`. Because transforms preserve the input's rotations, this class can stay the same or strengthen. |
+| [Point group](symmetries.md) | The full Schoenflies point group derived from the current geometry, including proper rotations and every available reflection, inversion, or rotoreflection. Examples are pyramidal `C_nv`, prismatic `D_nh`, full octahedral `O_h`, and chiral icosahedral `I`. |
 | Rotation axis | A line through the origin around which a non-identity proper rotation preserves the current geometry. The symmetry overlay draws each physical axis once as a thin black line, with configurable half-length relative to the circumradius. |
 | Reflection plane | A plane through the origin whose mirror reflection preserves the current geometry. The symmetry overlay renders each one as a translucent circular disk with configurable radius relative to the circumradius. Chiral geometries have none even though they retain their proper rotations and axes. |
 | Orbit rollover | Transient selection of a face, edge, or vertex rotation orbit. Hovering either its F/E/V popup row or matching front-facing canvas geometry selects the entire orbit in both views. |

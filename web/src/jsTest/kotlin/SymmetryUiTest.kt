@@ -11,8 +11,9 @@ import org.jetbrains.compose.web.renderComposable
 import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLDivElement
 import polyhedra.model.api.CoreSymmetry
-import polyhedra.model.api.SymmetryFamily
-import polyhedra.model.api.SymmetryGroup
+import polyhedra.model.api.PointGroup
+import polyhedra.model.api.PointGroupFamily
+import polyhedra.model.api.PointGroupSuffix
 import polyhedra.model.poly.FEV
 import polyhedra.model.util.MutableVec3
 import polyhedra.model.util.norm
@@ -88,7 +89,10 @@ class SymmetryUiTest {
     fun symmetryPillTogglesAxesAndReflectionPlanesAndUpdatesItsTooltip(): Promise<Unit> {
         val showSymmetry = BooleanParam("sym", false)
         val symmetry = CoreSymmetry(
-            group = SymmetryGroup(SymmetryFamily.Octahedral),
+            pointGroup = PointGroup(
+                PointGroupFamily.Octahedral,
+                suffix = PointGroupSuffix.Horizontal,
+            ),
             orbitCounts = FEV(3, 3, 1),
             reflectionPlaneNormals = List(9) { MutableVec3(1.0, 0.0, 0.0) },
             rotationAxisDirections = List(13) { MutableVec3(0.0, 1.0, 0.0) },
@@ -97,8 +101,9 @@ class SymmetryUiTest {
         var button = symmetryButton()
 
         assertEquals("O", button.firstChild?.textContent)
+        assertEquals("h", button.querySelector("sub")?.textContent)
         assertEquals(
-            "Octahedral symmetry; show 13 rotation axes and 9 reflection planes",
+            "Full octahedral point group (O_h); show 13 rotation axes and 9 reflection planes",
             button.getAttribute("aria-label"),
         )
         assertFalse(button.disabled)
@@ -109,7 +114,7 @@ class SymmetryUiTest {
             button = symmetryButton()
             assertTrue(button.parentElement!!.classList.contains("active"))
             assertEquals(
-                "Octahedral symmetry; hide 13 rotation axes and 9 reflection planes",
+                "Full octahedral point group (O_h); hide 13 rotation axes and 9 reflection planes",
                 button.getAttribute("aria-label"),
             )
         }
@@ -118,7 +123,7 @@ class SymmetryUiTest {
     @Test
     fun chiralSymmetryPillStillOffersRotationAxes() {
         val symmetry = CoreSymmetry(
-            group = SymmetryGroup(SymmetryFamily.Icosahedral),
+            pointGroup = PointGroup(PointGroupFamily.Icosahedral),
             orbitCounts = FEV(3, 3, 1),
             reflectionPlaneNormals = emptyList(),
             rotationAxisDirections = List(31) { MutableVec3(0.0, 0.0, 1.0) },
@@ -127,8 +132,32 @@ class SymmetryUiTest {
 
         val button = symmetryButton()
         assertFalse(button.disabled)
+        assertEquals(null, button.querySelector("sub"))
         assertEquals(
-            "Icosahedral symmetry; show 31 rotation axes and no reflection planes",
+            "Chiral icosahedral point group (I); show 31 rotation axes and no reflection planes",
+            button.getAttribute("aria-label"),
+        )
+    }
+
+    @Test
+    fun axialPointGroupRendersFoldAndSuffixAsHtmlSubscript() {
+        val symmetry = CoreSymmetry(
+            pointGroup = PointGroup(
+                PointGroupFamily.Dihedral,
+                fold = 7,
+                suffix = PointGroupSuffix.Horizontal,
+            ),
+            orbitCounts = FEV(2, 2, 1),
+            reflectionPlaneNormals = List(8) { MutableVec3(1.0, 0.0, 0.0) },
+            rotationAxisDirections = List(8) { MutableVec3(0.0, 1.0, 0.0) },
+        )
+        composition = renderComposable(host) { SymmetryControl(symmetry, BooleanParam("sym", false)) }
+
+        val button = symmetryButton()
+        assertEquals("D", button.firstChild?.textContent)
+        assertEquals("7h", button.querySelector("sub")?.textContent)
+        assertEquals(
+            "7-fold prismatic point group (D_7h); show 8 rotation axes and 8 reflection planes",
             button.getAttribute("aria-label"),
         )
     }

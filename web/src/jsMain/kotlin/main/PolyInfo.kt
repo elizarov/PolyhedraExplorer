@@ -75,7 +75,8 @@ internal fun SymmetryControl(symmetry: CoreSymmetry, showSymmetry: BooleanParam)
         else add("no reflection planes")
     }.joinToString(" and ")
     val action = "${if (showingSymmetry) "hide" else "show"} $elements"
-    val tooltip = "${symmetry.group.fullName}; $action"
+    val pointGroup = symmetry.pointGroup
+    val tooltip = "${pointGroup.fullName} (${pointGroup.notation}); $action"
     Div(attrs = {
         classes("btn", "symmetry", *(if (showingSymmetry) arrayOf("active") else emptyArray()))
     }) {
@@ -84,7 +85,8 @@ internal fun SymmetryControl(symmetry: CoreSymmetry, showSymmetry: BooleanParam)
             attr("aria-label", tooltip)
             onClick { showSymmetry.updateValue(!showingSymmetry) }
         }) {
-            Text(symmetry.group.compactName)
+            Text(pointGroup.symbol)
+            pointGroup.subscript?.let { subscript -> Sub { Text(subscript) } }
             Aside(attrs = { classes("tooltip-text") }) { Text(tooltip) }
         }
     }
