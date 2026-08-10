@@ -9,10 +9,13 @@ import polyhedra.core.poly.*
 import polyhedra.core.util.*
 import polyhedra.model.poly.*
 import polyhedra.model.util.*
+import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.log10
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sin
 import kotlin.time.ExperimentalTime
 import kotlin.time.TimeSource
 
@@ -23,6 +26,9 @@ private const val MAX_ADJUSTMENT = 0.5
 private const val ADJUSTMENT_UP = 1.01
 private const val ADJUSTMENT_DOWN = 0.995
 private const val ORTHOGONALITY_ADJUSTMENT = 0.5
+private const val OVERLAP_ADJUSTMENT = 0.1
+private const val OVERLAP_WARMUP_ITERATIONS = 10_000
+private const val POST_UNSCRAMBLE_ADJUSTMENT = 0.001
 private const val ORBIT_MATCH_TOLERANCE = 1e-8
 
 var totalIterations = 0
@@ -40,6 +46,7 @@ fun Polyhedron.canonical(): Polyhedron =
 private data class PackingTopology(
     val faces: List<IntArray>,
     val pointFaces: List<IntArray>,
+    val pointNeighbors: List<IntArray>,
 )
 
 private data class PackingSymmetry(
@@ -48,6 +55,7 @@ private data class PackingSymmetry(
     val faceOrbits: List<PackingFaceOrbit>,
     val faceLocations: List<OrbitLocation>,
     val surroundingFaces: List<List<PackingFaceReference>>,
+    val surroundingPoints: List<List<PackingPointReference>>,
 )
 
 private data class PackingPointOrbit(
@@ -170,12 +178,69 @@ private class OrbitRotationSum(rotations: List<OrbitRotation>) {
  */
 @OptIn(ExperimentalTime::class)
 suspend fun Polyhedron.canonical(progress: OperationProgressContext?): Polyhedron {
+    return canonicalWithFallback(progress)
+}
+
+private suspend fun Polyhedron.canonicalWithFallback(
+    progress: OperationProgressContext?,
+): Polyhedron = try {
+    canonicalAttempt(
+        progress,
+        useSymmetry = true,
+        useEdgeNearPoints = false,
+        useTutteEmbedding = false,
+    )
+} catch (quotientFailure: IllegalStateException) {
+    println("Canonicalization: quotient solve failed (${quotientFailure.message}); retrying full packing")
+    try {
+        canonicalAttempt(
+            progress,
+            useSymmetry = false,
+            useEdgeNearPoints = false,
+            useTutteEmbedding = false,
+        )
+    } catch (fullFailure: IllegalStateException) {
+        println("Canonicalization: full solve failed (${fullFailure.message}); retrying from edge near-points")
+        try {
+            canonicalAttempt(
+                progress,
+                useSymmetry = false,
+                useEdgeNearPoints = true,
+                useTutteEmbedding = false,
+            )
+        } catch (nearPointFailure: IllegalStateException) {
+            println(
+                "Canonicalization: edge near-point solve failed (${nearPointFailure.message}); " +
+                    "retrying from a Tutte embedding"
+            )
+            canonicalAttempt(
+                progress,
+                useSymmetry = false,
+                useEdgeNearPoints = false,
+                useTutteEmbedding = true,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalTime::class)
+private suspend fun Polyhedron.canonicalAttempt(
+    progress: OperationProgressContext?,
+    useSymmetry: Boolean,
+    useEdgeNearPoints: Boolean,
+    useTutteEmbedding: Boolean,
+): Polyhedron {
     val startTime = TimeSource.Monotonic.markNow()
     val topology = packingTopology()
-    val symmetry = packingSymmetry(topology, initialPackingPoints())
+    val symmetry = packingSymmetry(
+        topology,
+        if (useTutteEmbedding) tuttePackingPoints(topology) else initialPackingPoints(useEdgeNearPoints),
+        useSymmetry,
+    )
     val offsets = symmetry.pointOrbits.map { MutableVec3() }
     val centroid = MutableVec3()
     val centroidContribution = MutableVec3()
+    var correctingOverlaps = true
 
     var adjustment = INITIAL_ADJUSTMENT
     var lastMaxOffset = Double.POSITIVE_INFINITY
@@ -183,6 +248,7 @@ suspend fun Polyhedron.canonical(progress: OperationProgressContext?): Polyhedro
     var previousProgress = 0
     var lastReportTime = 0L
     var iterations = 0
+    var result: Polyhedron? = null
 
     while (true) {
         updateOrbitFacePlanes(symmetry)
@@ -200,8 +266,11 @@ suspend fun Polyhedron.canonical(progress: OperationProgressContext?): Polyhedro
             updatePackingPointOffset(
                 point = orbit.point,
                 surroundingFaces = symmetry.surroundingFaces[orbitIndex],
+                surroundingPoints = symmetry.surroundingPoints[orbitIndex],
+                pointOrbits = symmetry.pointOrbits,
                 faceOrbits = symmetry.faceOrbits,
                 adjustment = adjustment,
+                correctOverlaps = correctingOverlaps,
                 offset = offset,
             )
             offset -= centroid
@@ -217,8 +286,20 @@ suspend fun Polyhedron.canonical(progress: OperationProgressContext?): Polyhedro
         }
 
         iterations++
+        if (correctingOverlaps && iterations == OVERLAP_WARMUP_ITERATIONS) {
+            correctingOverlaps = false
+            adjustment = POST_UNSCRAMBLE_ADJUSTMENT
+            lastMaxOffset = Double.POSITIVE_INFINITY
+        }
         if (initialMaxOffset == 0.0) initialMaxOffset = maxOffset
-        if (maxOffset <= TARGET_TOLERANCE) break
+        if (maxOffset <= TARGET_TOLERANCE) {
+            updateOrbitFacePlanes(symmetry)
+            val candidate = rebuildFromPacking(symmetry)
+            if (candidate.isCanonical()) {
+                result = candidate
+                break
+            }
+        }
         check(iterations < MAX_ITERATIONS) {
             "Canonicalization did not converge after $iterations iterations (offset=$maxOffset)"
         }
@@ -254,8 +335,55 @@ suspend fun Polyhedron.canonical(progress: OperationProgressContext?): Polyhedro
             "${symmetry.faceOrbits.size}/${topology.faces.size} face orbits)"
     )
     totalIterations += iterations
-    updateOrbitFacePlanes(symmetry)
-    return rebuildFromPacking(symmetry)
+    return requireNotNull(result)
+}
+
+private fun tuttePackingPoints(topology: PackingTopology): List<MutableVec3> {
+    val outer = topology.faces.maxBy { it.size }
+    val fixed = BooleanArray(topology.pointNeighbors.size)
+    val x = DoubleArray(topology.pointNeighbors.size)
+    val y = DoubleArray(topology.pointNeighbors.size)
+    for ((index, pointIndex) in outer.withIndex()) {
+        val angle = -2.0 * PI * index / outer.size
+        fixed[pointIndex] = true
+        x[pointIndex] = cos(angle)
+        y[pointIndex] = sin(angle)
+    }
+
+    var converged = false
+    var iteration = 0
+    while (iteration < 100_000 && !converged) {
+        var maxMovement = 0.0
+        for (pointIndex in topology.pointNeighbors.indices) {
+            if (fixed[pointIndex]) continue
+            val neighbors = topology.pointNeighbors[pointIndex]
+            var targetX = 0.0
+            var targetY = 0.0
+            for (neighbor in neighbors) {
+                targetX += x[neighbor]
+                targetY += y[neighbor]
+            }
+            targetX /= neighbors.size
+            targetY /= neighbors.size
+            maxMovement = max(maxMovement, norm(targetX - x[pointIndex], targetY - y[pointIndex]))
+            x[pointIndex] = targetX
+            y[pointIndex] = targetY
+        }
+        if (maxMovement <= 1e-13) {
+            converged = true
+        }
+        iteration++
+    }
+    check(converged) { "Tutte packing initialization did not converge" }
+    return x.indices.map { pointIndex ->
+        val radiusSquared = x[pointIndex] * x[pointIndex] + y[pointIndex] * y[pointIndex]
+        val denominator = radiusSquared + 1.0
+        MutableVec3(
+            2.0 * x[pointIndex] / denominator,
+            2.0 * y[pointIndex] / denominator,
+            (radiusSquared - 1.0) / denominator,
+        )
+    }
 }
 
 private fun convergenceProgress(initialOffset: Double, currentOffset: Double): Int {
@@ -281,6 +409,7 @@ private fun Polyhedron.packingTopology(): PackingTopology {
     val sourceFaces = fs.map { face ->
         face.directedEdges.map { it.index() }.toIntArray()
     }
+    val faces = vertexFaces + sourceFaces
     val pointFaces = es.map { edge ->
         intArrayOf(
             edge.a.id,
@@ -289,7 +418,14 @@ private fun Polyhedron.packingTopology(): PackingTopology {
             vs.size + edge.r.id,
         )
     }
-    return PackingTopology(vertexFaces + sourceFaces, pointFaces)
+    val pointNeighbors = pointFaces.mapIndexed { pointIndex, surrounding ->
+        IntArray(surrounding.size) { index ->
+            val first = faces[surrounding[index]]
+            val second = faces[surrounding[(index + 1) % surrounding.size]]
+            first.first { candidate -> candidate != pointIndex && candidate in second }
+        }
+    }
+    return PackingTopology(faces, pointFaces, pointNeighbors)
 }
 
 private fun edgeKey(a: Int, b: Int): Long {
@@ -298,13 +434,19 @@ private fun edgeKey(a: Int, b: Int): Long {
     return (low.toLong() shl 32) or (high.toLong() and 0xffffffffL)
 }
 
-private fun Polyhedron.initialPackingPoints(): List<MutableVec3> {
+private fun Polyhedron.initialPackingPoints(
+    useEdgeNearPoints: Boolean = false,
+): List<MutableVec3> {
     val points = es.map { edge ->
-        MutableVec3(
-            (edge.a.x + edge.b.x) / 2,
-            (edge.a.y + edge.b.y) / 2,
-            (edge.a.z + edge.b.z) / 2,
-        )
+        if (useEdgeNearPoints) {
+            MutableVec3(edge.tangentPoint())
+        } else {
+            MutableVec3(
+                (edge.a.x + edge.b.x) / 2,
+                (edge.a.y + edge.b.y) / 2,
+                (edge.a.z + edge.b.z) / 2,
+            )
+        }
     }
     val centroid = MutableVec3()
     for (point in points) centroid += point
@@ -315,7 +457,7 @@ private fun Polyhedron.initialPackingPoints(): List<MutableVec3> {
 
 internal fun Polyhedron.canonicalOrbitStats(): CanonicalOrbitStats {
     val topology = packingTopology()
-    val symmetry = packingSymmetry(topology, initialPackingPoints())
+    val symmetry = packingSymmetry(topology, initialPackingPoints(), useSymmetry = true)
     return CanonicalOrbitStats(
         points = es.size,
         pointOrbits = symmetry.pointOrbits.size,
@@ -327,10 +469,13 @@ internal fun Polyhedron.canonicalOrbitStats(): CanonicalOrbitStats {
 private fun Polyhedron.packingSymmetry(
     topology: PackingTopology,
     initialPoints: List<MutableVec3>,
+    useSymmetry: Boolean,
 ): PackingSymmetry {
     val pointLocations = arrayOfNulls<OrbitLocation>(initialPoints.size)
     val pointOrbits = ArrayList<PackingPointOrbit>()
-    val pointGroups = es.indices.groupBy { es[it].kind }
+    val pointGroups = es.indices.groupBy { pointIndex ->
+        if (useSymmetry) 0 to es[pointIndex].kind else 1 to pointIndex
+    }
 
     for (group in pointGroups.values) {
         val remaining = group.toMutableList()
@@ -374,6 +519,7 @@ private fun Polyhedron.packingSymmetry(
     val faceLocations = arrayOfNulls<OrbitLocation>(topology.faces.size)
     val faceRepresentatives = ArrayList<Int>()
     val faceGroups = topology.faces.indices.groupBy { faceIndex ->
+        if (!useSymmetry) return@groupBy faceIndex to faceIndex
         if (faceIndex < vs.size) {
             0 to vs[faceIndex].kind.id
         } else {
@@ -429,6 +575,12 @@ private fun Polyhedron.packingSymmetry(
             PackingFaceReference(location.orbitIndex, location.rotation)
         }
     }
+    val surroundingPoints = pointOrbits.map { orbit ->
+        topology.pointNeighbors[orbit.sourcePointIndex].map { pointIndex ->
+            val location = resolvedPointLocations[pointIndex]
+            PackingPointReference(location.orbitIndex, location.rotation)
+        }
+    }
 
     return PackingSymmetry(
         fullPointCount = initialPoints.size,
@@ -436,6 +588,7 @@ private fun Polyhedron.packingSymmetry(
         faceOrbits = faceOrbits,
         faceLocations = resolvedFaceLocations,
         surroundingFaces = surroundingFaces,
+        surroundingPoints = surroundingPoints,
     )
 }
 
@@ -614,8 +767,11 @@ private fun updateOrbitFacePlanes(symmetry: PackingSymmetry) {
 private fun updatePackingPointOffset(
     point: Vec3,
     surroundingFaces: List<PackingFaceReference>,
+    surroundingPoints: List<PackingPointReference>,
+    pointOrbits: List<PackingPointOrbit>,
     faceOrbits: List<PackingFaceOrbit>,
     adjustment: Double,
+    correctOverlaps: Boolean,
     offset: MutableVec3,
 ) {
     offset.setToZero()
@@ -642,7 +798,7 @@ private fun updatePackingPointOffset(
         val ny = opposite.z * first.x - opposite.x * first.z
         val nz = opposite.x * first.y - opposite.y * first.x
         val length = norm(nx, ny, nz)
-        check(length > EPS && length.isFinite()) { "Degenerate canonical packing plane" }
+        if (length <= EPS || !length.isFinite()) continue
         val ux = nx / length
         val uy = ny / length
         val uz = nz / length
@@ -651,6 +807,32 @@ private fun updatePackingPointOffset(
         offset.x -= ux * factor
         offset.y -= uy * factor
         offset.z -= uz * factor
+    }
+
+    if (!correctOverlaps) return
+    for (pointRef in surroundingPoints) {
+        pointRef.rotation.transformTo(pointRef.point, pointOrbits[pointRef.orbitIndex].point)
+    }
+    for (index in surroundingPoints.indices) {
+        val first = surroundingPoints[index].point
+        val second = surroundingPoints[(index + 1) % surroundingPoints.size].point
+        val triple =
+            point.x * (first.y * second.z - first.z * second.y) +
+                point.y * (first.z * second.x - first.x * second.z) +
+                point.z * (first.x * second.y - first.y * second.x)
+        if (triple <= 0.0) continue
+        var x = 0.0
+        var y = 0.0
+        var z = 0.0
+        for (pointRef in surroundingPoints) {
+            x += pointRef.point.x
+            y += pointRef.point.y
+            z += pointRef.point.z
+        }
+        offset.x += (x / surroundingPoints.size - point.x) * OVERLAP_ADJUSTMENT
+        offset.y += (y / surroundingPoints.size - point.y) * OVERLAP_ADJUSTMENT
+        offset.z += (z / surroundingPoints.size - point.z) * OVERLAP_ADJUSTMENT
+        return
     }
 }
 
