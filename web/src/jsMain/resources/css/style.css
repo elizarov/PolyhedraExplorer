@@ -199,6 +199,17 @@ div.btn.export {
     right: 1em;
 }
 
+div.btn.saves {
+    position: absolute;
+    top: 7em;
+    right: 1em;
+}
+
+div.btn.saves > button > aside.tooltip-text {
+    left: auto;
+    right: 0;
+}
+
 div.btn.reset {
     position: absolute;
     left: 1em;
@@ -263,6 +274,115 @@ aside.drawer.export {
 
 aside.drawer.print-color-picker {
     width: min(22em, calc(100vw - 1em));
+}
+
+aside.drawer.saves {
+    top: 9.5em;
+    width: min(24em, calc(100vw - 1em));
+    max-height: calc(100vh - 12em);
+}
+
+/* --------- Saved configurations --------- */
+
+.save-current {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.4em;
+    padding: 0.55em;
+}
+
+input.save-name {
+    min-width: 0;
+    width: 100%;
+    padding: 0.3em 0.45em;
+}
+
+button.save-current-button {
+    min-width: 4.5em;
+    padding: 0.3em 0.6em;
+    white-space: nowrap;
+}
+
+.save-error {
+    grid-column: 1 / -1;
+    color: hsl(0, 70%, 38%);
+    font-size: 0.75em;
+    line-height: 1.2;
+}
+
+.empty-saves {
+    padding: 0.7em;
+    color: rgba(0, 0, 0, 0.68);
+    font-size: 0.8em;
+}
+
+.saved-configurations {
+    display: flex;
+    flex-direction: column;
+}
+
+button.saved-configuration {
+    display: grid;
+    grid-template-columns: 5.4em minmax(0, 1fr) 0.7em;
+    align-items: center;
+    gap: 0.55em;
+    width: 100%;
+    min-width: 0;
+    padding: 0.4em 0.55em;
+    color: var(--text-color);
+    background: rgba(255, 255, 255, 0.42);
+    border: 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.18);
+    cursor: pointer;
+    text-align: left;
+}
+
+button.saved-configuration:hover,
+button.saved-configuration:focus-visible {
+    background: var(--hover-color);
+}
+
+img.saved-preview {
+    display: block;
+    width: 5.4em;
+    height: 4.05em;
+    border: 1px solid rgba(0, 0, 0, 0.4);
+    border-radius: 0.3em;
+    object-fit: cover;
+}
+
+.saved-details {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.3em;
+}
+
+.saved-name {
+    overflow: hidden;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.saved-time {
+    color: rgba(0, 0, 0, 0.68);
+    font-size: 0.75em;
+}
+
+.saved-load-icon {
+    color: rgba(0, 0, 0, 0.48);
+}
+
+@media only screen and (max-width: 24em) {
+    button.saved-configuration {
+        grid-template-columns: 4.5em minmax(0, 1fr) 0.7em;
+    }
+
+    img.saved-preview {
+        width: 4.5em;
+        height: 3.375em;
+    }
 }
 
 /* --------- Print preview color picker --------- */

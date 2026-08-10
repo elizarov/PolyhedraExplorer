@@ -16,6 +16,7 @@ import org.jetbrains.compose.web.dom.I
 import org.jetbrains.compose.web.dom.Text
 import polyhedra.web.components.observe
 import polyhedra.web.params.Param
+import polyhedra.web.poly.CanvasPreviewCapture
 import polyhedra.web.poly.FaceContext
 import polyhedra.web.poly.PolyCanvas
 
@@ -24,6 +25,8 @@ fun RootPane(params: RootParams) {
     params.render.poly.observe(Param.TargetValue + Param.Progress)
     var popup by remember { mutableStateOf<Popup?>(null) }
     var faces by remember { mutableStateOf<FaceContext?>(null) }
+    var capturePreview by remember { mutableStateOf<CanvasPreviewCapture>({ onCaptured -> onCaptured(null) }) }
+    val savedConfigurationStore = remember { SavedConfigurationStore() }
     val togglePopup: (Popup?) -> Unit = { requested ->
         params.render.poly.clearRolloverSelection()
         popup = if (popup == requested) null else requested
@@ -36,6 +39,7 @@ fun RootPane(params: RootParams) {
             params = params.render,
             popup = popup,
             faceContextSink = { faces = it },
+            previewCaptureSink = { capturePreview = it },
             resetPopup = {
                 params.render.poly.clearRolloverSelection()
                 popup = null
@@ -64,6 +68,16 @@ fun RootPane(params: RootParams) {
                 onClick { togglePopup(if (exportOpen) null else Popup.Export) }
             }) { I(attrs = { classes("fa", "fa-share-square-o") }) }
         }
+        Div(attrs = { classes("btn", "saves", *activeWhen(popup, Popup.Saves)) }) {
+            Button(attrs = {
+                classes("square")
+                attr("aria-label", "Saved configurations")
+                onClick { togglePopup(Popup.Saves) }
+            }) {
+                I(attrs = { classes("fa", "fa-floppy-o") })
+                Aside(attrs = { classes("tooltip-text") }) { Text("Saved configurations") }
+            }
+        }
     }
     when (popup) {
         Popup.Config -> Aside(attrs = { classes("drawer", "config") }) { ConfigPopup(params) }
@@ -72,6 +86,15 @@ fun RootPane(params: RootParams) {
         }
         Popup.PrintColor -> Aside(attrs = { classes("drawer", "export", "print-color-picker") }) {
             PrintColorPopup(params.render.printPreview, onBack = { popup = Popup.Export })
+        }
+        Popup.Saves -> Aside(attrs = { classes("drawer", "saves") }) {
+            SaveLoadPopup(
+                autoName = params.render.poly.polyName,
+                serializeState = params::toString,
+                store = savedConfigurationStore,
+                capturePreview = capturePreview,
+                onLoad = ::loadSavedConfiguration,
+            )
         }
         else -> Unit
     }

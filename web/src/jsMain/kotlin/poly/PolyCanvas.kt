@@ -6,6 +6,7 @@ package polyhedra.web.poly
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import kotlinx.browser.document
 import kotlinx.browser.window
 import org.jetbrains.compose.web.dom.Canvas
 import org.jetbrains.compose.web.dom.Div
@@ -21,6 +22,10 @@ import kotlin.math.PI
 import kotlin.math.atan2
 
 private const val MIN_MOUSE_MOVE_DISTANCE = 3.0
+private const val SAVE_PREVIEW_WIDTH = 240
+private const val SAVE_PREVIEW_HEIGHT = 180
+
+typealias CanvasPreviewCapture = (onCaptured: (String?) -> Unit) -> Unit
 
 @Composable
 fun PolyCanvas(
@@ -28,11 +33,13 @@ fun PolyCanvas(
     params: RenderParams,
     popup: Popup?,
     faceContextSink: (FaceContext) -> Unit,
+    previewCaptureSink: (CanvasPreviewCapture) -> Unit = {},
     resetPopup: () -> Unit,
 ) {
     val controller = remember(params) { PolyCanvasController(params) }
     controller.popup = popup
     controller.faceContextSink = faceContextSink
+    controller.previewCaptureSink = previewCaptureSink
     controller.resetPopup = resetPopup
 
     Canvas(attrs = {
@@ -53,6 +60,7 @@ fun PolyCanvas(
 
 private class PolyCanvasController(private val params: RenderParams) {
     var faceContextSink: (FaceContext) -> Unit = {}
+    var previewCaptureSink: (CanvasPreviewCapture) -> Unit = {}
     var resetPopup: () -> Unit = {}
     var fpsElement: HTMLDivElement? = null
     var popup: Popup? = null
@@ -76,6 +84,7 @@ private class PolyCanvasController(private val params: RenderParams) {
     private var prevAngle = 0.0
     private var drawCount = 0
     private var fpsTimeout = 0
+    private var pendingPreviewCapture: ((String?) -> Unit)? = null
 
     fun mount(canvas: HTMLCanvasElement) {
         if (mounted) return
@@ -95,6 +104,7 @@ private class PolyCanvasController(private val params: RenderParams) {
         canvas.addTouchListener("touchmove", ::handleTouchMove)
         drawContext = DrawContext(canvas, params, ::draw)
         faceContextSink(drawContext.faces)
+        previewCaptureSink(::capturePreview)
         ResizeTracker.add(requestRedraw)
         requestFpsTimeout()
         requestRedraw()
@@ -104,6 +114,9 @@ private class PolyCanvasController(private val params: RenderParams) {
         if (!mounted) return
         mounted = false
         cancelFpsTimeout()
+        pendingPreviewCapture?.invoke(null)
+        pendingPreviewCapture = null
+        previewCaptureSink { onCaptured -> onCaptured(null) }
         ResizeTracker.remove(requestRedraw)
         drawContext.destroy()
     }
@@ -115,8 +128,22 @@ private class PolyCanvasController(private val params: RenderParams) {
     private fun draw() {
         resizeCanvasIfNeeded(canvas.clientWidth, canvas.clientHeight)
         drawContext.drawScene()
+        pendingPreviewCapture?.let { onCaptured ->
+            pendingPreviewCapture = null
+            onCaptured(runCatching { createSavePreview(canvas) }.getOrNull())
+        }
         if (pointerOnCanvas && !isRotating) updateRolloverSelection(pointerX, pointerY)
         drawCount++
+    }
+
+    private fun capturePreview(onCaptured: (String?) -> Unit) {
+        if (!mounted) {
+            onCaptured(null)
+            return
+        }
+        pendingPreviewCapture?.invoke(null)
+        pendingPreviewCapture = onCaptured
+        requestRedraw()
     }
 
     private fun resizeCanvasIfNeeded(clientWidth: Int, clientHeight: Int) {
@@ -306,6 +333,35 @@ private class PolyCanvasController(private val params: RenderParams) {
         if (fpsTimeout != 0) window.clearTimeout(fpsTimeout)
         fpsTimeout = 0
     }
+}
+
+internal fun createSavePreview(canvas: HTMLCanvasElement): String {
+    require(canvas.width > 0 && canvas.height > 0) { "Cannot capture an empty canvas" }
+    val preview = document.createElement("canvas") as HTMLCanvasElement
+    preview.width = SAVE_PREVIEW_WIDTH
+    preview.height = SAVE_PREVIEW_HEIGHT
+    val context = requireNotNull(preview.getContext("2d") as? CanvasRenderingContext2D)
+    context.fillStyle = "#f2f2f2"
+    context.fillRect(0.0, 0.0, SAVE_PREVIEW_WIDTH.toDouble(), SAVE_PREVIEW_HEIGHT.toDouble())
+
+    val targetAspect = SAVE_PREVIEW_WIDTH.toDouble() / SAVE_PREVIEW_HEIGHT
+    val sourceAspect = canvas.width.toDouble() / canvas.height
+    val sourceWidth = if (sourceAspect > targetAspect) canvas.height * targetAspect else canvas.width.toDouble()
+    val sourceHeight = if (sourceAspect > targetAspect) canvas.height.toDouble() else canvas.width / targetAspect
+    val sourceX = (canvas.width - sourceWidth) / 2.0
+    val sourceY = (canvas.height - sourceHeight) / 2.0
+    context.drawImage(
+        canvas,
+        sourceX,
+        sourceY,
+        sourceWidth,
+        sourceHeight,
+        0.0,
+        0.0,
+        SAVE_PREVIEW_WIDTH.toDouble(),
+        SAVE_PREVIEW_HEIGHT.toDouble(),
+    )
+    return preview.toDataURL("image/webp", 0.78)
 }
 
 private fun HTMLCanvasElement.addTouchListener(type: String, handler: (TouchEvent) -> Unit) {

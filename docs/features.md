@@ -39,6 +39,7 @@
 ## Persistence and export
 
 - Complete application state, including non-default continuous transform parameters and print-preview color, is encoded in the URL hash and restored on load. Disabled default-red preview remains implicit.
+- A save/load button below Export opens an append-only local save log. Save uses the current catalog-derived polyhedron name immediately, while the editable field selects a custom name and Enter is equivalent to clicking Save. Every entry stores the exact compact URL state, a cropped rendering preview, and its timestamp. Entries remain in browser local storage, are shown newest first with relative ages, and load by restoring the saved URL state. There is intentionally no delete action.
 - Export of rendered solid geometry to standards-compatible ASCII STL without zero-area facets.
 - Export of polyhedron vertices and faces to OpenSCAD source.
 - Export size and shell parameters are controlled from the export drawer.
