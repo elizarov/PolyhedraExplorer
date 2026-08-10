@@ -1,5 +1,8 @@
 package polyhedra.model.api
 
+import polyhedra.model.poly.CHIRALITY_PRIME
+import polyhedra.model.poly.Chirality
+import polyhedra.model.poly.toAnyKindOrNull
 import polyhedra.model.util.fmt
 
 private const val TWEAK_SEPARATOR = "~"
@@ -28,45 +31,52 @@ object TransformTweakRanges {
     val KisHeight = TransformTweakRange(0.1, 1.5)
 }
 
-/** Continuous controls supported by an operation, in their UI display order. */
-fun String.transformTweakRanges(): Map<TransformTweak, TransformTweakRange> {
-    val operationTag = removeSuffix("'")
-    if (operationTag.startsWith("k[")) {
+/** Continuous controls supported by a transform, in their UI display order. */
+fun TransformId.transformTweakRanges(): Map<TransformTweak, TransformTweakRange> {
+    if (operation == TransformOperation.Kis && target != null) {
         return linkedMapOf(TransformTweak.Height to TransformTweakRanges.KisHeight)
     }
-    if (operationTag.startsWith("t[")) {
+    if (operation == TransformOperation.Truncated && target != null) {
         return linkedMapOf(TransformTweak.Depth to TransformTweakRanges.TruncationDepth)
     }
-    if (operationTag.startsWith("a[")) {
+    if (operation == TransformOperation.Rectified && target != null) {
         return linkedMapOf(TransformTweak.Depth to TransformTweakRanges.RectificationDepth)
     }
-    return when (operationTag) {
-        "t", "N", "z" -> linkedMapOf(TransformTweak.Depth to TransformTweakRanges.TruncationDepth)
-        "k" -> linkedMapOf(TransformTweak.Height to TransformTweakRanges.KisHeight)
-        "e", "O" -> linkedMapOf(TransformTweak.Distance to TransformTweakRanges.CantellationDistance)
-        "b", "m" -> linkedMapOf(
+    return when (operation) {
+        TransformOperation.Truncated,
+        TransformOperation.Needle,
+        TransformOperation.Zip -> linkedMapOf(TransformTweak.Depth to TransformTweakRanges.TruncationDepth)
+        TransformOperation.Kis -> linkedMapOf(TransformTweak.Height to TransformTweakRanges.KisHeight)
+        TransformOperation.Cantellated,
+        TransformOperation.Ortho -> linkedMapOf(
+            TransformTweak.Distance to TransformTweakRanges.CantellationDistance
+        )
+        TransformOperation.Bevelled,
+        TransformOperation.Meta -> linkedMapOf(
             TransformTweak.Distance to TransformTweakRanges.CantellationDistance,
             TransformTweak.Depth to TransformTweakRanges.TruncationDepth,
         )
-        "s", "g" -> linkedMapOf(
+        TransformOperation.Snub,
+        TransformOperation.Gyro -> linkedMapOf(
             TransformTweak.Inset to TransformTweakRanges.SnubInset,
             TransformTweak.Twist to TransformTweakRanges.SnubTwist,
         )
-        "c" -> linkedMapOf(TransformTweak.Width to TransformTweakRanges.ChamferWidth)
+        TransformOperation.Chamfered -> linkedMapOf(TransformTweak.Width to TransformTweakRanges.ChamferWidth)
         else -> emptyMap()
     }
 }
 
-data class ParsedTransformTag(
-    val operationTag: String,
-    val tweaks: Map<TransformTweak, Double>,
-)
-
 fun encodeTransformTag(
-    operationTag: String,
+    id: TransformId,
     tweaks: Map<TransformTweak, Double>,
 ): String = buildString {
-    append(operationTag)
+    append(id.operation.tag)
+    if (id.chirality == Chirality.Flipped) append(CHIRALITY_PRIME)
+    id.target?.let { target ->
+        append('[')
+        append(target)
+        append(']')
+    }
     for (tweak in TransformTweak.entries) {
         val value = tweaks[tweak]?.takeUnless { it == 1.0 } ?: continue
         append(TWEAK_SEPARATOR)
@@ -76,9 +86,32 @@ fun encodeTransformTag(
     }
 }
 
-fun String.parseTransformTag(): ParsedTransformTag? {
+val TransformSpec.tag: String
+    get() = encodeTransformTag(id, tweaks)
+
+fun String.parseTransformTag(): TransformSpec? {
     val parts = split(TWEAK_SEPARATOR)
-    val operationTag = parts.firstOrNull()?.takeIf(String::isNotEmpty) ?: return null
+    val serializedId = parts.firstOrNull()?.takeIf(String::isNotEmpty) ?: return null
+    val bracket = serializedId.indexOf('[')
+    val serializedOperation = if (bracket < 0) {
+        serializedId
+    } else {
+        if (!serializedId.endsWith(']') || bracket == 0) return null
+        serializedId.substring(0, bracket)
+    }
+    val target = if (bracket < 0) null else {
+        serializedId.substring(bracket + 1, serializedId.lastIndex).toAnyKindOrNull() ?: return null
+    }
+    val flipped = serializedOperation.endsWith(CHIRALITY_PRIME)
+    val operationTag = serializedOperation.removeSuffix(CHIRALITY_PRIME)
+    val operation = TransformOperation.entries.singleOrNull { it.tag == operationTag } ?: return null
+    if (flipped && !operation.isChiral) return null
+    val chirality = if (operation.isChiral) {
+        if (flipped) Chirality.Flipped else Chirality.Default
+    } else {
+        null
+    }
+    val id = runCatching { TransformId(operation, chirality, target) }.getOrNull() ?: return null
     val tweaks = linkedMapOf<TransformTweak, Double>()
     for (part in parts.drop(1)) {
         val key = part.substringBefore(TWEAK_ASSIGNMENT, missingDelimiterValue = "")
@@ -87,8 +120,5 @@ fun String.parseTransformTag(): ParsedTransformTag? {
         val value = valueText.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 } ?: return null
         if (tweaks.put(tweak, value) != null) return null
     }
-    return ParsedTransformTag(operationTag, tweaks.filterValues { it != 1.0 })
+    return TransformSpec(id, tweaks.filterValues { it != 1.0 })
 }
-
-fun String.withoutTransformTweaks(): String =
-    substringBefore(TWEAK_SEPARATOR)

@@ -127,7 +127,7 @@ class ContinuousTransformRangeTest {
 
     private suspend fun validateDynamicExtremes(seed: Seed, initialTag: String) {
         val parsed = requireNotNull(initialTag.parseTransformTag())
-        val tweakOrder = parsed.operationTag.transformTweakRanges().keys.toList()
+        val tweakOrder = parsed.id.transformTweakRanges().keys.toList()
         check(tweakOrder.isNotEmpty()) { "No continuous settings" }
 
         suspend fun validateRangesAt(tag: String) {
@@ -141,7 +141,7 @@ class ContinuousTransformRangeTest {
                 .associateBy(CoreTransformTweakRange::tweak)
             for (tweak in tweakOrder) {
                 val safeRange = ranges[tweak] ?: continue
-                val envelope = parsed.operationTag.transformTweakRanges().getValue(tweak)
+                val envelope = parsed.id.transformTweakRanges().getValue(tweak)
                 check(safeRange.min >= envelope.min && safeRange.max <= envelope.max) {
                     "$tweak range $safeRange exceeds $envelope"
                 }
@@ -155,7 +155,7 @@ class ContinuousTransformRangeTest {
                     val candidateTweaks = current.tweaks.toMutableMap().apply {
                         if (value == 1.0) remove(tweak) else put(tweak, value)
                     }
-                    val candidateTag = encodeTransformTag(current.operationTag, candidateTweaks)
+                    val candidateTag = encodeTransformTag(current.id, candidateTweaks)
                     val endpoint = evaluateCore(
                         CoreRequest(
                             CoreState(seed.tag, listOf(candidateTag), "c"),
@@ -200,12 +200,12 @@ private val outerExtremeTransformTags = continuousTransformTags.flatMap(String::
 private fun String.outerExtremeTags(): List<String> {
     val parsed = requireNotNull(parseTransformTag())
     var variants: List<Map<TransformTweak, Double>> = listOf(emptyMap())
-    for ((tweak, range) in parsed.operationTag.transformTweakRanges()) {
+    for ((tweak, range) in parsed.id.transformTweakRanges()) {
         variants = variants.flatMap { values ->
             listOf(range.min, range.max).map { value -> values + (tweak to value) }
         }
     }
-    return variants.map { tweaks -> encodeTransformTag(parsed.operationTag, tweaks) }
+    return variants.map { tweaks -> encodeTransformTag(parsed.id, tweaks) }
 }
 
 private fun Seed.continuousOrbitTransformTags(): List<String> =

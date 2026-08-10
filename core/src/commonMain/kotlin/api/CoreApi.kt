@@ -15,12 +15,13 @@ private const val SAFE_RANGE_SEARCH_STEPS = 8
 private const val SAFE_RANGE_ANCHOR_SAMPLES = 20
 
 private data class LogicalTransform(
-    val tag: String,
+    val spec: TransformSpec,
     val name: String,
     val primitiveTransforms: List<Transform>,
     /** Primitive visual stages; macros can differ from their fused evaluation kernel. */
     val animationTransforms: List<Transform> = primitiveTransforms,
 ) {
+    val tag: String get() = spec.tag
     val animationTransform: Transform?
         get() = animationTransforms.singleOrNull()
 
@@ -30,93 +31,62 @@ private data class LogicalTransform(
     override fun toString(): String = name
 }
 
-private fun String.toLogicalTransformOrNull(): LogicalTransform? {
-    val parsed = parseTransformTag() ?: return null
-    parsed.operationTag.toTransformMacroOrNull()?.let { macro ->
-        fun remap(vararg mappings: Pair<TransformTweak, TransformTweak>): Map<TransformTweak, Double>? {
-            val sources = mappings.mapTo(hashSetOf()) { it.first }
-            if (!parsed.tweaks.keys.all { it in sources }) return null
-            return mappings.mapNotNull { (source, target) ->
-                parsed.tweaks[source]?.let { target to it }
-            }.toMap()
-        }
+private fun TransformSpec.toLogicalTransformOrNull(): LogicalTransform? {
+    id.toTransformMacroOrNull()?.let { macro ->
+        if (!tweaks.keys.all { it in id.transformTweakRanges() }) return null
 
-        val primitives = when (macro.tag.removeSuffix("'")) {
-            "k" -> listOf(
-                KisAll(
-                    (remap(TransformTweak.Height to TransformTweak.Height) ?: return null)[TransformTweak.Height]
-                        ?: 1.0
-                )
+        val primitives = when (id.operation) {
+            TransformOperation.Kis -> listOf(
+                KisAll(tweaks[TransformTweak.Height] ?: 1.0)
             )
-            "j" -> {
-                if (parsed.tweaks.isNotEmpty()) return null
-                listOf(Transform.Dual, Transform.Rectified, Transform.Dual)
-            }
-            "N" -> listOf(
-                Transform.Truncated.withTweaks(remap(TransformTweak.Depth to TransformTweak.Depth) ?: return null),
+            TransformOperation.Join -> listOf(Transform.Dual, Transform.Rectified, Transform.Dual)
+            TransformOperation.Needle -> listOf(
+                Transform.Truncated.withTweaks(tweaks),
                 Transform.Dual,
             )
-            "z" -> listOf(
+            TransformOperation.Zip -> listOf(
                 Transform.Dual,
-                Transform.Truncated.withTweaks(remap(TransformTweak.Depth to TransformTweak.Depth) ?: return null),
+                Transform.Truncated.withTweaks(tweaks),
             )
-            "e" -> listOf(
-                Transform.Cantellated.withTweaks(
-                    remap(TransformTweak.Distance to TransformTweak.Distance) ?: return null
-                )
+            TransformOperation.Cantellated -> listOf(
+                Transform.Cantellated.withTweaks(tweaks)
             )
-            "b" -> listOf(
-                Transform.Bevelled.withTweaks(
-                    remap(
-                        TransformTweak.Distance to TransformTweak.Distance,
-                        TransformTweak.Depth to TransformTweak.Depth,
-                    ) ?: return null
-                )
+            TransformOperation.Bevelled -> listOf(
+                Transform.Bevelled.withTweaks(tweaks)
             )
-            "O" -> listOf(
+            TransformOperation.Ortho -> listOf(
                 Transform.Dual,
-                Transform.Cantellated.withTweaks(
-                    remap(TransformTweak.Distance to TransformTweak.Distance) ?: return null
-                ),
+                Transform.Cantellated.withTweaks(tweaks),
                 Transform.Dual,
             )
-            "m" -> listOf(
+            TransformOperation.Meta -> listOf(
                 Transform.Dual,
-                Transform.Bevelled.withTweaks(
-                    remap(
-                        TransformTweak.Distance to TransformTweak.Distance,
-                        TransformTweak.Depth to TransformTweak.Depth,
-                    ) ?: return null
-                ),
+                Transform.Bevelled.withTweaks(tweaks),
                 Transform.Dual,
             )
-            "g" -> listOf(
+            TransformOperation.Gyro -> listOf(
                 Transform.Dual,
-                (if (macro.chirality == Chirality.Flipped) Transform.SnubFlipped else Transform.Snub).withTweaks(
-                    remap(
-                        TransformTweak.Inset to TransformTweak.Inset,
-                        TransformTweak.Twist to TransformTweak.Twist,
-                    ) ?: return null
-                ),
+                (if (macro.chirality == Chirality.Flipped) Transform.SnubFlipped else Transform.Snub)
+                    .withTweaks(tweaks),
                 Transform.Dual,
             )
             else -> return null
         }
-        val animationTransforms = when (macro.tag.removeSuffix("'")) {
+        val animationTransforms = when (id.operation) {
             // The direct Kis kernel supports height but has no stable collapsed topology. Its
             // Conway expansion is composed entirely of well-behaved animated operations.
-            "k" -> listOf(Transform.Dual, Transform.Truncated, Transform.Dual)
+            TransformOperation.Kis -> listOf(Transform.Dual, Transform.Truncated, Transform.Dual)
             else -> primitives
         }
         return LogicalTransform(
-            encodeTransformTag(macro.tag, parsed.tweaks),
+            this,
             macro.displayName,
             primitives,
             animationTransforms,
         )
     }
-    return encodeTransformTag(parsed.operationTag, parsed.tweaks).toTransformOrNull()?.let { transform ->
-        LogicalTransform(transform.tag, transform.toString(), listOf(transform))
+    return toTransformOrNull()?.let { transform ->
+        LogicalTransform(this, transform.toString(), listOf(transform))
     }
 }
 
@@ -197,7 +167,7 @@ private suspend fun evaluateState(
     val scale = Scales.firstOrNull { it.tag == state.scaleTag }
         ?: error("Unknown scale tag: ${state.scaleTag}")
     val transforms = state.transformTags.map { tag ->
-        tag.toLogicalTransformOrNull() ?: error("Unknown transform tag: $tag")
+        tag.parseTransformTag()?.toLogicalTransformOrNull() ?: error("Unknown transform tag: $tag")
     }
 
     var poly = seed.poly
@@ -283,20 +253,19 @@ private suspend fun LogicalTransform.safeTweakRanges(
     inputPendingRectification: PendingRectification?,
     outputScale: Scale,
 ): List<CoreTransformTweakRange> {
-    val parsed = tag.parseTransformTag() ?: return emptyList()
-    val envelopes = parsed.operationTag.transformTweakRanges()
+    val envelopes = spec.id.transformTweakRanges()
     if (envelopes.isEmpty()) return emptyList()
 
     val result = ArrayList<CoreTransformTweakRange>(envelopes.size)
     for ((tweak, envelope) in envelopes) {
-        safeTweakRange(parsed, tweak, envelope, inputPoly, inputPendingRectification, outputScale)
+        safeTweakRange(spec, tweak, envelope, inputPoly, inputPendingRectification, outputScale)
             ?.let(result::add)
     }
     return result
 }
 
 private suspend fun safeTweakRange(
-    parsed: ParsedTransformTag,
+    spec: TransformSpec,
     tweak: TransformTweak,
     envelope: TransformTweakRange,
     inputPoly: Polyhedron,
@@ -304,10 +273,10 @@ private suspend fun safeTweakRange(
     outputScale: Scale,
 ): CoreTransformTweakRange? {
     suspend fun isValid(value: Double): Boolean {
-        val tweaks = parsed.tweaks.toMutableMap().apply {
+        val tweaks = spec.tweaks.toMutableMap().apply {
             if (value == 1.0) remove(tweak) else put(tweak, value)
         }
-        val candidate = encodeTransformTag(parsed.operationTag, tweaks).toLogicalTransformOrNull() ?: return false
+        val candidate = spec.copy(tweaks = tweaks).toLogicalTransformOrNull() ?: return false
         return applyTransform(
             candidate,
             inputPoly,
@@ -318,7 +287,7 @@ private suspend fun safeTweakRange(
         ) is TransformApplication.Success
     }
 
-    val current = (parsed.tweaks[tweak] ?: 1.0).coerceIn(envelope.min, envelope.max)
+    val current = (spec.tweaks[tweak] ?: 1.0).coerceIn(envelope.min, envelope.max)
     val anchors = buildList {
         add(current)
         if (current != 1.0 && 1.0 in envelope.min..envelope.max) add(1.0)
@@ -355,9 +324,8 @@ private suspend fun applyTransform(
     inputPoly: Polyhedron,
     inputPendingRectification: PendingRectification?,
     reportProgress: (Int) -> Unit,
-    validateResultGeometry: Boolean = transform.tag.parseTransformTag()?.let { parsed ->
-        parsed.tweaks.isNotEmpty() || parsed.operationTag.transformTweakRanges().isNotEmpty()
-    } == true,
+    validateResultGeometry: Boolean =
+        transform.spec.tweaks.isNotEmpty() || transform.spec.id.transformTweakRanges().isNotEmpty(),
     outputScale: Scale? = null,
 ): TransformApplication {
     var poly = inputPoly
@@ -447,19 +415,20 @@ private fun computeAnimation(
         val currentPoly = current.response.transformedPolys.getOrNull(commonSize) ?: basePoly
         val previousLogicalTransform = previous.validTransforms.getOrNull(commonSize)
         val currentLogicalTransform = current.validTransforms.getOrNull(commonSize)
-        val previousOperationTag = previousLogicalTransform?.tag?.withoutTransformTweaks()
-        val currentOperationTag = currentLogicalTransform?.tag?.withoutTransformTweaks()
+        val previousId = previousLogicalTransform?.spec?.id
+        val currentId = currentLogicalTransform?.spec?.id
         if (
-            previousOperationTag != currentOperationTag &&
-            previousOperationTag?.removeSuffix("'") == currentOperationTag?.removeSuffix("'") &&
-            previousOperationTag?.removeSuffix("'") in setOf("s", "p", "w", "g")
+            previousId != null && currentId != null &&
+            previousId.operation == currentId.operation &&
+            previousId.chirality != currentId.chirality &&
+            previousId.operation.isChiral
         ) {
             return emptyList()
         }
         if (
             previousLogicalTransform != null && currentLogicalTransform != null &&
-            previousLogicalTransform.tag != currentLogicalTransform.tag &&
-            previousOperationTag == currentOperationTag &&
+            previousLogicalTransform.spec != currentLogicalTransform.spec &&
+            previousId == currentId &&
             currentPoly.hasSameTopology(previousPoly)
         ) {
             return listOf(
@@ -631,14 +600,12 @@ private fun LogicalTransform.macroAnimationOrigins(
     basePoly: Polyhedron,
     resultPoly: Polyhedron,
 ): List<Vec3> {
-    val operationTag = tag.parseTransformTag()?.operationTag?.removeSuffix("'")
-        ?: error("Invalid macro tag: $tag")
-    val positions = when (operationTag) {
+    val positions = when (spec.id.operation) {
         // Full Kis retains all input vertices and appends one apex per input face. Collapsing an
         // apex to a boundary vertex removes its spike while keeping the final topology available.
-        "k" -> basePoly.vs + basePoly.fs.map { face -> face.fvs.first() }
+        TransformOperation.Kis -> basePoly.vs + basePoly.fs.map { face -> face.fvs.first() }
         // Zip has a precise directed-edge correspondence.
-        "z" -> basePoly.dual().directedEdges.map { edge -> basePoly.vs[edge.r.id] }
+        TransformOperation.Zip -> basePoly.dual().directedEdges.map { edge -> basePoly.vs[edge.r.id] }
         // The remaining Conway macros preserve orientation. Assign every final vertex to the
         // input vertex in the same radial sector, collapsing all component-created vertices at
         // once instead of exposing any intermediate logical solid.

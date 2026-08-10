@@ -5,10 +5,8 @@
 package polyhedra.core.transform
 
 import kotlinx.serialization.*
-import polyhedra.model.api.TransformTweak
-import polyhedra.model.api.encodeTransformTag
-import polyhedra.model.api.parseTransformTag
 import polyhedra.core.util.OperationProgressContext
+import polyhedra.model.api.*
 import polyhedra.model.poly.*
 import polyhedra.model.util.*
 import kotlin.reflect.*
@@ -16,11 +14,12 @@ import kotlin.reflect.*
 val Transforms: List<Transform>
     get() = Transform.Transforms
 
-fun String.toTransformOrNull(): Transform? {
-    val parsed = parseTransformTag() ?: return null
-    Transforms.find { it.tag == parsed.operationTag }?.let { transform ->
-        if (!transform.supportsTweaks(parsed.tweaks.keys)) return null
-        return transform.withTweaks(parsed.tweaks)
+fun String.toTransformOrNull(): Transform? = parseTransformTag()?.toTransformOrNull()
+
+internal fun TransformSpec.toTransformOrNull(): Transform? {
+    Transforms.find { it.id == id }?.let { transform ->
+        if (!transform.supportsTweaks(tweaks.keys)) return null
+        return transform.withTweaks(tweaks)
     }
     return toOrbitTargetedTransformOrNull()
 }
@@ -29,6 +28,11 @@ typealias AsyncTransform = suspend (poly: Polyhedron, progress: OperationProgres
 
 @Serializable
 sealed class Transform : Tagged {
+    abstract val id: TransformId
+    open val tweaks: Map<TransformTweak, Double> get() = emptyMap()
+
+    override val tag: String get() = TransformSpec(id, tweaks).tag
+
     abstract fun transform(poly: Polyhedron): Polyhedron
     open fun isApplicable(poly: Polyhedron): Boolean = true // todo: not defined usefully now
     open fun truncationRatio(poly: Polyhedron): Double? = null
@@ -84,7 +88,7 @@ sealed class Transform : Tagged {
 @Serializable
 class None : Transform() {
     @Transient
-    override val tag: String = "n"
+    override val id = TransformId(TransformOperation.None)
     override fun transform(poly: Polyhedron): Polyhedron = poly
     override fun truncationRatio(poly: Polyhedron) = 0.0
     override fun cantellationRatio(poly: Polyhedron) = 0.0
@@ -97,7 +101,7 @@ class None : Transform() {
 @Serializable
 class Truncated : Transform() {
     @Transient
-    override val tag: String = "t"
+    override val id = TransformId(TransformOperation.Truncated)
     override fun transform(poly: Polyhedron): Polyhedron = poly.truncated()
     override fun truncationRatio(poly: Polyhedron) = poly.regularTruncationRatio()
     @Transient
@@ -111,7 +115,7 @@ class Truncated : Transform() {
 @Serializable
 class Rectified : Transform() {
     @Transient
-    override val tag: String = "a"
+    override val id = TransformId(TransformOperation.Rectified)
     override fun transform(poly: Polyhedron): Polyhedron = poly.rectified()
     override fun truncationRatio(poly: Polyhedron) = 1.0
     @Transient
@@ -125,7 +129,7 @@ class Rectified : Transform() {
 @Serializable
 class Cantellated : Transform() { // ~= Rectified, Rectified
     @Transient
-    override val tag: String = "e"
+    override val id = TransformId(TransformOperation.Cantellated)
     override fun transform(poly: Polyhedron): Polyhedron = poly.cantellated()
     override fun cantellationRatio(poly: Polyhedron) = poly.regularCantellationRatio()
     @Transient
@@ -139,7 +143,7 @@ class Cantellated : Transform() { // ~= Rectified, Rectified
 @Serializable
 class Dual : Transform() {
     @Transient
-    override val tag: String = "d"
+    override val id = TransformId(TransformOperation.Dual)
     override fun transform(poly: Polyhedron): Polyhedron = poly.dual()
     override fun cantellationRatio(poly: Polyhedron) = 1.0
     @Transient
@@ -153,7 +157,7 @@ class Dual : Transform() {
 @Serializable
 class Bevelled : Transform() { // ~= Rectified, Truncated
     @Transient
-    override val tag: String = "b"
+    override val id = TransformId(TransformOperation.Bevelled)
     override fun transform(poly: Polyhedron): Polyhedron = poly.bevelled()
     override fun bevellingRatio(poly: Polyhedron) = poly.regularBevellingRatio()
     @Transient
@@ -169,7 +173,7 @@ class Snub(
     @Transient val chirality: Chirality = Chirality.Default,
 ) : Transform() {
     @Transient
-    override val tag: String = "s".withChirality(chirality)
+    override val id = TransformId(TransformOperation.Snub, chirality)
     override fun transform(poly: Polyhedron): Polyhedron = poly.snub(requireNotNull(snubbingRatio(poly)))
     override fun snubbingRatio(poly: Polyhedron) = poly.regularSnubbingRatio().let { ratio ->
         if (chirality == Chirality.Flipped) ratio.copy(sa = -ratio.sa) else ratio
@@ -201,10 +205,10 @@ private fun Transform.supportsTweaks(tweaks: Set<TransformTweak>): Boolean {
 
 private data class TweakedTransform(
     val base: Transform,
-    val tweaks: Map<TransformTweak, Double>,
+    override val tweaks: Map<TransformTweak, Double>,
 ) : Transform() {
-    override val tag: String
-        get() = encodeTransformTag(base.tag, tweaks)
+    override val id: TransformId
+        get() = base.id
 
     override val fev: TransformFEV?
         get() = base.fev
@@ -257,7 +261,7 @@ class Propeller(
     @Transient val chirality: Chirality = Chirality.Default,
 ) : Transform() {
     @Transient
-    override val tag: String = "p".withChirality(chirality)
+    override val id = TransformId(TransformOperation.Propeller, chirality)
     override fun transform(poly: Polyhedron): Polyhedron = poly.propeller(chirality)
     @Transient
     override val asyncTransform: AsyncTransform = { poly, progress -> poly.propeller(chirality, progress) }
@@ -276,7 +280,7 @@ class Whirl(
     @Transient val chirality: Chirality = Chirality.Default,
 ) : Transform() {
     @Transient
-    override val tag: String = "w".withChirality(chirality)
+    override val id = TransformId(TransformOperation.Whirl, chirality)
     override fun transform(poly: Polyhedron): Polyhedron = poly.whirl(chirality)
     @Transient
     override val asyncTransform: AsyncTransform = { poly, progress -> poly.whirl(chirality, progress) }
@@ -293,7 +297,7 @@ class Whirl(
 @Serializable
 class Quinto : Transform() {
     @Transient
-    override val tag: String = "q"
+    override val id = TransformId(TransformOperation.Quinto)
     override fun transform(poly: Polyhedron): Polyhedron = poly.quinto()
     @Transient
     override val asyncTransform: AsyncTransform = { poly, progress -> poly.quinto(progress) }
@@ -308,7 +312,7 @@ class Quinto : Transform() {
 @Serializable
 class Chamfered : Transform() {
     @Transient
-    override val tag: String = "c"
+    override val id = TransformId(TransformOperation.Chamfered)
     override fun transform(poly: Polyhedron): Polyhedron = poly.chamfered()
     override fun chamferingRatio(poly: Polyhedron) = poly.chamferingRatio()
     @Transient
@@ -322,7 +326,7 @@ class Chamfered : Transform() {
 @Serializable
 class Canonical : Transform() {
     @Transient
-    override val tag: String = "o"
+    override val id = TransformId(TransformOperation.Canonical)
     override fun transform(poly: Polyhedron): Polyhedron = poly.canonical()
     override fun isIdentityTransform(poly: Polyhedron): Boolean = poly.isCanonical()
     @Transient

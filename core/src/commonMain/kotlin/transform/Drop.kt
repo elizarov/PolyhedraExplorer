@@ -2,14 +2,14 @@ package polyhedra.core.transform
 
 import kotlinx.serialization.*
 import polyhedra.core.poly.*
+import polyhedra.model.api.TransformId
+import polyhedra.model.api.TransformOperation
 import polyhedra.model.poly.*
-
-const val DROP_TAG = "x"
 
 @Serializable
 data class Drop(val kind: AnyKind) : Transform() {
-    override val tag: String
-        get() = "$DROP_TAG[$kind]"
+    @Transient
+    override val id = TransformId(TransformOperation.Drop, target = kind)
     override fun transform(poly: Polyhedron): Polyhedron = poly.drop(kind)
     override fun toString(): String = "Drop $kind"
 }

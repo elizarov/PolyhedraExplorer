@@ -1,20 +1,11 @@
 package polyhedra.web.catalog
 
-import polyhedra.model.api.FamilySeedId
-import polyhedra.model.api.MAX_FAMILY_SEED_N
-import polyhedra.model.api.MIN_FAMILY_SEED_N
-import polyhedra.model.api.SeedFamily
-import polyhedra.model.api.TransformTweak
-import polyhedra.model.api.encodeTransformTag
-import polyhedra.model.api.parseTransformTag
-import polyhedra.model.api.toTransformMacroOrNull
-import polyhedra.model.api.transformTweakRanges
+import polyhedra.model.api.*
 import polyhedra.model.poly.AnyKind
 import polyhedra.model.poly.Chirality
 import polyhedra.model.poly.EdgeKind
 import polyhedra.model.poly.FaceKind
 import polyhedra.model.poly.VertexKind
-import polyhedra.model.poly.toAnyKindOrNull
 import polyhedra.model.poly.withChirality
 import polyhedra.model.util.Tagged
 
@@ -113,49 +104,53 @@ fun Seed.flippedChirality(): Seed {
 }
 
 data class Transform(
-    val baseTag: String,
+    val id: TransformId,
     val name: String,
     val category: TransformCategory = TransformCategory.Transform,
-    val chirality: Chirality? = null,
     val tweaks: Map<TransformTweak, Double> = emptyMap(),
 ) : Tagged {
-    override val tag: String get() = encodeTransformTag(baseTag.withChirality(chirality), tweaks)
-    val isChiral: Boolean get() = chirality != null
-    override fun toString(): String = name + chirality?.suffix.orEmpty()
+    val spec: TransformSpec get() = TransformSpec(id, tweaks)
+    val operation: TransformOperation get() = id.operation
+    val chirality: Chirality? get() = id.chirality
+    override val tag: String get() = spec.tag
+    val isChiral: Boolean get() = operation.isChiral
+    override fun toString(): String = name + id.chirality?.suffix.orEmpty()
 
     companion object {
-        val None = Transform("n", "None")
-        val Truncated = Transform("t", "Truncated")
-        val Rectified = Transform("a", "Rectified")
-        val Dual = Transform("d", "Dual")
-        val Snub = Transform("s", "Snub", chirality = Chirality.Default)
-        val SnubFlipped = Snub.copy(chirality = Chirality.Flipped)
-        val Propeller = Transform("p", "Propeller", chirality = Chirality.Default)
-        val PropellerFlipped = Propeller.copy(chirality = Chirality.Flipped)
-        val Whirl = Transform("w", "Whirl", chirality = Chirality.Default)
-        val WhirlFlipped = Whirl.copy(chirality = Chirality.Flipped)
-        val Quinto = Transform("q", "Quinto")
-        val Chamfered = Transform("c", "Chamfered")
-        val Canonical = Transform("o", "Canonical")
+        val None = transform(TransformOperation.None, "None")
+        val Truncated = transform(TransformOperation.Truncated, "Truncated")
+        val Rectified = transform(TransformOperation.Rectified, "Rectified")
+        val Dual = transform(TransformOperation.Dual, "Dual")
+        val Snub = transform(TransformOperation.Snub, "Snub")
+        val SnubFlipped = Snub.copy(id = Snub.id.flippedChirality())
+        val Propeller = transform(TransformOperation.Propeller, "Propeller")
+        val PropellerFlipped = Propeller.copy(id = Propeller.id.flippedChirality())
+        val Whirl = transform(TransformOperation.Whirl, "Whirl")
+        val WhirlFlipped = Whirl.copy(id = Whirl.id.flippedChirality())
+        val Quinto = transform(TransformOperation.Quinto, "Quinto")
+        val Chamfered = transform(TransformOperation.Chamfered, "Chamfered")
+        val Canonical = transform(TransformOperation.Canonical, "Canonical")
 
-        val Kis = macro("k")
-        val Join = macro("j")
-        val Needle = macro("N")
-        val Zip = macro("z")
-        val Cantellated = macro("e")
-        val Bevelled = macro("b")
-        val Ortho = macro("O")
-        val Meta = macro("m")
-        val Gyro = macro("g")
-        val GyroFlipped = macro("g'")
+        val Kis = macro(TransformOperation.Kis)
+        val Join = macro(TransformOperation.Join)
+        val Needle = macro(TransformOperation.Needle)
+        val Zip = macro(TransformOperation.Zip)
+        val Cantellated = macro(TransformOperation.Cantellated)
+        val Bevelled = macro(TransformOperation.Bevelled)
+        val Ortho = macro(TransformOperation.Ortho)
+        val Meta = macro(TransformOperation.Meta)
+        val Gyro = macro(TransformOperation.Gyro)
+        val GyroFlipped = Gyro.copy(id = Gyro.id.flippedChirality())
 
-        private fun macro(tag: String): Transform {
-            val macro = requireNotNull(tag.toTransformMacroOrNull())
+        private fun transform(operation: TransformOperation, name: String): Transform =
+            Transform(TransformId(operation), name)
+
+        private fun macro(operation: TransformOperation): Transform {
+            val macro = TransformMacros.single { it.id.operation == operation }
             return Transform(
-                macro.tag.removeSuffix("'"),
+                macro.id,
                 macro.name,
                 TransformCategory.Macro,
-                macro.chirality,
             )
         }
     }
@@ -211,15 +206,15 @@ val TransformOptions: List<Transform> = PrimitiveTransforms + MacroTransforms
 
 val Transforms: List<Transform> = TransformOptions.flatMap { transform ->
     if (transform.isChiral) {
-        listOf(transform, transform.copy(chirality = Chirality.Flipped))
+        listOf(transform, transform.copy(id = transform.id.flippedChirality()))
     } else {
         listOf(transform)
     }
 }
 
 fun Transform.flippedChirality(): Transform {
-    val flipped = requireNotNull(chirality).flipped()
-    return Transforms.single { transform -> transform.baseTag == baseTag && transform.chirality == flipped }
+    val flippedId = id.flippedChirality()
+    return Transforms.single { transform -> transform.id == flippedId }
         .copy(tweaks = tweaks)
 }
 
@@ -232,7 +227,7 @@ data class TransformSetting(
 )
 
 val Transform.settings: List<TransformSetting>
-    get() = baseTag.transformTweakRanges().map { (tweak, range) ->
+    get() = id.transformTweakRanges().map { (tweak, range) ->
         TransformSetting(tweak, tweak.name, range.min, range.max)
     }
 
@@ -248,26 +243,29 @@ fun Transform.withoutTweaks(): Transform =
 
 fun Transform.withDefaultSettings(): Transform =
     copy(
-        chirality = chirality?.let { Chirality.Default },
+        id = if (isChiral) id.copy(chirality = Chirality.Default) else id,
         tweaks = emptyMap(),
     )
 
-private const val DROP_TAG = "x"
-private const val KIS_FACE_TAG = "k"
-private const val TRUNCATE_VERTEX_TAG = "t"
-private const val RECTIFY_VERTEX_TAG = "a"
-
 fun Drop(kind: AnyKind): Transform =
-    Transform("$DROP_TAG[$kind]", "Drop $kind", TransformCategory.OrbitTargeted)
+    Transform(TransformId(TransformOperation.Drop, target = kind), "Drop $kind", TransformCategory.OrbitTargeted)
 
 fun KisFace(kind: FaceKind): Transform =
-    Transform("$KIS_FACE_TAG[$kind]", "Kis $kind", TransformCategory.OrbitTargeted)
+    Transform(TransformId(TransformOperation.Kis, target = kind), "Kis $kind", TransformCategory.OrbitTargeted)
 
 fun TruncateVertex(kind: VertexKind): Transform =
-    Transform("$TRUNCATE_VERTEX_TAG[$kind]", "Truncate $kind", TransformCategory.OrbitTargeted)
+    Transform(
+        TransformId(TransformOperation.Truncated, target = kind),
+        "Truncate $kind",
+        TransformCategory.OrbitTargeted,
+    )
 
 fun RectifyVertex(kind: VertexKind): Transform =
-    Transform("$RECTIFY_VERTEX_TAG[$kind]", "Rectify $kind", TransformCategory.OrbitTargeted)
+    Transform(
+        TransformId(TransformOperation.Rectified, target = kind),
+        "Rectify $kind",
+        TransformCategory.OrbitTargeted,
+    )
 
 data class OrbitTarget(
     val operation: OrbitTargetedOperation,
@@ -275,43 +273,37 @@ data class OrbitTarget(
 )
 
 fun Transform.orbitTargetOrNull(): OrbitTarget? {
-    if (!baseTag.endsWith("]")) return null
-    val bracket = baseTag.indexOf('[')
-    if (bracket <= 0) return null
-    val prefix = baseTag.substring(0, bracket)
-    val kind = baseTag.substring(bracket + 1, baseTag.length - 1).toAnyKindOrNull() ?: return null
+    val kind = id.target ?: return null
     val operation = when {
-        prefix == DROP_TAG && kind is FaceKind -> OrbitTargetedOperation.DropFace
-        prefix == KIS_FACE_TAG && kind is FaceKind -> OrbitTargetedOperation.KisFace
-        prefix == DROP_TAG && kind is EdgeKind -> OrbitTargetedOperation.DropEdge
-        prefix == DROP_TAG && kind is VertexKind -> OrbitTargetedOperation.DropVertex
-        prefix == TRUNCATE_VERTEX_TAG && kind is VertexKind -> OrbitTargetedOperation.TruncateVertex
-        prefix == RECTIFY_VERTEX_TAG && kind is VertexKind -> OrbitTargetedOperation.RectifyVertex
+        id.operation == TransformOperation.Drop && kind is FaceKind -> OrbitTargetedOperation.DropFace
+        id.operation == TransformOperation.Kis && kind is FaceKind -> OrbitTargetedOperation.KisFace
+        id.operation == TransformOperation.Drop && kind is EdgeKind -> OrbitTargetedOperation.DropEdge
+        id.operation == TransformOperation.Drop && kind is VertexKind -> OrbitTargetedOperation.DropVertex
+        id.operation == TransformOperation.Truncated && kind is VertexKind -> OrbitTargetedOperation.TruncateVertex
+        id.operation == TransformOperation.Rectified && kind is VertexKind -> OrbitTargetedOperation.RectifyVertex
         else -> return null
     }
     return OrbitTarget(operation, kind)
 }
 
 fun String.toTransformOrNull(): Transform? {
-    val parsed = parseTransformTag() ?: return null
-    Transforms.firstOrNull { it.tag == parsed.operationTag }?.let { transform ->
-        if (transform.accepts(parsed.tweaks)) {
-            return transform.copy(tweaks = parsed.tweaks)
+    val spec = parseTransformTag() ?: return null
+    Transforms.firstOrNull { it.id == spec.id }?.let { transform ->
+        if (transform.accepts(spec.tweaks)) {
+            return transform.copy(tweaks = spec.tweaks)
         }
         return null
     }
-    val placeholder = Transform(parsed.operationTag, "", TransformCategory.OrbitTargeted)
-    val target = placeholder.orbitTargetOrNull() ?: return null
-    val transform = when (target.operation) {
-        OrbitTargetedOperation.DropFace,
-        OrbitTargetedOperation.DropEdge,
-        OrbitTargetedOperation.DropVertex -> Drop(target.kind)
-        OrbitTargetedOperation.KisFace -> KisFace(target.kind as FaceKind)
-        OrbitTargetedOperation.TruncateVertex -> TruncateVertex(target.kind as VertexKind)
-        OrbitTargetedOperation.RectifyVertex -> RectifyVertex(target.kind as VertexKind)
+    val kind = spec.id.target ?: return null
+    val transform = when (spec.id.operation) {
+        TransformOperation.Drop -> Drop(kind)
+        TransformOperation.Kis -> KisFace(kind as? FaceKind ?: return null)
+        TransformOperation.Truncated -> TruncateVertex(kind as? VertexKind ?: return null)
+        TransformOperation.Rectified -> RectifyVertex(kind as? VertexKind ?: return null)
+        else -> return null
     }
-    if (!transform.accepts(parsed.tweaks)) return null
-    return transform.copy(tweaks = parsed.tweaks)
+    if (!transform.accepts(spec.tweaks)) return null
+    return transform.copy(tweaks = spec.tweaks)
 }
 
 private fun Transform.accepts(tweaks: Map<TransformTweak, Double>): Boolean =

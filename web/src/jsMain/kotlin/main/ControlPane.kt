@@ -34,7 +34,7 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
     val transformError = params.transformError
     val errorIndex = transformError?.index ?: Int.MAX_VALUE
     val prefixReplacement = if (transformError == null) {
-        findTransformPrefixReplacement(transforms.map(Transform::tag))
+        findTransformPrefixReplacement(transforms.map(Transform::spec))
     } else {
         null
     }
@@ -65,8 +65,7 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
             .reuseRememberedOrbitTarget(transform, possibleTransformsAt(index))
             .let { selected ->
                 if (
-                    current != null && selected.baseTag == current.baseTag &&
-                    selected.chirality == current.chirality
+                    current != null && selected.id == current.id
                 ) selected.copy(tweaks = current.tweaks) else selected
             }
         val updated = when {
@@ -111,7 +110,7 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
         val currentOrbitOperation = current.orbitTargetOrNull()?.operation
         val options = operationOptionsAt(transforms.lastIndex)
         val currentIndex = options.indexOfFirst { option ->
-            (option.baseTag == current.baseTag && option.chirality == current.chirality) ||
+            option.id == current.id ||
                 currentOrbitOperation != null && option.orbitTargetOrNull()?.operation == currentOrbitOperation
         }
         val replacement = options.getOrNull(currentIndex + delta) ?: return
@@ -166,7 +165,7 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
 
     fun acceptPrefixReplacement(replacement: TransformPrefixReplacement) {
         togglePopup(null)
-        val transform = Transforms.single { it.tag == replacement.replacementTag }
+        val transform = Transforms.single { it.id == replacement.replacement }
         params.transforms.updateValue(transforms.take(replacement.startIndex) + transform)
     }
 
@@ -434,7 +433,7 @@ private fun PrefixReplacementSuggestion(
     replacement: TransformPrefixReplacement,
     onAccept: (TransformPrefixReplacement) -> Unit,
 ) {
-    val transform = Transforms.single { it.tag == replacement.replacementTag }
+    val transform = Transforms.single { it.id == replacement.replacement }
     Div(attrs = { classes("btn", "suggestion", "prefix-replacement-suggestion") }) {
         Button(attrs = {
             classes("txt")

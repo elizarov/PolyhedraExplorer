@@ -333,7 +333,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
 
 internal fun shouldDetectSeed(previous: CoreState?, current: CoreState): Boolean =
     (current.transformTags.isNotEmpty() || current.seedTag.toFamilySeedIdOrNull() != null) &&
-        current.transformTags.all { it == it.withoutTransformTweaks() } &&
+        current.transformTags.all { it.parseTransformTag()?.tweaks?.isEmpty() == true } &&
         (previous == null || previous.seedTag != current.seedTag ||
             previous.transformTags != current.transformTags)
 

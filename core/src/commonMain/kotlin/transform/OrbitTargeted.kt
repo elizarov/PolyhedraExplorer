@@ -1,20 +1,15 @@
 package polyhedra.core.transform
 
 import kotlinx.serialization.Serializable
-import polyhedra.model.api.TransformTweak
-import polyhedra.model.api.encodeTransformTag
-import polyhedra.model.api.parseTransformTag
 import polyhedra.core.poly.*
+import polyhedra.model.api.*
 import polyhedra.model.poly.*
 import polyhedra.model.util.*
 
-private const val KIS_FACE_TAG = "k"
-private const val TRUNCATE_VERTEX_TAG = "t"
-private const val RECTIFY_VERTEX_TAG = "a"
-
 internal data class KisAll(val height: Double = 1.0) : Transform() {
-    override val tag: String
-        get() = encodeTransformTag("k", mapOf(TransformTweak.Height to height))
+    override val id = TransformId(TransformOperation.Kis)
+    override val tweaks: Map<TransformTweak, Double>
+        get() = mapOf(TransformTweak.Height to height)
 
     override val fev = TransformFEV(
         0, 2, 0,
@@ -43,8 +38,10 @@ internal interface OrbitTargetedAnimation {
 
 @Serializable
 data class KisFace(val kind: FaceKind, val height: Double = 1.0) : Transform() {
-    override val tag: String
-        get() = encodeTransformTag("$KIS_FACE_TAG[$kind]", mapOf(TransformTweak.Height to height))
+    @kotlinx.serialization.Transient
+    override val id = TransformId(TransformOperation.Kis, target = kind)
+    override val tweaks: Map<TransformTweak, Double>
+        get() = mapOf(TransformTweak.Height to height)
 
     override fun transform(poly: Polyhedron): Polyhedron = poly.kisFaces(setOf(kind), height)
 
@@ -55,11 +52,12 @@ data class KisFace(val kind: FaceKind, val height: Double = 1.0) : Transform() {
 
 @Serializable
 data class TruncateVertex(val kind: VertexKind, val depth: Double = 1.0) : Transform(), OrbitTargetedAnimation {
+    @kotlinx.serialization.Transient
+    override val id = TransformId(TransformOperation.Truncated, target = kind)
+    override val tweaks: Map<TransformTweak, Double>
+        get() = mapOf(TransformTweak.Depth to depth)
     override val targetKind: AnyKind
         get() = kind
-
-    override val tag: String
-        get() = encodeTransformTag("$TRUNCATE_VERTEX_TAG[$kind]", mapOf(TransformTweak.Depth to depth))
 
     override fun transform(poly: Polyhedron): Polyhedron =
         poly.truncateVertices(setOf(kind), targetRatio(poly))
@@ -80,11 +78,12 @@ data class TruncateVertex(val kind: VertexKind, val depth: Double = 1.0) : Trans
 
 @Serializable
 data class RectifyVertex(val kind: VertexKind, val depth: Double = 1.0) : Transform(), OrbitTargetedAnimation {
+    @kotlinx.serialization.Transient
+    override val id = TransformId(TransformOperation.Rectified, target = kind)
+    override val tweaks: Map<TransformTweak, Double>
+        get() = mapOf(TransformTweak.Depth to depth)
     override val targetKind: AnyKind
         get() = kind
-
-    override val tag: String
-        get() = encodeTransformTag("$RECTIFY_VERTEX_TAG[$kind]", mapOf(TransformTweak.Depth to depth))
 
     override fun transform(poly: Polyhedron): Polyhedron =
         if (depth == 1.0) poly.rectifyVertices(setOf(kind)) else poly.truncateVertices(setOf(kind), depth)
@@ -103,22 +102,19 @@ data class RectifyVertex(val kind: VertexKind, val depth: Double = 1.0) : Transf
     override fun toString(): String = "Rectify $kind"
 }
 
-internal fun String.toOrbitTargetedTransformOrNull(): Transform? {
-    val parsed = parseTransformTag() ?: return null
-    val operationTag = parsed.operationTag
-    if (!operationTag.endsWith("]")) return null
-    val bracket = operationTag.indexOf('[')
-    if (bracket <= 0) return null
-    val prefix = operationTag.substring(0, bracket)
-    val kind = operationTag.substring(bracket + 1, operationTag.length - 1).toAnyKindOrNull() ?: return null
-    return when {
-        prefix == DROP_TAG && parsed.tweaks.isEmpty() -> Drop(kind)
-        prefix == KIS_FACE_TAG && kind is FaceKind && parsed.tweaks.keys.all { it == TransformTweak.Height } ->
-            KisFace(kind, parsed.tweaks[TransformTweak.Height] ?: 1.0)
-        prefix == TRUNCATE_VERTEX_TAG && kind is VertexKind && parsed.tweaks.keys.all { it == TransformTweak.Depth } ->
-            TruncateVertex(kind, parsed.tweaks[TransformTweak.Depth] ?: 1.0)
-        prefix == RECTIFY_VERTEX_TAG && kind is VertexKind && parsed.tweaks.keys.all { it == TransformTweak.Depth } ->
-            RectifyVertex(kind, parsed.tweaks[TransformTweak.Depth] ?: 1.0)
+internal fun TransformSpec.toOrbitTargetedTransformOrNull(): Transform? {
+    val kind = id.target ?: return null
+    return when (id.operation) {
+        TransformOperation.Drop -> Drop(kind).takeIf { tweaks.isEmpty() }
+        TransformOperation.Kis -> if (kind is FaceKind && tweaks.keys.all { it == TransformTweak.Height }) {
+            KisFace(kind, tweaks[TransformTweak.Height] ?: 1.0)
+        } else null
+        TransformOperation.Truncated -> if (kind is VertexKind && tweaks.keys.all { it == TransformTweak.Depth }) {
+            TruncateVertex(kind, tweaks[TransformTweak.Depth] ?: 1.0)
+        } else null
+        TransformOperation.Rectified -> if (kind is VertexKind && tweaks.keys.all { it == TransformTweak.Depth }) {
+            RectifyVertex(kind, tweaks[TransformTweak.Depth] ?: 1.0)
+        } else null
         else -> null
     }
 }

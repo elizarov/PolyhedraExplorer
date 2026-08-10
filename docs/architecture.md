@@ -4,7 +4,7 @@
 
 | Module | Targets | Responsibility |
 | --- | --- | --- |
-| `model` | JVM, JS, WasmGC | Serializable mesh/presentation types, vector math needed for rendering and inspection, the browser core-request/response contract, and shared string-only macro definitions. It contains no seed generator or manipulation transform. |
+| `model` | JVM, JS, WasmGC | Serializable mesh/presentation types, vector math needed for rendering and inspection, the browser core-request/response contract, and shared typed transform notation and macro definitions. It contains no seed generator or manipulation transform. |
 | `core` | JVM, JS, WasmGC | Seed construction, topology manipulation, transforms, scaling, validation, browser API evaluation, and JVM tests. The browser executes this module only as WasmGC; its JS target exists solely for the controlled baseline benchmark. |
 | `web` | JS | Compose HTML controls, URL parameter state, animation interpolation, inspection/export UI, and the WebGL renderer. It consumes completed meshes and metadata; it does not invoke manipulation transforms. |
 | `benchmarks` | JS, WasmGC | Identical production benchmark workloads over the core algorithms. |
@@ -63,7 +63,12 @@ Continuous transform settings are stored as dimensionless multipliers in the
 logical transform tag. A regular/default multiplier of `1` is never serialized;
 non-default values use compact suffixes such as `t~d=0.7`. The shared `model`
 codec is used by both the JS URL model and the Wasm core, so parsing cannot drift
-between runtimes. The core maps macro controls onto their geometric primitive
+between runtimes. `TransformOperation` is the single source of truth for each
+operation's compact tag. A serialized tag is parsed at the URL/core-contract edge
+into a `TransformId` (operation, chirality, and optional orbit target) and a
+`TransformSpec` (identity plus tweaks); macro expansion, core evaluation,
+animation, and UI selection use those typed values rather than comparing strings.
+The core maps macro controls onto their geometric primitive
 (for example Bevelled distance/depth onto the fused bevel kernel) and returns
 direct same-topology interpolation or topology-compatible cut keyframes between
 old and new parameter realizations. For every parameterized stage, the worker

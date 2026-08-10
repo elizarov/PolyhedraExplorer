@@ -8,16 +8,23 @@ import polyhedra.model.api.CoreRequest
 import polyhedra.model.api.CoreState
 import polyhedra.model.api.TransformMacros
 import polyhedra.model.api.findTransformPrefixReplacement
+import polyhedra.model.api.parseTransformTag
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class TransformMacroTest {
+    private fun replacement(vararg tags: String) =
+        findTransformPrefixReplacement(tags.map { tag -> requireNotNull(tag.parseTransformTag()) })
+
+    private fun replacement(tags: List<String>) =
+        findTransformPrefixReplacement(tags.map { tag -> requireNotNull(tag.parseTransformTag()) })
+
     @Test
     fun parameterOnlyChangeDoesNotSuggestReplacingAnOperationWithItself() {
-        assertNull(findTransformPrefixReplacement(listOf("t~d=0.7")))
-        assertNull(findTransformPrefixReplacement(listOf("g'~r=0.8")))
+        assertNull(replacement("t~d=0.7"))
+        assertNull(replacement("g'~r=0.8"))
     }
 
     @Test
@@ -54,16 +61,16 @@ class TransformMacroTest {
     @Test
     fun findsEquivalentSingleOperationsAtTheDisplayedPrefix() {
         for (macro in TransformMacros) {
-            val match = findTransformPrefixReplacement(listOf("c") + macro.expansionTags)
+            val match = replacement(listOf("c") + macro.expansionTags)
             assertEquals(macro.tag, match?.replacementTag, macro.name)
             assertEquals(1, match?.startIndex, macro.name)
             assertNull(
-                findTransformPrefixReplacement(listOf(macro.tag)),
+                replacement(macro.tag),
                 "Do not suggest an existing ${macro.name} macro",
             )
         }
 
-        val nestedOrtho = findTransformPrefixReplacement(listOf("t", "d", "e", "d"))
+        val nestedOrtho = replacement("t", "d", "e", "d")
         assertEquals("O", nestedOrtho?.replacementTag)
         assertEquals(1, nestedOrtho?.startIndex)
     }
@@ -71,7 +78,7 @@ class TransformMacroTest {
     @Test
     fun simplifiesDualNeedleToTruncated() = runTest {
         // Logical order is reversed for display, so these tags render as "Dual Needle".
-        val replacement = findTransformPrefixReplacement(listOf("N", "d"))
+        val replacement = replacement("N", "d")
 
         assertEquals("t", replacement?.replacementTag)
         assertEquals(0, replacement?.startIndex)
@@ -86,7 +93,7 @@ class TransformMacroTest {
 
     @Test
     fun prefersTheLongestReplaceableDisplayedPrefix() {
-        val replacement = findTransformPrefixReplacement(listOf("c", "d", "d", "t"))
+        val replacement = replacement("c", "d", "d", "t")
 
         assertEquals("t", replacement?.replacementTag)
         assertEquals(1, replacement?.startIndex)
@@ -94,7 +101,7 @@ class TransformMacroTest {
 
     @Test
     fun prefersTheLongestFormalReplacementEvenWhenItExposesCompositionFusion() {
-        val replacement = findTransformPrefixReplacement(listOf("a", "d", "d", "t"))
+        val replacement = replacement("a", "d", "d", "t")
 
         assertEquals("b", replacement?.replacementTag)
         assertEquals(0, replacement?.startIndex)
@@ -102,8 +109,8 @@ class TransformMacroTest {
 
     @Test
     fun prefixReplacementPreservesSnubAndGyroChirality() = runTest {
-        val flippedGyro = findTransformPrefixReplacement(listOf("d", "s'", "d"))
-        val flippedSnub = findTransformPrefixReplacement(listOf("d", "g'", "d"))
+        val flippedGyro = replacement("d", "s'", "d")
+        val flippedSnub = replacement("d", "g'", "d")
 
         assertEquals("g'", flippedGyro?.replacementTag)
         assertEquals("s'", flippedSnub?.replacementTag)
