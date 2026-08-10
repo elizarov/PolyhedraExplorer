@@ -12,11 +12,15 @@ import polyhedra.web.params.*
 import polyhedra.web.util.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
-class EdgeContext(val gl: GL, params: RenderParams) : Param.Context(params) {
-    val drawEdges by { params.view.display.value.hasEdges() }
-    val poly by { params.poly.targetPoly }
+class EdgeContext(
+    val gl: GL,
+    params: RenderParams,
+    private val polyProvider: () -> Polyhedron = { params.poly.targetPoly },
+) : Param.Context(params) {
+    val drawEdges by { params.view.display.value.hasEdges() && !params.printPreview.enabled.value }
+    val poly by { polyProvider() }
     val animation by { params.poly.transformAnimation }
-    val selectedEdge by { params.poly.selectedEdge.value }
+    val selectedEdge by { if (params.printPreview.enabled.value) null else params.poly.selectedEdge.value }
 
     val program = EdgeProgram(gl)
 

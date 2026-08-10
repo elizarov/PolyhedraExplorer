@@ -26,6 +26,7 @@
 - Rotation-orbit classification with orbit-based coloring and selection highlighting. Bottom F/E/V labels append the actual geometric orbit count only when it exceeds one, such as `F: 38/3`, while one-orbit labels remain compact.
 - A separate bottom symmetry pill reports the full Schoenflies point group, such as `C_nv`, `D_nh`, `T_d`, `O_h`, or chiral `I`, with its fold and suffix rendered as an HTML subscript and its full name in a tooltip. The same toggle draws every distinct proper-rotation axis as a thin black line and every reflection plane as a translucent circular disk; chiral geometries retain the axis overlay and explicitly report that they have no reflection planes. Config sliders scale plane radii and axis half-lengths from `1.0` to `2.0` times the circumradius, defaulting to `1.1` and `1.2` respectively. Overlay visibility and non-default sizes are encoded in the URL.
 - Live face/edge/vertex counts and frames-per-second display.
+- The export drawer has an optional print preview that replaces face-orbit colors with one PLA material color and suppresses rendered edges for an unobstructed surface preview, while retaining the live plastic lighting, geometry, and environment. It defaults to red. An in-place picker provides Basic colors plus a perceptual OKLCH hue wheel and Hue, Chroma, and Lightness sliders; opening the picker enables preview so every choice is visible immediately.
 
 ## Inspection
 
@@ -37,7 +38,7 @@
 
 ## Persistence and export
 
-- Complete application state, including non-default continuous transform parameters, is encoded in the URL hash and restored on load.
+- Complete application state, including non-default continuous transform parameters and print-preview color, is encoded in the URL hash and restored on load. Disabled default-red preview remains implicit.
 - Export of rendered solid geometry to standards-compatible ASCII STL without zero-area facets.
 - Export of polyhedron vertices and faces to OpenSCAD source.
 - Export size and shell parameters are controlled from the export drawer.

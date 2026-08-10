@@ -64,6 +64,12 @@ print temperature, mold/contact surface, additives, and post-processing can all
 change it. The default is therefore a visual calibration, while IOR is the
 physics-backed bulk-material calibration.
 
+Face-orbit colors are the normal base colors. The export drawer's Print preview
+can replace them with one material color, red by default, without changing this
+optical model. Its picker uses OKLCH so brightness and colorfulness remain
+predictable while hue changes; colors beyond display sRGB are gamut-mapped by
+reducing chroma while preserving lightness and hue.
+
 ## Controls
 
 The View group selects the scene environment. Two controls describe illumination
@@ -76,9 +82,11 @@ and two are necessary to vary opaque plastics.
 | Lighting | Fill light | `0.22` | `0.0–1.0` | Intensity of the cool constant environment approximation. |
 | Material | Roughness | `0.45` | `0.15–1.0` | Perceived microsurface roughness; lower is glossier and higher is more matte. |
 | Material | IOR | `1.46` | `1.30–1.70` | Plastic index of refraction, converted to dielectric `F0`. |
+| Export | Print preview | Off, red | Basic colors or OKLCH | Use one filament base color for every rendered surface and hide edge overlays; this does not alter exported geometry. |
 
-The environment and all four numeric values are URL-backed. `None` is omitted;
-Table is stored as `env(t)` in the View parameters. The old `Ambient` and
+The environment, all four lighting/material values, and print-preview color are
+URL-backed. `None` is omitted; Table is stored as `env(t)` in the View
+parameters. The old `Ambient` and
 `Diffuse` URL tags remain compatible as Fill light and Key light respectively;
 obsolete Specular and
 Shininess tags are ignored because Fresnel and roughness now determine those

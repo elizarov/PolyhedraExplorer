@@ -26,6 +26,10 @@ class FaceContext(
     val hasExpand by { params.view.expandFaces.value > 0.0 }
     val hasRim by { params.view.faceRim.value > 0.0 }
     val hasWidth by { params.view.faceWidth.value > 0.0 }
+    val printPreview by { params.printPreview.enabled.value }
+    val printLightness by { params.printPreview.lightness.value }
+    val printChroma by { params.printPreview.chroma.value }
+    val printHue by { params.printPreview.hue.value }
     
     // effectively hidden faces
     val hiddenFaces by {
@@ -116,6 +120,7 @@ class FaceContext(
 
             var idxOfs = 0
             var bufOfs = 0
+            val printColor = if (printPreview) oklchColor(printLightness, printChroma, printHue) else null
 
             fun Uint32Buffer.indexTriangle(a: Int, b: Int, c: Int, invert: Boolean) {
                 this[idxOfs++] = a
@@ -204,7 +209,7 @@ class FaceContext(
             }
 
             for (f in poly.fs) {
-                val faceColor = PolyStyle.faceColor(f)
+                val faceColor = printColor ?: PolyStyle.faceColor(f)
                 // Note: In GL front faces are CCW
                 if (faceShown(f)) {
                     makeFace(f, faceColor,false)

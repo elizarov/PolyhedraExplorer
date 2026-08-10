@@ -261,6 +261,182 @@ aside.drawer.export {
     max-height: calc(100vh - 9em);
 }
 
+aside.drawer.print-color-picker {
+    width: min(22em, calc(100vw - 1em));
+}
+
+/* --------- Print preview color picker --------- */
+
+.print-color-sample,
+.print-color-current {
+    display: inline-block;
+    width: 1.25em;
+    height: 1.25em;
+    border: 1px solid rgba(0, 0, 0, 0.65);
+    border-radius: 50%;
+    vertical-align: middle;
+}
+
+.print-color-sample {
+    margin-right: 0.55em;
+}
+
+button.pick-print-color {
+    white-space: nowrap;
+}
+
+.print-color-header {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    gap: 0.55em;
+    min-height: 2.25em;
+    padding: 0.25em 0.5em;
+    background: hsl(0, 0%, 95%);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.18);
+    font-weight: 500;
+}
+
+button.print-color-back {
+    display: inline-grid;
+    place-items: center;
+    width: 1.75em;
+    height: 1.75em;
+    padding: 0;
+    color: var(--button-color);
+    background: var(--button-background-color);
+    border: 0;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.print-color-current {
+    margin-left: auto;
+}
+
+.print-color-hex {
+    min-width: 6.5ch;
+    font-family: monospace;
+    font-size: 0.82em;
+}
+
+.pla-color-presets {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.35em;
+    padding: 0.5em;
+}
+
+button.pla-color-preset {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: 0.35em;
+    padding: 0.3em 0.4em;
+    color: var(--text-color);
+    background: rgba(255, 255, 255, 0.48);
+    border: 1px solid rgba(0, 0, 0, 0.28);
+    border-radius: 0.45em;
+    cursor: pointer;
+}
+
+button.pla-color-preset:hover,
+button.pla-color-preset.selected {
+    border-color: var(--button-background-color);
+    box-shadow: inset 0 0 0 1px var(--button-background-color);
+}
+
+.pla-color-swatch {
+    flex: 0 0 auto;
+    width: 1.35em;
+    height: 1.35em;
+    border: 1px solid rgba(0, 0, 0, 0.45);
+    border-radius: 0.3em;
+}
+
+.pla-color-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.8em;
+}
+
+.hue-picker-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.45em;
+    padding: 0.65em 0.75em 0.35em;
+}
+
+button.hue-wheel {
+    position: relative;
+    width: 10em;
+    height: 10em;
+    padding: 0;
+    border: 1px solid rgba(0, 0, 0, 0.5);
+    border-radius: 50%;
+    box-shadow: 0 0.18em 0.45em rgba(0, 0, 0, 0.22);
+    cursor: crosshair;
+}
+
+button.hue-wheel:focus-visible {
+    outline: 0.16em solid var(--button-background-color);
+    outline-offset: 0.14em;
+}
+
+.hue-wheel-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 5.8em;
+    height: 5.8em;
+    border: 0.35em solid rgba(255, 255, 255, 0.92);
+    border-radius: 50%;
+    box-shadow: 0 0.12em 0.35em rgba(0, 0, 0, 0.35);
+    transform: translate(-50%, -50%);
+}
+
+.hue-pointer {
+    position: absolute;
+    z-index: 2;
+    width: 0.7em;
+    height: 0.7em;
+    background: transparent;
+    border: 0.16em solid white;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px black;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+
+.print-color-components tr.control > td:last-child {
+    white-space: nowrap;
+}
+
+.print-color-components tr.control > td:last-child > span {
+    display: inline-block;
+    width: 5.25ch;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.color-space-note {
+    max-width: 24em;
+    color: rgba(0, 0, 0, 0.72);
+    font-size: 0.72em;
+    line-height: 1.2;
+    text-align: center;
+}
+
+@media only screen and (max-width: 24em) {
+    .pla-color-presets {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
 /* --------- Transform/Seed Dropdowns --------- */
 
 aside.dropdown {

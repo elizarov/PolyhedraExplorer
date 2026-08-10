@@ -57,16 +57,22 @@ fun RootPane(params: RootParams) {
         }) { I(attrs = { classes("fa", "fa-cog") }) }
     }
     if (popup != Popup.Config && poly != null) {
-        Div(attrs = { classes("btn", "export", *activeWhen(popup, Popup.Export)) }) {
+        val exportOpen = popup == Popup.Export || popup == Popup.PrintColor
+        Div(attrs = { classes("btn", "export", *(if (exportOpen) arrayOf("active") else emptyArray())) }) {
             Button(attrs = {
                 classes("square")
-                onClick { togglePopup(Popup.Export) }
+                onClick { togglePopup(if (exportOpen) null else Popup.Export) }
             }) { I(attrs = { classes("fa", "fa-share-square-o") }) }
         }
     }
     when (popup) {
         Popup.Config -> Aside(attrs = { classes("drawer", "config") }) { ConfigPopup(params) }
-        Popup.Export -> Aside(attrs = { classes("drawer", "export") }) { ExportPopup(params, faces) }
+        Popup.Export -> Aside(attrs = { classes("drawer", "export") }) {
+            ExportPopup(params, faces, onPickColor = { popup = Popup.PrintColor })
+        }
+        Popup.PrintColor -> Aside(attrs = { classes("drawer", "export", "print-color-picker") }) {
+            PrintColorPopup(params.render.printPreview, onBack = { popup = Popup.Export })
+        }
         else -> Unit
     }
 }

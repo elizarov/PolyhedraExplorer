@@ -11,6 +11,7 @@ import polyhedra.model.api.*
 import polyhedra.web.catalog.*
 import polyhedra.web.main.*
 import polyhedra.web.params.*
+import polyhedra.web.util.Oklch
 import polyhedra.web.worker.evaluateInWasm
 import kotlin.js.console
 import kotlin.math.PI
@@ -21,6 +22,7 @@ class RenderParams(tag: String, val animationParams: ViewAnimationParams?) : Par
     val poly = using(PolyParams("", animationParams))
     val view = using(ViewParams("v", animationParams))
     val lighting = using(LightingParams("l", animationParams))
+    val printPreview = using(PrintPreviewParams("p"))
 }
 
 private val defaultSeed = Seed.Tetrahedron
@@ -410,6 +412,23 @@ class LightingParams(tag: String, animationParams: ViewAnimationParams?) : Param
     val fillLight = using(DoubleParam("a", 0.22, 0.0, 1.0, 0.01, animationParams))
     val roughness = using(DoubleParam("r", 0.45, 0.15, 1.0, 0.01, animationParams))
     val ior = using(DoubleParam("i", 1.46, 1.3, 1.7, 0.01, animationParams))
+}
+
+internal const val DEFAULT_PRINT_LIGHTNESS = 0.58
+internal const val DEFAULT_PRINT_CHROMA = 0.20
+internal const val DEFAULT_PRINT_HUE = 28.0
+
+class PrintPreviewParams(tag: String) : Param.Composite(tag) {
+    val enabled = using(BooleanParam("e", false))
+    val lightness = using(DoubleParam("l", DEFAULT_PRINT_LIGHTNESS, 0.20, 0.95, 0.01))
+    val chroma = using(DoubleParam("c", DEFAULT_PRINT_CHROMA, 0.0, 0.30, 0.005))
+    val hue = using(DoubleParam("h", DEFAULT_PRINT_HUE, 0.0, 360.0, 1.0))
+
+    fun updateColor(color: Oklch) {
+        lightness.updateValue(color.lightness)
+        chroma.updateValue(color.chroma)
+        hue.updateValue(color.hue)
+    }
 }
 
 class ExportParams(tag: String) : Param.Composite(tag) {
