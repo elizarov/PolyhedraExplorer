@@ -16,13 +16,14 @@ class DrawContext(
 ) : Param.Context(params) {
     val transparentFaces by { params.view.transparentFaces.value }
 
-    val gl: GL = canvas.getContext("webgl", js("({ premultipliedAlpha: false })") as Any) as GL
+    val gl: GL = canvas.getContext("webgl", js("({ premultipliedAlpha: false, stencil: true })") as Any) as GL
 
     val view = ViewContext(params.view)
     val lighting = LightingContext(params.lighting)
     val faces = FaceContext(gl, params)
     val edges = EdgeContext(gl, params)
     val vertices = VertexContext(gl, params)
+    val environment = EnvironmentContext(gl, params)
     val symmetryOverlay = SymmetryOverlayContext(gl, params)
 
     init {
@@ -40,6 +41,7 @@ private fun DrawContext.initGL() {
     gl.depthFunc(GL.LEQUAL)
     gl.clearColor(0.0f, 0.0f, 0.0f, 0.0f)
     gl.clearDepth(1.0f)
+    gl.clearStencil(0)
     gl.getExtension("OES_element_index_uint")
     gl[GL.CULL_FACE] = true
     gl.cullFace(GL.BACK)
@@ -51,7 +53,9 @@ fun DrawContext.drawScene() {
 
     view.initProjection(width, height)
     gl.viewport(0, 0, width, height)
-    gl.clear(GL.COLOR_BUFFER_BIT or GL.DEPTH_BUFFER_BIT)
+    gl.clear(GL.COLOR_BUFFER_BIT or GL.DEPTH_BUFFER_BIT or GL.STENCIL_BUFFER_BIT)
+
+    environment.draw(view, lighting, faces)
 
     val transparentFaces = faces.drawFaces && transparentFaces != 0.0
     gl[GL.DEPTH_TEST] = !transparentFaces

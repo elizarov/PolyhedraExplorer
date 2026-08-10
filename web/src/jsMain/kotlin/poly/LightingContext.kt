@@ -17,8 +17,8 @@ class LightingContext(params: LightingParams) : Param.Context(params) {
     // A neutral-warm key and subtle cool environment produce readable studio lighting without IBL.
     val lightColor = float32Of(1.0, 0.97, 0.92)
     val fillColor = float32Of(0.72, 0.80, 0.95)
-    val lightPosition = float32Of(-1.2, 1.2, 4.0)
-    
+    val lightPosition = float32Of(-2.4, 3.2, 4.3)
+
     init { setup() }
 
     override fun update() = Unit

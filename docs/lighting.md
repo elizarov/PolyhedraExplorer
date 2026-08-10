@@ -42,6 +42,14 @@ The neutral-warm key is a fixed nearby point light. Its inverse-square falloff
 is normalized at the model origin, retaining physical spatial variation while
 keeping the Key light control independent of the polyhedron's orientation.
 
+The same fixed key position is used in every environment. The optional Table
+environment adds a neutral-gray rough-plastic receiver with the same dielectric
+model and projects the rendered face mesh onto it from that key. The one exact
+projection produces a sharp geometry-dependent cast shadow. Toggling the table
+therefore changes only the surroundings; polyhedron illumination remains
+identical. The receiver remains fixed while the polyhedron rotates, so the
+object reads as floating in a stable scene.
+
 ## PLA default
 
 The default IOR is `1.46`. Visible-wavelength ellipsometry measured PLA from
@@ -58,34 +66,43 @@ physics-backed bulk-material calibration.
 
 ## Controls
 
-Only four controls are exposed: two describe illumination and two are necessary
-to vary opaque plastics.
+The View group selects the scene environment. Two controls describe illumination
+and two are necessary to vary opaque plastics.
 
 | Group | Control | Default | Range | Meaning |
 | --- | --- | ---: | ---: | --- |
+| View | Environment | `None` | `None`, `Table` | Keep the background-only view, or add the lit table and cast shadow. |
 | Lighting | Key light | `2.5` | `0.0–5.0` | Radiance multiplier for the fixed neutral-warm studio point light. |
 | Lighting | Fill light | `0.22` | `0.0–1.0` | Intensity of the cool constant environment approximation. |
 | Material | Roughness | `0.45` | `0.15–1.0` | Perceived microsurface roughness; lower is glossier and higher is more matte. |
 | Material | IOR | `1.46` | `1.30–1.70` | Plastic index of refraction, converted to dielectric `F0`. |
 
-All four values are URL-backed. The old `Ambient` and `Diffuse` URL tags remain
-compatible as Fill light and Key light respectively; obsolete Specular and
+The environment and all four numeric values are URL-backed. `None` is omitted;
+Table is stored as `env(t)` in the View parameters. The old `Ambient` and
+`Diffuse` URL tags remain compatible as Fill light and Key light respectively;
+obsolete Specular and
 Shininess tags are ignored because Fresnel and roughness now determine those
 effects.
 
 ## Performance and limits
 
-The fragment shader evaluates one point light and one constant
-environment. It uses no material textures, lookup tables, cubemaps, shadow
-maps, or extra passes. Its main non-polynomial work is normalizing the light
-vectors, two square roots for correlated Smith visibility, and small fixed
-powers for Fresnel and color-space conversion.
+The face fragment shader evaluates one point light and one constant environment.
+It uses no material textures, lookup tables, cubemaps, or shadow maps. Its main
+non-polynomial work is normalizing the light vectors, two square roots for
+correlated Smith visibility, and small fixed powers for Fresnel and color-space
+conversion.
+
+`None` adds no scene pass. `Table` adds one inexpensive receiver pass and one
+draw of the already-uploaded animated face mesh. The shadow vertex shader uses
+analytic point-to-plane projection, so it needs no framebuffer texture, depth
+texture, or shadow-map allocation. A stencil union prevents overlapping faces
+and triangulation from darkening the sharp shadow multiple times.
 
 The model represents the optical response of a smooth aggregate surface. It
-does not synthesize FDM layer lines, scratches, subsurface scattering, cast
-shadows, self-reflections, or spatially varying roughness. Those effects need
-geometry, textures, or extra rendering passes and are outside the current
-performance/UI budget.
+does not synthesize FDM layer lines, scratches, subsurface scattering,
+self-reflections, or spatially varying roughness. Table shadows are planar
+projections, so they do not create self-shadowing and can only be received by
+the table plane.
 
 ## References
 

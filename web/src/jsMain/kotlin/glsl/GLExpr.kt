@@ -136,6 +136,10 @@ fun <T : GLType.NonMatrixFloats<T>> max(a: GLExpr<T>, b: Double): GLExpr<T> = ma
 // conversions & constructors
 fun vec3(value: GLExpr<GLType.float>): GLExpr<GLType.vec3> = Call(GLType.vec3, "vec3", value)
 fun vec3(value: Double): GLExpr<GLType.vec3> = vec3(value.literal)
+fun vec3(x: GLExpr<GLType.float>, y: GLExpr<GLType.float>, z: GLExpr<GLType.float>): GLExpr<GLType.vec3> =
+    Call(GLType.vec3, "vec3", x, y, z)
+fun vec3(x: Double, y: Double, z: Double): GLExpr<GLType.vec3> =
+    vec3(x.literal, y.literal, z.literal)
 fun vec4(xyz: GLExpr<GLType.vec3>, w: GLExpr<GLType.float>): GLExpr<GLType.vec4> = Call(GLType.vec4, "vec4", xyz, w)
 fun vec4(xyz: GLExpr<GLType.vec3>, w: Double): GLExpr<GLType.vec4> = vec4(xyz, w.literal)
 fun vec4(x: GLExpr<GLType.float>, y: GLExpr<GLType.float>, z: GLExpr<GLType.float>, w: GLExpr<GLType.float>): GLExpr<GLType.vec4> =
@@ -144,6 +148,9 @@ fun vec4(x: Double, y: Double, z: Double, w: Double): GLExpr<GLType.vec4> =
     vec4(x.literal, y.literal, z.literal, w.literal)
 
 // swizzling
+val GLExpr<GLType.vec3>.x: GLExpr<GLType.float> get() = DotCall(GLType.float, this, "x")
+val GLExpr<GLType.vec3>.y: GLExpr<GLType.float> get() = DotCall(GLType.float, this, "y")
+val GLExpr<GLType.vec3>.z: GLExpr<GLType.float> get() = DotCall(GLType.float, this, "z")
 val GLExpr<GLType.vec4>.x: GLExpr<GLType.float> get() = DotCall(GLType.float, this, "x")
 val GLExpr<GLType.vec4>.y: GLExpr<GLType.float> get() = DotCall(GLType.float, this, "y")
 val GLExpr<GLType.vec4>.z: GLExpr<GLType.float> get() = DotCall(GLType.float, this, "z")

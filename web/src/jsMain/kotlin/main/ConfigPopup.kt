@@ -25,6 +25,7 @@ fun ConfigPopup(params: RootParams) {
         ControlRow("View scale") { PSlider(params.render.view.scale) }
         ControlRow("Expand") { PSlider(params.render.view.expandFaces) }
         ControlRow("Display") { PDropdown(params.render.view.display) }
+        ControlRow("Environment") { PDropdown(params.render.view.environment) }
     }
 
     GroupHeader("Faces")

@@ -23,6 +23,8 @@ class ViewContext(params: ViewParams) : Param.Context(params) {
     val projectionMatrix = mat4.create()
     val modelMatrix = mat4.create()
     val normalMatrix = mat3.create()
+    var scaleFactor = 1.0
+        private set
 
     private val cameraFieldOfViewDegrees = 45.0
 
@@ -49,7 +51,8 @@ class ViewContext(params: ViewParams) : Param.Context(params) {
     }
 
     override fun update() {
-        modelScale.fill(2.0.pow(scale))
+        scaleFactor = 2.0.pow(scale)
+        modelScale.fill(scaleFactor)
         val r = rotate
         tmpQuat[0] = r.x
         tmpQuat[1] = r.y

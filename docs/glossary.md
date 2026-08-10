@@ -36,6 +36,8 @@
 | Inradius | Minimum distance from the origin to a face plane. |
 | Face rim | In-face inset used to render borders around hidden or expanded faces. |
 | [Plastic material model](lighting.md) | The opaque dielectric Cook-Torrance BRDF used for faces: GGX microfacet distribution, correlated Smith visibility, Schlick Fresnel derived from IOR, and energy-conserving diffuse reflection. |
+| Environment | The scene surrounding the polyhedron. `None` retains the background-only renderer; `Table` adds a fixed neutral-gray plastic receiver and a geometry-dependent cast shadow while the polyhedron rotates above it. |
+| Planar projected shadow | A cast-shadow technique that projects the animated rendered face mesh from the same fixed point light used to illuminate it onto the table plane. One projection gives a sharp silhouette, and stencil unioning prevents face overlap from over-darkening it. |
 | Roughness | Perceived isotropic microsurface roughness used by GGX. Lower values concentrate reflection into a sharp glossy highlight; higher values spread it into a broad matte response. |
 | IOR | Index of refraction of the plastic. The shader converts it to normal-incidence reflectance `F0 = ((IOR - 1) / (IOR + 1))²`; PLA defaults to `1.46`. |
 | Keyframe | A mesh and interpolation fraction returned by the core for a transform animation step. |
