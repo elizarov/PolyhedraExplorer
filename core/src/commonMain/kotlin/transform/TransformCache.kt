@@ -5,6 +5,7 @@
 package polyhedra.core.transform
 
 import polyhedra.core.poly.*
+import polyhedra.core.util.OperationProgressContext
 import polyhedra.model.poly.*
 import polyhedra.model.util.*
 
@@ -116,6 +117,21 @@ object TransformCache {
         hashSize++
         addLruFirst(e)
     }
+}
+
+internal suspend fun Polyhedron.cachedCanonicalTransform(
+    key: Transform,
+    progress: OperationProgressContext?,
+    topology: Polyhedron.() -> Polyhedron,
+): Polyhedron {
+    TransformCache[this, key]?.let { return it }
+    val result = runCatching {
+        val raw = topology()
+        val canonical = raw.canonical(progress)
+        polyhedronCopy(canonical.vs, canonical.fs, raw.faceKindSources)
+    }
+    TransformCache[this, key] = result
+    return result.getOrThrow()
 }
 
 fun Polyhedron.transformedPolyhedron(
