@@ -5,6 +5,7 @@ import polyhedra.core.transform.*
 import polyhedra.core.util.OperationProgressContext
 import polyhedra.model.api.*
 import polyhedra.model.poly.*
+import polyhedra.model.util.*
 import kotlin.math.abs
 
 private const val MAX_DISPLAY_EDGES = (1 shl 15) - 1
@@ -17,8 +18,12 @@ private data class LogicalTransform(
     val tag: String,
     val name: String,
     val primitiveTransforms: List<Transform>,
-    val animationTransform: Transform? = primitiveTransforms.singleOrNull(),
+    /** Primitive visual stages; macros can differ from their fused evaluation kernel. */
+    val animationTransforms: List<Transform> = primitiveTransforms,
 ) {
+    val animationTransform: Transform?
+        get() = animationTransforms.singleOrNull()
+
     fun isIdentityTransform(poly: Polyhedron): Boolean =
         primitiveTransforms.size == 1 && primitiveTransforms.single().isIdentityTransform(poly)
 
@@ -97,12 +102,17 @@ private fun String.toLogicalTransformOrNull(): LogicalTransform? {
             )
             else -> return null
         }
-        val animationTransform = primitives.singleOrNull()
+        val animationTransforms = when (macro.tag.removeSuffix("'")) {
+            // The direct Kis kernel supports height but has no stable collapsed topology. Its
+            // Conway expansion is composed entirely of well-behaved animated operations.
+            "k" -> listOf(Transform.Dual, Transform.Truncated, Transform.Dual)
+            else -> primitives
+        }
         return LogicalTransform(
             encodeTransformTag(macro.tag, parsed.tweaks),
             macro.displayName,
             primitives,
-            animationTransform,
+            animationTransforms,
         )
     }
     return encodeTransformTag(parsed.operationTag, parsed.tweaks).toTransformOrNull()?.let { transform ->
@@ -462,13 +472,29 @@ private fun computeAnimation(
                 )
             )
         }
-        val previousTransform = previousLogicalTransform
+        val previousAnimationTransform = previousLogicalTransform
+            ?.takeUnless { transform -> transform.isIdentityTransform(basePoly) }
+        val currentAnimationTransform = currentLogicalTransform
+            ?.takeUnless { transform -> transform.isIdentityTransform(basePoly) }
+        if (
+            previousAnimationTransform?.animationTransforms?.size?.let { it > 1 } == true ||
+            currentAnimationTransform?.animationTransforms?.size?.let { it > 1 } == true
+        ) {
+            return macroAnimation(
+                basePoly,
+                current.scale,
+                previousPoly,
+                currentPoly,
+                previousAnimationTransform,
+                currentAnimationTransform,
+                duration,
+            ) ?: emptyList()
+        }
+        val previousTransform = previousAnimationTransform
             ?.animationTransform
-            ?.takeIf { !it.isIdentityTransform(basePoly) }
             ?: Transform.None
-        val currentTransform = currentLogicalTransform
+        val currentTransform = currentAnimationTransform
             ?.animationTransform
-            ?.takeIf { !it.isIdentityTransform(basePoly) }
             ?: Transform.None
         return transformAnimation(
             basePoly,
@@ -522,6 +548,140 @@ private fun compositionFusionAnimation(
     )
 }
 
+private fun macroAnimation(
+    basePoly: Polyhedron,
+    scale: Scale,
+    previousPoly: Polyhedron,
+    currentPoly: Polyhedron,
+    previousTransform: LogicalTransform?,
+    currentTransform: LogicalTransform?,
+    duration: Double,
+): List<CoreAnimationStep>? {
+    val removing = previousTransform?.let { transform ->
+        transform.macroDirectionAnimation(basePoly, scale, previousPoly, duration, applying = false)
+            ?: return null
+    }.orEmpty().withoutStationarySteps(duration)
+    val applying = currentTransform?.let { transform ->
+        transform.macroDirectionAnimation(basePoly, scale, currentPoly, duration, applying = true)
+            ?: return null
+    }.orEmpty().withoutStationarySteps(duration)
+    return removing + applying
+}
+
+/** Runs every primitive component of a multi-part macro on one shared animation clock. */
+private fun LogicalTransform.macroDirectionAnimation(
+    basePoly: Polyhedron,
+    scale: Scale,
+    resultPoly: Polyhedron,
+    duration: Double,
+    applying: Boolean,
+): List<CoreAnimationStep>? {
+    if (animationTransforms.size > 1) {
+        return listOf(macroAnimationStep(basePoly, scale, resultPoly, this, duration, applying) ?: return null)
+    }
+    val transform = animationTransforms.singleOrNull() ?: return null
+    return transformAnimation(
+        basePoly,
+        scale,
+        if (applying) basePoly else resultPoly,
+        if (applying) resultPoly else basePoly,
+        if (applying) Transform.None else transform,
+        if (applying) transform else Transform.None,
+        duration,
+    ).takeIf { it.isNotEmpty() }
+}
+
+private fun Polyhedron.hasSameAnimationGeometry(other: Polyhedron): Boolean =
+    hasSameTopology(other) && vs.indices.all { index -> vs[index] approx other.vs[index] }
+
+private fun List<CoreAnimationStep>.withoutStationarySteps(
+    totalDuration: Double? = null,
+): List<CoreAnimationStep> {
+    val active = filterNot { step -> step.previousPoly.hasSameAnimationGeometry(step.targetPoly) }
+    if (totalDuration == null || active.isEmpty()) return active
+    val durationScale = totalDuration / active.sumOf(CoreAnimationStep::duration)
+    return active.map { step -> step.copy(duration = step.duration * durationScale) }
+}
+
+private fun macroAnimationStep(
+    basePoly: Polyhedron,
+    scale: Scale,
+    resultPoly: Polyhedron,
+    transform: LogicalTransform,
+    duration: Double,
+    applying: Boolean,
+): CoreAnimationStep? {
+    val result = resultPoly.scaled(scale).triangulatedForAnimation()
+    val originScale = 1.0 / basePoly.scaleDenominator(scale)
+    val origins = transform.macroAnimationOrigins(basePoly, resultPoly)
+        .map { position -> position * originScale }
+    if (origins.size != result.vs.size) return null
+    val nearCollapsed = result.withAnimationPositions(result.vs.indices.map { index ->
+        ANIMATION_GAP.atSegment(origins[index], result.vs[index])
+    })
+    return if (applying) {
+        CoreAnimationStep(duration, nearCollapsed, ANIMATION_GAP, result, 1.0)
+    } else {
+        CoreAnimationStep(duration, result, 0.0, nearCollapsed, 1.0 - ANIMATION_GAP)
+    }
+}
+
+/** Maps the final macro topology onto the input while all primitive components are at 0%. */
+private fun LogicalTransform.macroAnimationOrigins(
+    basePoly: Polyhedron,
+    resultPoly: Polyhedron,
+): List<Vec3> {
+    val operationTag = tag.parseTransformTag()?.operationTag?.removeSuffix("'")
+        ?: error("Invalid macro tag: $tag")
+    val positions = when (operationTag) {
+        // Full Kis retains all input vertices and appends one apex per input face. Collapsing an
+        // apex to a boundary vertex removes its spike while keeping the final topology available.
+        "k" -> basePoly.vs + basePoly.fs.map { face -> face.fvs.first() }
+        // Zip has a precise directed-edge correspondence.
+        "z" -> basePoly.dual().directedEdges.map { edge -> basePoly.vs[edge.r.id] }
+        // The remaining Conway macros preserve orientation. Assign every final vertex to the
+        // input vertex in the same radial sector, collapsing all component-created vertices at
+        // once instead of exposing any intermediate logical solid.
+        else -> resultPoly.vs.map { resultVertex ->
+            basePoly.vs.minBy { sourceVertex ->
+                (resultVertex / resultVertex.norm - sourceVertex / sourceVertex.norm).norm
+            }
+        }
+    }
+    require(positions.size == resultPoly.vs.size) {
+        "Macro $tag animation has ${positions.size} origins for ${resultPoly.vs.size} vertices"
+    }
+    return positions
+}
+
+private fun Polyhedron.withAnimationPositions(positions: List<Vec3>): Polyhedron {
+    require(positions.size == vs.size)
+    val topology = this
+    return polyhedron {
+        positions.forEachIndexed { index, position -> vertex(position, topology.vs[index].kind) }
+        faces(topology.fs)
+        faceKindSources(topology.faceKindSources)
+    }
+}
+
+/** Keeps every interpolated face planar; the completed polygon mesh replaces these triangles. */
+private fun Polyhedron.triangulatedForAnimation(): Polyhedron {
+    val topology = this
+    return polyhedron {
+        vertices(topology.vs)
+        for (face in topology.fs) {
+            if (face.size <= 3) {
+                face(face.fvs, face.kind)
+            } else {
+                for (index in 1 until (face.size - 1)) {
+                    face(listOf(face.fvs[0], face.fvs[index], face.fvs[index + 1]), face.kind)
+                }
+            }
+        }
+        faceKindSources(topology.faceKindSources)
+    }
+}
+
 private fun transformAnimation(
     basePoly: Polyhedron,
     scale: Scale,
@@ -561,6 +721,16 @@ private fun transformAnimation(
             CoreAnimationStep(duration, previousPoly.scaled(scale), 0.0, currentPoly.scaled(scale), 1.0)
         )
     }
+
+    surfaceSubdivisionAnimation(
+        basePoly,
+        scale,
+        previousPoly,
+        currentPoly,
+        previousTransform,
+        currentTransform,
+        duration,
+    )?.let { return it }
 
     val previousTruncation = previousTransform.truncationRatio(basePoly)
     val currentTruncation = currentTransform.truncationRatio(basePoly)
@@ -692,18 +862,73 @@ private fun transformAnimation(
                 basePoly,
                 previousTransform,
                 Transform.None,
-                duration / 2,
-            ) + transformAnimation(
+                duration,
+            ).withoutStationarySteps() + transformAnimation(
                 basePoly,
                 scale,
                 basePoly,
                 currentPoly,
                 Transform.None,
                 currentTransform,
-                duration / 2,
-            )
+                duration,
+            ).withoutStationarySteps()
 
         else -> emptyList()
+    }
+}
+
+/**
+ * Propeller, Whirl, and Quinto first subdivide the source faces without moving the surface, then
+ * morph that topology into the canonical output. This gives both sides identical buffers without
+ * collapsing faces or inventing an unstable vertex correspondence.
+ */
+private fun surfaceSubdivisionAnimation(
+    basePoly: Polyhedron,
+    scale: Scale,
+    previousPoly: Polyhedron,
+    currentPoly: Polyhedron,
+    previousTransform: Transform,
+    currentTransform: Transform,
+    duration: Double,
+): List<CoreAnimationStep>? {
+    val applying = previousTransform == Transform.None
+    val transform = when {
+        applying -> currentTransform
+        currentTransform == Transform.None -> previousTransform
+        else -> return null
+    }
+    val subdivision = when (transform) {
+        is Propeller -> basePoly.propellerAnimationStart(transform.chirality)
+        is Whirl -> basePoly.whirlAnimationStart(transform.chirality)
+        is Quinto -> basePoly.quintoAnimationStart()
+        else -> return null
+    }
+    val transformed = if (applying) currentPoly else previousPoly
+    if (!subdivision.hasSameTopology(transformed)) return emptyList()
+
+    // The subdivision lies exactly on the input surface. Scale it by the input denominator so the
+    // first/last visual frame also coincides under Midradius, whose value changes after subdivision.
+    val subdivisionScale = 1.0 / basePoly.scaleDenominator(scale)
+    return if (applying) {
+        listOf(
+            CoreAnimationStep(
+                duration,
+                subdivision.scaled(subdivisionScale),
+                0.0,
+                currentPoly.scaled(scale),
+                1.0,
+            )
+        )
+    } else {
+        listOf(
+            CoreAnimationStep(
+                duration,
+                previousPoly.scaled(scale),
+                0.0,
+                subdivision.scaled(subdivisionScale),
+                1.0,
+            )
+        )
     }
 }
 

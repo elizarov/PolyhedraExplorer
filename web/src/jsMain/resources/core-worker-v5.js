@@ -4,7 +4,7 @@ self.onmessage = async event => {
     let request
     try {
         request = JSON.parse(event.data)
-        coreModulePromise ??= import("./core-v2/PolyhedraExplorer-core.mjs")
+        coreModulePromise ??= import("./core-v5/PolyhedraExplorer-core.mjs")
         const core = await coreModulePromise
         const response = await core.evaluateCoreJson(request.requestJson, (transformIndex, done) => {
             self.postMessage(JSON.stringify({ id: request.id, type: "progress", transformIndex, done }))

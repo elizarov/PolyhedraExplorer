@@ -203,7 +203,7 @@ class OrbitTargetedTransformTest {
             )
 
             assertEquals(2, response.animation.size, transforms.joinToString(" -> "))
-            assertEquals(listOf(0.25, 0.25), response.animation.map { it.duration })
+            assertEquals(listOf(0.5, 0.5), response.animation.map { it.duration })
             assertTrue(response.animation.all { it.previousPoly.hasSameTopology(it.targetPoly) })
             assertTrue(response.animation[0].targetFraction >= 0.999, "old target must animate out")
             assertTrue(response.animation[1].previousFraction <= 0.001, "new target must animate in")

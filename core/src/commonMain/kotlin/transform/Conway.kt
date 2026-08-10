@@ -19,6 +19,9 @@ import polyhedra.model.util.*
 private const val ONE_THIRD = 1.0 / 3.0
 private const val EDGE_RADIUS_FACTOR = 0.9
 private const val INNER_RADIUS_FACTOR = 0.8
+private const val PROPELLER_ANIMATION_START_FRACTION = 0.01
+private const val WHIRL_ANIMATION_INNER_FRACTION = 0.01
+private const val QUINTO_ANIMATION_INNER_FRACTION = 0.99
 
 private fun Face.centroid(): Vec3 = MutableVec3().also { center ->
     for (vertex in fvs) center += vertex
@@ -53,12 +56,27 @@ suspend fun Polyhedron.propeller(
     }
 }
 
-private fun Polyhedron.rawPropeller(): Polyhedron = polyhedron {
+/**
+ * The Propeller topology nearly collapsed onto the input polyhedron. The central face retains the
+ * source face while its corner quadrilaterals start as narrow slivers, making the opening twist
+ * visible even during the default short animation without evaluating exactly degenerate faces.
+ */
+internal fun Polyhedron.propellerAnimationStart(chirality: Chirality): Polyhedron =
+    if (chirality == Chirality.Default) {
+        rawPropeller(PROPELLER_ANIMATION_START_FRACTION, 1.0)
+    } else {
+        reflected().rawPropeller(PROPELLER_ANIMATION_START_FRACTION, 1.0).reflected()
+    }
+
+private fun Polyhedron.rawPropeller(
+    edgeFraction: Double = ONE_THIRD,
+    edgeRadiusFactor: Double = EDGE_RADIUS_FACTOR,
+): Polyhedron = polyhedron {
     val oldVertices = vs.associateWith { vertex -> vertex(vertex) }
     val edgeVertexKindOffset = vertexKinds.size
     val edgeVertices = directedEdges.associateWith { edge ->
         vertex(
-            ONE_THIRD.atSegment(edge.a, edge.b) * EDGE_RADIUS_FACTOR,
+            edgeFraction.atSegment(edge.a, edge.b) * edgeRadiusFactor,
             VertexKind(edgeVertexKindOffset + directedEdgeKindsIndex.getValue(edge.kind)),
         )
     }
@@ -99,12 +117,36 @@ suspend fun Polyhedron.whirl(
     }
 }
 
-private fun Polyhedron.rawWhirl(): Polyhedron = polyhedron {
+/**
+ * The Whirl topology laid flat on the input surface with its inner ring nearly collapsed at each
+ * source-face center. The corner hexagons still tile the input face and visibly open outward.
+ */
+internal fun Polyhedron.whirlAnimationStart(chirality: Chirality): Polyhedron =
+    if (chirality == Chirality.Default) {
+        rawWhirl(
+            edgeRadiusFactor = 1.0,
+            innerFraction = WHIRL_ANIMATION_INNER_FRACTION,
+            innerRadiusFactor = 1.0,
+        )
+    } else {
+        reflected().rawWhirl(
+            edgeRadiusFactor = 1.0,
+            innerFraction = WHIRL_ANIMATION_INNER_FRACTION,
+            innerRadiusFactor = 1.0,
+        ).reflected()
+    }
+
+private fun Polyhedron.rawWhirl(
+    edgeFraction: Double = ONE_THIRD,
+    edgeRadiusFactor: Double = EDGE_RADIUS_FACTOR,
+    innerFraction: Double = ONE_THIRD,
+    innerRadiusFactor: Double = INNER_RADIUS_FACTOR,
+): Polyhedron = polyhedron {
     val oldVertices = vs.associateWith { vertex -> vertex(vertex) }
     val edgeVertexKindOffset = vertexKinds.size
     val edgeVertices = directedEdges.associateWith { edge ->
         vertex(
-            ONE_THIRD.atSegment(edge.a, edge.b) * EDGE_RADIUS_FACTOR,
+            edgeFraction.atSegment(edge.a, edge.b) * edgeRadiusFactor,
             VertexKind(edgeVertexKindOffset + directedEdgeKindsIndex.getValue(edge.kind)),
         )
     }
@@ -112,8 +154,8 @@ private fun Polyhedron.rawWhirl(): Polyhedron = polyhedron {
     val innerVertexKindOffset = edgeVertexKindOffset + directedEdgeKindsIndex.size
     val innerVertices = directedEdges.associateWith { edge ->
         vertex(
-            ONE_THIRD.atSegment(faceCenters.getValue(edge.r), edgeVertices.getValue(edge)) *
-                INNER_RADIUS_FACTOR,
+            innerFraction.atSegment(faceCenters.getValue(edge.r), edgeVertices.getValue(edge)) *
+                innerRadiusFactor,
             VertexKind(innerVertexKindOffset + directedEdgeKindsIndex.getValue(edge.kind)),
         )
     }
@@ -148,12 +190,27 @@ fun Polyhedron.quinto(): Polyhedron = runSynchronously { quinto(null) }
 suspend fun Polyhedron.quinto(progress: OperationProgressContext?): Polyhedron =
     canonicalConwayTransform(Transform.Quinto, progress) { rawQuinto() }
 
-private fun Polyhedron.rawQuinto(): Polyhedron = polyhedron {
+/**
+ * The Quinto topology laid flat on the input surface with its central face nearly collapsed to the
+ * source-face center. Its surrounding corner pentagons retain the visible input surface.
+ */
+internal fun Polyhedron.quintoAnimationStart(): Polyhedron = rawQuinto(
+    edgeRadiusFactor = 1.0,
+    innerFraction = QUINTO_ANIMATION_INNER_FRACTION,
+    innerRadiusFactor = 1.0,
+)
+
+private fun Polyhedron.rawQuinto(
+    edgeFraction: Double = 0.5,
+    edgeRadiusFactor: Double = EDGE_RADIUS_FACTOR,
+    innerFraction: Double = 0.5,
+    innerRadiusFactor: Double = INNER_RADIUS_FACTOR,
+): Polyhedron = polyhedron {
     val oldVertices = vs.associateWith { vertex -> vertex(vertex) }
     val edgeVertexKindOffset = vertexKinds.size
     val edgeVertices = es.associateWith { edge ->
         vertex(
-            0.5.atSegment(edge.a, edge.b) * EDGE_RADIUS_FACTOR,
+            edgeFraction.atSegment(edge.a, edge.b) * edgeRadiusFactor,
             VertexKind(edgeVertexKindOffset + edgeKindsIndex.getValue(edge.kind)),
         )
     }
@@ -161,10 +218,10 @@ private fun Polyhedron.rawQuinto(): Polyhedron = polyhedron {
     val innerVertexKindOffset = edgeVertexKindOffset + edgeKindsIndex.size
     val innerVertices = directedEdges.associateWith { edge ->
         vertex(
-            0.5.atSegment(
+            innerFraction.atSegment(
                 edgeVertices.getValue(edge.normalizedDirection()),
                 faceCenters.getValue(edge.r),
-            ) * INNER_RADIUS_FACTOR,
+            ) * innerRadiusFactor,
             VertexKind(innerVertexKindOffset + directedEdgeKindsIndex.getValue(edge.kind)),
         )
     }

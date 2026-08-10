@@ -80,6 +80,50 @@ are also fixed because moving a shared edge midpoint splits it into two vertices
 and becomes truncation rather than a coordinate variation of rectification.
 Dual, Drop, Quinto, Canonical, and None have no continuous geometric setting.
 
+## Animations
+
+Transform animation is computed in the Wasm core and returned as one or more
+topology-compatible mesh pairs. The renderer interpolates positions, normals,
+and face colors on the GPU; it does not rerun a transform per frame. The
+Animation / Updates controls enable the behavior and set the duration of one
+operation phase. Applying an operation runs its construction forward and
+removing it runs the same construction backward. Replacing unrelated operations
+uses two full phases: the old operation animates out, then the new one animates
+in. A visually stationary phase is omitted and its operation keeps the full
+duration; for example, replacing an identity Canonical on a regular seed starts
+the new operation immediately. Compatible pairs such as Truncated/Rectified use
+one direct phase, and chirality flips remain immediate.
+
+Three constructions are used:
+
+- **Parameterized topology.** Truncate, Rectify, Dual, Cantellate, Bevel, Snub,
+  Chamfer, and selective vertex cuts retain the output topology while a ratio
+  approaches the input or limiting geometry. A tiny endpoint gap avoids
+  evaluating exactly degenerate normals before the renderer switches meshes.
+- **Surface construction.** Propeller begins with its new corner faces nearly
+  collapsed at the source vertices. Whirl and Quinto lay their output topology
+  on the input surface with each new central face nearly collapsed at the source
+  face center. The constructions visibly open into their canonical outputs while
+  preserving the input surface at the first frame and working under Midradius
+  scaling.
+- **Coordinate interpolation.** Canonicalization and changes to continuous
+  settings keep connectivity fixed and interpolate corresponding vertices
+  directly.
+
+All components of a multi-part macro share one normalized progress value. The
+core constructs one topology-compatible mesh whose component-created vertices
+are collapsed onto the input at 0%, and whose coordinates are the exact macro
+result at 100%. Apply and removal therefore use one fused morph over one configured
+operation duration; removal runs the same morph backward. Cantellated and
+Bevelled already use direct single-kernel morphs. Non-default macro settings,
+including Kis Height, are included in the same fused target.
+
+Animation is intentionally omitted where no stable, non-self-intersecting mesh
+correspondence exists: Drop, adding/removing or retargeting selective Kis face,
+and chirality flips. A selective Kis Height change still interpolates because
+its topology is already present. A chirality flip is immediate rather than
+passing through a flattened or self-intersecting intermediate mesh.
+
 ## Primitive transformations
 
 ### None (`n`)
@@ -87,6 +131,9 @@ Dual, Drop, Quinto, Canonical, and None have no continuous geometric setting.
 None is an identity operation in the core. In the transform editor it is an
 action that removes the selected stage, so it is normally absent from a stored
 chain. It changes neither topology nor geometry.
+
+None has no animation of its own. When it removes a stage, the removed
+operation's animation is played backward whenever that operation supports one.
 
 ### Truncated (`t`)
 
@@ -96,12 +143,21 @@ vertices lie on every original edge, which produces three output edge segments.
 The default cut depth is chosen from the representative regular-face geometry;
 the Depth setting scales it continuously.
 
+For animation, the two cut points on each directed edge begin arbitrarily close
+to their source vertex and move to the selected cut ratio. The new vertex faces
+therefore grow out while the retained faces shorten; removal reverses the cut.
+Depth changes interpolate the ratio directly without collapsing the topology.
+
 ### Rectified (`a`)
 
 Rectification, or ambo, places one output vertex at every original edge midpoint.
 Every original face becomes a face through its edge midpoints, and every original
 vertex becomes a face through the midpoints of its incident edges. It is the full
 midpoint limit of truncation and has no independent continuous parameter.
+
+Rectified uses the same cut topology as Truncated and animates its cut points to
+the shared edge-midpoint limit. On removal they return toward their source
+vertices before the input mesh replaces the near-degenerate keyframe.
 
 ### Dual (`d`)
 
@@ -110,6 +166,11 @@ between edges. The implementation places a dual vertex for every face and builds
 one dual face around every original vertex. Applying Dual twice restores the
 original topology.
 
+Dual is animated through the limiting cantellation family. Face-, edge-, and
+vertex-derived regions move toward the reciprocal face points until the mesh is
+visually the dual; removal traverses that limit in reverse. This supplies stable
+matching buffers even though the input and dual exchange faces and vertices.
+
 ### Snub (`s`)
 
 Snubbing separates and consistently twists the original faces. It keeps one face
@@ -117,6 +178,12 @@ for every original face and vertex, then fills the gap around every original edg
 with two triangles. The consistent twist makes Snub chiral: reversing the twist
 produces its mirror form. Inset and Twist can be varied independently. The UI
 writes this alternate operation as `Snub'` (`s'`).
+
+Snub animation grows the inset and signed twist together from the untwisted
+input limit; changing Inset or Twist interpolates those values directly. Removal
+collapses the same construction. Switching between `Snub` and `Snub'` is
+immediate because interpolating opposite handedness crosses an invalid flattened
+mesh.
 
 ### Propeller (`p`)
 
@@ -128,6 +195,13 @@ the mirror operation, written `Propeller'` (`p'`). After building this incidence
 structure, the core finds its canonical convex realization so a later transform
 does not encounter the coplanar faces of the literal subdivision.
 
+Propeller starts with each directed edge point very close to its source vertex.
+The central polygon therefore retains almost the whole input face while the new
+corner quadrilaterals are narrow slivers. They visibly open and twist into the
+canonical Propeller coordinates; removal collapses them back before the original
+faces replace the construction. The small nonzero opening avoids degenerate face
+normals. `Propeller`/`Propeller'` flips remain immediate.
+
 ### Whirl (`w`)
 
 Whirl starts with the same original vertices and directed one-third edge points
@@ -135,6 +209,12 @@ as Propeller, then adds an inner point for every face-edge incidence. The inner
 points form the new central face, and a hexagon fills each original face corner.
 Its consistent winding makes it chiral; the reverse winding is `Whirl'` (`w'`).
 The returned geometry is the canonical convex realization of this topology.
+
+Whirl starts as a planar subdivision with each inner ring nearly collapsed at
+the source-face center. The surrounding corner hexagons retain the input surface,
+then the inner ring visibly opens and all vertices move into the canonical Whirl;
+removal reverses it. Changing between `Whirl` and `Whirl'` does not interpolate
+chirality.
 
 ### Quinto (`q`)
 
@@ -145,6 +225,12 @@ pentagon. The construction has reflection symmetry, so Quinto has no alternate
 chirality. As with Propeller and Whirl, the returned coordinates are canonicalized
 to keep subsequent operations geometrically well-defined.
 
+Quinto animation starts with its edge midpoints on the source edges and its inner
+points near the source-face centers. The central face is therefore almost
+collapsed while the surrounding corner pentagons retain the input surface. That
+central face visibly opens as the vertices move to canonical Quinto coordinates;
+removal runs the same motion backward.
+
 ### Chamfered (`c`)
 
 Chamfering moves the boundary of each original face inward and inserts one
@@ -153,12 +239,21 @@ vertices are introduced for every original edge. The current geometry uses
 bisector planes and stops when the limiting new edges reach the regular target
 length. The Width setting scales the regular limiting distance.
 
+Chamfer animation starts with the new edge faces collapsed along their source
+edges while the retained vertices coincide with the input. Increasing the
+chamfer ratio opens those faces to the configured Width; removal closes them,
+and Width changes interpolate the ratio directly.
+
 ### Canonical (`o`)
 
 Canonical changes coordinates but not connectivity. The background
 [canonicalization algorithm](canonicalization.md) iteratively seeks the canonical
 representation in which faces are planar and all edges are tangent to a common
 midsphere. The result is unique only up to rotation and reflection.
+
+Canonical preserves connectivity, so animation directly interpolates every
+vertex from the current realization to the canonical coordinates. Removing a
+Canonical stage performs the same coordinate morph backward.
 
 ### Drop (`x[kind]`)
 
@@ -167,6 +262,10 @@ orbit. It expands the requested deletion to adjacent elements that would
 otherwise become degenerate, verifies that the merged boundary is one valid face,
 and rebuilds the remaining mesh. Because the selected orbit and necessary cleanup
 vary with the input, Drop has no single linear `F/E/V` formula.
+
+Drop is immediate. Deleting an orbit can recursively delete vertices and edges
+and merge several source faces into one boundary, so there is no general
+one-to-one face/vertex correspondence suitable for the renderer's mesh morph.
 
 ### Kis face (`k[face]`)
 
@@ -179,6 +278,12 @@ when the input has more than one face orbit and is displayed as `Kis α`, `Kis �
 and so on. Height moves the generated apex along the line from the source face
 center to its regular Kis position.
 
+Once selective Kis exists, Height changes animate the apex coordinates directly.
+Adding, removing, or changing its target orbit is immediate: collapsing only
+some apexes leaves unstable zero-area triangles and previously produced broken
+interpolation. This limitation does not apply to the full Kis macro, whose
+Dual/Truncated/Dual expansion uses stable primitive limiting meshes.
+
 ### Truncate vertex (`t[vertex]`)
 
 Truncate vertex cuts off every vertex in one selected vertex orbit. Each selected
@@ -189,6 +294,11 @@ The operation is offered only when the input has more than one vertex orbit and
 is displayed as `Truncate A`, `Truncate B`, and so on. Depth scales the regular
 cut position.
 
+Truncate vertex uses the full truncation ratio kernel restricted to the selected
+vertex orbit. Adding grows its new faces from the selected source vertices and
+removal collapses them. Changing target orbit animates the old target out and
+the new target in as two full operation phases.
+
 ### Rectify vertex (`a[vertex]`)
 
 Rectify vertex moves the edges incident to one selected vertex orbit to their
@@ -198,6 +308,11 @@ than producing coincident duplicate vertices. Selecting every vertex orbit is
 therefore exactly equivalent to full Rectified. The operation is offered only
 when the input has more than one vertex orbit and is displayed as `Rectify A`,
 `Rectify B`, and so on. Depth explores shallower cuts up to the midpoint limit.
+
+Rectify vertex animates the selected orbit through the same selective cut
+topology until shared cut points reach the midpoint limit. Adding and removal
+run that ratio forward or backward; changing target orbit uses the same
+old-target-out/new-target-in sequence as Truncate vertex.
 
 The transform popup presents valid selective operations in its final
 `Orbit-targeted` section. Entries use one global order: Drop face, Drop edge, Drop
@@ -215,15 +330,9 @@ The URL retains the
 concrete `x[kind]`, `k[face]`, `t[vertex]`, or `a[vertex]` tag, so the selected
 orbit round-trips.
 
-Truncate vertex and Rectify vertex expose parameterized cut-depth animation
-kernels. Adding and removing one uses the same collapsed-topology technique as
-the corresponding full operation. Changing the target with the orbit spinner
-produces two half-duration keyframes: the old target animates out to the input
-mesh, then the new target animates in. Kis face changes are immediate: collapsing
-its apex produced unstable triangles, so the core intentionally emits no Kis-face
-animation keyframes. Truncate vertex and Rectify vertex share the same selective
-cut topology on a common target, so switching between them interpolates the cut
-ratio directly in one full-duration step.
+Truncate vertex and Rectify vertex share one selective cut topology on a common
+target, so switching between them interpolates the cut ratio directly in one
+full-duration step instead of collapsing and rebuilding the orbit.
 
 ## Macros
 
@@ -246,17 +355,29 @@ Kis adds a new vertex over the center of every face and connects it to every
 boundary vertex. Each original `n`-gon is replaced by `n` triangles. In this
 project it is expressed as Dual, Truncated, Dual.
 
+Kis animates Dual, Truncated, and Dual on one shared 0–100% clock. At 0% its
+retained vertices coincide with the input vertices and each new apex is collapsed
+to its source-face boundary; at 100% the mesh has the exact Kis coordinates.
+Removal reverses that one fused morph. A non-default Height changes the same
+100% target without adding another animation stage.
+
 ### Join (`j`)
 
 Join is the dual of Rectified/Ambo. It introduces vertices corresponding to both
 the original faces and vertices, then places one quadrilateral face across every
 original edge. It resembles Kis with the original edges removed.
 
+Join animates `Dual -> Rectified -> Dual` as one fused morph: all three component
+percentages advance together, and removal runs that morph backward.
+
 ### Needle (`N`)
 
 Needle is the dual of Truncated. New vertices correspond to the original faces and
 vertices, while every original edge contributes two triangular faces. Its count
 formula matches Kis, but its incidence structure is different.
+
+Needle advances Truncated and Dual together on one 0–100% clock. Removal reverses
+the same fused morph.
 
 ### Zip (`z`)
 
@@ -265,12 +386,21 @@ regions, as if the surface were zipped across each original edge. It is also
 called bitruncation. Its count formula matches Truncated, but the correspondence
 to original elements differs.
 
+Zip uses a direct fused cut topology: Dual and Truncated advance together while
+its final cut vertices move from their corresponding source vertices to the
+zipped positions. This avoids exposing the intermediate dual mesh. Its Depth
+setting changes the same topology directly.
+
 ### Cantellated (`e`)
 
 Cantellation, or expansion, separates every original face from its neighbors.
 Faces remain over the original faces and vertices, and a new quadrilateral bridges
 each original edge. Topologically it is two Rectified operations; the evaluator
 uses the fused cantellation kernel to retain regular geometry.
+
+Cantellated uses one fused cantellation morph rather than visibly stopping at
+the intermediate Rectified mesh. Its Distance ratio opens or closes the original
+face, edge, and vertex regions continuously on apply, removal, and setting edits.
 
 ### Bevelled (`b`)
 
@@ -279,6 +409,10 @@ It produces faces corresponding to every original face, edge, and vertex, with
 four output vertices and six output edges per original edge. The evaluator uses
 the fused bevel kernel so the expanded and named forms coincide geometrically.
 
+Bevelled uses one fused two-parameter bevel morph. Distance separates the face
+regions and Depth cuts their corners in the same animation; removal returns both
+ratios toward the input limit, and setting edits interpolate them directly.
+
 ### Ortho (`O`)
 
 Ortho is the dual of Cantellated and is also equivalent to Join applied twice.
@@ -286,11 +420,18 @@ It places vertices corresponding to original faces, edges, and vertices and
 subdivides the surface into two quadrilateral or kite-like faces per original
 edge.
 
+Ortho advances `Dual -> Cantellated -> Dual` together on one shared 0–100% clock.
+Removal reverses the same fused morph.
+
 ### Meta (`m`)
 
 Meta is the dual of Bevelled and can also be viewed as Kis after Join. It connects
 face-center and edge-derived vertices to the original vertex regions, producing
 four triangular faces per original edge.
+
+Meta advances `Dual -> Bevelled -> Dual` together on one shared 0–100% clock.
+Removal reverses the same fused morph; Distance and Depth are included in its
+100% target coordinates.
 
 ### Gyro (`g`)
 
@@ -298,6 +439,11 @@ Gyro is the dual of Snub. It uses a consistent handed twist to divide the surfac
 into two pentagonal faces per original edge. Like Snub, it preserves rotational
 symmetry while discarding reflection symmetry and therefore has mirror forms.
 The alternate form is written `Gyro'` (`g'`) and expands to `d -> s' -> d`.
+
+Gyro advances `Dual -> Snub -> Dual` together on one shared 0–100% clock while
+preserving the selected handedness. Removal reverses the same fused morph. Inset
+and Twist are included in its 100% target coordinates. `Gyro`/`Gyro'` flips are
+immediate to avoid passing through the invalid opposite-twist intermediate.
 
 ## Sources of truth
 
