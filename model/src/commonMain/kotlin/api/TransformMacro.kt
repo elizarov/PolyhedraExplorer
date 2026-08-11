@@ -49,6 +49,8 @@ private val primitiveReplacementIds = listOf(
     id(Quinto),
     id(Chamfered),
     id(Canonical),
+    id(Greatened),
+    id(Stellated),
 )
 private val replacementIdsByExpansion =
     (primitiveReplacementIds + allTransformMacros.map(TransformMacro::id)).associateBy { transformId ->

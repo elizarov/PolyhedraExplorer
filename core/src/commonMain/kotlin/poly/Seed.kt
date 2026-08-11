@@ -12,6 +12,7 @@ import kotlin.math.*
 enum class SeedType {
     Platonic,
     Families,
+    KeplerPoinsot,
     Archimedean,
     Catalan
 }
@@ -122,7 +123,7 @@ private val cubeGeometry = polyhedron {
     face(4, 7, 6, 5)
 }
 
-private val icosahedronGeometry = polyhedron {
+internal val icosahedronGeometry = polyhedron {
     val phi = (sqrt(5.0) + 1) / 2
     vertex(0.0, -1.0, -phi) // 0
     vertex(0.0, 1.0, -phi) // 1
@@ -158,13 +159,44 @@ private val icosahedronGeometry = polyhedron {
     face(9, 10, 11)
 }
 
+internal val dodecahedronGeometry = icosahedronGeometry.dual()
+
 // --------------------- 5 Platonic Solids ---------------------
 
 val SC.Tetrahedron by seed("T", SeedType.Platonic, tetrahedronGeometry)
 val SC.Cube by seed("C", SeedType.Platonic, cubeGeometry)
 val SC.Octahedron by seed("O", SeedType.Platonic, cubeGeometry.dual())
-val SC.Dodecahedron by seed("D", SeedType.Platonic, icosahedronGeometry.dual())
+val SC.Dodecahedron by seed("D", SeedType.Platonic, dodecahedronGeometry)
 val SC.Icosahedron by seed("I", SeedType.Platonic, icosahedronGeometry)
+
+// --------------------- 4 Kepler-Poinsot Solids ---------------------
+
+// Uppercase storage tags avoid the historical sD collision with Snub dodecahedron. Their Conway
+// notations (sD, gD, sgD/gsD, and gI) are shown in the catalog and documented as the public names.
+val SC.SmallStellatedDodecahedron by seed(
+    "SD",
+    SeedType.KeplerPoinsot,
+    FEV(60, 90, 32),
+    wikiName = "Small stellated dodecahedron",
+) { KeplerPoinsotGeometry.smallStellatedDodecahedron }
+val SC.GreatDodecahedron by seed(
+    "GD",
+    SeedType.KeplerPoinsot,
+    FEV(60, 90, 32),
+    wikiName = "Great dodecahedron",
+) { KeplerPoinsotGeometry.greatDodecahedron }
+val SC.GreatStellatedDodecahedron by seed(
+    "GSD",
+    SeedType.KeplerPoinsot,
+    FEV(60, 90, 32),
+    wikiName = "Great stellated dodecahedron",
+) { KeplerPoinsotGeometry.greatStellatedDodecahedron }
+val SC.GreatIcosahedron by seed(
+    "GI",
+    SeedType.KeplerPoinsot,
+    FEV(180, 270, 92),
+    wikiName = "Great icosahedron",
+) { KeplerPoinsotGeometry.greatIcosahedron }
 
 // --------------------- 13 Archimedean Solids ---------------------
 

@@ -71,6 +71,8 @@ sealed class Transform : Tagged {
         val Quinto: Transform by Quinto()
         val Chamfered: Transform by Chamfered()
         val Canonical: Transform by Canonical()
+        val Greatened: Transform by Greatened()
+        val Stellated: Transform by Stellated()
 
         val Transforms: List<Transform> = registeredTransforms.toList()
 

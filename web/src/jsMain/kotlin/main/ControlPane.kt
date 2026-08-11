@@ -359,7 +359,12 @@ internal fun ControlPane(
                             Div(attrs = {
                                 classes("item")
                                 onClick { selectSeed(seed) }
-                            }) { Text(seed.name) }
+                            }) {
+                                Text(seed.name)
+                                seed.conwayNotation?.let { notation ->
+                                    Span(attrs = { classes("seed-notation") }) { Text(notation) }
+                                }
+                            }
                         }
                     }
                 }

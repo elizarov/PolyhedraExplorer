@@ -22,6 +22,8 @@ enum class TransformOperation(
     Quinto("q"),
     Chamfered("c"),
     Canonical("o"),
+    Greatened("G"),
+    Stellated("S"),
     Kis("k"),
     Join("j"),
     Needle("N"),

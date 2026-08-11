@@ -766,6 +766,13 @@ tr.info {
     height: 1em;
 }
 
+.seed-notation {
+    float: right;
+    margin-left: 2ch;
+    opacity: 0.65;
+    font-family: monospace;
+}
+
 aside.transform-settings {
     display: block;
     position: absolute;

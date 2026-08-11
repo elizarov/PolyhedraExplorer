@@ -9,11 +9,15 @@ import polyhedra.model.poly.VertexKind
 import polyhedra.model.poly.withChirality
 import polyhedra.model.util.Tagged
 
-enum class SeedType {
-    Platonic,
-    Families,
-    Archimedean,
-    Catalan,
+enum class SeedType(private val displayName: String) {
+    Platonic("Platonic"),
+    Families("Families"),
+    KeplerPoinsot("Kepler-Poinsot"),
+    Archimedean("Archimedean"),
+    Catalan("Catalan"),
+    ;
+
+    override fun toString(): String = displayName
 }
 
 data class Seed(
@@ -22,6 +26,7 @@ data class Seed(
     val type: SeedType,
     val chirality: Chirality? = null,
     val familyId: FamilySeedId? = null,
+    val conwayNotation: String? = null,
 ) : Tagged {
     init {
         require((type == SeedType.Families) == (familyId != null))
@@ -58,6 +63,10 @@ val SeedOptions: List<Seed> = listOf(
     Seed("D", "Dodecahedron", SeedType.Platonic),
     Seed("I", "Icosahedron", SeedType.Platonic),
 ) + DefaultFamilySeedOptions + listOf(
+    Seed("SD", "Small stellated dodecahedron", SeedType.KeplerPoinsot, conwayNotation = "sD"),
+    Seed("GD", "Great dodecahedron", SeedType.KeplerPoinsot, conwayNotation = "gD"),
+    Seed("GSD", "Great stellated dodecahedron", SeedType.KeplerPoinsot, conwayNotation = "sgD = gsD"),
+    Seed("GI", "Great icosahedron", SeedType.KeplerPoinsot, conwayNotation = "gI"),
     Seed("tT", "Truncated tetrahedron", SeedType.Archimedean),
     Seed("aC", "Cuboctahedron", SeedType.Archimedean),
     Seed("tC", "Truncated cube", SeedType.Archimedean),
@@ -130,6 +139,8 @@ data class Transform(
         val Quinto = transform(TransformOperation.Quinto, "Quinto")
         val Chamfered = transform(TransformOperation.Chamfered, "Chamfered")
         val Canonical = transform(TransformOperation.Canonical, "Canonical")
+        val Greatened = transform(TransformOperation.Greatened, "Greatened")
+        val Stellated = transform(TransformOperation.Stellated, "Stellated")
 
         val Kis = macro(TransformOperation.Kis)
         val Join = macro(TransformOperation.Join)
@@ -188,6 +199,8 @@ val PrimitiveTransforms: List<Transform> = listOf(
     Transform.Quinto,
     Transform.Chamfered,
     Transform.Canonical,
+    Transform.Greatened,
+    Transform.Stellated,
 )
 
 val MacroTransforms: List<Transform> = listOf(

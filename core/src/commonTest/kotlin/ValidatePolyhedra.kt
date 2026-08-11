@@ -65,7 +65,8 @@ class ValidatePolyhedra {
 //                    check(poly.vertexKinds.size == 1)
                 }
                 SeedType.Families,
-                SeedType.Catalan -> Unit
+                SeedType.Catalan,
+                SeedType.KeplerPoinsot -> Unit
             }
             // check FEV counts
             assertEquals(seed.fev, poly.fev())
