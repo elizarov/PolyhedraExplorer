@@ -1,6 +1,7 @@
 package polyhedra.web.main
 
 import androidx.compose.runtime.*
+import kotlinx.browser.document
 import org.jetbrains.compose.web.attributes.InputType
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.attributes.value
@@ -21,11 +22,17 @@ import kotlin.math.floor
 import kotlin.math.roundToInt
 
 @Composable
-fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit) {
+internal fun ControlPane(
+    params: PolyParams,
+    popup: Popup?,
+    togglePopup: (Popup?) -> Unit,
+    keyboardActions: ControlKeyboardActions? = null,
+) {
     params.observe(Param.TargetValue + Param.Progress)
     var lastFamilyN by remember {
         mutableStateOf(params.seed.value.familyId?.n ?: MIN_FAMILY_SEED_N)
     }
+    var addTransformSelection by remember { mutableStateOf(0) }
     val currentFamilyN = params.seed.value.familyId?.n
     SideEffect {
         if (currentFamilyN != null) lastFamilyN = currentFamilyN
@@ -57,6 +64,8 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
         return regular + orbitTargeted
     }
 
+    val addTransformOptions = displayedTransformOptions(possibleTransformsAt(transforms.size))
+
     fun updateTransform(index: Int, transform: Transform) {
         togglePopup(null)
         params.rememberOrbitTarget(transforms.getOrNull(index))
@@ -76,15 +85,15 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
         params.transforms.updateValue(updated)
     }
 
-    fun adjustSeed(delta: Int) {
-        togglePopup(null)
+    fun adjustSeed(delta: Int): Boolean {
         val current = params.seed.value
         val currentIndex = SeedOptions.indexOfFirst { seed -> seed.optionKey == current.optionKey }
         current.familyId?.let { lastFamilyN = it.n }
-        SeedOptions.getOrNull(currentIndex + delta)?.let { option ->
-            val seed = if (option.isFamily) option.withFamilyN(lastFamilyN) else option
-            params.seed.updateValue(seed)
-        }
+        val option = SeedOptions.getOrNull(currentIndex + delta) ?: return false
+        togglePopup(null)
+        val seed = if (option.isFamily) option.withFamilyN(lastFamilyN) else option
+        params.seed.updateValue(seed)
+        return true
     }
 
     fun selectSeed(option: Seed) {
@@ -93,19 +102,18 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
         params.seed.updateValue(seed)
     }
 
-    fun adjustFamilyN(delta: Int) {
-        togglePopup(null)
+    fun adjustFamilyN(delta: Int): Boolean {
         val current = params.seed.value
         val n = requireNotNull(current.familyId).n + delta
-        if (n in MIN_FAMILY_SEED_N..MAX_FAMILY_SEED_N) {
-            lastFamilyN = n
-            params.seed.updateValue(current.withFamilyN(n))
-        }
+        if (n !in MIN_FAMILY_SEED_N..MAX_FAMILY_SEED_N) return false
+        togglePopup(null)
+        lastFamilyN = n
+        params.seed.updateValue(current.withFamilyN(n))
+        return true
     }
 
-    fun adjustLastTransform(delta: Int) {
-        togglePopup(null)
-        val current = transforms.lastOrNull() ?: return
+    fun adjustLastTransform(delta: Int): Boolean {
+        val current = transforms.lastOrNull() ?: return false
         params.rememberOrbitTarget(current)
         val currentOrbitOperation = current.orbitTargetOrNull()?.operation
         val options = operationOptionsAt(transforms.lastIndex)
@@ -113,24 +121,24 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
             option.id == current.id ||
                 currentOrbitOperation != null && option.orbitTargetOrNull()?.operation == currentOrbitOperation
         }
-        val replacement = options.getOrNull(currentIndex + delta) ?: return
-        if (replacement != Transform.None) {
-            val selected = params.reuseRememberedOrbitTarget(
-                replacement,
-                possibleTransformsAt(transforms.lastIndex),
-            )
-            params.transforms.updateValue(transforms.dropLast(1) + selected)
-        }
+        val replacement = options.getOrNull(currentIndex + delta)
+            ?.takeIf { it != Transform.None } ?: return false
+        togglePopup(null)
+        val selected = params.reuseRememberedOrbitTarget(
+            replacement,
+            possibleTransformsAt(transforms.lastIndex),
+        )
+        params.transforms.updateValue(transforms.dropLast(1) + selected)
+        return true
     }
 
-    fun adjustLastOrbitTarget(delta: Int) {
-        togglePopup(null)
-        val current = transforms.lastOrNull() ?: return
-        val currentTarget = current.orbitTargetOrNull() ?: return
+    fun adjustLastOrbitTarget(delta: Int): Boolean {
+        val current = transforms.lastOrNull() ?: return false
+        val currentTarget = current.orbitTargetOrNull() ?: return false
         val supportedTransforms = params.availableOrbitTransformsAt(transforms.lastIndex)
             .filter { it.orbitTargetOrNull()?.operation == currentTarget.operation }
             .sortedBy { it.orbitTargetOrNull()?.kind.toString() }
-        if (supportedTransforms.isEmpty()) return
+        if (supportedTransforms.isEmpty()) return false
         val currentIndex = supportedTransforms.indexOf(current)
         val replacementIndex = if (currentIndex >= 0) {
             (currentIndex + delta + supportedTransforms.size) % supportedTransforms.size
@@ -139,7 +147,11 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
         } else {
             0
         }
-        params.transforms.updateValue(transforms.dropLast(1) + supportedTransforms[replacementIndex])
+        val replacement = supportedTransforms[replacementIndex]
+        if (replacement == current) return false
+        togglePopup(null)
+        params.transforms.updateValue(transforms.dropLast(1) + replacement)
+        return true
     }
 
     fun flipTransformChirality(index: Int) {
@@ -169,17 +181,95 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
         params.transforms.updateValue(transforms.take(replacement.startIndex) + transform)
     }
 
+    fun navigateAddTransform(delta: Int): Boolean {
+        if (popup != Popup.AddTransform || addTransformOptions.isEmpty()) return false
+        addTransformSelection = (
+            addTransformSelection + delta + addTransformOptions.size
+        ) % addTransformOptions.size
+        return true
+    }
+
+    fun confirmAddTransform(): Boolean {
+        if (popup != Popup.AddTransform) return false
+        val selectedIndex = addTransformSelection.coerceAtMost(addTransformOptions.lastIndex)
+        val option = addTransformOptions.getOrNull(selectedIndex) ?: return false
+        updateTransform(transforms.size, option.transform)
+        return true
+    }
+
+    fun acceptVisibleSuggestion(): Boolean {
+        if (popup != null) return false
+        prefixReplacement?.let { replacement ->
+            acceptPrefixReplacement(replacement)
+            return true
+        }
+        if (params.suggestedSeed == null) return false
+        togglePopup(null)
+        params.acceptSuggestedSeed()
+        return true
+    }
+
+    val addDisabled = transforms.size > errorIndex
+    val isReset = transforms.isEmpty() &&
+        params.seed.value == Seed.Tetrahedron &&
+        lastFamilyN == MIN_FAMILY_SEED_N
+
+    fun toggleAddTransform(): Boolean {
+        if (addDisabled) return false
+        if (popup != Popup.AddTransform) addTransformSelection = 0
+        togglePopup(Popup.AddTransform)
+        return true
+    }
+
+    fun deleteLast(): Boolean {
+        if (isReset) return false
+        togglePopup(null)
+        if (transforms.isNotEmpty()) {
+            params.transforms.updateValue(transforms.dropLast(1))
+        } else {
+            lastFamilyN = MIN_FAMILY_SEED_N
+            params.clearRememberedOrbitTargets()
+            params.seed.updateValue(Seed.Tetrahedron)
+        }
+        return true
+    }
+
+    SideEffect {
+        if (popup == Popup.AddTransform) {
+            val selectedIndex = addTransformSelection.coerceAtMost(addTransformOptions.lastIndex)
+            document.getElementById(addTransformOptionId(selectedIndex))?.scrollIntoView()
+        }
+        keyboardActions?.adjustHorizontal = { delta ->
+            if (transforms.isEmpty()) adjustSeed(delta) else adjustLastTransform(delta)
+        }
+        keyboardActions?.adjustVertical = { delta ->
+            when {
+                transforms.lastOrNull()?.orbitTargetOrNull() != null -> adjustLastOrbitTarget(delta)
+                transforms.isEmpty() && params.seed.value.familyId != null -> adjustFamilyN(-delta)
+                else -> false
+            }
+        }
+        keyboardActions?.addTransform = ::toggleAddTransform
+        keyboardActions?.navigateAddTransform = ::navigateAddTransform
+        keyboardActions?.confirmAddTransform = ::confirmAddTransform
+        keyboardActions?.acceptSuggestion = ::acceptVisibleSuggestion
+        keyboardActions?.deleteTransform = ::deleteLast
+    }
+
     Div(attrs = { classes("ctrl-pane") }) {
         val addPopup = Popup.AddTransform
-        val addDisabled = transforms.size > errorIndex
         Div(attrs = { classes("btn", *activeWhen(popup, addPopup)) }) {
             if (popup == addPopup && !addDisabled) {
-                TransformDropdown(possibleTransformsAt(transforms.size)) { updateTransform(transforms.size, it) }
+                TransformDropdown(
+                    options = addTransformOptions,
+                    selectedIndex = addTransformSelection.coerceAtMost(addTransformOptions.lastIndex),
+                    onHighlight = { addTransformSelection = it },
+                ) { updateTransform(transforms.size, it) }
             }
             Button(attrs = {
                 classes("square", *activeWhen(popup, addPopup))
                 if (addDisabled) disabled()
-                onClick { togglePopup(addPopup) }
+                onClick { toggleAddTransform() }
             }) {
                 I(attrs = { classes("fa", "fa-plus") })
                 Aside(attrs = { classes("tooltip-text") }) { Text("Add transform") }
@@ -198,7 +288,9 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
                     LeftRightSpinner(itemDisabled) { adjustLastTransform(it) }
                 }
                 if (popup == itemPopup && !itemDisabled) {
-                    TransformDropdown(possibleTransformsAt(index)) { updateTransform(index, it) }
+                    TransformDropdown(displayedTransformOptions(possibleTransformsAt(index))) {
+                        updateTransform(index, it)
+                    }
                 }
                 if (popup == settingsPopup && hasSettings && !itemDisabled) {
                     TransformSettingsPopup(
@@ -229,7 +321,7 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
                     }
                 }
                 if (index == transforms.lastIndex && transforms[index].orbitTargetOrNull() != null) {
-                    OrbitTargetControls(itemDisabled, ::adjustLastOrbitTarget)
+                    OrbitTargetControls(itemDisabled) { adjustLastOrbitTarget(it) }
                 }
                 if (index == errorIndex) {
                     if (transformError?.isAsync == true) {
@@ -254,7 +346,7 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
         }
 
         Div(attrs = { classes("btn", *activeWhen(popup, Popup.Seed)) }) {
-            if (transforms.isEmpty()) LeftRightSpinner(disabled = false, onAdjust = ::adjustSeed)
+            if (transforms.isEmpty()) LeftRightSpinner(disabled = false) { adjustSeed(it) }
             if (popup == Popup.Seed) {
                 Aside(attrs = { classes("dropdown") }) {
                     var previousType: SeedType? = null
@@ -280,7 +372,7 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
                 Aside(attrs = { classes("tooltip-text") }) { Text("Seed") }
             }
             params.seed.value.familyId?.let { familyId ->
-                FamilySeedControls(familyId.n, ::adjustFamilyN)
+                FamilySeedControls(familyId.n) { adjustFamilyN(it) }
             }
             if (transforms.isEmpty() && params.seed.value.isChiral) {
                 ChiralityFlipButton(::flipSeedChirality)
@@ -306,20 +398,10 @@ fun ControlPane(params: PolyParams, popup: Popup?, togglePopup: (Popup?) -> Unit
     }
 
     Div(attrs = { classes("btn", "reset") }) {
-        val isReset = transforms.isEmpty() &&
-            params.seed.value == Seed.Tetrahedron &&
-            lastFamilyN == MIN_FAMILY_SEED_N
         Button(attrs = {
             classes("square")
             if (isReset) disabled()
-            onClick {
-                if (transforms.isNotEmpty()) params.transforms.updateValue(transforms.dropLast(1))
-                else {
-                    lastFamilyN = MIN_FAMILY_SEED_N
-                    params.clearRememberedOrbitTargets()
-                    params.seed.updateValue(Seed.Tetrahedron)
-                }
-            }
+            onClick { deleteLast() }
         }) {
             I(attrs = { classes("fa", "fa-trash-o") })
             Aside(attrs = { classes("tooltip-text") }) { Text("Delete transform/reset seed") }
@@ -401,32 +483,64 @@ private fun ChiralityFlipButton(onFlip: () -> Unit) {
 }
 
 @Composable
-private fun TransformDropdown(options: Set<Transform>, onSelect: (Transform) -> Unit) {
-    Aside(attrs = { classes("dropdown") }) {
+private fun TransformDropdown(
+    options: List<DisplayedTransformOption>,
+    selectedIndex: Int? = null,
+    onHighlight: ((Int) -> Unit)? = null,
+    onSelect: (Transform) -> Unit,
+) {
+    Aside(attrs = {
+        classes("dropdown")
+        if (selectedIndex != null) {
+            attr("role", "listbox")
+            attr("aria-label", "Transform options")
+        }
+    }) {
         for (category in TransformCategory.entries) {
-            val categoryOptions = options.filter { it.category == category }
+            val categoryOptions = options.withIndex().filter { it.value.category == category }
             if (categoryOptions.isNotEmpty()) {
                 GroupHeader(category.toString())
-                val displayedOptions = when (category) {
-                    TransformCategory.OrbitTargeted -> OrbitTargetedOperation.entries.mapNotNull { operation ->
-                        categoryOptions.filter { it.orbitTargetOrNull()?.operation == operation }
-                            .minByOrNull { it.orbitTargetOrNull()?.kind.toString() }
-                            ?.let { it to operation.optionName }
-                    }
-                    else -> categoryOptions.map { it to it.toString() }
-                }
-                for ((transform, name) in displayedOptions) {
+                for ((index, option) in categoryOptions) {
+                    val selected = index == selectedIndex
                     Div(attrs = { classes("text-row") }) {
                         Div(attrs = {
-                            classes("item")
-                            onClick { onSelect(transform) }
-                        }) { Text(name) }
+                            classes("item", *(if (selected) arrayOf("keyboard-selected") else emptyArray()))
+                            attr("role", "option")
+                            if (selectedIndex != null) attr("id", addTransformOptionId(index))
+                            if (selected) attr("aria-selected", "true")
+                            onMouseOver { onHighlight?.invoke(index) }
+                            onClick { onSelect(option.transform) }
+                        }) { Text(option.name) }
                     }
                 }
             }
         }
     }
 }
+
+private data class DisplayedTransformOption(
+    val transform: Transform,
+    val name: String,
+    val category: TransformCategory,
+)
+
+private fun displayedTransformOptions(options: Set<Transform>): List<DisplayedTransformOption> = buildList {
+    for (category in TransformCategory.entries) {
+        val categoryOptions = options.filter { it.category == category }
+        when (category) {
+            TransformCategory.OrbitTargeted -> OrbitTargetedOperation.entries.mapNotNullTo(this) { operation ->
+                categoryOptions.filter { it.orbitTargetOrNull()?.operation == operation }
+                    .minByOrNull { it.orbitTargetOrNull()?.kind.toString() }
+                    ?.let { transform -> DisplayedTransformOption(transform, operation.optionName, category) }
+            }
+            else -> categoryOptions.mapTo(this) { transform ->
+                DisplayedTransformOption(transform, transform.toString(), category)
+            }
+        }
+    }
+}
+
+private fun addTransformOptionId(index: Int): String = "add-transform-option-$index"
 
 @Composable
 private fun PrefixReplacementSuggestion(

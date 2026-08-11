@@ -205,7 +205,14 @@ div.btn.saves {
     right: 1em;
 }
 
-div.btn.saves > button > aside.tooltip-text {
+div.btn.help {
+    position: absolute;
+    top: 10em;
+    right: 1em;
+}
+
+div.btn.saves > button > aside.tooltip-text,
+div.btn.help > button > aside.tooltip-text {
     left: auto;
     right: 0;
 }
@@ -282,6 +289,57 @@ aside.drawer.saves {
     max-height: calc(100vh - 12em);
 }
 
+aside.drawer.help {
+    top: 12.5em;
+    width: min(25em, calc(100vw - 1em));
+    max-height: calc(100vh - 15em);
+}
+
+/* --------- Keyboard help --------- */
+
+.keyboard-help-about {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1em;
+    padding: 0.65em 0.7em;
+}
+
+.keyboard-help-title {
+    font-weight: 500;
+}
+
+.keyboard-help-version {
+    color: rgba(0, 0, 0, 0.65);
+    font-size: 0.72em;
+    white-space: nowrap;
+}
+
+table.keyboard-help-table td {
+    height: 1.65em;
+}
+
+td.keyboard-help-key {
+    width: 4.8em;
+    text-align: right;
+}
+
+span.keyboard-help-keycap {
+    display: inline-block;
+    min-width: 2.2em;
+    padding: 0.08em 0.4em;
+    border: 1px solid rgba(0, 0, 0, 0.45);
+    border-bottom-width: 0.18em;
+    border-radius: 0.3em;
+    background: rgba(255, 255, 255, 0.7);
+    box-shadow: 0 0.08em 0.12em rgba(0, 0, 0, 0.16);
+    font-family: inherit;
+    font-size: 0.78em;
+    font-weight: 500;
+    line-height: 1.25;
+    text-align: center;
+}
+
 /* --------- Saved configurations --------- */
 
 .save-current {
@@ -338,8 +396,16 @@ button.saved-configuration {
 }
 
 button.saved-configuration:hover,
-button.saved-configuration:focus-visible {
+button.saved-configuration:focus-visible,
+button.saved-configuration.keyboard-selected,
+.save-current.keyboard-selected {
     background: var(--hover-color);
+}
+
+.save-current.keyboard-selected,
+button.saved-configuration.keyboard-selected {
+    outline: 1px solid rgba(0, 0, 0, 0.22);
+    outline-offset: -1px;
 }
 
 img.saved-preview {
@@ -576,6 +642,11 @@ aside.dropdown {
 
 aside.dropdown div.item:hover {
     background-color: var(--hover-color);
+}
+
+aside.dropdown div.item.keyboard-selected {
+    background-color: var(--hover-color);
+    font-weight: 500;
 }
 
 /* --------- FEV popup --------- */

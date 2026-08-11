@@ -2,6 +2,7 @@
 
 This directory describes the current behavior and structure of Polyhedra Explorer. It is a live specification: changes to architecture, behavior, dependencies, or performance must update these documents in the same change. The documents describe the resulting state, not a change log or roadmap.
 
+- [Keyboard navigation](keyboard.md) — shortcut behavior, contextual navigation, focus rules, and in-app help.
 - [Transformations and macros](transformations.md) - names, notation, expansions, count formulas, and operation summaries.
 - [Seed catalog](seeds.md) — category definitions, complete seed table, symmetry and orbit counts, duals, and construction recipes.
 - [Symmetries](symmetries.md) — full Schoenflies point groups, axis/plane exploration, rotation orbits, and possible symmetry strengthening.

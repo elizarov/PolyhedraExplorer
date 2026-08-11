@@ -134,6 +134,7 @@ internal fun <K : AnyKind> OrbitInfoRow(
     val selected = selectedKind.value == kind
     Tr(attrs = {
         classes("info", *(if (selected) arrayOf("selected") else emptyArray()))
+        attr("aria-selected", selected.toString())
         onMouseOver { selectedKind.updateValue(kind) }
         onMouseOut {
             if (selectedKind.value == kind) selectedKind.updateValue(null)

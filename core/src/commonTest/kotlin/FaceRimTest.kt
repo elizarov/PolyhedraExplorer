@@ -1,5 +1,6 @@
 package polyhedra.core
 
+import polyhedra.core.poly.DisdyakisTriacontahedron
 import polyhedra.core.poly.Seed
 import polyhedra.model.poly.FaceKind
 import polyhedra.model.poly.FaceRim

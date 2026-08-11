@@ -77,6 +77,7 @@ class OrbitSelectionTest {
                     row.classList.contains("selected"),
                     "Row $index must follow external selection state",
                 )
+                assertEquals("true", row.getAttribute("aria-selected"))
             }
         }
     }

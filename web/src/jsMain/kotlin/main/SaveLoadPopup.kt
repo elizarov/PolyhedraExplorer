@@ -5,6 +5,7 @@
 package polyhedra.web.main
 
 import androidx.compose.runtime.*
+import kotlinx.browser.document
 import kotlinx.browser.window
 import org.jetbrains.compose.web.attributes.InputType
 import org.jetbrains.compose.web.attributes.disabled
@@ -21,12 +22,14 @@ internal fun SaveLoadPopup(
     store: SavedConfigurationStore,
     capturePreview: CanvasPreviewCapture,
     onLoad: (String) -> Unit,
+    keyboardActions: SaveKeyboardActions? = null,
 ) {
     var savedConfigurations by remember(store) { mutableStateOf(store.load()) }
     var saveName by remember(autoName) { mutableStateOf(autoName) }
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var now by remember { mutableStateOf(Date.now().toLong()) }
+    var keyboardSelection by remember { mutableStateOf(0) }
 
     DisposableEffect(Unit) {
         val interval = window.setInterval({ now = Date.now().toLong() }, 30_000)
@@ -57,8 +60,38 @@ internal fun SaveLoadPopup(
         }
     }
 
+    fun navigate(delta: Int): Boolean {
+        val rowCount = savedConfigurations.size + 1
+        keyboardSelection = (keyboardSelection + delta).mod(rowCount)
+        return true
+    }
+
+    fun confirm(): Boolean {
+        if (keyboardSelection == 0) {
+            if (saving) return false
+            saveCurrent()
+            return true
+        }
+        val saved = savedConfigurations.getOrNull(keyboardSelection - 1) ?: return false
+        onLoad(saved.urlState)
+        return true
+    }
+
+    SideEffect {
+        keyboardActions?.navigate = ::navigate
+        keyboardActions?.confirm = ::confirm
+    }
+    LaunchedEffect(keyboardSelection) {
+        document.getElementById(savedConfigurationRowId(keyboardSelection))?.scrollIntoView()
+    }
+
     GroupHeader("Save current")
-    Div(attrs = { classes("save-current") }) {
+    Div(attrs = {
+        classes("save-current", *(if (keyboardSelection == 0) arrayOf("keyboard-selected") else emptyArray()))
+        attr("id", savedConfigurationRowId(0))
+        attr("aria-selected", (keyboardSelection == 0).toString())
+        onMouseOver { keyboardSelection = 0 }
+    }) {
         Input(type = InputType.Text, attrs = {
             classes("save-name")
             attr("aria-label", "Save name")
@@ -94,11 +127,18 @@ internal fun SaveLoadPopup(
         }
     } else {
         Div(attrs = { classes("saved-configurations") }) {
-            for (saved in savedConfigurations) {
+            for ((index, saved) in savedConfigurations.withIndex()) {
+                val rowIndex = index + 1
                 Button(attrs = {
-                    classes("saved-configuration")
+                    classes(
+                        "saved-configuration",
+                        *(if (keyboardSelection == rowIndex) arrayOf("keyboard-selected") else emptyArray()),
+                    )
+                    attr("id", savedConfigurationRowId(rowIndex))
+                    attr("aria-selected", (keyboardSelection == rowIndex).toString())
                     attr("aria-label", "Load ${saved.name}, saved ${relativeSavedTime(saved.savedAtEpochMillis, now)}")
                     attr("title", "Saved ${Date(saved.savedAtEpochMillis.toDouble()).toLocaleString()}")
+                    onMouseOver { keyboardSelection = rowIndex }
                     onClick { onLoad(saved.urlState) }
                 }) {
                     Img(
@@ -118,3 +158,5 @@ internal fun SaveLoadPopup(
         }
     }
 }
+
+private fun savedConfigurationRowId(index: Int): String = "saved-configuration-row-$index"

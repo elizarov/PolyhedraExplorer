@@ -162,6 +162,43 @@ class SavedConfigurationsTest {
         }
     }
 
+    @Test
+    fun keyboardSelectsSaveCurrentThenLoadsSavedRows(): Promise<Unit> {
+        val storage = FakeSavedConfigurationStorage()
+        val store = SavedConfigurationStore(storage) { 1_000L }
+        val actions = SaveKeyboardActions()
+        var loadedState: String? = null
+        composition = renderComposable(host) {
+            SaveLoadPopup(
+                autoName = "Cube",
+                serializeState = { "s(C)" },
+                store = store,
+                capturePreview = { it(PREVIEW_RED) },
+                onLoad = { loadedState = it },
+                keyboardActions = actions,
+            )
+        }
+
+        val saveCurrent = assertNotNull(host.querySelector(".save-current.keyboard-selected"))
+        assertEquals("true", saveCurrent.getAttribute("aria-selected"))
+        assertTrue(actions.confirm())
+        assertEquals(1, storage.length)
+
+        return awaitRecomposition().then {
+            assertTrue(actions.navigate(1))
+            awaitRecomposition()
+        }.then {
+            val saved = assertNotNull(host.querySelector("button.saved-configuration.keyboard-selected"))
+            assertEquals("true", saved.getAttribute("aria-selected"))
+            assertTrue(actions.confirm())
+            assertEquals("s(C)", loadedState)
+            assertTrue(actions.navigate(1))
+            awaitRecomposition()
+        }.then {
+            assertNotNull(host.querySelector(".save-current.keyboard-selected"), "Selection must wrap")
+        }
+    }
+
     private fun saveNameInput() = host.querySelector("input.save-name") as HTMLInputElement
 
     private fun savedNames(): List<HTMLElement> {

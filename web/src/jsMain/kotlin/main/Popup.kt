@@ -5,6 +5,7 @@ sealed class Popup {
     object Export : Popup()
     object PrintColor : Popup()
     object Saves : Popup()
+    object Help : Popup()
     object Seed : Popup()
     object AddTransform : Popup()
     data class ModifyTransform(val index: Int) : Popup()
