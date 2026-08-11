@@ -64,22 +64,22 @@ class ContinuousTransformRangeTest {
 
     @Test
     fun outerExplorationExtremesNeverExposeInvalidGeometryForPrisms() = runTest {
-        validateOuterExtremes(FamilySeeds.withFamily(SeedFamily.Prism))
+        validateOuterExtremes(representativeFamilySeeds.withFamily(SeedFamily.Prism))
     }
 
     @Test
     fun outerExplorationExtremesNeverExposeInvalidGeometryForAntiprisms() = runTest {
-        validateOuterExtremes(FamilySeeds.withFamily(SeedFamily.Antiprism))
+        validateOuterExtremes(representativeFamilySeeds.withFamily(SeedFamily.Antiprism))
     }
 
     @Test
     fun outerExplorationExtremesNeverExposeInvalidGeometryForPyramids() = runTest {
-        validateOuterExtremes(FamilySeeds.withFamily(SeedFamily.Pyramid))
+        validateOuterExtremes(representativeFamilySeeds.withFamily(SeedFamily.Pyramid))
     }
 
     @Test
     fun outerExplorationExtremesNeverExposeInvalidGeometryForBipyramids() = runTest {
-        validateOuterExtremes(FamilySeeds.withFamily(SeedFamily.Bipyramid))
+        validateOuterExtremes(representativeFamilySeeds.withFamily(SeedFamily.Bipyramid))
     }
 
     private suspend fun validateOuterExtremes(seeds: List<Seed>) {
