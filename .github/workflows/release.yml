@@ -45,6 +45,7 @@ jobs:
         uses: browser-actions/setup-chrome@v2.1.2
         with:
           chrome-version: 151.0.7922.77
+          install-chromedriver: true
 
       - name: Run test suite
         run: ./gradlew test
