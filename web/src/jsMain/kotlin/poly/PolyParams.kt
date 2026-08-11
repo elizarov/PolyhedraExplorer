@@ -404,7 +404,7 @@ class ViewParams(
     val symmetryPlaneSize = using(DoubleParam("ps", 1.1, 1.0, 2.0, 0.01))
     val symmetryAxisSize = using(DoubleParam("as", 1.2, 1.0, 2.0, 0.01))
     val display = using(EnumParam("d", Display.All, Displays))
-    val environment = using(EnumParam("env", SceneEnvironment.None, SceneEnvironments))
+    val environment = using(EnumParam("env", SceneEnvironment.Table, SceneEnvironments))
 }
 
 class LightingParams(tag: String, animationParams: ViewAnimationParams?) : Param.Composite(tag) {

@@ -70,18 +70,18 @@ class EnvironmentRenderingTest {
     }
 
     @Test
-    fun tableEnvironmentRoundTripsAndNoneStaysImplicit() {
+    fun tableEnvironmentIsImplicitDefaultAndNoneRoundTrips() {
         val source = RootParams()
-        assertEquals(SceneEnvironment.None, source.render.view.environment.value)
+        assertEquals(SceneEnvironment.Table, source.render.view.environment.value)
         assertFalse("env(" in source.toString())
 
-        source.render.view.environment.updateValue(SceneEnvironment.Table)
+        source.render.view.environment.updateValue(SceneEnvironment.None)
         val serialized = source.toString()
-        assertTrue("env(t)" in serialized, serialized)
+        assertTrue("env(n)" in serialized, serialized)
 
         val restored = RootParams()
         restored.loadFromString(serialized)
-        assertEquals(SceneEnvironment.Table, restored.render.view.environment.value)
+        assertEquals(SceneEnvironment.None, restored.render.view.environment.value)
     }
 
     @Test

@@ -77,7 +77,7 @@ and two are necessary to vary opaque plastics.
 
 | Group | Control | Default | Range | Meaning |
 | --- | --- | ---: | ---: | --- |
-| View | Environment | `None` | `None`, `Table` | Keep the background-only view, or add the lit table and cast shadow. |
+| View | Environment | `Table` | `None`, `Table` | Keep the background-only view, or add the lit table and cast shadow. |
 | Lighting | Key light | `2.5` | `0.0–5.0` | Radiance multiplier for the fixed neutral-warm studio point light. |
 | Lighting | Fill light | `0.22` | `0.0–1.0` | Intensity of the cool constant environment approximation. |
 | Material | Roughness | `0.45` | `0.15–1.0` | Perceived microsurface roughness; lower is glossier and higher is more matte. |
