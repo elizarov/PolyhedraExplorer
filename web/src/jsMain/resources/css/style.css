@@ -814,13 +814,48 @@ button.orbit-target-action > aside.tooltip-text {
     color: red;
 }
 
-/* --------- canvas fps --------- */
+/* --------- GitHub / canvas fps --------- */
 
-.fps {
+div.github-corner {
     position: absolute;
-    margin-right: 5px;
-    bottom: 0;
-    right: 0;
+    right: 1em;
+    bottom: 0.25em;
+    width: 2em;
+    display: flex;
+    flex-flow: column nowrap;
+    align-items: center;
+    gap: 0.3em;
+    pointer-events: none;
+}
+
+a.github-link {
+    width: 2em;
+    height: 2em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-color);
+    text-decoration: none;
+    pointer-events: auto;
+}
+
+a.github-link > i {
+    font-size: 2em;
+    line-height: 1;
+}
+
+a.github-link:hover,
+a.github-link:focus-visible {
+    color: var(--button-background-color);
+}
+
+div.github-caption {
+    min-width: 6em;
+    font-size: 0.45em;
+    font-weight: 500;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
 }
 
 /* --------- custom select style --------- */

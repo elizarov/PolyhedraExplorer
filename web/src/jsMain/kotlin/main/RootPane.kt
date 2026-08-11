@@ -9,6 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import org.jetbrains.compose.web.dom.A
 import org.jetbrains.compose.web.dom.Aside
 import org.jetbrains.compose.web.dom.Button
 import org.jetbrains.compose.web.dom.Div
@@ -20,11 +21,14 @@ import polyhedra.web.poly.CanvasPreviewCapture
 import polyhedra.web.poly.FaceContext
 import polyhedra.web.poly.PolyCanvas
 
+internal const val PROJECT_GITHUB_URL = "https://github.com/elizarov/PolyhedraExplorer"
+
 @Composable
 fun RootPane(params: RootParams) {
     params.render.poly.observe(Param.TargetValue + Param.Progress)
     var popup by remember { mutableStateOf<Popup?>(null) }
     var faces by remember { mutableStateOf<FaceContext?>(null) }
+    var fps by remember { mutableStateOf<Int?>(null) }
     var capturePreview by remember { mutableStateOf<CanvasPreviewCapture>({ onCaptured -> onCaptured(null) }) }
     val savedConfigurationStore = remember { SavedConfigurationStore() }
     val togglePopup: (Popup?) -> Unit = { requested ->
@@ -40,6 +44,7 @@ fun RootPane(params: RootParams) {
             popup = popup,
             faceContextSink = { faces = it },
             previewCaptureSink = { capturePreview = it },
+            fpsSink = { fps = it },
             resetPopup = {
                 params.render.poly.clearRolloverSelection()
                 popup = null
@@ -79,6 +84,7 @@ fun RootPane(params: RootParams) {
             }
         }
     }
+    GitHubCorner(fps)
     when (popup) {
         Popup.Config -> Aside(attrs = { classes("drawer", "config") }) { ConfigPopup(params) }
         Popup.Export -> Aside(attrs = { classes("drawer", "export") }) {
@@ -99,6 +105,25 @@ fun RootPane(params: RootParams) {
         else -> Unit
     }
 }
+
+@Composable
+internal fun GitHubCorner(fps: Int?) {
+    Div(attrs = { classes("github-corner") }) {
+        A(href = PROJECT_GITHUB_URL, attrs = {
+            classes("github-link")
+            attr("target", "_blank")
+            attr("rel", "noopener noreferrer")
+            attr("aria-label", "Open Polyhedra Explorer on GitHub")
+        }) {
+            I(attrs = { classes("fa", "fa-github") })
+        }
+        Div(attrs = { classes("github-caption", "fps") }) {
+            Text(fpsCaption(fps))
+        }
+    }
+}
+
+internal fun fpsCaption(fps: Int?): String = fps?.let { "$it fps" } ?: "Open Source"
 
 internal fun activeWhen(actual: Popup?, expected: Popup): Array<String> =
     if (actual == expected) arrayOf("active") else emptyArray()

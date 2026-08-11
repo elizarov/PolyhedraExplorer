@@ -9,7 +9,6 @@ import androidx.compose.runtime.remember
 import kotlinx.browser.document
 import kotlinx.browser.window
 import org.jetbrains.compose.web.dom.Canvas
-import org.jetbrains.compose.web.dom.Div
 import org.w3c.dom.*
 import org.w3c.dom.events.*
 import polyhedra.model.util.norm
@@ -34,12 +33,14 @@ fun PolyCanvas(
     popup: Popup?,
     faceContextSink: (FaceContext) -> Unit,
     previewCaptureSink: (CanvasPreviewCapture) -> Unit = {},
+    fpsSink: (Int?) -> Unit = {},
     resetPopup: () -> Unit,
 ) {
     val controller = remember(params) { PolyCanvasController(params) }
     controller.popup = popup
     controller.faceContextSink = faceContextSink
     controller.previewCaptureSink = previewCaptureSink
+    controller.fpsSink = fpsSink
     controller.resetPopup = resetPopup
 
     Canvas(attrs = {
@@ -49,20 +50,13 @@ fun PolyCanvas(
             onDispose { controller.destroy() }
         }
     })
-    Div(attrs = {
-        classes("fps")
-        ref { element ->
-            controller.fpsElement = element
-            onDispose { controller.fpsElement = null }
-        }
-    })
 }
 
 private class PolyCanvasController(private val params: RenderParams) {
     var faceContextSink: (FaceContext) -> Unit = {}
     var previewCaptureSink: (CanvasPreviewCapture) -> Unit = {}
+    var fpsSink: (Int?) -> Unit = {}
     var resetPopup: () -> Unit = {}
-    var fpsElement: HTMLDivElement? = null
     var popup: Popup? = null
         set(value) {
             if (field == value) return
@@ -114,6 +108,7 @@ private class PolyCanvasController(private val params: RenderParams) {
         if (!mounted) return
         mounted = false
         cancelFpsTimeout()
+        fpsSink(null)
         pendingPreviewCapture?.invoke(null)
         pendingPreviewCapture = null
         previewCaptureSink { onCaptured -> onCaptured(null) }
@@ -323,7 +318,7 @@ private class PolyCanvasController(private val params: RenderParams) {
     }
 
     private val fpsTick: () -> Unit = {
-        fpsElement?.textContent = if (drawCount == 0) "" else "$drawCount fps"
+        fpsSink(drawCount.takeIf { it > 0 })
         fpsTimeout = 0
         drawCount = 0
         if (mounted) requestFpsTimeout()
