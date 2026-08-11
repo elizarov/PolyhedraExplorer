@@ -45,6 +45,7 @@ abstract class GLBuffer<T : GLType<T>, D : BufferDataSource>(
 
     fun bindBufferData(gl: GL, target: Int = GL.ARRAY_BUFFER) {
         if (replaceGlBuffer) {
+            if (target == GL.ARRAY_BUFFER) detachVertexAttributes(gl)
             gl.deleteBuffer(glBuffer)
             glBuffer = requireNotNull(gl.createBuffer())
             replaceGlBuffer = false
@@ -52,6 +53,17 @@ abstract class GLBuffer<T : GLType<T>, D : BufferDataSource>(
         gl.bindBuffer(target, glBuffer)
         gl.bufferData(target, data, GL.STATIC_DRAW)
         hasUploaded = true
+    }
+
+    private fun detachVertexAttributes(gl: GL) {
+        val maxAttributes = gl.getParameter(GL.MAX_VERTEX_ATTRIBS) as Int
+        for (index in 0 until maxAttributes) {
+            if (gl.getVertexAttrib(index, GL.VERTEX_ATTRIB_ARRAY_BUFFER_BINDING) === glBuffer) {
+                // A draw fails while an enabled attribute still points at a deleted buffer. The
+                // next program use will bind and enable the replacement in the normal way.
+                gl.disableVertexAttribArray(index)
+            }
+        }
     }
 }
 
