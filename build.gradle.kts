@@ -10,6 +10,12 @@ allprojects {
     version = "1.0-SNAPSHOT"
 }
 
+tasks.register("test") {
+    group = "verification"
+    description = "Runs core tests on the JVM and web tests in a JS browser for fast feedback."
+    dependsOn(":core:jvmTest", ":web:jsBrowserTest")
+}
+
 fun registerBrowserDistribution(
     taskName: String,
     mode: String,
