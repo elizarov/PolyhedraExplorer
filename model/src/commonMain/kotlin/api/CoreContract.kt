@@ -41,6 +41,7 @@ data class CoreIssue(
     val code: CoreIssueCode,
     val transformTag: String? = null,
     val fev: FEV? = null,
+    val detail: String? = null,
 )
 
 @Serializable

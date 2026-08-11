@@ -10,6 +10,19 @@ import polyhedra.model.poly.*
 import polyhedra.model.util.*
 
 fun Polyhedron.exportGeometryToScad(name: String, description: String): String = buildString {
+    val exportFaces = fs.flatMap { face ->
+        if (face.isPlanar && face.isConvex) {
+            listOf(ScadFace(face.fvs.map(Vertex::id), face.kind, face.id))
+        } else {
+            face.triangles.map { triangle ->
+                ScadFace(
+                    listOf(face[triangle.c].id, face[triangle.b].id, face[triangle.a].id),
+                    face.kind,
+                    face.id,
+                )
+            }
+        }
+    }
     appendLine("// polyhedron($name[0], $name[1]);")
     appendLine("// $description")
     appendLine()
@@ -25,15 +38,15 @@ fun Polyhedron.exportGeometryToScad(name: String, description: String): String =
         appendLine(" // ${v.id} ${v.kind} vertex")
     }
     appendLine("], [")
-    for ((i, f) in fs.withIndex()) {
-        append(" [${f.fvs.joinToString { it.id.toString() }}]")
-        appendSeparator(i, fs.size)
-        appendLine(" // ${f.id} ${f.kind} face")
+    for ((i, f) in exportFaces.withIndex()) {
+        append(" [${f.vertexIds.joinToString()}]")
+        appendSeparator(i, exportFaces.size)
+        appendLine(" // ${f.sourceFaceId} ${f.kind} face")
     }
     appendLine("], [")
     appendLine(vs.joinToStringRows("  ") { it.kind.id.toString() })
     appendLine("], [")
-    appendLine(fs.joinToStringRows("  ") { it.kind.id.toString() })
+    appendLine(exportFaces.joinToStringRows("  ") { it.kind.id.toString() })
     appendLine("]];")
 }
 
@@ -65,6 +78,12 @@ fun download(filename: String, content: String) {
     body.removeChild(node)
 
 }
+
+private data class ScadFace(
+    val vertexIds: List<Int>,
+    val kind: FaceKind,
+    val sourceFaceId: Int,
+)
 
 external fun encodeURIComponent(content: String): String
 

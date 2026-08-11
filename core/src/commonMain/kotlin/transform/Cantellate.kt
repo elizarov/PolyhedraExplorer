@@ -66,7 +66,17 @@ fun Polyhedron.cantellated(
     mergeIndistinguishableKinds()
 }
 
-fun Polyhedron.dual(): Polyhedron = transformedPolyhedron(Transform.Dual) {
+fun Polyhedron.dual(): Polyhedron {
+    val direct = polarDual()
+    if (isConvexGeometry || runCatching { direct.validateProperGeometry() }.isSuccess) return direct
+
+    // Polar reciprocation of a reflex vertex can produce a self-crossing dual face even when the
+    // origin lies inside the input. Duality is topological, so use the canonical realization as a
+    // deterministic slower fallback and then reciprocate its supporting planes.
+    return canonical().polarDual().also { it.validateProperGeometry() }
+}
+
+private fun Polyhedron.polarDual(): Polyhedron = transformedPolyhedron(Transform.Dual) {
     val rr = dualReciprocationRadius
     // vertices from the original faces
     val fv = fs.associateWith { f ->

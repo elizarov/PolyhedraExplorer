@@ -294,7 +294,7 @@ private suspend fun Polyhedron.canonicalAttempt(
         if (initialMaxOffset == 0.0) initialMaxOffset = maxOffset
         if (maxOffset <= TARGET_TOLERANCE) {
             updateOrbitFacePlanes(symmetry)
-            val candidate = rebuildFromPacking(symmetry)
+            val candidate = rebuildFromPacking(symmetry).withOutwardOrientation()
             if (candidate.isCanonical()) {
                 result = candidate
                 break
@@ -336,6 +336,18 @@ private suspend fun Polyhedron.canonicalAttempt(
     )
     totalIterations += iterations
     return requireNotNull(result)
+}
+
+private fun Polyhedron.withOutwardOrientation(): Polyhedron {
+    val volume = signedVolume()
+    check(abs(volume) > EPS && volume.isFinite()) { "Canonical reconstruction has zero signed volume" }
+    if (volume > 0.0) return this
+    val source = this
+    return polyhedron {
+        vertices(source.vs)
+        for (face in source.fs) face(face.fvs.asReversed(), face.kind)
+        faceKindSources(source.faceKindSources)
+    }
 }
 
 private fun tuttePackingPoints(topology: PackingTopology): List<MutableVec3> {

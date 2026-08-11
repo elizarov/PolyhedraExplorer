@@ -8,6 +8,7 @@ This directory describes the current behavior and structure of Polyhedra Explore
 - [Symmetries](symmetries.md) — full Schoenflies point groups, axis/plane exploration, rotation orbits, and possible symmetry strengthening.
 - [Lighting and plastic material](lighting.md) — dielectric microfacet model, PLA defaults, controls, performance, and limitations.
 - [Architecture](architecture.md) — module boundaries, runtime flow, and invariants.
+- [Non-convex geometry](non-convex.md) — surface validity, shared triangulation, rims, and transform applicability.
 - [Features](features.md) — user-visible capabilities and supported operations.
 - [Glossary](glossary.md) — project terminology and notation.
 - [Canonicalization](canonicalization.md) — canonical representation invariants, solver steps, safeguards, and optimizations.

@@ -41,11 +41,12 @@ class FaceRim(f: Face)  {
             }
 
             // The fixed-topology inset remains valid until its first shrinking edge collapses.
-            maxRim = (0 until n).mapNotNull { i ->
+            val edgeCollapseLimit = (0 until n).mapNotNull { i ->
                 val j = (i + 1) % n
                 val shrinkRate = (rimDir[i] - rimDir[j]) * projectedEvu[i]
                 if (shrinkRate > EPS) projectedLength[i] / shrinkRate else null
             }.minOrNull() ?: 0.0
+            maxRim = safeInsetLimit(f, rimDir, edgeCollapseLimit)
         }
     }
 
@@ -53,4 +54,36 @@ class FaceRim(f: Face)  {
         val j = (i + 1) % f.size
         (f[j] cross f[i]).unit
     }
+}
+
+/**
+ * Convex insets first fail when an edge collapses. A concave inset can fail earlier when a reflex
+ * corner reaches another edge, so search the interval up to the first edge collapse and keep only
+ * the initial simple-polygon range. This also works for a non-planar face because triangulation and
+ * rim construction use the same average-plane projection.
+ */
+private fun safeInsetLimit(face: Face, directions: List<Vec3>, edgeCollapseLimit: Double): Double {
+    if (!edgeCollapseLimit.isFinite() || edgeCollapseLimit <= EPS) return 0.0
+    fun isValid(rim: Double): Boolean {
+        val inset = face.fvs.mapIndexed { index, vertex -> vertex + directions[index] * rim }
+        return runCatching { triangulateFace(inset, face) }.isSuccess
+    }
+
+    var previous = 0.0
+    val samples = 64
+    for (sample in 1..samples) {
+        val candidate = edgeCollapseLimit * sample / samples
+        if (isValid(candidate)) {
+            previous = candidate
+            continue
+        }
+        var valid = previous
+        var invalid = candidate
+        repeat(32) {
+            val middle = (valid + invalid) / 2.0
+            if (isValid(middle)) valid = middle else invalid = middle
+        }
+        return valid
+    }
+    return edgeCollapseLimit
 }

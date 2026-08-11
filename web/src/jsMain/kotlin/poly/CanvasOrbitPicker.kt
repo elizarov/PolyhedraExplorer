@@ -125,7 +125,7 @@ internal class CanvasOrbitPicker(
         // triangles. A rendered front face is therefore positive in the
         // Y-down canvas coordinates used here.
         if (signedArea <= SCREEN_EPSILON) return null
-        return ProjectedFace(points)
+        return ProjectedFace(points, face.triangles)
     }
 
     private fun interpolate(target: Vec3, previous: Vec3): Vec3 {
@@ -148,12 +148,20 @@ internal data class ScreenPoint(val x: Double, val y: Double, val depth: Double)
 
 private data class ClipPoint(val x: Double, val y: Double, val z: Double, val w: Double)
 
-private data class ProjectedFace(val points: List<ScreenPoint>) {
+private data class ProjectedFace(
+    val points: List<ScreenPoint>,
+    val triangles: List<FaceTriangle>,
+) {
     fun depthAt(x: Double, y: Double): Double? {
-        val first = points.first()
         var nearest: Double? = null
-        for (index in 2 until points.size) {
-            val depth = triangleDepthAt(x, y, first, points[index - 1], points[index]) ?: continue
+        for (triangle in triangles) {
+            val depth = triangleDepthAt(
+                x,
+                y,
+                points[triangle.a],
+                points[triangle.b],
+                points[triangle.c],
+            ) ?: continue
             nearest = nearest?.let { min(it, depth) } ?: depth
         }
         return nearest

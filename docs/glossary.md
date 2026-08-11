@@ -3,6 +3,10 @@
 | Term | Meaning |
 | --- | --- |
 | Polyhedron | An immutable vertex/edge/face mesh plus orbit-kind metadata. |
+| [Proper surface](non-convex.md) | One connected, consistently oriented two-manifold mesh whose faces intersect only at their explicitly shared vertices and edges. Every edge has exactly two opposite face uses. |
+| Non-convex polyhedron | A proper polyhedron that is not the boundary of a convex set. Its faces may be convex or concave; non-convexity is a property of the whole realization. |
+| Concave face | A simple polygonal face with at least one reflex corner. It is filled, picked, animated, and exported through the model's shared ear-clipped triangulation rather than a triangle fan. |
+| Compound | Two or more disconnected closed polyhedral shells treated as one result. Compounds are rejected. |
 | [Seed](seeds.md) | A built-in starting polyhedron selected before transforms. There are 31 fixed types, four additional prime-tagged chiral representations, and four families with `n = 3..100`. |
 | Seed family | A parameterized seed class: Prism, Antiprism, Pyramid, or Bipyramid. Its base/equator order `n` is stored in the seed tag and changed with bounded up/down controls. The UI privately remembers the last selected `n` (initially 3) across popup and horizontal navigation through every seed category; only a seed-level reset clears it. |
 | Catalog recognition | Orientation-sensitive comparison of a completed transform result with both handed variants of the built-in seeds after circumradius normalization. A match with the proper chirality is offered as an optional replacement; accepting it replaces the equivalent seed-plus-transform-chain state with the single catalog seed. |
@@ -34,7 +38,7 @@
 | Circumradius | Maximum distance from the origin to a vertex. |
 | Midradius | Mean closest distance from the origin to an edge. |
 | Inradius | Minimum distance from the origin to a face plane. |
-| Face rim | In-face inset used to render borders around hidden or expanded faces. |
+| Face rim | In-face inset used to render borders around hidden or expanded faces. Its maximum stops before the first edge collapse or concave reflex-corner collision, and it uses the average plane for a non-planar face. |
 | Print preview | An export-drawer rendering mode that replaces face-orbit colors with one selected filament color across faces, rims, inner surfaces, and walls, while suppressing edge overlays. It changes presentation only; mesh geometry and exported STL/SCAD data are unchanged. |
 | OKLCH | The perceptual color space used by the print-color picker. Lightness controls brightness, chroma controls colorfulness, and hue chooses the color family; out-of-gamut selections reduce chroma while preserving lightness and hue before conversion to sRGB. |
 | Saved configuration | One append-only, versioned browser-local record containing a custom or generated name, save timestamp, exact URL-format application state, and cropped scene preview. Loading it restores the URL state and reloads the application; saves are ordered newest first and are not deleted by the UI. |

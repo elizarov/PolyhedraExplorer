@@ -282,7 +282,6 @@ private suspend fun safeTweakRange(
             inputPoly,
             inputPendingRectification,
             reportProgress = {},
-            validateResultGeometry = true,
             outputScale = outputScale,
         ) is TransformApplication.Success
     }
@@ -324,8 +323,6 @@ private suspend fun applyTransform(
     inputPoly: Polyhedron,
     inputPendingRectification: PendingRectification?,
     reportProgress: (Int) -> Unit,
-    validateResultGeometry: Boolean =
-        transform.spec.tweaks.isNotEmpty() || transform.spec.id.transformTweakRanges().isNotEmpty(),
     outputScale: Scale? = null,
 ): TransformApplication {
     var poly = inputPoly
@@ -368,10 +365,14 @@ private suspend fun applyTransform(
                 else -> primitive.asyncTransform?.invoke(poly, OperationProgressContext(reportPrimitiveProgress))
                     ?: primitive.transform(poly)
             }
+        } catch (cause: IllegalArgumentException) {
+            return TransformApplication.Failure(
+                CoreIssue(CoreIssueCode.InvalidGeometry, transform.tag, detail = cause.message)
+            )
         } catch (cause: Throwable) {
             cause.printStackTrace()
             return TransformApplication.Failure(
-                CoreIssue(CoreIssueCode.TransformFailed, transform.tag)
+                CoreIssue(CoreIssueCode.TransformFailed, transform.tag, detail = cause.message)
             )
         }
 
@@ -384,15 +385,15 @@ private suspend fun applyTransform(
         reportPrimitiveProgress(100)
     }
 
-    if (validateResultGeometry) {
-        try {
-            poly.validateMeshGeometry()
-            outputScale?.let { poly.scaled(it).validateMeshGeometry() }
-        } catch (cause: IllegalArgumentException) {
-            return TransformApplication.Failure(
-                CoreIssue(CoreIssueCode.InvalidGeometry, transform.tag)
-            )
-        }
+    try {
+        poly.validateProperGeometry()
+        // Uniform positive scaling preserves intersections; only recheck finite coordinates and
+        // orientation because a non-convex radius denominator can be zero or negative.
+        outputScale?.let { poly.scaled(it).validateMeshGeometry() }
+    } catch (cause: IllegalArgumentException) {
+        return TransformApplication.Failure(
+            CoreIssue(CoreIssueCode.InvalidGeometry, transform.tag, detail = cause.message)
+        )
     }
 
     return TransformApplication.Success(poly, pendingRectification, isIdentity)
@@ -637,12 +638,11 @@ private fun Polyhedron.triangulatedForAnimation(): Polyhedron {
     return polyhedron {
         vertices(topology.vs)
         for (face in topology.fs) {
-            if (face.size <= 3) {
-                face(face.fvs, face.kind)
-            } else {
-                for (index in 1 until (face.size - 1)) {
-                    face(listOf(face.fvs[0], face.fvs[index], face.fvs[index + 1]), face.kind)
-                }
+            for (triangle in face.triangles) {
+                face(
+                    listOf(face[triangle.c], face[triangle.b], face[triangle.a]),
+                    face.kind,
+                )
             }
         }
         faceKindSources(topology.faceKindSources)

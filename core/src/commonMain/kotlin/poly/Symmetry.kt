@@ -35,6 +35,7 @@ fun Polyhedron.analyzeSymmetry(): CoreSymmetry {
     val radius = circumradius.coerceAtLeast(1.0)
     val tolerance = radius * SYMMETRY_TOLERANCE
     val vertexIndex = VertexSpatialIndex(vs, tolerance)
+    val topology = SymmetryTopology(this)
     val sourceEdge = directedEdges.firstOrNull { edgeFrame(it, tolerance) != null }
         ?: error("Cannot derive a symmetry frame from $this")
     val sourceFrame = requireNotNull(edgeFrame(sourceEdge, tolerance))
@@ -44,11 +45,17 @@ fun Polyhedron.analyzeSymmetry(): CoreSymmetry {
     for (targetEdge in directedEdges) {
         val targetFrame = edgeFrame(targetEdge, tolerance) ?: continue
         if (sourceEdge.hasMatchingGeometry(targetEdge, tolerance, reverseSides = false)) {
-            symmetryOperation(sourceFrame, targetFrame, orientation = 1, vertexIndex)
+            symmetryOperation(sourceFrame, targetFrame, orientation = 1, vertexIndex, topology)
                 ?.let(proper::add)
         }
         if (improperSeed == null && sourceEdge.hasMatchingGeometry(targetEdge, tolerance, reverseSides = true)) {
-            improperSeed = symmetryOperation(sourceFrame, targetFrame, orientation = -1, vertexIndex)?.transform
+            improperSeed = symmetryOperation(
+                sourceFrame,
+                targetFrame,
+                orientation = -1,
+                vertexIndex,
+                topology,
+            )?.transform
         }
     }
     check(proper.isNotEmpty()) { "Every polyhedron must have the identity symmetry" }
@@ -109,17 +116,28 @@ private data class SymmetryOperation(
     val vertexPermutation: IntArray,
 )
 
+private class SymmetryTopology(poly: Polyhedron) {
+    private val edges = poly.es.mapTo(HashSet()) { edge -> edgeKey(edge.a.id, edge.b.id) }
+    private val faces = poly.fs.mapTo(HashSet()) { face -> face.fvs.map(Vertex::id).sorted() }
+
+    fun isPreserved(permutation: IntArray, poly: Polyhedron): Boolean =
+        poly.es.all { edge -> edgeKey(permutation[edge.a.id], permutation[edge.b.id]) in edges } &&
+            poly.fs.all { face -> face.fvs.map { vertex -> permutation[vertex.id] }.sorted() in faces }
+}
+
 private fun Polyhedron.symmetryOperation(
     source: OrthonormalFrame,
     target: OrthonormalFrame,
     orientation: Int,
     vertexIndex: VertexSpatialIndex,
+    topology: SymmetryTopology,
 ): SymmetryOperation? {
     val transform = OrthogonalTransform(source, target, orientation)
     val permutation = IntArray(vs.size)
     for (vertex in vs) {
         permutation[vertex.id] = vertexIndex.find(transform(vertex)) ?: return null
     }
+    if (!topology.isPreserved(permutation, this)) return null
     return SymmetryOperation(transform, permutation)
 }
 

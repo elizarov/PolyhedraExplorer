@@ -44,8 +44,30 @@ class ExportStlTest {
                 FaceExportParams(scale = 20.0, width = 0.1, rim = 0.05, expand = 0.0),
             )
             val validation = StlGeometryValidator.validateAscii(stl)
-            assertEquals(4_080, validation.triangleCount)
+            // Robust rim limits keep every generated surface triangle non-degenerate.
+            assertEquals(4_320, validation.triangleCount)
             assertTrue(validation.isValid, "Invalid STL geometry for the reported configuration: $validation")
+        } finally {
+            faces.destroy()
+        }
+    }
+
+    @Test
+    fun exportsConcaveFacesAsWatertightEarClippedGeometry() {
+        val canvas = document.createElement("canvas") as HTMLCanvasElement
+        val gl = requireNotNull(canvas.getContext("webgl") as? WebGLRenderingContext)
+        val params = RenderParams("", null)
+        val poly = concavePrismFixture()
+        val faces = FaceContext(gl, params) { poly }
+        try {
+            faces.performUpdate(null, 0.0)
+            val stl = faces.exportSolidToStl(
+                "concave_prism",
+                FaceExportParams(scale = 10.0, width = 0.0, rim = 0.0, expand = 0.0),
+            )
+            val validation = StlGeometryValidator.validateAscii(stl)
+            assertEquals(28, validation.triangleCount)
+            assertTrue(validation.isValid, "Invalid STL geometry for a concave face: $validation")
         } finally {
             faces.destroy()
         }

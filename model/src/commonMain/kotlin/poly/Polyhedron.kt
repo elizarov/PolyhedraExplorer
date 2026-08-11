@@ -10,12 +10,12 @@ import kotlin.jvm.*
 
 @Serializable(with = PolyhedronSerializer::class)
 class Polyhedron(
-    vs: List<MutableVertex>,
-    fs: List<MutableFace>,
+    mutableVertices: List<MutableVertex>,
+    mutableFaces: List<MutableFace>,
     val faceKindSources: List<FaceKindSource>? // non-null when polyhedron was transformed
 )  {
-    val vs: List<Vertex> = vs
-    val fs: List<Face> = fs
+    val vs: List<Vertex> = mutableVertices
+    val fs: List<Face> = mutableFaces
     val es: List<Edge>
     val directedEdges: List<Edge>
 
@@ -23,27 +23,42 @@ class Polyhedron(
     init {
         val es = ArrayList<Edge>()
         val directedEdges = ArrayList<Edge>()
-        val lFaces = ArrayIdMap<Vertex, HashMap<Vertex, MutableFace>>()
-        for (f in fs) {
+        val edgeUses = HashMap<VertexPair, MutableList<FaceEdgeUse>>()
+        for (f in mutableFaces) {
+            require(f.size >= 3) { "Face $f has fewer than three vertices" }
+            require(f.fvs.mapTo(HashSet()) { it.id }.size == f.size) {
+                "Face $f contains a vertex more than once"
+            }
             for (i in 0 until f.size) {
-                val a = f[i]
-                val b = f[(i + 1) % f.size]
+                val a = f.fvs[i]
+                val b = f.fvs[(i + 1) % f.size]
                 require(a.id != b.id) { "Duplicate vertices at face $f" }
-                if (a.id <= b.id) continue
-                lFaces.getOrPut(b) { HashMap() }[a] = f
+                edgeUses.getOrPut(vertexPair(a, b)) { ArrayList(2) } += FaceEdgeUse(a, b, f)
             }
         }
-        for (rf in fs) {
-            for (i in 0 until rf.size) {
-                val a = rf.fvs[i]
-                val b = rf.fvs[(i + 1) % rf.size]
+        for ((pair, uses) in edgeUses) {
+            require(uses.size == 2) {
+                "Edge ${pair.a.id}-${pair.b.id} has ${uses.size} incident faces; expected exactly two"
+            }
+            val forward = uses.singleOrNull { it.a == pair.a && it.b == pair.b }
+            val backward = uses.singleOrNull { it.a == pair.b && it.b == pair.a }
+            require(forward != null && backward != null) {
+                "Edge ${pair.a.id}-${pair.b.id} is not oppositely oriented by its two faces"
+            }
+        }
+        // Preserve the historical deterministic edge order: visit the lower-to-higher occurrence
+        // in face order after validating all pairs above.
+        for (face in mutableFaces) {
+            for (index in 0 until face.size) {
+                val a = face.fvs[index]
+                val b = face.fvs[(index + 1) % face.size]
                 if (a.id >= b.id) continue
-                val lf = lFaces[a]?.get(b)
-                require(lf != null) {
-                    "Edge $a to $b on face $rf does not have an adjacent face"
-                }
-                val ea = Edge(a, b, lf, rf)
-                val eb = Edge(b, a, rf, lf) 
+                val uses = edgeUses.getValue(vertexPair(a, b))
+                val forward = uses.single { it.a == a && it.b == b }
+                val backward = uses.single { it.a == b && it.b == a }
+                // A clockwise boundary keeps its face to the right of its directed edge.
+                val ea = Edge(a, b, backward.face, forward.face)
+                val eb = Edge(b, a, forward.face, backward.face)
                 ea.reversed = eb
                 eb.reversed = ea
                 es += ea.normalizedDirection()
@@ -51,12 +66,12 @@ class Polyhedron(
                 directedEdges += eb
                 a.directedEdges.add(ea)
                 b.directedEdges.add(eb)
-                rf.directedEdges.add(ea)
-                lf.directedEdges.add(eb)
+                forward.face.directedEdges.add(ea)
+                backward.face.directedEdges.add(eb)
             }
         }
-        for (v in vs) v.directedEdges.sortVertexAdjacentEdges(v)
-        for (f in fs) f.directedEdges.sortFaceAdjacentEdges(f)
+        for (v in mutableVertices) v.directedEdges.sortVertexAdjacentEdges(v)
+        for (f in mutableFaces) f.directedEdges.sortFaceAdjacentEdges(f)
         this.es = es
         this.directedEdges = directedEdges
     }
@@ -120,18 +135,22 @@ private fun MutableList<Edge>.sortVertexAdjacentEdges(v: Vertex) {
     require(all { it.a == v })
     for (i in 1 until size) {
         val prev = this[i - 1].r
-        val j = (i until size).first { this[it].l == prev }
+        val j = (i until size).firstOrNull { this[it].l == prev }
+        require(j != null) { "Edges around $v do not form one manifold cycle" }
         swap(i, j)
     }
+    require(isEmpty() || last().r == first().l) { "Edges around $v do not close into one manifold cycle" }
 }
 
 private fun MutableList<Edge>.sortFaceAdjacentEdges(f: Face) {
     require(all { it.r == f })
     for (i in 1 until size) {
         val prev = this[i - 1].b
-        val j = (i until size).first { this[it].a == prev }
+        val j = (i until size).firstOrNull { this[it].a == prev }
+        require(j != null) { "Edges around $f do not form one boundary cycle" }
         swap(i, j)
     }
+    require(isEmpty() || last().b == first().a) { "Edges around $f do not close into one boundary cycle" }
 }
 
 private fun idString(id: Int, from: Char, to: Char): String {
@@ -224,8 +243,23 @@ interface Face : Id, Plane {
     val fvs: List<Vertex>
     val kind: FaceKind
     val isPlanar: Boolean
+    val triangles: List<FaceTriangle>
     val directedEdges: List<Edge> // edges are properly ordered clockwise
 }
+
+private data class VertexPair(val a: MutableVertex, val b: MutableVertex)
+
+private fun vertexPair(a: MutableVertex, b: MutableVertex) =
+    VertexPair(
+        if (a.id < b.id) a else b,
+        if (a.id < b.id) b else a,
+    )
+
+private data class FaceEdgeUse(
+    val a: MutableVertex,
+    val b: MutableVertex,
+    val face: MutableFace,
+)
 
 enum class IsoDir { L, R }
 
@@ -236,6 +270,7 @@ class MutableFace(
     override val directedEdges: MutableList<Edge> = ArrayList() // edges are properly ordered clockwise
 ) : Face, MutablePlane(fvs.averagePlane()), MutableKind<FaceKind> {
     override val isPlanar = fvs.all { it in this }
+    override val triangles: List<FaceTriangle> by lazy { triangulateFace(fvs, this) }
 
     override fun equals(other: Any?): Boolean = other is Face && id == other.id
     override fun hashCode(): Int = id

@@ -13,7 +13,7 @@ fun Polyhedron.validate() {
 }
 
 fun Polyhedron.validateGeometry() {
-    validateMeshGeometry()
+    validateProperGeometry()
     for (f in fs) {
         require(f.isPlanar) {
             "Face is not planar: $f"
@@ -23,10 +23,13 @@ fun Polyhedron.validateGeometry() {
 
 /** Validates the mesh properties required for safe rendering, while allowing non-planar faces. */
 fun Polyhedron.validateMeshGeometry() {
+    require(vs.isNotEmpty()) { "Polyhedron has no vertices" }
+    require(fs.isNotEmpty()) { "Polyhedron has no faces" }
     for (v in vs) {
         require(v.x.isFinite() && v.y.isFinite() && v.z.isFinite()) {
             "$v has non-finite coordinates"
         }
+        require(v.directedEdges.isNotEmpty()) { "$v is not part of the surface" }
     }
     // Validate edges
     for (e in es) {
@@ -36,20 +39,48 @@ fun Polyhedron.validateMeshGeometry() {
     }
     // Validate faces
     for (f in fs) {
-        require(f.d > 0) {
-            "Face normal does not point outwards: $f $f "
-        }
-        for (i in 0 until f.size) {
-            val a = f[i]
-            val b = f[(i + 1) % f.size]
-            val c = f[(i + 2) % f.size]
-            val rot = (c - a) cross (b - a)
-            // Compare angular direction, not absolute triangle area. High-order family faces can
-            // contain very small local triangles even when their winding is perfectly valid.
-            require(rot * f > -EPS * rot.norm) {
-                "Face is not clockwise: $f, vertices $a $b $c"
+        for (triangle in f.triangles) {
+            val a = f[triangle.a]
+            val b = f[triangle.b]
+            val c = f[triangle.c]
+            val normal = (b - a) cross (c - a)
+            require(normal.norm > EPS) { "$f has a degenerate triangle" }
+            require(normal * f > EPS * normal.norm) {
+                "$f has inconsistent boundary orientation"
             }
         }
+    }
+    val signedVolume = signedVolume()
+    val volumeTolerance = EPS * circumradius * circumradius * circumradius
+    require(signedVolume > volumeTolerance) {
+        "Polyhedron surface is inward-facing or has zero signed volume"
+    }
+
+    // A disconnected closed mesh is a compound (or an unused nested shell), not one polyhedron.
+    val visited = HashSet<Face>()
+    var componentCount = 0
+    for (first in fs) {
+        if (first in visited) continue
+        componentCount++
+        val pending = ArrayDeque<Face>()
+        pending += first
+        while (pending.isNotEmpty()) {
+            val face = pending.removeFirst()
+            if (!visited.add(face)) continue
+            for (edge in face.directedEdges) pending += edge.l
+        }
+    }
+    require(componentCount == 1) {
+        "Polyhedron has $componentCount disconnected surface components"
+    }
+}
+
+fun Polyhedron.signedVolume(): Double = fs.sumOf { face ->
+    face.triangles.sumOf { triangle ->
+        val a = face[triangle.a]
+        val b = face[triangle.b]
+        val c = face[triangle.c]
+        a * (b cross c) / 6.0
     }
 }
 

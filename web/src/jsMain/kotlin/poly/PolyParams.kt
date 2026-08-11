@@ -358,7 +358,7 @@ private fun CoreIssue.toIndicatorMessage(): IndicatorMessage<*> {
     val transform = transformTag?.toTransformOrNull() ?: Transform.None
     return when (code) {
         CoreIssueCode.TransformFailed -> TransformFailed(transform)
-        CoreIssueCode.InvalidGeometry -> InvalidGeometry()
+        CoreIssueCode.InvalidGeometry -> InvalidGeometry(detail ?: "the surface is not proper")
         CoreIssueCode.TransformNotApplicable -> TransformNotApplicable(transform)
         CoreIssueCode.TransformIsIdentity -> TransformIsId(transform)
         CoreIssueCode.TooLarge -> TooLarge(requireNotNull(fev))

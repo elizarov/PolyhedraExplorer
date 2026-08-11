@@ -6,6 +6,7 @@ import polyhedra.model.util.Vec3
 import polyhedra.web.poly.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class CanvasOrbitPickerTest {
     @Test
@@ -82,6 +83,27 @@ class CanvasOrbitPickerTest {
         assertEquals(targetFace.kind, picker.hitFace(screen.x, screen.y))
     }
 
+    @Test
+    fun concaveFaceNotchIsNotPickable() {
+        val poly = concavePrismFixture()
+        val picker = CanvasOrbitPicker(
+            poly,
+            defaultView(),
+            400,
+            400,
+            expand = 0.0,
+            excludedFaces = emptySet(),
+        )
+        val top = poly.fs.first()
+        val inside = Vec3(-1.0, 0.0, 1.0)
+        val notch = Vec3(0.5, 0.0, 1.0)
+        val insideScreen = picker.project(inside, top)!!
+        val notchScreen = picker.project(notch, top)!!
+
+        assertEquals(top.kind, picker.hitFace(insideScreen.x, insideScreen.y))
+        assertNull(picker.hitFace(notchScreen.x, notchScreen.y))
+    }
+
     private fun defaultView(): ViewContext {
         val params = ViewParams("", null)
         val view = ViewContext(params)
@@ -101,4 +123,5 @@ class CanvasOrbitPickerTest {
             }
         }
     }
+
 }

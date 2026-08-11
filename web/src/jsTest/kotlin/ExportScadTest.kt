@@ -21,6 +21,17 @@ class ExportScadTest {
         assertTrue(scad.trimEnd().endsWith("]];"))
     }
 
+    @Test
+    fun triangulatesConcaveFacesForOpenScad() {
+        val scad = concavePrismFixture().exportGeometryToScad("concave", "concave test")
+
+        // Two eight-vertex C-shaped caps become six triangles each; the eight convex side quads
+        // stay intact. Face kinds are expanded in lockstep with the emitted geometry.
+        assertEquals(20, scad.lineSequence().count { it.endsWith(" face") })
+        val faceKindSection = scad.substringAfterLast("], [").substringBefore("]];")
+        assertEquals(20, Regex("\\d+").findAll(faceKindSection).count())
+    }
+
     private fun cube(): Polyhedron {
         val vertices = listOf(
             Vec3(1.0, 1.0, -1.0),
@@ -45,4 +56,5 @@ class ExportScadTest {
         }
         return Polyhedron(vertices, faces, faceKindSources = null)
     }
+
 }

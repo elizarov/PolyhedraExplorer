@@ -88,10 +88,10 @@ class FaceContext(
             for (f in poly.fs) {
                 if (faceShown(f)) {
                     bufferSize += f.size
-                    indexSize += (f.size - 2) * 3
+                    indexSize += f.triangles.size * 3
                     if (hasHiddenFaces || hasExpand) {
                         bufferSize += f.size
-                        indexSize += (f.size - 2) * 3
+                        indexSize += f.triangles.size * 3
                     }
                 } else {
                     if (hasRim) {
@@ -150,8 +150,13 @@ class FaceContext(
                     ofs++
                 }
                 if (indexBuffer != null) {
-                    for (i in 2 until n) {
-                        indexBuffer.indexTriangle(bufOfs, bufOfs + i, bufOfs + i - 1, inner)
+                    for (triangle in f.triangles) {
+                        indexBuffer.indexTriangle(
+                            bufOfs + triangle.a,
+                            bufOfs + triangle.b,
+                            bufOfs + triangle.c,
+                            inner,
+                        )
                     }
                 }
                 bufOfs = ofs
