@@ -8,58 +8,44 @@ class FaceRim(f: Face)  {
 
     init {
         val n = f.size
-        // edge vectors
         val ev = List(n) { i ->
             val j = (i + 1) % n
             f[j] - f[i]
         }
-        // edge unit vectors
-        val evu = List(n) { i ->
-            ev[i].unit
+        // A non-planar face is inset in its average plane. Keeping all rim directions tangent to
+        // that plane gives a stable, deterministic offset while preserving the original vertices'
+        // out-of-plane coordinates.
+        val projectedEv = ev.map { edge -> edge - f * (edge * f) }
+        val projectedLength = projectedEv.map { edge -> edge.norm }
+        val projectedEvu = projectedEv.mapIndexed { i, edge ->
+            if (projectedLength[i] < EPS) Vec3.ZERO else edge / projectedLength[i]
         }
-        // angle bisectors
-        val bis = List(n) { i ->
+        val inward = projectedEvu.map { edge -> edge cross f }
+        val cornerDenominator = List(n) { i ->
             val k = (i + n - 1) % n
-            evu[i] - evu[k]
+            1.0 + inward[k] * inward[i]
         }
-        // pseudo-incenter
-        val ic = run {
-            val sum = MutableVec3()
-            val tmp = MutableVec3()
-            for (i in 0 until n) {
-                val j = (i + 1) % n
-                val a1 = bis[i] * bis[i]
-                val b1 = -bis[i] * bis[j]
-                val c1 = bis[i] * ev[i]
-                val a2 = -b1
-                val b2 = bis[j] * bis[j]
-                val c2 = bis[j] * ev[i]
-                val d = det(a1, b1, a2, b2)
-                val t1 = det(c1, b1, c2, b2) / d
-                val t2 = det(a1, c1, a2, c2) / d
-                tmp.setToZero()
-                tmp += f[i]
-                tmp += bis[i] * t1
-                tmp += f[j]
-                tmp += bis[j] * t2
-                tmp /= 2.0
-                sum += tmp
+
+        if (projectedLength.any { it < EPS } || cornerDenominator.any { it < EPS }) {
+            // A collapsed projected edge or a 180-degree corner has no unique finite inset.
+            // Disable its rim safely instead of feeding infinities or NaNs to the renderer.
+            maxRim = 0.0
+            rimDir = List(n) { Vec3.ZERO }
+        } else {
+            // Intersect the two adjacent edge lines after each has moved inward by one unit.
+            // Scaling this direction by r therefore keeps both adjacent inset edges exactly r
+            // away from their original edges, including for scalene and non-tangential faces.
+            rimDir = List(n) { i ->
+                val k = (i + n - 1) % n
+                (inward[k] + inward[i]) / cornerDenominator[i]
             }
-            sum /= n.toDouble()
-            sum
-        }
-        // vector from vertex to ic
-        val icd = List(n) { i ->
-            ic - f[i]
-        }
-        // shortest distance from ic to edge
-        maxRim = (0 until n).minOf { i ->
-            val j = (i + 1) % n
-            tangentDistance(icd[i], icd[j])
-        }
-        // rescale so that rimDir reaches ic when multiplied by maxRim
-        rimDir = List(n) { i ->
-            icd[i] / maxRim
+
+            // The fixed-topology inset remains valid until its first shrinking edge collapses.
+            maxRim = (0 until n).mapNotNull { i ->
+                val j = (i + 1) % n
+                val shrinkRate = (rimDir[i] - rimDir[j]) * projectedEvu[i]
+                if (shrinkRate > EPS) projectedLength[i] / shrinkRate else null
+            }.minOrNull() ?: 0.0
         }
     }
 
