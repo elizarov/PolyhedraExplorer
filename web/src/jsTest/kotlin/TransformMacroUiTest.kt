@@ -37,7 +37,7 @@ class TransformMacroUiTest {
     }
 
     @Test
-    fun addPopupSeparatesPrimitiveTransformsFromMacros() {
+    fun addPopupSeparatesStandardTransformsMacrosAndStarTransforms() {
         val params = PolyParams("", null)
         composition = renderComposable(host) {
             ControlPane(params, popup = Popup.AddTransform, togglePopup = {})
@@ -59,13 +59,16 @@ class TransformMacroUiTest {
             }
         }
 
-        assertEquals(listOf("Transform", "Macro"), optionsBySection.keys.toList())
+        assertEquals(listOf("Transform", "Macro", "Star"), optionsBySection.keys.toList())
         assertTrue("Cantellated" !in optionsBySection.getValue("Transform"))
         assertTrue("Bevelled" !in optionsBySection.getValue("Transform"))
+        assertTrue("Greatened" !in optionsBySection.getValue("Transform"))
+        assertTrue("Stellated" !in optionsBySection.getValue("Transform"))
         assertEquals(
             listOf("Kis", "Join", "Needle", "Zip", "Cantellated", "Bevelled", "Ortho", "Meta", "Gyro"),
             optionsBySection.getValue("Macro"),
         )
+        assertEquals(listOf("Greatened", "Stellated"), optionsBySection.getValue("Star"))
     }
 
     @Test

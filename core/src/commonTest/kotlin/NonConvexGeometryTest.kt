@@ -34,6 +34,21 @@ class NonConvexGeometryTest {
     }
 
     @Test
+    fun triangulationAndPropernessAreScaleInvariant() {
+        val source = concavePrism()
+
+        for (factor in listOf(1e-6, 1.0, 1e6)) {
+            val scaled = source.scaled(factor)
+            scaled.validateProperGeometry()
+            assertEquals(
+                source.fs.sumOf { face -> face.size - 2 },
+                scaled.fs.sumOf { face -> face.triangles.size },
+                "factor=$factor",
+            )
+        }
+    }
+
+    @Test
     fun edgeWithThreeIncidentFacesIsRejectedAtConstruction() {
         val tetrahedron = Seed.Tetrahedron.poly
         val failure = assertFailsWith<IllegalArgumentException> {
@@ -76,10 +91,12 @@ class NonConvexGeometryTest {
             }
         }
 
-        val failure = assertFailsWith<IllegalArgumentException> {
-            selfIntersecting.validateProperGeometry()
+        for (factor in listOf(1e-6, 1.0, 1e6)) {
+            val failure = assertFailsWith<IllegalArgumentException>("factor=$factor") {
+                selfIntersecting.scaled(factor).validateProperGeometry()
+            }
+            assertContains(failure.message.orEmpty(), "intersect outside their shared boundary")
         }
-        assertContains(failure.message.orEmpty(), "intersect outside their shared boundary")
     }
 
     @Test

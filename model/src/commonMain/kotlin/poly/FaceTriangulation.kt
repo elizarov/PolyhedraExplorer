@@ -27,11 +27,12 @@ internal fun triangulateFace(vertices: List<Vec3>, normal: Vec3): List<FaceTrian
     require(normal.norm > EPS) { "Face has no well-defined normal" }
 
     val projected = vertices.map { vertex -> vertex.projectAlongDominantAxis(normal) }
-    val scale = projected.maxCoordinateSpan().coerceAtLeast(1.0)
-    val tolerance = EPS * scale * scale
+    val scale = projected.maxCoordinateSpan()
+    val linearTolerance = EPS * scale
+    val areaTolerance = linearTolerance * scale
     val area = projected.signedDoubleArea()
-    require(abs(area) > tolerance) { "Face has zero projected area" }
-    projected.requireSimple(tolerance)
+    require(abs(area) > areaTolerance) { "Face has zero projected area" }
+    projected.requireSimple(linearTolerance, areaTolerance)
 
     val orientation = if (area > 0.0) 1.0 else -1.0
     val remaining = vertices.indices.toMutableList()
@@ -43,7 +44,7 @@ internal fun triangulateFace(vertices: List<Vec3>, normal: Vec3): List<FaceTrian
             val current = remaining[position]
             val next = remaining[(position + 1) % remaining.size]
             val turn = orientation * projected.cross(previous, current, next)
-            if (turn <= tolerance) continue
+            if (turn <= areaTolerance) continue
             if (remaining.any { candidate ->
                     candidate != previous && candidate != current && candidate != next &&
                         projected[candidate].insideOrOnTriangle(
@@ -51,7 +52,7 @@ internal fun triangulateFace(vertices: List<Vec3>, normal: Vec3): List<FaceTrian
                             projected[current],
                             projected[next],
                             orientation,
-                            tolerance,
+                            areaTolerance,
                         )
                 }
             ) continue
@@ -112,31 +113,47 @@ private fun Vec2.insideOrOnTriangle(
 private fun cross(a: Vec2, b: Vec2, c: Vec2): Double =
     (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
 
-private fun List<Vec2>.requireSimple(tolerance: Double) {
+private fun List<Vec2>.requireSimple(linearTolerance: Double, areaTolerance: Double) {
     for (first in indices) {
         val firstNext = (first + 1) % size
         for (second in (first + 1) until size) {
             val secondNext = (second + 1) % size
             if (first == second || firstNext == second || secondNext == first) continue
-            require(!segmentsIntersect(this[first], this[firstNext], this[second], this[secondNext], tolerance)) {
+            require(!segmentsIntersect(
+                this[first],
+                this[firstNext],
+                this[second],
+                this[secondNext],
+                linearTolerance,
+                areaTolerance,
+            )) {
                 "Face boundary intersects itself"
             }
         }
     }
 }
 
-private fun segmentsIntersect(a: Vec2, b: Vec2, c: Vec2, d: Vec2, tolerance: Double): Boolean {
+private fun segmentsIntersect(
+    a: Vec2,
+    b: Vec2,
+    c: Vec2,
+    d: Vec2,
+    linearTolerance: Double,
+    areaTolerance: Double,
+): Boolean {
     val abc = cross(a, b, c)
     val abd = cross(a, b, d)
     val cda = cross(c, d, a)
     val cdb = cross(c, d, b)
-    if (((abc > tolerance && abd < -tolerance) || (abc < -tolerance && abd > tolerance)) &&
-        ((cda > tolerance && cdb < -tolerance) || (cda < -tolerance && cdb > tolerance))
+    if (((abc > areaTolerance && abd < -areaTolerance) ||
+            (abc < -areaTolerance && abd > areaTolerance)) &&
+        ((cda > areaTolerance && cdb < -areaTolerance) ||
+            (cda < -areaTolerance && cdb > areaTolerance))
     ) return true
-    return (abs(abc) <= tolerance && c.onSegment(a, b, tolerance)) ||
-        (abs(abd) <= tolerance && d.onSegment(a, b, tolerance)) ||
-        (abs(cda) <= tolerance && a.onSegment(c, d, tolerance)) ||
-        (abs(cdb) <= tolerance && b.onSegment(c, d, tolerance))
+    return (abs(abc) <= areaTolerance && c.onSegment(a, b, linearTolerance)) ||
+        (abs(abd) <= areaTolerance && d.onSegment(a, b, linearTolerance)) ||
+        (abs(cda) <= areaTolerance && a.onSegment(c, d, linearTolerance)) ||
+        (abs(cdb) <= areaTolerance && b.onSegment(c, d, linearTolerance))
 }
 
 private fun Vec2.onSegment(a: Vec2, b: Vec2, tolerance: Double): Boolean =

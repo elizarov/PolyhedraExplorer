@@ -31,9 +31,11 @@ fun Polyhedron.validateMeshGeometry() {
         }
         require(v.directedEdges.isNotEmpty()) { "$v is not part of the surface" }
     }
+    val lengthTolerance = EPS * circumradius
+    val areaTolerance = lengthTolerance * circumradius
     // Validate edges
     for (e in es) {
-        require((e.a - e.b).norm > EPS) {
+        require((e.a - e.b).norm > lengthTolerance) {
             "$e non-degenerate"
         }
     }
@@ -44,7 +46,7 @@ fun Polyhedron.validateMeshGeometry() {
             val b = f[triangle.b]
             val c = f[triangle.c]
             val normal = (b - a) cross (c - a)
-            require(normal.norm > EPS) { "$f has a degenerate triangle" }
+            require(normal.norm > areaTolerance) { "$f has a degenerate triangle" }
             require(normal * f > EPS * normal.norm) {
                 "$f has inconsistent boundary orientation"
             }

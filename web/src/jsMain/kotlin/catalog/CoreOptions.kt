@@ -12,9 +12,9 @@ import polyhedra.model.util.Tagged
 enum class SeedType(private val displayName: String) {
     Platonic("Platonic"),
     Families("Families"),
-    KeplerPoinsot("Kepler-Poinsot"),
     Archimedean("Archimedean"),
     Catalan("Catalan"),
+    KeplerPoinsot("Kepler-Poinsot"),
     ;
 
     override fun toString(): String = displayName
@@ -26,7 +26,6 @@ data class Seed(
     val type: SeedType,
     val chirality: Chirality? = null,
     val familyId: FamilySeedId? = null,
-    val conwayNotation: String? = null,
 ) : Tagged {
     init {
         require((type == SeedType.Families) == (familyId != null))
@@ -63,10 +62,6 @@ val SeedOptions: List<Seed> = listOf(
     Seed("D", "Dodecahedron", SeedType.Platonic),
     Seed("I", "Icosahedron", SeedType.Platonic),
 ) + DefaultFamilySeedOptions + listOf(
-    Seed("SD", "Small stellated dodecahedron", SeedType.KeplerPoinsot, conwayNotation = "sD"),
-    Seed("GD", "Great dodecahedron", SeedType.KeplerPoinsot, conwayNotation = "gD"),
-    Seed("GSD", "Great stellated dodecahedron", SeedType.KeplerPoinsot, conwayNotation = "sgD = gsD"),
-    Seed("GI", "Great icosahedron", SeedType.KeplerPoinsot, conwayNotation = "gI"),
     Seed("tT", "Truncated tetrahedron", SeedType.Archimedean),
     Seed("aC", "Cuboctahedron", SeedType.Archimedean),
     Seed("tC", "Truncated cube", SeedType.Archimedean),
@@ -93,6 +88,10 @@ val SeedOptions: List<Seed> = listOf(
     Seed("deD", "Deltoidal hexecontahedron", SeedType.Catalan),
     Seed("dbD", "Disdyakis triacontahedron", SeedType.Catalan),
     Seed("dsD", "Pentagonal hexecontahedron", SeedType.Catalan, Chirality.Default),
+    Seed("SD", "Stellated dodecahedron", SeedType.KeplerPoinsot),
+    Seed("GD", "Great dodecahedron", SeedType.KeplerPoinsot),
+    Seed("GSD", "Great stellated dodecahedron", SeedType.KeplerPoinsot),
+    Seed("GI", "Great icosahedron", SeedType.KeplerPoinsot),
 )
 
 val Seeds: List<Seed> = SeedOptions.filterNot(Seed::isFamily).flatMap { seed ->
@@ -139,8 +138,8 @@ data class Transform(
         val Quinto = transform(TransformOperation.Quinto, "Quinto")
         val Chamfered = transform(TransformOperation.Chamfered, "Chamfered")
         val Canonical = transform(TransformOperation.Canonical, "Canonical")
-        val Greatened = transform(TransformOperation.Greatened, "Greatened")
-        val Stellated = transform(TransformOperation.Stellated, "Stellated")
+        val Greatened = transform(TransformOperation.Greatened, "Greatened", TransformCategory.Star)
+        val Stellated = transform(TransformOperation.Stellated, "Stellated", TransformCategory.Star)
 
         val Kis = macro(TransformOperation.Kis)
         val Join = macro(TransformOperation.Join)
@@ -153,8 +152,11 @@ data class Transform(
         val Gyro = macro(TransformOperation.Gyro)
         val GyroFlipped = Gyro.copy(id = Gyro.id.flippedChirality())
 
-        private fun transform(operation: TransformOperation, name: String): Transform =
-            Transform(TransformId(operation), name)
+        private fun transform(
+            operation: TransformOperation,
+            name: String,
+            category: TransformCategory = TransformCategory.Transform,
+        ): Transform = Transform(TransformId(operation), name, category)
 
         private fun macro(operation: TransformOperation): Transform {
             val macro = TransformMacros.single { it.id.operation == operation }
@@ -171,6 +173,7 @@ enum class TransformCategory(private val displayName: String) {
     Transform("Transform"),
     Macro("Macro"),
     OrbitTargeted("Orbit-targeted"),
+    Star("Star"),
     ;
 
     override fun toString(): String = displayName
@@ -215,7 +218,8 @@ val MacroTransforms: List<Transform> = listOf(
     Transform.Gyro,
 )
 
-val TransformOptions: List<Transform> = PrimitiveTransforms + MacroTransforms
+val TransformOptions: List<Transform> = (PrimitiveTransforms + MacroTransforms)
+    .sortedBy { transform -> transform.category.ordinal }
 
 val Transforms: List<Transform> = TransformOptions.flatMap { transform ->
     if (transform.isChiral) {

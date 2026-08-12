@@ -70,7 +70,9 @@ private fun diagramPathsFromTetrahedron(): Map<String, List<String>> {
         val previousSize = paths.size
         for (edge in DIAGRAM_CONSTRUCTION_EDGES) {
             val sourcePath = paths[edge.sourceTag] ?: continue
-            paths.putIfAbsent(edge.targetTag, sourcePath + edge.transformTags)
+            if (edge.targetTag !in paths) {
+                paths[edge.targetTag] = sourcePath + edge.transformTags
+            }
         }
     } while (paths.size != previousSize)
     return paths

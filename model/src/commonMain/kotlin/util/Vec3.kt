@@ -56,7 +56,7 @@ val Vec3.norm: Double
 val Vec3.unit: Vec3
     get() {
         val norm = norm
-        return if (abs(norm) < EPS) this else this / norm
+        return if (norm == 0.0) this else this / norm
     }
 
 operator fun MutableVec3.timesAssign(a: Double) {

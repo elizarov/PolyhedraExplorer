@@ -32,14 +32,14 @@ class Stellated : Transform() {
 fun Polyhedron.greatened(): Polyhedron = when (regularStarFormOrNull()) {
     RegularStarForm.Dodecahedron -> KeplerPoinsotGeometry.greatDodecahedron
     RegularStarForm.Icosahedron -> KeplerPoinsotGeometry.greatIcosahedron
-    RegularStarForm.SmallStellatedDodecahedron -> KeplerPoinsotGeometry.greatStellatedDodecahedron
+    RegularStarForm.StellatedDodecahedron -> KeplerPoinsotGeometry.greatStellatedDodecahedron
     else -> throw IllegalArgumentException(
-        "Greatening currently requires a regular dodecahedron, icosahedron, or small stellated dodecahedron",
+        "Greatening currently requires a regular dodecahedron, icosahedron, or stellated dodecahedron",
     )
 }.scaled(Scale.Circumradius)
 
 fun Polyhedron.stellated(): Polyhedron = when (regularStarFormOrNull()) {
-    RegularStarForm.Dodecahedron -> KeplerPoinsotGeometry.smallStellatedDodecahedron
+    RegularStarForm.Dodecahedron -> KeplerPoinsotGeometry.stellatedDodecahedron
     RegularStarForm.GreatDodecahedron -> KeplerPoinsotGeometry.greatStellatedDodecahedron
     else -> throw IllegalArgumentException(
         "Stellation currently requires a regular dodecahedron or great dodecahedron",

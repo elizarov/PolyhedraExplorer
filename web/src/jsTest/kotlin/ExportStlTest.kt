@@ -83,7 +83,7 @@ class ExportStlTest {
             )
             val validation = StlGeometryValidator.validateAscii(stl)
             // Robust rim limits keep every generated surface triangle non-degenerate.
-            assertEquals(4_320, validation.triangleCount)
+            assertEquals(4_080, validation.triangleCount)
             assertTrue(validation.isValid, "Invalid STL geometry for the reported configuration: $validation")
         } finally {
             faces.destroy()

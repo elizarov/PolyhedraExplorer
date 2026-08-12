@@ -89,7 +89,7 @@ class DropOrbitUiTest {
             linkedMapOf(
                 "Transform" to listOf(
                     "Truncated", "Rectified", "Dual", "Snub", "Propeller", "Whirl", "Quinto",
-                    "Chamfered", "Canonical", "Greatened", "Stellated",
+                    "Chamfered", "Canonical",
                 ),
                 "Macro" to listOf("Kis", "Join", "Needle", "Zip", "Cantellated", "Bevelled", "Ortho", "Meta", "Gyro"),
                 "Orbit-targeted" to listOf(
@@ -100,6 +100,7 @@ class DropOrbitUiTest {
                     "Truncate vertex",
                     "Rectify vertex",
                 ),
+                "Star" to listOf("Greatened", "Stellated"),
             ),
             dropdownOptionsBySection(),
         )

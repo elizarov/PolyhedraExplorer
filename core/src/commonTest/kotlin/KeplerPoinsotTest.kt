@@ -33,6 +33,7 @@ class KeplerPoinsotTest {
         )
         val seeds = Seeds.filter { seed -> seed.type == SeedType.KeplerPoinsot }
         assertEquals(expected.keys, seeds.mapTo(linkedSetOf(), Seed::tag))
+        assertEquals("Stellated dodecahedron", seeds.single { seed -> seed.tag == "SD" }.name)
         for (seed in seeds) {
             assertEquals(expected.getValue(seed.tag), seed.poly.fev(), seed.name)
             seed.poly.validate()
@@ -46,9 +47,9 @@ class KeplerPoinsotTest {
         assertEquals("GI", Seed.Icosahedron.poly.greatened().recognizedSeedOrNull()?.tag)
 
         val greatDodecahedron = Seed.Dodecahedron.poly.greatened()
-        val smallStellatedDodecahedron = Seed.Dodecahedron.poly.stellated()
+        val stellatedDodecahedron = Seed.Dodecahedron.poly.stellated()
         assertEquals("GSD", greatDodecahedron.stellated().recognizedSeedOrNull()?.tag)
-        assertEquals("GSD", smallStellatedDodecahedron.greatened().recognizedSeedOrNull()?.tag)
+        assertEquals("GSD", stellatedDodecahedron.greatened().recognizedSeedOrNull()?.tag)
     }
 
     @Test

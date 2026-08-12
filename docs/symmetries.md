@@ -61,7 +61,7 @@ group that becomes larger after a special construction.
 Every transform is equivariant under the input's proper rotations: applying a
 rotation before or after the transform gives the same result. The proper
 rotation subgroup therefore cannot become weaker. At special coordinates,
-previously distinct orbits can coincide and the result can acquire more proper
+distinct input orbits can coincide and the result can acquire more proper
 rotations. For example, Snub applied to a tetrahedron produces an icosahedron,
 so `T_d` becomes `I_h` and its F/E/V orbit counts collapse to one each.
 

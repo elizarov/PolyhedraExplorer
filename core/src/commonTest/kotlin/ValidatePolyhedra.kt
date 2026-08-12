@@ -112,17 +112,23 @@ class ValidatePolyhedra {
 
     @Test
     fun validatePlatonic3Transforms() {
-        testParameter("seed", Seeds.filter { it.type == SeedType.Platonic}) { seed ->
-            testParameter("transform1", expandingTransforms) { transform1 ->
-                testParameter("transform2", expandingTransforms) { transform2 ->
-                    testParameter("transform3", expandingTransforms) { transform3 ->
-                        if (isOkSequence(transform1, transform2, transform3)) {
-                            println("Checking $transform3 $transform2 $transform1 $seed")
-                            seed.poly.transformed(transform1, transform2, transform3).validate()
-                        }
-                    }
-                }
-            }
+        // The one- and two-operation tests already cover every transform on every Platonic seed.
+        // A full cubic product mostly repeats those checks and makes canonicalizing operations run
+        // on thousands of needlessly large meshes. Keep a deterministic depth-three smoke matrix
+        // on the minimal Platonic topology, placing each operation in every position where the
+        // operation-order contract permits it.
+        val seed = Seed.Tetrahedron
+        val sequences = expandingTransforms.flatMap { transform ->
+            listOf(
+                listOf(transform, Transform.Truncated, Transform.Rectified),
+                listOf(Transform.Truncated, transform, Transform.Rectified),
+                listOf(Transform.Truncated, Transform.Rectified, transform),
+            )
+        }.filter { transforms -> isOkSequence(*transforms.toTypedArray()) }.distinct()
+
+        testParameter("transforms", sequences) { transforms ->
+            println("Checking ${transforms.asReversed().joinToString(" ")} $seed")
+            seed.poly.transformed(transforms).validate()
         }
     }
 

@@ -54,7 +54,7 @@ class SeedFamilyUiTest {
         composition = renderComposable(host) { ControlPane(params, popup = Popup.Seed, togglePopup = {}) }
 
         assertEquals(
-            listOf("Platonic", "Families", "Kepler-Poinsot", "Archimedean", "Catalan"),
+            listOf("Platonic", "Families", "Archimedean", "Catalan", "Kepler-Poinsot"),
             elements(".dropdown .header").map { it.textContent.orEmpty().trim() },
         )
         assertEquals(
@@ -72,13 +72,24 @@ class SeedFamilyUiTest {
     }
 
     @Test
-    fun keplerPoinsotPopupShowsConwayFormsAndRoundTripsItsSeedTag() {
+    fun keplerPoinsotPopupUsesNamesOnlyAndRoundTripsItsSeedTag() {
         val params = PolyParams("", null)
         composition = renderComposable(host) { ControlPane(params, popup = Popup.Seed, togglePopup = {}) }
 
+        assertTrue(elements(".seed-notation").isEmpty())
+        val keplerPoinsotItems = elements(".dropdown .header").last().parentElement?.let { headerRow ->
+            generateSequence(headerRow.nextElementSibling) { it.nextElementSibling }
+                .map { it.textContent.orEmpty().trim() }
+                .toList()
+        }
         assertEquals(
-            listOf("sD", "gD", "sgD = gsD", "gI"),
-            elements(".seed-notation").map { element -> element.textContent.orEmpty() },
+            listOf(
+                "Stellated dodecahedron",
+                "Great dodecahedron",
+                "Great stellated dodecahedron",
+                "Great icosahedron",
+            ),
+            keplerPoinsotItems,
         )
         elements(".dropdown .item").single { element ->
             element.textContent.orEmpty().contains("Great icosahedron")

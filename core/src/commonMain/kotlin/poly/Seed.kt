@@ -12,9 +12,9 @@ import kotlin.math.*
 enum class SeedType {
     Platonic,
     Families,
-    KeplerPoinsot,
     Archimedean,
-    Catalan
+    Catalan,
+    KeplerPoinsot,
 }
 
 private val seedScale = Scale.Circumradius
@@ -169,35 +169,6 @@ val SC.Octahedron by seed("O", SeedType.Platonic, cubeGeometry.dual())
 val SC.Dodecahedron by seed("D", SeedType.Platonic, dodecahedronGeometry)
 val SC.Icosahedron by seed("I", SeedType.Platonic, icosahedronGeometry)
 
-// --------------------- 4 Kepler-Poinsot Solids ---------------------
-
-// Uppercase storage tags avoid the historical sD collision with Snub dodecahedron. Their Conway
-// notations (sD, gD, sgD/gsD, and gI) are shown in the catalog and documented as the public names.
-val SC.SmallStellatedDodecahedron by seed(
-    "SD",
-    SeedType.KeplerPoinsot,
-    FEV(60, 90, 32),
-    wikiName = "Small stellated dodecahedron",
-) { KeplerPoinsotGeometry.smallStellatedDodecahedron }
-val SC.GreatDodecahedron by seed(
-    "GD",
-    SeedType.KeplerPoinsot,
-    FEV(60, 90, 32),
-    wikiName = "Great dodecahedron",
-) { KeplerPoinsotGeometry.greatDodecahedron }
-val SC.GreatStellatedDodecahedron by seed(
-    "GSD",
-    SeedType.KeplerPoinsot,
-    FEV(60, 90, 32),
-    wikiName = "Great stellated dodecahedron",
-) { KeplerPoinsotGeometry.greatStellatedDodecahedron }
-val SC.GreatIcosahedron by seed(
-    "GI",
-    SeedType.KeplerPoinsot,
-    FEV(180, 270, 92),
-    wikiName = "Great icosahedron",
-) { KeplerPoinsotGeometry.greatIcosahedron }
-
 // --------------------- 13 Archimedean Solids ---------------------
 
 val SC.TruncatedTetrahedron by seed("tT", SeedType.Archimedean, Transform.Truncated, SC.Tetrahedron)
@@ -245,6 +216,35 @@ val SC.PentagonalHexecontahedron by seed(
     SC.SnubDodecahedron,
     chirality = Chirality.Default,
 )
+
+// --------------------- 4 Kepler-Poinsot Solids ---------------------
+
+// Uppercase storage tags avoid the historical sD collision with Snub dodecahedron. Conventional
+// Conway forms remain documented separately from the seed names shown in the catalog.
+val SC.StellatedDodecahedron by seed(
+    "SD",
+    SeedType.KeplerPoinsot,
+    FEV(60, 90, 32),
+    wikiName = "Small stellated dodecahedron",
+) { KeplerPoinsotGeometry.stellatedDodecahedron }
+val SC.GreatDodecahedron by seed(
+    "GD",
+    SeedType.KeplerPoinsot,
+    FEV(60, 90, 32),
+    wikiName = "Great dodecahedron",
+) { KeplerPoinsotGeometry.greatDodecahedron }
+val SC.GreatStellatedDodecahedron by seed(
+    "GSD",
+    SeedType.KeplerPoinsot,
+    FEV(60, 90, 32),
+    wikiName = "Great stellated dodecahedron",
+) { KeplerPoinsotGeometry.greatStellatedDodecahedron }
+val SC.GreatIcosahedron by seed(
+    "GI",
+    SeedType.KeplerPoinsot,
+    FEV(180, 270, 92),
+    wikiName = "Great icosahedron",
+) { KeplerPoinsotGeometry.greatIcosahedron }
 
 val Seeds: List<Seed> = registeredSeeds + listOf(
     SC.SnubCube,

@@ -43,7 +43,7 @@ regular map:
 
 | Regular star form | Classical `F / E / V` | Resolved `F / E / V` |
 | --- | --- | --- |
-| Small stellated dodecahedron | `12 / 30 / 12` | `60 / 90 / 32` |
+| Stellated dodecahedron | `12 / 30 / 12` | `60 / 90 / 32` |
 | Great dodecahedron | `12 / 30 / 12` | `60 / 90 / 32` |
 | Great stellated dodecahedron | `12 / 30 / 20` | `60 / 90 / 32` |
 | Great icosahedron | `20 / 30 / 12` | `180 / 270 / 92` |
@@ -54,8 +54,10 @@ distinction prevents the extra intersection cells from changing classical dual p
 
 ## Shared surface triangulation
 
-The model computes one scale-aware, deterministic ear-clipped triangulation for every face. The
-same triangle indices drive WebGL face fill, canvas face hit-testing, topology-compatible animation
+The model computes one scale-aware, deterministic ear-clipped triangulation for every face. Length,
+area, and intersection tolerances scale with the actual mesh, so a small intermediate construction
+has exactly the same validity as its display-scaled result. The same triangle indices drive WebGL
+face fill, canvas face hit-testing, topology-compatible animation
 subdivision, and STL export. OpenSCAD keeps a planar convex face as one polygon and emits the shared
 triangles for concave or non-planar faces. Consequently, a concave notch is empty consistently in
 the view, picking, and exported geometry; no consumer can accidentally restore a triangle fan.
@@ -79,6 +81,8 @@ from the actual input mesh rather than a convex-only constant.
 | Dual | For a recognized Kepler-Poinsot form, returns its classical star dual. Otherwise it tries the direct polar reciprocal of average face planes; if a reflex neighborhood makes that surface improper, it canonicalizes the input topology and reciprocates the convex realization. Singular or non-canonicalizable cases fail cleanly. |
 | Greaten / Stellate | Defined on the recognized regular dodecahedral/icosahedral forms listed in the transformation reference. They return a resolved Kepler-Poinsot boundary. Arbitrary inputs and compound-producing stellations are rejected with a domain explanation. |
 | Kis / Kis face | Full default Kis uses its Dual-Truncate-Dual definition and is accepted only when the result is proper. Continuous-height and orbit-targeted Kis require a topological dual and are deliberately unavailable on resolved regular-star meshes, whose classical dual has different physical cell topology. |
+| Join, Needle, Zip, Ortho, Meta | Their documented primitive expansions run under the same contract. Every Dual, Rectify, Truncate, Cantellate, or Bevel stage must be proper; a later stage cannot conceal an intersecting intermediate surface. |
+| Gyro | Its Dual-Snub-Dual expansion validates the Snub surface and uses a strict final polar dual. It does not use the standalone Dual operation's canonical fallback, because that fallback could otherwise replace an invalid chiral construction with an unrelated convex realization. |
 | Snub | Face rotation can overlap a concave boundary or a reflex neighborhood. Such inputs or settings are rejected by the intersection check. |
 | Chamfered | The bisector construction can fold at reflex corners. It is supported only where its emitted face boundaries and full surface remain proper. |
 | Propeller, Whirl, Quinto | Their incidence subdivision is canonicalized. They support a non-convex input topology when canonicalization converges, producing a convex canonical realization. |

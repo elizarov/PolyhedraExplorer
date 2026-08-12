@@ -29,10 +29,10 @@ import kotlin.math.sqrt
  * paper or printable model is split along all visible face intersections.
  */
 internal object KeplerPoinsotGeometry {
-    val smallStellatedDodecahedron: Polyhedron by lazy {
+    val stellatedDodecahedron: Polyhedron by lazy {
         resolveStarSurface(
             regularPentagonFaces(icosahedronGeometry.vs, star = true),
-            "small stellated dodecahedron",
+            "stellated dodecahedron",
         )
     }
 
@@ -61,7 +61,7 @@ internal object KeplerPoinsotGeometry {
 internal enum class RegularStarForm {
     Dodecahedron,
     Icosahedron,
-    SmallStellatedDodecahedron,
+    StellatedDodecahedron,
     GreatDodecahedron,
     GreatStellatedDodecahedron,
     GreatIcosahedron,
@@ -73,7 +73,7 @@ internal fun Polyhedron.regularStarFormOrNull(): RegularStarForm? {
         FEV(12, 30, 20) -> listOf(RegularStarForm.Dodecahedron to dodecahedronGeometry)
         FEV(20, 30, 12) -> listOf(RegularStarForm.Icosahedron to icosahedronGeometry)
         FEV(60, 90, 32) -> listOf(
-            RegularStarForm.SmallStellatedDodecahedron to KeplerPoinsotGeometry.smallStellatedDodecahedron,
+            RegularStarForm.StellatedDodecahedron to KeplerPoinsotGeometry.stellatedDodecahedron,
             RegularStarForm.GreatDodecahedron to KeplerPoinsotGeometry.greatDodecahedron,
             RegularStarForm.GreatStellatedDodecahedron to KeplerPoinsotGeometry.greatStellatedDodecahedron,
         )
@@ -96,8 +96,8 @@ internal fun Polyhedron.regularStarFormOrNull(): RegularStarForm? {
  * underlying regular star polyhedron.
  */
 internal fun Polyhedron.regularStarDualOrNull(): Polyhedron? = when (regularStarFormOrNull()) {
-    RegularStarForm.SmallStellatedDodecahedron -> KeplerPoinsotGeometry.greatDodecahedron
-    RegularStarForm.GreatDodecahedron -> KeplerPoinsotGeometry.smallStellatedDodecahedron
+    RegularStarForm.StellatedDodecahedron -> KeplerPoinsotGeometry.greatDodecahedron
+    RegularStarForm.GreatDodecahedron -> KeplerPoinsotGeometry.stellatedDodecahedron
     RegularStarForm.GreatStellatedDodecahedron -> KeplerPoinsotGeometry.greatIcosahedron
     RegularStarForm.GreatIcosahedron -> KeplerPoinsotGeometry.greatStellatedDodecahedron
     else -> null

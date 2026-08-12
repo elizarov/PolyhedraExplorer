@@ -13,7 +13,7 @@ private const val INTERSECTION_EPS = 1e-7
  */
 fun Polyhedron.validateProperGeometry() {
     validateMeshGeometry()
-    val tolerance = INTERSECTION_EPS * circumradius.coerceAtLeast(1.0)
+    val tolerance = INTERSECTION_EPS * circumradius
     val triangles = fs.flatMap { face ->
         face.triangles.map { triangle -> SurfaceTriangle(face, triangle) }
     }.sortedBy(SurfaceTriangle::minX)
@@ -104,7 +104,7 @@ private fun pointInTriangle(point: Vec3, triangle: SurfaceTriangle, tolerance: D
     val d20 = v2 * v0
     val d21 = v2 * v1
     val denominator = d00 * d11 - d01 * d01
-    if (abs(denominator) <= EPS) return false
+    if (abs(denominator) <= EPS * d00 * d11) return false
     val v = (d11 * d20 - d01 * d21) / denominator
     val w = (d00 * d21 - d01 * d20) / denominator
     val barycentricTolerance = tolerance / maxOf(v0.norm, v1.norm, (triangle.c - triangle.b).norm)
@@ -173,12 +173,13 @@ private fun addCoplanarSegmentIntersections(
     val r = b - a
     val s = d - c
     val denominator = r cross s
-    val projectedTolerance = tolerance * maxOf(r.norm, s.norm, 1.0)
+    val projectedScale = maxOf(r.norm, s.norm)
+    val projectedTolerance = tolerance * projectedScale
     if (abs(denominator) > projectedTolerance) {
         val ca = c - a
         val t = (ca cross s) / denominator
         val u = (ca cross r) / denominator
-        val parameterTolerance = tolerance / maxOf(r.norm, s.norm, 1.0)
+        val parameterTolerance = tolerance / projectedScale
         if (t in -parameterTolerance..(1.0 + parameterTolerance) &&
             u in -parameterTolerance..(1.0 + parameterTolerance)
         ) result += t.coerceIn(0.0, 1.0).atSegment(a3, b3)
@@ -214,7 +215,7 @@ private fun Vec3.onSharedFeature(sharedVertices: List<Vertex>, tolerance: Double
 private fun Vec3.distanceToSegment(a: Vec3, b: Vec3): Double {
     val edge = b - a
     val lengthSquared = edge * edge
-    if (lengthSquared <= EPS) return (this - a).norm
+    if (lengthSquared == 0.0) return (this - a).norm
     val fraction = (((this - a) * edge) / lengthSquared).coerceIn(0.0, 1.0)
     return (this - fraction.atSegment(a, b)).norm
 }

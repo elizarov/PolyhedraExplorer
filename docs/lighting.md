@@ -86,11 +86,9 @@ and two are necessary to vary opaque plastics.
 
 The environment, all four lighting/material values, and print-preview color are
 URL-backed. `None` is omitted; Table is stored as `env(t)` in the View
-parameters. The old `Ambient` and
-`Diffuse` URL tags remain compatible as Fill light and Key light respectively;
-obsolete Specular and
-Shininess tags are ignored because Fresnel and roughness now determine those
-effects.
+parameters. Deserialization maps `Ambient` to Fill light and `Diffuse` to Key
+light. It ignores Specular and Shininess because Fresnel and roughness determine
+those effects.
 
 ## Performance and limits
 

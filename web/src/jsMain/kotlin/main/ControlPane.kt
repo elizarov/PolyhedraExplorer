@@ -55,13 +55,7 @@ internal fun ControlPane(
     }
 
     fun operationOptionsAt(index: Int): List<Transform> {
-        val options = possibleTransformsAt(index)
-        val regular = options.filter { it.category != TransformCategory.OrbitTargeted }
-        val orbitTargeted = OrbitTargetedOperation.entries.mapNotNull { operation ->
-            options.filter { it.orbitTargetOrNull()?.operation == operation }
-                .minByOrNull { it.orbitTargetOrNull()?.kind.toString() }
-        }
-        return regular + orbitTargeted
+        return displayedTransformOptions(possibleTransformsAt(index)).map { option -> option.transform }
     }
 
     val addTransformOptions = displayedTransformOptions(possibleTransformsAt(transforms.size))
@@ -361,9 +355,6 @@ internal fun ControlPane(
                                 onClick { selectSeed(seed) }
                             }) {
                                 Text(seed.name)
-                                seed.conwayNotation?.let { notation ->
-                                    Span(attrs = { classes("seed-notation") }) { Text(notation) }
-                                }
                             }
                         }
                     }

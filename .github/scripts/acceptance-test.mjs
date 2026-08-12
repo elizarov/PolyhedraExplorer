@@ -20,6 +20,12 @@ const cases = [
         counts: { faces: 32, edges: 90, vertices: 60 },
         labels: ["Canonical", "Truncated", "Icosahedron"],
     },
+    {
+        name: "Kepler-Poinsot construction",
+        hash: "#/s(D)t(S,G)",
+        counts: { faces: 60, edges: 90, vertices: 32 },
+        labels: ["Greatened", "Stellated", "Dodecahedron"],
+    },
 ]
 
 const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds))

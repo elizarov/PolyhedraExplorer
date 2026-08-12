@@ -34,20 +34,6 @@ Octahedron, and Pyramid 3 is Tetrahedron. Those coincident members display the
 stronger polyhedral symmetry and its actual orbit counts rather than the
 family's normal axial point group.
 
-### Kepler-Poinsot solids
-
-A Kepler-Poinsot solid is a regular non-convex polyhedron: every classical face is the same
-regular polygon or pentagram, and every classical vertex has the same vertex figure. Exactly four
-exist. Their classical faces form an immersed self-intersecting arrangement, while the application
-requires one embedded printable surface. It therefore displays and exports the triangulated
-boundary of the nonzero-winding physical volume. The catalog table gives both classical and
-resolved counts; the bottom-row UI reports the resolved counts. See
-[Non-convex geometry](non-convex.md) for the construction and validity contract.
-
-The catalog shows the conventional Conway forms `sD`, `gD`, `sgD = gsD`, and `gI`. URL seed tags
-are the unambiguous uppercase `SD`, `GD`, `GSD`, and `GI`: lowercase `sD` is retained for the
-long-standing Snub dodecahedron URL.
-
 ### Archimedean solids
 
 An Archimedean solid is a convex, vertex-transitive polyhedron whose faces are
@@ -62,6 +48,20 @@ A Catalan solid is the dual of an Archimedean solid. Its faces are congruent and
 the symmetry group is face-transitive, but the faces are generally not regular
 polygons and its vertices are not all equivalent. There are 13 types. The duals
 of the two snub solids are chiral and also have two mirror realizations.
+
+### Kepler-Poinsot solids
+
+A Kepler-Poinsot solid is a regular non-convex polyhedron: every classical face is the same
+regular polygon or pentagram, and every classical vertex has the same vertex figure. Exactly four
+exist. Their classical faces form an immersed self-intersecting arrangement, while the application
+requires one embedded printable surface. It therefore displays and exports the triangulated
+boundary of the nonzero-winding physical volume. The catalog table gives both classical and
+resolved counts; the bottom-row UI reports the resolved counts. This category is last in the seed
+popup, whose entries use solid names only. See [Non-convex geometry](non-convex.md) for the
+construction and validity contract.
+
+The conventional Conway forms are `sD`, `gD`, `sgD = gsD`, and `gI`. URL seed tags use the
+unambiguous uppercase `SD`, `GD`, `GSD`, and `GI`; lowercase `sD` denotes Snub dodecahedron.
 
 ## Reading the catalog
 
@@ -109,14 +109,6 @@ flowchart LR
         I -->|Dual| D
     end
 
-    subgraph R["Kepler-Poinsot regular stars"]
-        direction TB
-        KPSD["Small stellated dodecahedron (sD / SD)"]:::regularStar
-        KPGD["Great dodecahedron (gD / GD)"]:::regularStar
-        KPGSD["Great stellated dodecahedron (sgD = gsD / GSD)"]:::regularStar
-        KPGI["Great icosahedron (gI / GI)"]:::regularStar
-    end
-
     subgraph A["Archimedean"]
         direction TB
         tT["Truncated tetrahedron"]:::archimedean
@@ -149,6 +141,14 @@ flowchart LR
         deD["Deltoidal hexecontahedron"]:::catalan
         dbD["Disdyakis triacontahedron"]:::catalan
         dsD["Pentagonal hexecontahedron / prime"]:::chiralDual
+    end
+
+    subgraph R["Kepler-Poinsot regular stars"]
+        direction TB
+        KPSD["Stellated dodecahedron (sD / SD)"]:::regularStar
+        KPGD["Great dodecahedron (gD / GD)"]:::regularStar
+        KPGSD["Great stellated dodecahedron (sgD = gsD / GSD)"]:::regularStar
+        KPGI["Great icosahedron (gI / GI)"]:::regularStar
     end
 
     T -->|Truncated| tT
@@ -223,15 +223,6 @@ both commuting paths to the great stellated dodecahedron and the two Kepler-Poin
 | Pyramid (`Y3`–`Y100`) | `n`-gonal pyramid | Pyramid `n` | `n+1 / 2n / n+1` | `C_nv` | normally `2 / 2 / 2` | Family seed |
 | Bipyramid (`B3`–`B100`) | Dipyramid; `n`-gonal bipyramid | Prism `n` | `2n / 3n / n+2` | `D_nh` | normally `1 / 2 / 2` | Family seed |
 
-### Kepler-Poinsot
-
-| Seed (URL tag; Conway form) | Schlaefli symbol | Dual | Classical `F / E / V` | Resolved `F / E / V` | Full point group | Resolved `F / E / V` orbits | Primitive construction |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Small stellated dodecahedron (`SD`; `sD`) | `{5/2, 5}` | Great dodecahedron | `12 / 30 / 12` | `60 / 90 / 32` | `I_h` | `1 / 2 / 2` | `D + S` |
-| Great dodecahedron (`GD`; `gD`) | `{5, 5/2}` | Small stellated dodecahedron | `12 / 30 / 12` | `60 / 90 / 32` | `I_h` | `1 / 2 / 2` | `D + G` |
-| Great stellated dodecahedron (`GSD`; `sgD = gsD`) | `{5/2, 3}` | Great icosahedron | `12 / 30 / 20` | `60 / 90 / 32` | `I_h` | `1 / 2 / 2` | `D + G -> S` or `D + S -> G` |
-| Great icosahedron (`GI`; `gI`) | `{3, 5/2}` | Great stellated dodecahedron | `20 / 30 / 12` | `180 / 270 / 92` | `I_h` | `3 / 5 / 3` | `I + G` |
-
 ### Archimedean
 
 | Seed (tag) | Common alternative names | Dual | `F / E / V` | Full point group | `F / E / V` orbits | Primitive construction |
@@ -268,10 +259,19 @@ both commuting paths to the great stellated dodecahedron and the two Kepler-Poin
 | Disdyakis triacontahedron (`dbD`) | Hexakis icosahedron | Rhombitruncated icosidodecahedron | `120 / 180 / 62` | `I_h` | `2 / 3 / 3` | `bD + d` |
 | Pentagonal hexecontahedron (`dsD`, `dsD'`) | — | Snub dodecahedron | `60 / 150 / 92` | `I` | `1 / 3 / 3` | `sD/sD' + d` |
 
+### Kepler-Poinsot
+
+| Seed (URL tag; Conway form) | Schlaefli symbol | Dual | Classical `F / E / V` | Resolved `F / E / V` | Full point group | Resolved `F / E / V` orbits | Primitive construction |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Stellated dodecahedron (`SD`; `sD`) | `{5/2, 5}` | Great dodecahedron | `12 / 30 / 12` | `60 / 90 / 32` | `I_h` | `1 / 2 / 2` | `D + S` |
+| Great dodecahedron (`GD`; `gD`) | `{5, 5/2}` | Stellated dodecahedron | `12 / 30 / 12` | `60 / 90 / 32` | `I_h` | `1 / 2 / 2` | `D + G` |
+| Great stellated dodecahedron (`GSD`; `sgD = gsD`) | `{5/2, 3}` | Great icosahedron | `12 / 30 / 20` | `60 / 90 / 32` | `I_h` | `1 / 2 / 2` | `D + G -> S` or `D + S -> G` |
+| Great icosahedron (`GI`; `gI`) | `{3, 5/2}` | Great stellated dodecahedron | `20 / 30 / 12` | `180 / 270 / 92` | `I_h` | `3 / 5 / 3` | `I + G` |
+
 ## Completeness and validation
 
-- The fixed catalog contains 35 unique base tags: exactly 5 Platonic, 4
-  Kepler-Poinsot, 13 Archimedean, and 13 Catalan types. These match the complete classical
+- The fixed catalog contains 35 unique base tags: exactly 5 Platonic, 13 Archimedean,
+  13 Catalan, and 4 Kepler-Poinsot types. These match the complete classical
   enumerations of their categories. The four family selectors add 392 concrete family members.
 - The 13 Catalan rows pair one-to-one with the 13 Archimedean rows. Every pair
   has the same `E`, exchanged `F` and `V`, the same point group, and exchanged
@@ -282,19 +282,19 @@ both commuting paths to the great stellated dodecahedron and the two Kepler-Poin
   adding new solid types. Thus the UI lists 35 fixed types plus four family
   selectors, while the core supports 39 handed fixed representations and 392
   family members.
-- Fixed-row `F / E / V` and orbit counts were read from each current `Seed.poly`.
+- Fixed-row `F / E / V` and orbit counts are derived from each `Seed.poly`.
   The validation suite checks representative members of every family through
   `n = 100` against their formulas and independently validates each generated
   mesh. The convex construction suite evaluates all handed directed variants of its
   diagram edges through the core and recognizes the stated target, including
-  both directions of Dual and prime chirality. The regular-star suite validates every new
+  both directions of Dual and prime chirality. The regular-star suite validates every
   construction edge and both Kepler-Poinsot Dual pairs. Path assertions prove
   that Tetrahedron alone reaches and constructs all 39 handed fixed representations.
 - Runtime symmetry tests independently recover the full point group,
   proper-rotation orbit counts, and mirror-plane counts of every fixed seed plus
   representative axial families directly from geometry, including chiral and
   strengthened cases.
-- No Platonic, Kepler-Poinsot, classical Archimedean, or Catalan solid is missing. The prism and
+- No Platonic, classical Archimedean, Catalan, or Kepler-Poinsot solid is missing. The prism and
   antiprism families plus the pyramid and bipyramid families are included;
   Johnson solids beyond pyramids and nonconvex uniform solids beyond the Kepler-Poinsot set
   remain outside this catalog.

@@ -14,6 +14,10 @@ Macro expansions are written in project execution order, from first applied to
 last applied. Traditional Conway notation is read in the opposite direction; for
 example, the project expansion `a -> t` is conventionally written `ta`.
 
+The transform popup is ordered as `Transform`, `Macro`, `Orbit-targeted`, then
+`Star`. The final `Star` section contains the primitive Greatened and Stellated
+operations, whose exact domain is the regular-star catalog.
+
 ## Summary
 
 | Name | Alternative names | Tag | Expansion | `F'` | `E'` | `V'` |
@@ -56,7 +60,7 @@ Gyro.
 The last transform has a gear button when it has a meaningful coordinate degree
 of freedom; earlier pills do not show or open settings. Slider values are
 dimensionless percentages of the operation's
-regular construction: `100%` is the existing default, while lower or higher
+regular construction: `100%` is the default, while lower or higher
 values move continuously away from it without changing the operation's
 topology. Default values are omitted from the URL. Non-default values follow the
 operation tag as `~key=value`, for example `t~d=0.7` for 70% truncation depth.
@@ -175,7 +179,7 @@ Duality exchanges faces and vertices while preserving a one-to-one correspondenc
 between edges. The implementation places a dual vertex for every face and builds
 one dual face around every original vertex. Applying Dual twice restores the
 original topology. On a recognized Kepler-Poinsot seed it instead exchanges the
-classical pairs Small stellated dodecahedron / Great dodecahedron and Great stellated
+classical pairs Stellated dodecahedron / Great dodecahedron and Great stellated
 dodecahedron / Great icosahedron; the extra resolved intersection cells are not dualized.
 
 Dual is animated through the limiting cantellation family. Face-, edge-, and
@@ -249,7 +253,7 @@ removal runs the same motion backward.
 
 Chamfering moves the boundary of each original face inward and inserts one
 hexagonal face along every original edge. Original vertices remain, and two new
-vertices are introduced for every original edge. The current geometry uses
+vertices are introduced for every original edge. The geometry uses
 bisector planes and stops when the limiting new edges reach the regular target
 length. The Width setting scales the regular limiting distance.
 
@@ -268,46 +272,6 @@ midsphere. The result is unique only up to rotation and reflection.
 Canonical preserves connectivity, so animation directly interpolates every
 vertex from the current realization to the canonical coordinates. Removing a
 Canonical stage performs the same coordinate morph backward.
-
-### Greatened (`G`)
-
-Greatening selects the other regular realization that retains the relevant regular face family.
-It is a geometry-recognizing operation, not a general incidence formula. The current exact domain
-is:
-
-| Input | Output |
-| --- | --- |
-| Dodecahedron | Great dodecahedron |
-| Icosahedron | Great icosahedron |
-| Small stellated dodecahedron | Great stellated dodecahedron |
-
-Recognition ignores scale, orientation, and vertex numbering but requires the regular geometry;
-an arbitrary deformed polyhedron with the same counts is not silently replaced. Outputs use the
-embedded nonzero-winding physical boundary described in [Non-convex geometry](non-convex.md).
-Inputs outside the table return an `InvalidGeometry` domain explanation instead of a compound or
-self-intersecting mesh.
-
-Greatened is immediate. Its resolved output cells do not have a proper collapsed correspondence to
-the input surface, so interpolating them would pass through the classical immersed star surface.
-
-### Stellated (`S`)
-
-Stellation continues a regular face-plane arrangement and selects the next supported
-Kepler-Poinsot form. The operation is intentionally narrower than unrestricted geometric
-stellation, because many other stellations are compounds or self-intersecting arrangements that
-violate the project surface contract. The exact domain is:
-
-| Input | Output |
-| --- | --- |
-| Dodecahedron | Small stellated dodecahedron |
-| Great dodecahedron | Great stellated dodecahedron |
-
-Consequently, both `D -> G -> S` and `D -> S -> G` reach the great stellated dodecahedron. As with
-Greatened, the result is the resolved non-intersecting physical boundary, and unsupported inputs
-return a precise `InvalidGeometry` result.
-
-Stellated is immediate for the same reason as Greatened: no connected, non-degenerate,
-non-self-intersecting interpolation has the required endpoint topology.
 
 ### Drop (`x[kind]`)
 
@@ -334,7 +298,7 @@ center to its regular Kis position.
 
 Once selective Kis exists, Height changes animate the apex coordinates directly.
 Adding, removing, or changing its target orbit is immediate: collapsing only
-some apexes leaves unstable zero-area triangles and previously produced broken
+some apexes leaves unstable zero-area triangles and cannot define a valid
 interpolation. This limitation does not apply to the full Kis macro, whose
 Dual/Truncated/Dual expansion uses stable primitive limiting meshes.
 
@@ -368,8 +332,8 @@ topology until shared cut points reach the midpoint limit. Adding and removal
 run that ratio forward or backward; changing target orbit uses the same
 old-target-out/new-target-in sequence as Truncate vertex.
 
-The transform popup presents valid selective operations in its final
-`Orbit-targeted` section. Entries use one global order: Drop face, Drop edge, Drop
+The transform popup presents valid selective operations in its
+`Orbit-targeted` section, immediately before `Star`. Entries use one global order: Drop face, Drop edge, Drop
 vertex, Kis face, Truncate vertex, Rectify vertex. The F/E/V orbit rows show every
 operation currently available for that exact orbit at the right edge in the same
 order, using × for Drop, an upward caret for Kis face, scissors for Truncate
@@ -498,6 +462,50 @@ Gyro advances `Dual -> Snub -> Dual` together on one shared 0–100% clock while
 preserving the selected handedness. Removal reverses the same fused morph. Inset
 and Twist are included in its 100% target coordinates. `Gyro`/`Gyro'` flips are
 immediate to avoid passing through the invalid opposite-twist intermediate.
+
+## Star transformations
+
+Greatened and Stellated are primitive transforms grouped in the final Star popup section.
+Their regular-star domains and immediate animation behavior are described below.
+
+### Greatened (`G`)
+
+Greatening selects the other regular realization that retains the relevant regular face family.
+It is a geometry-recognizing operation, not a general incidence formula. Its exact domain is:
+
+| Input | Output |
+| --- | --- |
+| Dodecahedron | Great dodecahedron |
+| Icosahedron | Great icosahedron |
+| Stellated dodecahedron | Great stellated dodecahedron |
+
+Recognition ignores scale, orientation, and vertex numbering but requires the regular geometry;
+an arbitrary deformed polyhedron with the same counts is not silently replaced. Outputs use the
+embedded nonzero-winding physical boundary described in [Non-convex geometry](non-convex.md).
+Inputs outside the table return an `InvalidGeometry` domain explanation instead of a compound or
+self-intersecting mesh.
+
+Greatened is immediate. Its resolved output cells do not have a proper collapsed correspondence to
+the input surface, so interpolating them would pass through the classical immersed star surface.
+
+### Stellated (`S`)
+
+Stellation continues a regular face-plane arrangement and selects the next supported
+Kepler-Poinsot form. The operation is intentionally narrower than unrestricted geometric
+stellation, because many other stellations are compounds or self-intersecting arrangements that
+violate the project surface contract. The exact domain is:
+
+| Input | Output |
+| --- | --- |
+| Dodecahedron | Stellated dodecahedron |
+| Great dodecahedron | Great stellated dodecahedron |
+
+Consequently, both `D -> G -> S` and `D -> S -> G` reach the great stellated dodecahedron. As with
+Greatened, the result is the resolved non-intersecting physical boundary, and unsupported inputs
+return a precise `InvalidGeometry` result.
+
+Stellated is immediate for the same reason as Greatened: no connected, non-degenerate,
+non-self-intersecting interpolation has the required endpoint topology.
 
 ## Sources of truth
 

@@ -72,7 +72,7 @@ animation, and UI selection use those typed values rather than comparing strings
 The core maps macro controls onto their geometric primitive
 (for example Bevelled distance/depth onto the fused bevel kernel) and returns
 direct same-topology interpolation or topology-compatible cut keyframes between
-old and new parameter realizations. For every parameterized stage, the worker
+source and target parameter realizations. For every parameterized stage, the worker
 tests the operation against the actual unscaled input mesh and final display
 scale, then returns the connected geometry-safe interval for each control while
 holding the other controls at their selected values. Shared static bounds are
