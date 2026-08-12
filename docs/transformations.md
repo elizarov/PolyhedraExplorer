@@ -5,6 +5,11 @@ Let `F`, `E`, and `V` be the input counts of faces, edges, and vertices, and let
 topological: they describe a valid closed polyhedron and do not specify its exact
 coordinates. Different operations can therefore have the same count formula.
 
+The formulas apply to ordinary topological meshes. A resolved Kepler-Poinsot mesh contains extra
+physical cells at classical face intersections; Dual, Greatened, and Stellated intentionally act
+on its recognized abstract regular-star form instead. Their resolved output counts are listed in
+the [seed catalog](seeds.md), and no misleading linear formula is inferred from the physical cells.
+
 Macro expansions are written in project execution order, from first applied to
 last applied. Traditional Conway notation is read in the opposite direction; for
 example, the project expansion `a -> t` is conventionally written `ta`.
@@ -23,6 +28,8 @@ example, the project expansion `a -> t` is conventionally written `ta`.
 | Quinto | - | `q` | - | `F + 2E` | `6E` | `V + 3E` |
 | Chamfered | Chamfer, edge chamfering | `c` | - | `F + E` | `4E` | `V + 2E` |
 | Canonical | Canonicalization | `o` | - | `F` | `E` | `V` |
+| Greatened | Greatening | `G` | - | regular-star-dependent | regular-star-dependent | regular-star-dependent |
+| Stellated | Stellation | `S` | - | regular-star-dependent | regular-star-dependent | regular-star-dependent |
 | Drop | Orbit deletion | `x[kind]` | - | input-dependent | input-dependent | input-dependent |
 | Kis face | Selective akisation | `k[face]` | - | input-dependent | input-dependent | input-dependent |
 | Truncate vertex | Selective vertex truncation | `t[vertex]` | - | input-dependent | input-dependent | input-dependent |
@@ -39,7 +46,8 @@ example, the project expansion `a -> t` is conventionally written `ta`.
 
 Tags are case-sensitive. The project uses `n` for None and `o` for Canonical,
 so Needle and Ortho use `N` and `O`; their conventional Conway symbols are `n`
-and `o`. A trailing prime selects alternate chirality: `s'`, `p'`, and `w'`
+and `o`. Greatened and Stellated use uppercase `G` and `S` because lowercase `g`
+and `s` are the established Gyro and Snub tags. A trailing prime selects alternate chirality: `s'`, `p'`, and `w'`
 are flipped Snub, Propeller, and Whirl, while `g' = d -> s' -> d` is flipped
 Gyro.
 
@@ -78,7 +86,7 @@ continuous coordinate control because their preliminary construction is
 canonicalized; their gear therefore contains only chirality. Rectified and Join
 are also fixed because moving a shared edge midpoint splits it into two vertices
 and becomes truncation rather than a coordinate variation of rectification.
-Dual, Drop, Quinto, Canonical, and None have no continuous geometric setting.
+Dual, Drop, Quinto, Canonical, Greatened, Stellated, and None have no continuous geometric setting.
 
 ## Animations
 
@@ -120,7 +128,9 @@ including Kis Height, are included in the same fused target.
 
 Animation is intentionally omitted where no stable, non-self-intersecting mesh
 correspondence exists: Drop, adding/removing or retargeting selective Kis face,
-and chirality flips. A selective Kis Height change still interpolates because
+Greatened, Stellated, and chirality flips. The regular-star operations change
+the resolved intersection-cell topology, and their classical collapsed forms would be immersed
+rather than proper meshes. A selective Kis Height change still interpolates because
 its topology is already present. A chirality flip is immediate rather than
 passing through a flattened or self-intersecting intermediate mesh.
 
@@ -164,12 +174,16 @@ vertices before the input mesh replaces the near-degenerate keyframe.
 Duality exchanges faces and vertices while preserving a one-to-one correspondence
 between edges. The implementation places a dual vertex for every face and builds
 one dual face around every original vertex. Applying Dual twice restores the
-original topology.
+original topology. On a recognized Kepler-Poinsot seed it instead exchanges the
+classical pairs Small stellated dodecahedron / Great dodecahedron and Great stellated
+dodecahedron / Great icosahedron; the extra resolved intersection cells are not dualized.
 
 Dual is animated through the limiting cantellation family. Face-, edge-, and
 vertex-derived regions move toward the reciprocal face points until the mesh is
 visually the dual; removal traverses that limit in reverse. This supplies stable
 matching buffers even though the input and dual exchange faces and vertices.
+Classical regular-star duality is immediate because its resolved physical cell topology cannot
+pass through that cantellation family without intersections.
 
 ### Snub (`s`)
 
@@ -254,6 +268,46 @@ midsphere. The result is unique only up to rotation and reflection.
 Canonical preserves connectivity, so animation directly interpolates every
 vertex from the current realization to the canonical coordinates. Removing a
 Canonical stage performs the same coordinate morph backward.
+
+### Greatened (`G`)
+
+Greatening selects the other regular realization that retains the relevant regular face family.
+It is a geometry-recognizing operation, not a general incidence formula. The current exact domain
+is:
+
+| Input | Output |
+| --- | --- |
+| Dodecahedron | Great dodecahedron |
+| Icosahedron | Great icosahedron |
+| Small stellated dodecahedron | Great stellated dodecahedron |
+
+Recognition ignores scale, orientation, and vertex numbering but requires the regular geometry;
+an arbitrary deformed polyhedron with the same counts is not silently replaced. Outputs use the
+embedded nonzero-winding physical boundary described in [Non-convex geometry](non-convex.md).
+Inputs outside the table return an `InvalidGeometry` domain explanation instead of a compound or
+self-intersecting mesh.
+
+Greatened is immediate. Its resolved output cells do not have a proper collapsed correspondence to
+the input surface, so interpolating them would pass through the classical immersed star surface.
+
+### Stellated (`S`)
+
+Stellation continues a regular face-plane arrangement and selects the next supported
+Kepler-Poinsot form. The operation is intentionally narrower than unrestricted geometric
+stellation, because many other stellations are compounds or self-intersecting arrangements that
+violate the project surface contract. The exact domain is:
+
+| Input | Output |
+| --- | --- |
+| Dodecahedron | Small stellated dodecahedron |
+| Great dodecahedron | Great stellated dodecahedron |
+
+Consequently, both `D -> G -> S` and `D -> S -> G` reach the great stellated dodecahedron. As with
+Greatened, the result is the resolved non-intersecting physical boundary, and unsupported inputs
+return a precise `InvalidGeometry` result.
+
+Stellated is immediate for the same reason as Greatened: no connected, non-degenerate,
+non-self-intersecting interpolation has the required endpoint topology.
 
 ### Drop (`x[kind]`)
 
@@ -454,5 +508,8 @@ immediate to avoid passing through the invalid opposite-twist intermediate.
 - Conway operator terminology and identities: [George W. Hart's Conway Notation
   for Polyhedra](https://www.georgehart.com/virtual-polyhedra/conway_notation.html)
   and [Antiprism's Conway documentation](https://www.antiprism.com/programs/conway.html).
+- Regular star polyhedra and stellation relationships: [George W. Hart's
+  Kepler-Poinsot Polyhedra](https://www.georgehart.com/virtual-polyhedra/kepler-poinsot-info.html)
+  and [Stellations](https://www.georgehart.com/virtual-polyhedra/stellations-info.html).
 - Propeller geometry and handedness: [George W. Hart's Propellor
   Polyhedra](https://georgehart.com/propello/propello.html).

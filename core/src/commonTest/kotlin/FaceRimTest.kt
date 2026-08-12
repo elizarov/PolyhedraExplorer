@@ -2,6 +2,8 @@ package polyhedra.core
 
 import polyhedra.core.poly.DisdyakisTriacontahedron
 import polyhedra.core.poly.Seed
+import polyhedra.core.poly.SeedType
+import polyhedra.core.poly.Seeds
 import polyhedra.model.poly.FaceKind
 import polyhedra.model.poly.FaceRim
 import polyhedra.model.poly.MutableFace
@@ -19,6 +21,26 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 class FaceRimTest {
+    @Test
+    fun keplerPoinsotPhysicalCellsHaveFiniteUniformRims() {
+        for (seed in Seeds.filter { candidate -> candidate.type == SeedType.KeplerPoinsot }) {
+            for (face in seed.poly.fs) {
+                val faceRim = seed.poly.faceRim(face)
+                val inset = faceRim.maxRim * 0.5
+                assertTrue(faceRim.maxRim.isFinite() && faceRim.maxRim > 0.0, "${seed.tag} face ${face.id}")
+                for (index in face.fvs.indices) {
+                    val next = (index + 1) % face.fvs.size
+                    val first = face.fvs[index] + faceRim.rimDir[index] * inset
+                    val second = face.fvs[next] + faceRim.rimDir[next] * inset
+                    val firstWidth = first.distanceToLine(face.fvs[index], face.fvs[next])
+                    val secondWidth = second.distanceToLine(face.fvs[index], face.fvs[next])
+                    assertTrue(abs(firstWidth - inset) < 1e-8, "${seed.tag} face ${face.id}, edge $index")
+                    assertTrue(abs(secondWidth - inset) < 1e-8, "${seed.tag} face ${face.id}, edge $index")
+                }
+            }
+        }
+    }
+
     @Test
     fun disdyakisTriacontahedronRimHasUniformWidthAlongEveryFaceEdge() {
         val poly = Seed.DisdyakisTriacontahedron.poly

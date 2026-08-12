@@ -22,6 +22,36 @@ Planarity is deliberately not part of properness. `validateProperGeometry` accep
 face when its deterministic triangle surface is otherwise valid. `validateGeometry` adds the
 stricter all-faces-planar requirement for algorithms and tests that need it.
 
+## Classical star faces and the physical boundary
+
+A classical Kepler-Poinsot polyhedron is an *immersed* regular polyhedron: its large regular
+polygon or pentagram faces pass through one another. Feeding those faces directly to the renderer
+would violate the project's embedded-surface contract and would produce an ambiguous STL. The core
+instead resolves the face arrangement into the boundary of its nonzero-winding physical volume:
+
+1. construct the twelve pentagon/pentagram planes or twenty great-icosahedron triangle planes;
+2. split each plane polygon at every other face plane;
+3. evaluate the signed ray winding immediately on both sides of every resulting cell;
+4. retain only cells that separate zero winding from nonzero winding, orienting them outward;
+5. merge coincident vertices, build one triangular two-manifold, and run the ordinary properness
+   validator.
+
+This representation preserves the visible solid form and full `I_h` symmetry without admitting
+face intersections, disconnected compounds, or special cases in rendering and export. It also
+means that the UI's F/E/V counts describe the resolved physical mesh, not the smaller abstract
+regular map:
+
+| Regular star form | Classical `F / E / V` | Resolved `F / E / V` |
+| --- | --- | --- |
+| Small stellated dodecahedron | `12 / 30 / 12` | `60 / 90 / 32` |
+| Great dodecahedron | `12 / 30 / 12` | `60 / 90 / 32` |
+| Great stellated dodecahedron | `12 / 30 / 20` | `60 / 90 / 32` |
+| Great icosahedron | `20 / 30 / 12` | `180 / 270 / 92` |
+
+Classical Dual, Greaten, and Stellate recognize the scale-independent regular-star geometry and
+operate on the abstract form. All other algorithms receive the resolved embedded mesh. This
+distinction prevents the extra intersection cells from changing classical dual pairs.
+
 ## Shared surface triangulation
 
 The model computes one scale-aware, deterministic ear-clipped triangulation for every face. The
@@ -46,8 +76,9 @@ from the actual input mesh rather than a convex-only constant.
 | --- | --- |
 | Truncated, Rectified | Unified edge-interpolation construction. Supported for a proper input when the resulting cuts remain proper. |
 | Cantellated, Bevelled | Unified face/edge construction. Concave inputs are supported for proper parameter ranges; the result check bounds or rejects unsafe ranges. |
-| Dual | Tries the direct polar reciprocal of average face planes. If a reflex neighborhood makes that surface improper, it canonicalizes the input topology and reciprocates the convex realization. Singular or non-canonicalizable cases fail cleanly. |
-| Kis / Kis face | Uses the dual-truncate-dual regular realization. It is geometry-dependent on non-convex inputs and is accepted only when its result is proper. |
+| Dual | For a recognized Kepler-Poinsot form, returns its classical star dual. Otherwise it tries the direct polar reciprocal of average face planes; if a reflex neighborhood makes that surface improper, it canonicalizes the input topology and reciprocates the convex realization. Singular or non-canonicalizable cases fail cleanly. |
+| Greaten / Stellate | Defined on the recognized regular dodecahedral/icosahedral forms listed in the transformation reference. They return a resolved Kepler-Poinsot boundary. Arbitrary inputs and compound-producing stellations are rejected with a domain explanation. |
+| Kis / Kis face | Full default Kis uses its Dual-Truncate-Dual definition and is accepted only when the result is proper. Continuous-height and orbit-targeted Kis require a topological dual and are deliberately unavailable on resolved regular-star meshes, whose classical dual has different physical cell topology. |
 | Snub | Face rotation can overlap a concave boundary or a reflex neighborhood. Such inputs or settings are rejected by the intersection check. |
 | Chamfered | The bisector construction can fold at reflex corners. It is supported only where its emitted face boundaries and full surface remain proper. |
 | Propeller, Whirl, Quinto | Their incidence subdivision is canonicalized. They support a non-convex input topology when canonicalization converges, producing a convex canonical realization. |

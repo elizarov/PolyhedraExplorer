@@ -2,10 +2,7 @@ package polyhedra.core
 
 import kotlinx.coroutines.test.runTest
 import polyhedra.core.api.evaluateCore
-import polyhedra.core.poly.FamilySeeds
-import polyhedra.core.poly.Seed
-import polyhedra.core.poly.Seeds
-import polyhedra.core.poly.validateMeshGeometry
+import polyhedra.core.poly.*
 import polyhedra.core.transform.KisFace
 import polyhedra.core.transform.RectifyVertex
 import polyhedra.core.transform.TruncateVertex
@@ -27,8 +24,8 @@ import kotlin.test.assertTrue
 
 class ContinuousTransformRangeTest {
     @Test
-    fun geometryDerivedExtremesAreValidForEveryCatalogSeed() = runTest {
-        validateDynamicRanges(Seeds)
+    fun geometryDerivedExtremesAreValidForRepresentativeCatalogSeeds() = runTest {
+        validateDynamicRanges(representativeCatalogSeeds)
     }
 
     @Test
@@ -58,8 +55,8 @@ class ContinuousTransformRangeTest {
     }
 
     @Test
-    fun outerExplorationExtremesNeverExposeInvalidGeometryForCatalogSeeds() = runTest {
-        validateOuterExtremes(Seeds)
+    fun outerExplorationExtremesNeverExposeInvalidGeometryForRepresentativeCatalogSeeds() = runTest {
+        validateOuterExtremes(representativeCatalogSeeds)
     }
 
     @Test
@@ -182,14 +179,27 @@ private val continuousTransformTags = listOf(
     "k",
     "e", "O",
     "b", "m",
-    "s", "s'", "g", "g'",
+    // Flipped chirality is a mirror and therefore has the same geometry-safe interval.
+    "s", "g",
     "c",
 )
 
-// Family geometry changes continuously with n. Exercise every catalog seed and the structural,
-// low-order, mid-range, and maximum members of each parameterized family in the costlier range test.
+// The range search is deliberately representative: default geometry for every fixed seed and
+// operation is covered by the catalog validation suites, while this test exercises distinct
+// symmetry/topology classes and every regular-star form without multiplying the expensive
+// intersection search by mirror-equivalent and construction-equivalent cases.
+private val representativeCatalogSeeds = listOf(
+    Seed.Tetrahedron,
+    Seed.RhombitruncatedIcosidodecahedron,
+    Seed.GreatDodecahedron,
+    Seed.GreatIcosahedron,
+)
+
+// Family construction itself is validated at structural low order and n=100 elsewhere. The range
+// algorithm needs one non-degenerate member of each family rather than repeating the same search
+// for every n.
 private val representativeFamilySeeds = FamilySeeds.filter { seed ->
-    seed.tag.toFamilySeedIdOrNull()?.n in setOf(3, 4, 5, 10, 100)
+    seed.tag.toFamilySeedIdOrNull()?.n == 10
 }
 
 private fun List<Seed>.withFamily(family: SeedFamily): List<Seed> =

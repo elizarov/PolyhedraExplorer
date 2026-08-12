@@ -33,7 +33,9 @@ class CanonicalSymmetryTest {
 
     @Test
     fun transformedPlatonicSolidsUseDeclaredSymmetryOrbits() {
-        val transforms = Transforms.filter { it.fev != TransformFEV.ID }
+        val transforms = Transforms.filter { transform ->
+            transform.fev != null && transform.fev != TransformFEV.ID
+        }
         for (seed in Seeds.filter { it.type == SeedType.Platonic }) {
             for (transform in transforms) {
                 val poly = seed.poly.transformed(transform)

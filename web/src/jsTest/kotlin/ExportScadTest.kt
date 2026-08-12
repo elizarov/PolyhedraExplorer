@@ -1,5 +1,7 @@
 package polyhedra.web
 
+import polyhedra.core.poly.SeedType
+import polyhedra.core.poly.Seeds
 import polyhedra.model.poly.*
 import polyhedra.model.util.Vec3
 import polyhedra.web.poly.exportGeometryToScad
@@ -9,6 +11,16 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class ExportScadTest {
+    @Test
+    fun exportsAllResolvedKeplerPoinsotCells() {
+        val expectedFaces = mapOf("SD" to 60, "GD" to 60, "GSD" to 60, "GI" to 180)
+        for (seed in Seeds.filter { candidate -> candidate.type == SeedType.KeplerPoinsot }) {
+            val scad = seed.poly.exportGeometryToScad(seed.tag, seed.name)
+            assertEquals(seed.poly.vs.size, scad.lineSequence().count { it.endsWith(" vertex") }, seed.tag)
+            assertEquals(expectedFaces.getValue(seed.tag), scad.lineSequence().count { it.endsWith(" face") }, seed.tag)
+        }
+    }
+
     @Test
     fun exportsCompleteCubeGeometry() {
         val scad = cube().exportGeometryToScad("cube", "test state")

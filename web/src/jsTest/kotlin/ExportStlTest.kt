@@ -7,6 +7,8 @@ import kotlinx.coroutines.promise
 import org.khronos.webgl.WebGLRenderingContext
 import org.w3c.dom.HTMLCanvasElement
 import polyhedra.core.api.evaluateCore
+import polyhedra.core.poly.SeedType
+import polyhedra.core.poly.Seeds
 import polyhedra.model.poly.FaceKind
 import polyhedra.model.api.CoreRequest
 import polyhedra.model.api.CoreState
@@ -23,6 +25,42 @@ class ExportStlTest {
     @AfterTest
     fun tearDown() {
         scope.cancel()
+    }
+
+    @Test
+    fun exportsKeplerPoinsotPhysicalSurfacesAsWatertightGeometry() {
+        val expectedTriangles = mapOf("SD" to 60, "GD" to 60, "GSD" to 60, "GI" to 180)
+        val canvas = document.createElement("canvas") as HTMLCanvasElement
+        val gl = requireNotNull(canvas.getContext("webgl") as? WebGLRenderingContext)
+
+        for (seed in Seeds.filter { candidate -> candidate.type == SeedType.KeplerPoinsot }) {
+            val params = RenderParams("", null)
+            val faces = FaceContext(gl, params) { seed.poly }
+            try {
+                faces.performUpdate(null, 0.0)
+                val stl = faces.exportSolidToStl(
+                    seed.tag,
+                    FaceExportParams(scale = 20.0, width = 0.0, rim = 0.0, expand = 0.0),
+                )
+                val validation = StlGeometryValidator.validateAscii(stl)
+                assertEquals(expectedTriangles.getValue(seed.tag), validation.triangleCount, seed.tag)
+                assertTrue(validation.isValid, "Invalid ${seed.name} STL geometry: $validation")
+
+                params.poly.hideFaces.updateValue(setOf(seed.poly.faceKinds.keys.first()))
+                faces.performUpdate(null, 0.0)
+                val rimmed = faces.exportSolidToStl(
+                    "${seed.tag}_rimmed",
+                    FaceExportParams(scale = 20.0, width = 0.08, rim = 0.04, expand = 0.0),
+                )
+                val rimmedValidation = StlGeometryValidator.validateAscii(rimmed)
+                assertTrue(
+                    rimmedValidation.isValid,
+                    "Invalid ${seed.name} hidden-orbit rim geometry: $rimmedValidation",
+                )
+            } finally {
+                faces.destroy()
+            }
+        }
     }
 
     @Test

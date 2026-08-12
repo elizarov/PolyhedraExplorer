@@ -13,7 +13,7 @@ import polyhedra.model.api.CoreResponse
 // Increment together with the worker filename, main-script query, and distribution directory
 // whenever the core contract or implementation changes, so a cached worker cannot keep running
 // an older Wasm core after an application refresh.
-private const val CORE_WORKER_URL = "./core-worker-v6.js"
+private const val CORE_WORKER_URL = "./core-worker-v7.js"
 private const val PROGRESS = "progress"
 private const val SUCCESS = "success"
 private const val FAILURE = "failure"

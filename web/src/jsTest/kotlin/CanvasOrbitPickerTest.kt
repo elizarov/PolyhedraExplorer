@@ -10,6 +10,15 @@ import kotlin.test.assertNull
 
 class CanvasOrbitPickerTest {
     @Test
+    fun resolvedGreatIcosahedronHasAPickableFrontSurface() {
+        val poly = Seed.GreatIcosahedron.poly
+        val picker = CanvasOrbitPicker(poly, defaultView(), 400, 400, expand = 0.0, excludedFaces = emptySet())
+
+        val picked = picker.hitFace(200.0, 200.0)
+        assertEquals(true, picked in poly.faceKinds)
+    }
+
+    @Test
     fun picksFrontFaceAndItsEdgeAndVertexOrbits() {
         val poly = cubeWithUniqueKinds()
         val view = defaultView()

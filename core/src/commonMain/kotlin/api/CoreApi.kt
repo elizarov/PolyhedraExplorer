@@ -362,9 +362,17 @@ private suspend fun applyTransform(
                     poly
                 }
 
+                transform.spec.id.operation == TransformOperation.Gyro &&
+                    primitive is Dual && primitiveIndex == transform.primitiveTransforms.lastIndex ->
+                    poly.directDual()
+
                 else -> primitive.asyncTransform?.invoke(poly, OperationProgressContext(reportPrimitiveProgress))
                     ?: primitive.transform(poly)
             }
+            // A later primitive (especially Dual's canonical fallback) must not turn an improper
+            // intermediate into an apparently valid macro result. Each logical construction stage
+            // is part of the operation's geometric meaning and must satisfy the surface contract.
+            poly.validateProperGeometry()
         } catch (cause: IllegalArgumentException) {
             return TransformApplication.Failure(
                 CoreIssue(CoreIssueCode.InvalidGeometry, transform.tag, detail = cause.message)
@@ -667,6 +675,12 @@ private fun transformAnimation(
     ) return emptyList()
     if (previousTransform is Whirl && currentTransform is Whirl &&
         previousTransform.chirality != currentTransform.chirality
+    ) return emptyList()
+    if (previousTransform is Greatened || currentTransform is Greatened ||
+        previousTransform is Stellated || currentTransform is Stellated
+    ) return emptyList()
+    if (!basePoly.isConvexGeometry && basePoly.regularStarFormOrNull() != null &&
+        (previousTransform is Dual || currentTransform is Dual)
     ) return emptyList()
     if (previousTransform is KisFace || currentTransform is KisFace) return emptyList()
     val changesOrbitTarget = previousTransform is OrbitTargetedAnimation &&

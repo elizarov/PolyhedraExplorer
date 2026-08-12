@@ -45,7 +45,8 @@ data class KisFace(val kind: FaceKind, val height: Double = 1.0) : Transform() {
 
     override fun transform(poly: Polyhedron): Polyhedron = poly.kisFaces(setOf(kind), height)
 
-    override fun isApplicable(poly: Polyhedron): Boolean = kind in poly.faceKinds
+    override fun isApplicable(poly: Polyhedron): Boolean =
+        kind in poly.faceKinds && (poly.isConvexGeometry || poly.regularStarFormOrNull() == null)
 
     override fun toString(): String = "Kis $kind"
 }
@@ -122,7 +123,9 @@ internal fun TransformSpec.toOrbitTargetedTransformOrNull(): Transform? {
 val Polyhedron.availableOrbitTransforms: Set<Transform>
     get() = buildSet {
         canDrop.mapTo(this, ::Drop)
-        if (faceKinds.size > 1) faceKinds.keys.mapTo(this, ::KisFace)
+        if (faceKinds.size > 1 && (isConvexGeometry || regularStarFormOrNull() == null)) {
+            faceKinds.keys.mapTo(this, ::KisFace)
+        }
         if (vertexKinds.size > 1) {
             vertexKinds.keys.mapTo(this, ::TruncateVertex)
             vertexKinds.keys.mapTo(this, ::RectifyVertex)
@@ -137,10 +140,16 @@ internal fun Polyhedron.kisFaces(
     require(kinds.isNotEmpty() && kinds.all { it in faceKinds })
     val fullKis = dual().truncated().dual()
     if (height == 1.0 && kinds.size == faceKinds.size && kinds.containsAll(faceKinds.keys)) return fullKis
+    require(isConvexGeometry || regularStarFormOrNull() == null) {
+        "Continuous or orbit-targeted Kis is not available for resolved regular-star surfaces"
+    }
+    require(fullKis.vs.size == vs.size + fs.size) {
+        "Continuous or orbit-targeted Kis requires a topological dual; it is not available for " +
+            "this resolved regular-star surface"
+    }
 
     return transformedPolyhedron(KisFace::class, kinds to height) {
         // Full Kis retains one vertex for each input vertex, followed by one apex per input face.
-        check(fullKis.vs.size == vs.size + fs.size)
         val outputVertices = HashMap<Vertex, Vertex>()
         for (vertex in vs) {
             outputVertices[fullKis.vs[vertex.id]] = vertex(fullKis.vs[vertex.id])
@@ -165,8 +174,9 @@ internal fun Polyhedron.kisFaces(
 
         val newFaceKindOffset = faceKinds.size
         for (fullFace in fullKis.fs) {
-            val apex = fullFace.fvs.singleOrNull { it.id >= vs.size }
-                ?: error("Kis face has no unique apex: $fullFace")
+            val apex = requireNotNull(fullFace.fvs.singleOrNull { it.id >= vs.size }) {
+                "Kis face has no unique apex: $fullFace"
+            }
             val sourceFace = fs[apex.id - vs.size]
             if (sourceFace.kind !in kinds) continue
             face(

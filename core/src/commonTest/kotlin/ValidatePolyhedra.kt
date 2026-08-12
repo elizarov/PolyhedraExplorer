@@ -12,7 +12,9 @@ import polyhedra.core.transform.*
 import kotlin.test.*
 
 class ValidatePolyhedra {
-    private val expandingTransforms = Transforms.filter { it.fev != TransformFEV.ID }
+    private val expandingTransforms = Transforms.filter { transform ->
+        transform.fev != null && transform.fev != TransformFEV.ID
+    }
 
     @Test
     fun testRectifiedTetrahedronIsOctahedron() {

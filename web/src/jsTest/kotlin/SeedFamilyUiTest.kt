@@ -54,7 +54,7 @@ class SeedFamilyUiTest {
         composition = renderComposable(host) { ControlPane(params, popup = Popup.Seed, togglePopup = {}) }
 
         assertEquals(
-            listOf("Platonic", "Families", "Archimedean", "Catalan"),
+            listOf("Platonic", "Families", "Kepler-Poinsot", "Archimedean", "Catalan"),
             elements(".dropdown .header").map { it.textContent.orEmpty().trim() },
         )
         assertEquals(
@@ -69,6 +69,27 @@ class SeedFamilyUiTest {
 
         elements(".dropdown .item").single { it.textContent == "Prism" }.click()
         assertEquals("P3", params.seed.value.tag)
+    }
+
+    @Test
+    fun keplerPoinsotPopupShowsConwayFormsAndRoundTripsItsSeedTag() {
+        val params = PolyParams("", null)
+        composition = renderComposable(host) { ControlPane(params, popup = Popup.Seed, togglePopup = {}) }
+
+        assertEquals(
+            listOf("sD", "gD", "sgD = gsD", "gI"),
+            elements(".seed-notation").map { element -> element.textContent.orEmpty() },
+        )
+        elements(".dropdown .item").single { element ->
+            element.textContent.orEmpty().contains("Great icosahedron")
+        }.click()
+        assertEquals("GI", params.seed.value.tag)
+
+        val source = RootParams()
+        source.render.poly.seed.updateValue(Seeds.single { seed -> seed.tag == "GSD" })
+        val restored = RootParams()
+        restored.loadFromString(source.toString())
+        assertEquals("GSD", restored.render.poly.seed.value.tag)
     }
 
     @Test

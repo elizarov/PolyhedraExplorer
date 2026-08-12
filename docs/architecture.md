@@ -52,7 +52,8 @@ The Wasm core owns:
 
 - seed geometry construction;
 - primitive transform and macro-expansion evaluation, including composition-aware `aa` cantellation and `at` bevel fusion;
-- truncate, rectify, cantellate, dual, bevel, snub, propeller, whirl, quinto, chamfer, canonicalization (the UI's `Canonical` transform), drop, and orbit-targeted Kis/Truncate/Rectify geometry kernels;
+- truncate, rectify, cantellate, dual, bevel, snub, propeller, whirl, quinto, chamfer, canonicalization (the UI's `Canonical` transform), Greaten, Stellate, drop, and orbit-targeted Kis/Truncate/Rectify geometry kernels;
+- regular Kepler-Poinsot face arrangements and their nonzero-winding embedded physical-boundary resolution;
 - size guards, applicability checks, warnings, and progress;
 - fixed and parameterized-family seed geometry, scale normalization, and topology/drop analysis;
 - rotation-orbit refinement and geometric comparison with built-in seeds;
@@ -124,11 +125,12 @@ The site must be served over HTTP; loading it directly from the filesystem is un
 ## Invariants
 
 - Browser manipulation algorithms execute through `evaluateCoreJson` in WasmGC inside a dedicated worker.
-- A breaking serialized core-contract change increments both the worker filename and its Wasm asset directory.
+- A core implementation or serialized-contract change increments the main-bundle query, worker filename, and Wasm asset directory together.
 - CPU-intensive transforms cannot block DOM/WebGL interaction, and worker messages repaint progress on the main thread.
 - The JS bundle contains the mesh presentation model and Wasm loader, but no seed-generation or transform implementation.
 - The UI renders with DOM + WebGL; no canvas UI toolkit owns the controls.
 - Transform order is significant and intermediate topology metadata corresponds to the same order.
 - A macro occupies one logical transform stage even though the core may execute several primitive operations for it.
 - A displayed polyhedron never exceeds 32,767 edges.
+- Every displayed/exported mesh is one connected embedded oriented two-manifold; compounds and surface intersections are rejected, while non-planar faces remain valid through their shared triangulation.
 - JS and Wasm benchmarks run the same common source and must produce the same checksum.

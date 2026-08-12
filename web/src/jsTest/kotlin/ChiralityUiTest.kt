@@ -8,6 +8,7 @@ import org.w3c.dom.HTMLDivElement
 import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLElement
 import polyhedra.web.catalog.Seeds
+import polyhedra.web.catalog.SeedOptions
 import polyhedra.web.catalog.Transform
 import polyhedra.web.main.ControlPane
 import polyhedra.web.main.Popup
@@ -112,7 +113,7 @@ class ChiralityUiTest {
         composition = renderComposable(host) { ControlPane(params, popup = Popup.Seed, togglePopup = {}) }
 
         assertNull(host.querySelector(".chirality-flip"))
-        assertEquals(35, host.querySelectorAll(".dropdown .item").length)
+        assertEquals(SeedOptions.size, host.querySelectorAll(".dropdown .item").length)
     }
 
     @Test

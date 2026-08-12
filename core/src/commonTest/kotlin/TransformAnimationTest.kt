@@ -62,7 +62,9 @@ class TransformAnimationTest {
     @Test
     fun everyStandardOperationPairAnimatesOutAndInUnlessItIsAChiralityFlip() = runTest {
         val operationTags = buildSet {
-            Transform.Transforms.filterNot { it == Transform.None }.mapTo(this, Transform::tag)
+            Transform.Transforms
+                .filterNot { it == Transform.None || it == Transform.Greatened || it == Transform.Stellated }
+                .mapTo(this, Transform::tag)
             TransformMacros.mapTo(this) { it.tag }
             addAll(listOf("s'", "p'", "w'", "g'"))
         }
@@ -150,7 +152,9 @@ class TransformAnimationTest {
             PrimitiveCase("Canonical", "o", baseTags = listOf("t~d=0.7")),
         )
         assertEquals(
-            Transform.Transforms.filterNot { it == Transform.None }.mapTo(linkedSetOf(), Transform::tag),
+            Transform.Transforms
+                .filterNot { it == Transform.None || it == Transform.Greatened || it == Transform.Stellated }
+                .mapTo(linkedSetOf(), Transform::tag),
             cases.mapTo(linkedSetOf(), PrimitiveCase::tag),
         )
 
@@ -285,6 +289,21 @@ class TransformAnimationTest {
             val transformed = state(base.transformTags + tag)
             assertTrue(evaluate(transformed, base).animation.isEmpty(), "apply $tag")
             assertTrue(evaluate(base, transformed).animation.isEmpty(), "remove $tag")
+        }
+    }
+
+    @Test
+    fun regularStarConstructionAndClassicalDualityRemainImmediate() = runTest {
+        val cases = listOf(
+            state(listOf("G"), seedTag = "D") to state(emptyList(), seedTag = "D"),
+            state(listOf("S"), seedTag = "D") to state(emptyList(), seedTag = "D"),
+            state(listOf("d"), seedTag = "SD") to state(emptyList(), seedTag = "SD"),
+            state(listOf("d"), seedTag = "GI") to state(emptyList(), seedTag = "GI"),
+        )
+        for ((current, previous) in cases) {
+            val response = evaluate(current, previous)
+            assertEquals(null, response.error, "${current.seedTag} ${current.transformTags}")
+            assertTrue(response.animation.isEmpty(), "${current.seedTag} ${current.transformTags}")
         }
     }
 

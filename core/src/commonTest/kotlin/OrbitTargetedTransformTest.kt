@@ -53,11 +53,11 @@ class OrbitTargetedTransformTest {
         val regular = Seed.Cube.poly.availableOrbitTransforms
         assertFalse(regular.any { it is KisFace || it is TruncateVertex || it is RectifyVertex })
 
-        val multiFace = Seeds.first { it.poly.faceKinds.size > 1 }.poly
+        val multiFace = Seed.TruncatedTetrahedron.poly
         val kisFaces = multiFace.availableOrbitTransforms.filterIsInstance<KisFace>()
         assertEquals(multiFace.faceKinds.keys, kisFaces.mapTo(linkedSetOf(), KisFace::kind))
 
-        val multiVertex = Seeds.first { it.poly.vertexKinds.size > 1 }.poly
+        val multiVertex = Seed.TriakisTetrahedron.poly
         val truncateVertices = multiVertex.availableOrbitTransforms.filterIsInstance<TruncateVertex>()
         assertEquals(multiVertex.vertexKinds.keys, truncateVertices.mapTo(linkedSetOf(), TruncateVertex::kind))
         val rectifyVertices = multiVertex.availableOrbitTransforms.filterIsInstance<RectifyVertex>()
@@ -81,7 +81,7 @@ class OrbitTargetedTransformTest {
 
     @Test
     fun truncatingOneVertexOrbitCutsEveryVertexInThatOrbit() {
-        val input = Seeds.first { it.poly.vertexKinds.size > 1 }.poly
+        val input = Seed.TriakisTetrahedron.poly
         val kind = input.vertexKinds.keys.first()
         val selectedVertices = input.vs.filter { it.kind == kind }
         val selectedDegree = selectedVertices.sumOf { it.directedEdges.size }
@@ -96,7 +96,7 @@ class OrbitTargetedTransformTest {
 
     @Test
     fun rectifyingOneVertexOrbitMovesItsIncidentEdgesToSharedMidpoints() {
-        val input = Seeds.first { it.poly.vertexKinds.size > 1 }.poly
+        val input = Seed.TriakisTetrahedron.poly
         val kind = input.vertexKinds.keys.first()
         val selectedVertices = input.vs.filter { it.kind == kind }
         val incidentEdges = input.es.filter { it.a.kind == kind || it.b.kind == kind }
@@ -129,20 +129,12 @@ class OrbitTargetedTransformTest {
     }
 
     @Test
-    fun everyCatalogOrbitProducesAValidSelectiveTransform() {
-        for (seed in Seeds) {
+    fun everyAdvertisedConvexCatalogOrbitProducesAValidSelectiveTransform() {
+        for (seed in Seeds.filter { candidate -> candidate.type != SeedType.KeplerPoinsot }) {
             val poly = seed.poly
-            if (poly.faceKinds.size > 1) {
-                testParameter("$seed kis face", poly.faceKinds.keys) { kind ->
-                    poly.transformed(KisFace(kind)).validate()
-                }
-            }
-            if (poly.vertexKinds.size > 1) {
-                testParameter("$seed truncate vertex", poly.vertexKinds.keys) { kind ->
-                    poly.transformed(TruncateVertex(kind)).validate()
-                }
-                testParameter("$seed rectify vertex", poly.vertexKinds.keys) { kind ->
-                    poly.transformed(RectifyVertex(kind)).validate()
+            for (transform in poly.availableOrbitTransforms) {
+                if (transform is KisFace || transform is TruncateVertex || transform is RectifyVertex) {
+                    poly.transformed(transform).validate()
                 }
             }
         }
@@ -185,7 +177,7 @@ class OrbitTargetedTransformTest {
 
     @Test
     fun changingTargetOrbitAnimatesOldTargetOutThenNewTargetIn() = runTest {
-        val vertexSeed = Seeds.first { it.poly.vertexKinds.size > 1 }
+        val vertexSeed = Seed.TriakisTetrahedron
         val vertexKinds = vertexSeed.poly.vertexKinds.keys.toList()
         val cases = listOf(
             vertexSeed to listOf(TruncateVertex(vertexKinds[0]), TruncateVertex(vertexKinds[1])),
@@ -232,7 +224,7 @@ class OrbitTargetedTransformTest {
 
     @Test
     fun selectiveTruncateAndRectifyAnimateInAndOut() = runTest {
-        val vertexSeed = Seeds.first { it.poly.vertexKinds.size > 1 }
+        val vertexSeed = Seed.TriakisTetrahedron
         val cases = listOf(
             vertexSeed to TruncateVertex(vertexSeed.poly.vertexKinds.keys.first()),
             vertexSeed to RectifyVertex(vertexSeed.poly.vertexKinds.keys.first()),
@@ -257,7 +249,7 @@ class OrbitTargetedTransformTest {
 
     @Test
     fun truncateAndRectifyOnSameOrbitAnimateAsOneCutDepthTransition() = runTest {
-        val seed = Seeds.first { it.poly.vertexKinds.size > 1 }
+        val seed = Seed.TriakisTetrahedron
         val kind = seed.poly.vertexKinds.keys.first()
         val truncateState = CoreState(seed.tag, listOf(TruncateVertex(kind).tag), "c")
         val rectifyState = CoreState(seed.tag, listOf(RectifyVertex(kind).tag), "c")

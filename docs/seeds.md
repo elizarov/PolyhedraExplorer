@@ -1,7 +1,8 @@
 # Seed catalog
 
 Polyhedra Explorer contains the complete classical catalog of 31 convex fixed
-seed types: 5 Platonic, 13 Archimedean, and 13 Catalan solids. It also provides
+seed types: 5 Platonic, 13 Archimedean, and 13 Catalan solids, plus all four
+regular non-convex Kepler-Poinsot solids. It also provides
 four parameterized families—Prism, Antiprism, Pyramid, and Bipyramid—for every
 `n` from 3 through 100. The two chiral Archimedean solids and their Catalan duals
 also have prime-tagged mirror forms.
@@ -32,6 +33,20 @@ replacement suggestions: Prism 4 is Cube, Antiprism 3 and Bipyramid 4 are
 Octahedron, and Pyramid 3 is Tetrahedron. Those coincident members display the
 stronger polyhedral symmetry and its actual orbit counts rather than the
 family's normal axial point group.
+
+### Kepler-Poinsot solids
+
+A Kepler-Poinsot solid is a regular non-convex polyhedron: every classical face is the same
+regular polygon or pentagram, and every classical vertex has the same vertex figure. Exactly four
+exist. Their classical faces form an immersed self-intersecting arrangement, while the application
+requires one embedded printable surface. It therefore displays and exports the triangulated
+boundary of the nonzero-winding physical volume. The catalog table gives both classical and
+resolved counts; the bottom-row UI reports the resolved counts. See
+[Non-convex geometry](non-convex.md) for the construction and validity contract.
+
+The catalog shows the conventional Conway forms `sD`, `gD`, `sgD = gsD`, and `gI`. URL seed tags
+are the unambiguous uppercase `SD`, `GD`, `GSD`, and `GI`: lowercase `sD` is retained for the
+long-standing Snub dodecahedron URL.
 
 ### Archimedean solids
 
@@ -71,7 +86,7 @@ of the two snub solids are chiral and also have two mirror realizations.
 ## Primitive construction graph
 
 Every fixed seed can be reached from one basic seed—Tetrahedron—using only the
-primitive Rectified, Truncated, Dual, and Snub operations. Labels containing two
+primitive Rectified, Truncated, Dual, Snub, Greatened, and Stellated operations. Labels containing two
 operations are literal sequences, not macro names. The Archimedean and Catalan
 columns are paired by bidirectional Dual edges: applying Dual in either direction
 crosses between a solid and its dual. A slash on a chiral node or edge covers
@@ -92,6 +107,14 @@ flowchart LR
         O -->|Dual| C
         T -->|Snub| I
         I -->|Dual| D
+    end
+
+    subgraph R["Kepler-Poinsot regular stars"]
+        direction TB
+        KPSD["Small stellated dodecahedron (sD / SD)"]:::regularStar
+        KPGD["Great dodecahedron (gD / GD)"]:::regularStar
+        KPGSD["Great stellated dodecahedron (sgD = gsD / GSD)"]:::regularStar
+        KPGI["Great icosahedron (gI / GI)"]:::regularStar
     end
 
     subgraph A["Archimedean"]
@@ -142,6 +165,14 @@ flowchart LR
     D -->|"Rectified → Truncated"| bD
     D -->|"Snub / Snub′"| sD
 
+    D -->|Stellated| KPSD
+    D -->|Greatened| KPGD
+    I -->|Greatened| KPGI
+    KPSD -->|Greatened| KPGSD
+    KPGD -->|Stellated| KPGSD
+    KPSD <-->|Dual| KPGD
+    KPGSD <-->|Dual| KPGI
+
     tT <-->|Dual| dtT
     aC <-->|Dual| daC
     tC <-->|Dual| dtC
@@ -162,12 +193,14 @@ flowchart LR
     classDef catalan fill:#ede9fe,stroke:#7c3aed,color:#2e1065
     classDef chiral fill:#cffafe,stroke:#0891b2,color:#164e63
     classDef chiralDual fill:#fae8ff,stroke:#a21caf,color:#4a044e
+    classDef regularStar fill:#fee2e2,stroke:#dc2626,color:#450a0a
 ```
 
 The construction test executes every arrow above through the core, including
 both directions of every Dual edge and both chiralities. It also proves that all
 fixed catalog tags are reachable from `T`, constructs each one along that full
-path, and rejects macro tags in the edge list.
+path, and rejects macro tags in the edge list. The regular-star construction test separately proves
+both commuting paths to the great stellated dodecahedron and the two Kepler-Poinsot Dual pairs.
 
 ## Catalog summary
 
@@ -189,6 +222,15 @@ path, and rejects macro tags in the edge list.
 | Antiprism (`A3`–`A100`) | `n`-gonal antiprism | `n`-gonal trapezohedron | `2n+2 / 4n / 2n` | `D_nd` | normally `2 / 3 / 1` | Family seed |
 | Pyramid (`Y3`–`Y100`) | `n`-gonal pyramid | Pyramid `n` | `n+1 / 2n / n+1` | `C_nv` | normally `2 / 2 / 2` | Family seed |
 | Bipyramid (`B3`–`B100`) | Dipyramid; `n`-gonal bipyramid | Prism `n` | `2n / 3n / n+2` | `D_nh` | normally `1 / 2 / 2` | Family seed |
+
+### Kepler-Poinsot
+
+| Seed (URL tag; Conway form) | Schlaefli symbol | Dual | Classical `F / E / V` | Resolved `F / E / V` | Full point group | Resolved `F / E / V` orbits | Primitive construction |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Small stellated dodecahedron (`SD`; `sD`) | `{5/2, 5}` | Great dodecahedron | `12 / 30 / 12` | `60 / 90 / 32` | `I_h` | `1 / 2 / 2` | `D + S` |
+| Great dodecahedron (`GD`; `gD`) | `{5, 5/2}` | Small stellated dodecahedron | `12 / 30 / 12` | `60 / 90 / 32` | `I_h` | `1 / 2 / 2` | `D + G` |
+| Great stellated dodecahedron (`GSD`; `sgD = gsD`) | `{5/2, 3}` | Great icosahedron | `12 / 30 / 20` | `60 / 90 / 32` | `I_h` | `1 / 2 / 2` | `D + G -> S` or `D + S -> G` |
+| Great icosahedron (`GI`; `gI`) | `{3, 5/2}` | Great stellated dodecahedron | `20 / 30 / 12` | `180 / 270 / 92` | `I_h` | `3 / 5 / 3` | `I + G` |
 
 ### Archimedean
 
@@ -228,37 +270,39 @@ path, and rejects macro tags in the edge list.
 
 ## Completeness and validation
 
-- The fixed catalog contains 31 unique base tags: exactly 5 Platonic, 13
-  Archimedean, and 13 Catalan types. This matches the complete classical
-  enumerations. The four family selectors add 392 concrete family members.
+- The fixed catalog contains 35 unique base tags: exactly 5 Platonic, 4
+  Kepler-Poinsot, 13 Archimedean, and 13 Catalan types. These match the complete classical
+  enumerations of their categories. The four family selectors add 392 concrete family members.
 - The 13 Catalan rows pair one-to-one with the 13 Archimedean rows. Every pair
   has the same `E`, exchanged `F` and `V`, the same point group, and exchanged
   face/vertex orbit counts, as duality requires.
-- Every row satisfies Euler's formula `F - E + V = 2`.
+- Every embedded mesh row satisfies Euler's formula `F - E + V = 2`, including the resolved
+  Kepler-Poinsot counts. Their abstract immersed regular maps use the separate classical counts.
 - The four chiral types add `sC'`, `sD'`, `dsC'`, and `dsD'` to the core without
-  adding new solid types. Thus the UI lists 31 fixed types plus four family
-  selectors, while the core supports 35 handed fixed representations and 392
+  adding new solid types. Thus the UI lists 35 fixed types plus four family
+  selectors, while the core supports 39 handed fixed representations and 392
   family members.
 - Fixed-row `F / E / V` and orbit counts were read from each current `Seed.poly`.
   The validation suite checks representative members of every family through
   `n = 100` against their formulas and independently validates each generated
-  mesh. The construction suite evaluates all 49 handed directed variants of the
+  mesh. The convex construction suite evaluates all handed directed variants of its
   diagram edges through the core and recognizes the stated target, including
-  both directions of Dual and prime chirality. Separate path assertions prove
-  that Tetrahedron alone reaches and constructs all 35 handed fixed
-  representations.
+  both directions of Dual and prime chirality. The regular-star suite validates every new
+  construction edge and both Kepler-Poinsot Dual pairs. Path assertions prove
+  that Tetrahedron alone reaches and constructs all 39 handed fixed representations.
 - Runtime symmetry tests independently recover the full point group,
   proper-rotation orbit counts, and mirror-plane counts of every fixed seed plus
   representative axial families directly from geometry, including chiral and
   strengthened cases.
-- No Platonic, classical Archimedean, or Catalan solid is missing. The prism and
+- No Platonic, Kepler-Poinsot, classical Archimedean, or Catalan solid is missing. The prism and
   antiprism families plus the pyramid and bipyramid families are included;
-  Johnson solids beyond pyramids and nonconvex uniform or Kepler-Poinsot solids
+  Johnson solids beyond pyramids and nonconvex uniform solids beyond the Kepler-Poinsot set
   remain outside this catalog.
 
 ## Sources of truth
 
 - Fixed seed definitions: [`Seed.kt`](../core/src/commonMain/kotlin/poly/Seed.kt).
+- Resolved regular-star geometry: [`KeplerPoinsot.kt`](../core/src/commonMain/kotlin/poly/KeplerPoinsot.kt).
 - Family seed definitions and geometry: [`FamilySeed.kt`](../core/src/commonMain/kotlin/poly/FamilySeed.kt).
 - UI seed types and prime variants: [`CoreOptions.kt`](../web/src/jsMain/kotlin/catalog/CoreOptions.kt).
 - Tested construction edges: [`SeedConstructionTest.kt`](../core/src/commonTest/kotlin/SeedConstructionTest.kt).
@@ -267,3 +311,5 @@ path, and rejects macro tags in the edge list.
 - [Wolfram MathWorld: Archimedean Solid](https://mathworld.wolfram.com/ArchimedeanSolid.html).
 - [Wolfram MathWorld: Archimedean Dual](https://mathworld.wolfram.com/ArchimedeanDual.html).
 - [George W. Hart: Archimedean Duals](https://georgehart.com/virtual-polyhedra/archimedean-duals-info.html).
+- [George W. Hart: Kepler-Poinsot Polyhedra](https://www.georgehart.com/virtual-polyhedra/kepler-poinsot-info.html).
+- [George W. Hart: Stellations](https://www.georgehart.com/virtual-polyhedra/stellations-info.html).

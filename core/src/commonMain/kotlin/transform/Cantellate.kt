@@ -67,6 +67,12 @@ fun Polyhedron.cantellated(
 }
 
 fun Polyhedron.dual(): Polyhedron {
+    // The physical Kepler-Poinsot meshes resolve every classical face intersection. Dualize the
+    // underlying regular star form, not those implementation-detail cells.
+    if (!isConvexGeometry) {
+        regularStarDualOrNull()?.let { dual -> return dual.scaled(Scale.Circumradius) }
+    }
+
     val direct = polarDual()
     if (isConvexGeometry || runCatching { direct.validateProperGeometry() }.isSuccess) return direct
 
@@ -75,6 +81,10 @@ fun Polyhedron.dual(): Polyhedron {
     // deterministic slower fallback and then reciprocate its supporting planes.
     return canonical().polarDual().also { it.validateProperGeometry() }
 }
+
+/** Direct polar dual used when a continuous construction must not change meaning via fallback. */
+internal fun Polyhedron.directDual(): Polyhedron =
+    polarDual().also { dual -> dual.validateProperGeometry() }
 
 private fun Polyhedron.polarDual(): Polyhedron = transformedPolyhedron(Transform.Dual) {
     val rr = dualReciprocationRadius

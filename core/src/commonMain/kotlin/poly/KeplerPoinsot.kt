@@ -88,6 +88,21 @@ internal fun Polyhedron.regularStarFormOrNull(): RegularStarForm? {
     }?.first
 }
 
+/**
+ * Returns the classical dual of a recognized Kepler-Poinsot surface.
+ *
+ * The resolved printable surfaces have extra vertices, edges, and triangular cells at classical
+ * face intersections. A topological dual of those physical cells is therefore not the dual of the
+ * underlying regular star polyhedron.
+ */
+internal fun Polyhedron.regularStarDualOrNull(): Polyhedron? = when (regularStarFormOrNull()) {
+    RegularStarForm.SmallStellatedDodecahedron -> KeplerPoinsotGeometry.greatDodecahedron
+    RegularStarForm.GreatDodecahedron -> KeplerPoinsotGeometry.smallStellatedDodecahedron
+    RegularStarForm.GreatStellatedDodecahedron -> KeplerPoinsotGeometry.greatIcosahedron
+    RegularStarForm.GreatIcosahedron -> KeplerPoinsotGeometry.greatStellatedDodecahedron
+    else -> null
+}
+
 private const val STAR_TOLERANCE = 1e-7
 private const val SAMPLE_OFFSET = 2e-6
 

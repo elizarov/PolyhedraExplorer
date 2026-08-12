@@ -31,7 +31,7 @@ class SeedConstructionTest {
     @Test
     fun diagramReachesEveryFixedSeedFromTetrahedronUsingOnlyPrimitives() {
         assertEquals(
-            49,
+            58,
             DIAGRAM_CONSTRUCTION_EDGES.size,
             "Keep the documented directed-edge count current",
         )
@@ -94,6 +94,17 @@ private val DIAGRAM_CONSTRUCTION_EDGES = listOf(
     edge("O", "d", "C"),
     edge("T", "s", "I"),
     edge("I", "d", "D"),
+
+    // Kepler-Poinsot regular stars and their classical duality.
+    edge("D", "S", "SD"),
+    edge("D", "G", "GD"),
+    edge("I", "G", "GI"),
+    edge("SD", "G", "GSD"),
+    edge("GD", "S", "GSD"),
+    edge("SD", "d", "GD"),
+    edge("GD", "d", "SD"),
+    edge("GSD", "d", "GI"),
+    edge("GI", "d", "GSD"),
 
     // Archimedean constructions.
     edge("T", "t", "tT"),
