@@ -89,7 +89,9 @@ reaching the renderer.
 nonzero-winding material. It is a generic geometry operation, not a catalog-seed substitution.
 Its production path:
 
-1. Takes the presentation triangles supplied by every resolved source face.
+1. Takes the presentation triangles supplied by every resolved source face. Each triangle carries
+   its cell's absolute face-winding multiplicity into the generalized solid-winding sum; the
+   geometric fragment itself is still emitted only once.
 2. Uses sorted bounding intervals to find overlapping triangle candidates.
 3. Splits triangles along actual non-coplanar intersection segments and rejects positive-area
    coplanar source-face overlap.

@@ -252,6 +252,8 @@ private data class SourceTriangle(
     val a: Vec3,
     val b: Vec3,
     val c: Vec3,
+    /** Absolute source-face winding represented by this one presentation triangle. */
+    val windingMultiplicity: Int = 1,
 ) {
     val normal: Vec3 = ((b - a) cross (c - a)).unit
     val planeDistance: Double = normal * a
@@ -271,13 +273,16 @@ private data class SourceTriangle(
 
 private fun Polyhedron.resolvedSurfaceTriangles(): List<SourceTriangle> = fs.flatMap { face ->
     val resolved = resolvedFaces[face.id]
-    resolved.triangles.map { triangle ->
-        SourceTriangle(
-            face.id,
-            resolved.vertices[triangle.a].position,
-            resolved.vertices[triangle.b].position,
-            resolved.vertices[triangle.c].position,
-        )
+    resolved.cells.flatMap { cell ->
+        cell.triangles.map { triangle ->
+            SourceTriangle(
+                face.id,
+                resolved.vertices[triangle.a].position,
+                resolved.vertices[triangle.b].position,
+                resolved.vertices[triangle.c].position,
+                windingMultiplicity = abs(cell.winding),
+            )
+        }
     }
 }
 
@@ -549,7 +554,7 @@ private fun List<SourceTriangle>.hasNonzeroWinding(point: Vec3, tolerance: Doubl
         if (minOf(la, lb, lc) <= tolerance) return true
         val numerator = a * (b cross c)
         val denominator = la * lb * lc + (a * b) * lc + (b * c) * la + (c * a) * lb
-        solidAngle += 2.0 * atan2(numerator, denominator)
+        solidAngle += triangle.windingMultiplicity * 2.0 * atan2(numerator, denominator)
     }
     return abs(solidAngle / (4.0 * PI)) > 0.5
 }

@@ -138,7 +138,7 @@ class StlApiTest {
     }
 
     @Test
-    fun classifiesUnsupportedExactStarArrangementAsTopologyWithoutPartialGeometry() = runTest {
+    fun exportsHigherWindingStarArrangement() = runTest {
         val source = starPrismFixture(
             n = 7,
             q = 3,
@@ -158,11 +158,9 @@ class StlApiTest {
             ),
         )
 
-        val error = assertNotNull(response.error)
-        assertEquals(CoreStlErrorKind.Topology, error.kind)
-        assertTrue(error.reason.isNotBlank())
-        assertTrue(response.vertices.isEmpty())
-        assertTrue(response.triangles.isEmpty())
+        assertNull(response.error, response.error?.reason)
+        response.toValidationPolyhedron().validateProperGeometry()
+        assertTrue(response.signedVolume6() > 0.0)
     }
 
     @Test

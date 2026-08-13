@@ -26,6 +26,12 @@ const cases = [
         counts: { faces: 12, edges: 30, vertices: 20 },
         labels: ["Greatened", "Stellated", "Dodecahedron"],
     },
+    {
+        name: "higher-winding resolution",
+        hash: "#/s(SA7_3)t(R)",
+        counts: { faces: 72, edges: 126, vertices: 56 },
+        labels: ["Resolve", "Antiprism 7/3"],
+    },
 ]
 
 const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds))

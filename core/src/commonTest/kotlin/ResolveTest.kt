@@ -15,6 +15,7 @@ import polyhedra.model.util.Vec3
 import polyhedra.model.util.rotated
 import polyhedra.model.util.toRotationAroundQuat
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -89,6 +90,35 @@ class ResolveTest {
     }
 
     @Test
+    fun resolvesStarAntiprismSevenThirdsThroughCoreApi() = runTest {
+        val source = requireNotNull("SA7_3".toSeedOrNull()).poly
+        assertEquals(3, source.resolvedFaces.flatMap { it.cells }.maxOf { abs(it.winding) })
+
+        val response = evaluateCore(CoreRequest(CoreState("SA7_3", listOf("R"), "c")))
+
+        assertNull(response.error)
+        assertEquals(listOf("R"), response.validTransformTags)
+        assertEquals(FEV(72, 126, 56), response.poly.fev())
+        response.poly.validateProperGeometry()
+        assertEquals(
+            PolyhedronContract.EmbeddedBoundary,
+            response.geometryAnalysis?.strongestContract,
+        )
+        assertSame(response.poly, response.poly.resolved(), "SA7_3 idempotence")
+    }
+
+    @Test
+    fun resolvesHigherWindingMembersOfEveryStarFamily() {
+        for (tag in listOf(
+            "SP7_3", "SY7_3", "SB7_3",
+            "SP9_4", "SA9_4", "SY9_4", "SB9_4",
+            "SP11_5", "SA11_5", "SY11_5", "SB11_5",
+            "SP23_10", "SA23_10", "SY23_10", "SB23_10",
+            "SA47_10",
+        )) assertResolvesStarFamily(tag)
+    }
+
+    @Test
     fun resolutionTopologyAndKindsAreScaleAndRotationInvariant() {
         val source = Seed.GreatIcosahedron.poly
         val baseline = source.resolved()
@@ -145,5 +175,18 @@ class ResolveTest {
         assertEquals(PolyhedronContract.RenderableImmersion, analysis.strongestContract)
         assertTrue(analysis.intersectionCounts.getValue(SurfaceIntersectionClass.SelfCrossingFace) > 0)
         assertTrue(analysis.intersectionCounts.getValue(SurfaceIntersectionClass.IntersectingFaces) > 0)
+    }
+
+    private fun assertResolvesStarFamily(tag: String) {
+        val source = requireNotNull(tag.toSeedOrNull()).poly
+        val resolved = source.resolved()
+
+        resolved.validateProperGeometry()
+        assertEquals(
+            PolyhedronContract.EmbeddedBoundary,
+            resolved.analyzeGeometry().strongestContract,
+            tag,
+        )
+        assertSame(resolved, resolved.resolved(), "$tag idempotence")
     }
 }
