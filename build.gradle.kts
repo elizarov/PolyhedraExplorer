@@ -16,6 +16,13 @@ tasks.register("test") {
     dependsOn(":core:jvmTest", ":web:jsBrowserTest")
 }
 
+// Keep wall-clock performance assertions isolated from the browser runner's CPU load.
+gradle.projectsEvaluated {
+    project(":web").tasks.named("jsBrowserTest") {
+        mustRunAfter(project(":core").tasks.named("jvmTest"))
+    }
+}
+
 fun registerBrowserDistribution(
     taskName: String,
     mode: String,
