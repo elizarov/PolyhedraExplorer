@@ -582,6 +582,10 @@ stored catalog meshes. Disconnected source surfaces (compounds), open incidence,
 non-planar sources, and invalid immersed surfaces are discarded. In particular, the icosahedron's
 `C` stratum is the compound of five octahedra and is not offered. Its supported main line therefore
 contains `B`, `D`, `E`, `F`, `G`, and `H`; `G` is recognized afterward as the Great icosahedron.
+Each surviving candidate derives its face and vertex kinds from the geometric automorphism orbits
+of the generated surface; edge kinds follow from their endpoint and incident-face kinds. One source
+face plane can therefore contribute several distinct face orbits in a later stratum, and those
+orbits remain separately selectable and colored in the F/E/V popup.
 The classical dodecahedral results are:
 
 | Input | Output |

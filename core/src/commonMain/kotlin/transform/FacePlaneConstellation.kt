@@ -10,7 +10,6 @@ import polyhedra.model.poly.FEV
 import polyhedra.model.poly.Edge
 import polyhedra.model.poly.Face
 import polyhedra.model.poly.FaceKind
-import polyhedra.model.poly.MutableFaceKindSource
 import polyhedra.model.poly.Polyhedron
 import polyhedra.model.poly.Scale
 import polyhedra.model.poly.VertexKind
@@ -373,13 +372,12 @@ private suspend fun buildMainLineCandidate(
     }
 
     val result = polyhedron(mergeIndistinguishableKinds = true) {
-        positions.forEach { point -> vertex(point, VertexKind(0)) }
-        faces.forEach { (face, kind) -> face(face, kind) }
-        faceKindSources(
-            diagrams.map { diagram ->
-                MutableFaceKindSource(diagram.plane.face.kind, diagram.plane.face.kind)
-            }.distinctBy { source -> source.kind },
-        )
+        positions.forEachIndexed { index, point -> vertex(point, VertexKind(index)) }
+        faces.forEachIndexed { index, (face, sourceKind) ->
+            val kind = FaceKind(index)
+            face(face, kind)
+            faceKindSource(kind, sourceKind)
+        }
     }
     val components = result.surfaceComponentCount()
     if (components != 1) throw CompoundStellationException(components)
@@ -494,8 +492,12 @@ private fun buildMainLinePhysicalBoundary(
         }
     }
     val result = polyhedron(mergeIndistinguishableKinds = true) {
-        positions.forEach { point -> vertex(point, VertexKind(0)) }
-        faces.forEach { (face, kind) -> face(face, kind) }
+        positions.forEachIndexed { index, point -> vertex(point, VertexKind(index)) }
+        faces.forEachIndexed { index, (face, sourceKind) ->
+            val kind = FaceKind(index)
+            face(face, kind)
+            faceKindSource(kind, sourceKind)
+        }
     }
     val components = result.surfaceComponentCount()
     if (components != 1) throw CompoundStellationException(components)
@@ -609,12 +611,12 @@ private suspend fun buildCandidate(
         "Constellation candidate is not a closed two-manifold"
     }
     val result = polyhedron(mergeIndistinguishableKinds = true) {
-        positions.forEach { point -> vertex(point, VertexKind(0)) }
-        faceIndices.forEachIndexed { index, face -> face(face, planes[index].face.kind) }
-        faceKindSources(
-            planes.map { plane -> MutableFaceKindSource(plane.face.kind, plane.face.kind) }
-            .distinctBy { source -> source.kind },
-        )
+        positions.forEachIndexed { index, point -> vertex(point, VertexKind(index)) }
+        faceIndices.forEachIndexed { index, face ->
+            val kind = FaceKind(index)
+            face(face, kind)
+            faceKindSource(kind, planes[index].face.kind)
+        }
     }
     val components = result.surfaceComponentCount()
     if (components != 1) throw CompoundStellationException(components)

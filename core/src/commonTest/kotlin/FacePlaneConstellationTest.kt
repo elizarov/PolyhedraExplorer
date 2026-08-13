@@ -14,6 +14,7 @@ import polyhedra.model.api.CoreState
 import polyhedra.model.api.TransformTweak
 import polyhedra.model.api.parseTransformTag
 import polyhedra.model.poly.fev
+import polyhedra.model.poly.FEV
 import polyhedra.model.poly.Polyhedron
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -31,6 +32,7 @@ class FacePlaneConstellationTest {
             candidates.map { candidate -> candidate.fev }.toString(),
         )
         assertEquals(listOf(1, 2, 3), candidates.map { candidate -> candidate.stratum })
+        candidates.forEach { candidate -> candidate.poly.assertKindsMatchGeometricOrbits() }
     }
 
     @Test
@@ -45,6 +47,18 @@ class FacePlaneConstellationTest {
         assertEquals(1, candidates.count { candidate -> candidate.poly.recognizedSeedOrNull()?.tag == "GI" })
         assertTrue(candidates.all { candidate -> runCatching { candidate.poly.validateRenderableImmersion() }.isSuccess })
         assertTrue(candidates.all { candidate -> candidate.poly.surfaceComponentCountForTest() == 1 })
+        candidates.forEach { candidate -> candidate.poly.assertKindsMatchGeometricOrbits() }
+    }
+
+    @Test
+    fun secondIcosahedronStellationPublishesItsDistinctFaceOrbits() = runTest {
+        val response = evaluateCore(CoreRequest(CoreState("I", listOf("S~l=2"), "c")))
+
+        assertEquals(null, response.error)
+        assertEquals(FEV(3, 5, 4), response.symmetry.orbitCounts)
+        assertEquals(response.symmetry.orbitCounts.f, response.poly.faceKinds.size)
+        assertEquals(response.symmetry.orbitCounts.e, response.poly.edgeKinds.size)
+        assertEquals(response.symmetry.orbitCounts.v, response.poly.vertexKinds.size)
     }
 
     @Test
@@ -69,6 +83,7 @@ class FacePlaneConstellationTest {
                 }}",
         )
         assertEquals("GD", greatened.firstOrNull()?.poly?.recognizedSeedOrNull()?.tag)
+        greatened.forEach { candidate -> candidate.poly.assertKindsMatchGeometricOrbits() }
 
     }
 
@@ -136,6 +151,12 @@ class FacePlaneConstellationTest {
             assertEquals(sourceGroup, response.symmetry.pointGroup, scaleTag)
         }
     }
+}
+
+private fun Polyhedron.assertKindsMatchGeometricOrbits() {
+    val orbits = analyzeSymmetry().orbitCounts
+    assertEquals(orbits.f, faceKinds.size, "face kinds for $orbits / ${fev()}")
+    assertEquals(orbits.v, vertexKinds.size, "vertex kinds for $orbits / ${fev()}")
 }
 
 private fun Polyhedron.surfaceComponentCountForTest(): Int {

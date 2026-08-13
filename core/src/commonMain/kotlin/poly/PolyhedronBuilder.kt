@@ -150,6 +150,9 @@ class PolyhedronBuilder(
         vs.renumberKinds(vkg) { VertexKind(it) }
         fs.renumberKinds(fkg) { FaceKind(it) }
         faceKindSources.renumberKinds(fkg) { FaceKind(it) }
+        val distinctFaceKindSources = faceKindSources.distinct()
+        faceKindSources.clear()
+        faceKindSources += distinctFaceKindSources
         // Rebuild polyhedron with renumbered kinds
         return polyhedronCopy(vs, fs, faceKindSources, resolvedTopologyProvenance = resolvedTopologyProvenance)
     }
