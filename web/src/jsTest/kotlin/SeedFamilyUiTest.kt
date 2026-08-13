@@ -118,7 +118,7 @@ class SeedFamilyUiTest {
     }
 
     @Test
-    fun starFamilyStepSettingUsesOnlyValidValuesAndRoundTrips(): Promise<Unit> {
+    fun starFamilyDensityUsesSharedControlsAndOnlyValidValues(): Promise<Unit> {
         val params = PolyParams("", null)
         params.seed.updateValue(starFamilySeed(SeedFamily.Antiprism, 7, 2))
         composition = renderComposable(host) {
@@ -126,17 +126,35 @@ class SeedFamilyUiTest {
         }
 
         val slider = host.querySelector(".seed-setting-slider") as HTMLInputElement
+        assertEquals("Density", slider.parentElement?.previousElementSibling?.textContent)
+        assertEquals("Star polygon density", slider.getAttribute("aria-label"))
         assertEquals("2", slider.value)
-        slider.value = "3"
-        slider.dispatchEvent(Event("input"))
+        assertEquals("3", slider.max)
+        val previous = host.querySelector(".slider-step-previous") as HTMLButtonElement
+        val next = host.querySelector(".slider-step-next") as HTMLButtonElement
+        assertTrue(previous.parentElement?.parentElement?.classList?.contains("transform-settings-actions") == true)
+        assertEquals("Previous density", previous.getAttribute("aria-label"))
+        assertEquals("Next density", next.getAttribute("aria-label"))
+        assertTrue(previous.disabled)
+        assertFalse(next.disabled)
+
+        next.click()
         assertEquals("SA7_3", params.seed.value.tag)
 
         return awaitRecomposition().then {
             val updated = host.querySelector(".seed-setting-slider") as HTMLInputElement
             assertEquals("3", updated.value)
+            assertFalse((host.querySelector(".slider-step-previous") as HTMLButtonElement).disabled)
+            assertTrue((host.querySelector(".slider-step-next") as HTMLButtonElement).disabled)
             updated.value = "4"
             updated.dispatchEvent(Event("input"))
             assertEquals("SA7_3", params.seed.value.tag)
+
+            (host.querySelector(".slider-step-previous") as HTMLButtonElement).click()
+            awaitRecomposition()
+        }.then {
+            assertEquals("SA7_2", params.seed.value.tag)
+            assertEquals("2", (host.querySelector(".seed-setting-slider") as HTMLInputElement).value)
 
             val source = RootParams()
             source.render.poly.seed.updateValue(starFamilySeed(SeedFamily.Pyramid, 23, 10))

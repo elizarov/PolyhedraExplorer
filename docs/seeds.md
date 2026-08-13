@@ -42,7 +42,9 @@ family topologies with each base or equatorial boundary traversed as the regular
 polygon `{n/q}`. A member is unique and valid when `3 <= n <= 100`, `2 <= q <= 10`,
 `q < n / 2`, and `gcd(n, q) = 1`. The menu shows family names; the initial member is
 `5/2`, the pill shows a compact name such as **Prism 5/2**, Up/Down enumerates valid
-`n` values while keeping `q`, and the gear controls `q` while keeping `n`. All four
+`n` values while keeping `q`, and the gear controls the star-polygon **density** `q`
+while keeping `n`. Its slider and compact previous/next controls select only canonical
+valid densities. All four
 families share one remembered pair. Their canonical URL tags are `SP<n>_<q>`,
 `SA<n>_<q>`, `SY<n>_<q>`, and `SB<n>_<q>`.
 

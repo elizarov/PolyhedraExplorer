@@ -627,15 +627,17 @@ private fun SeedSettingsPopup(
     onChangeQ: (Int) -> Unit,
 ) {
     val id = requireNotNull(seed.starFamilyId)
+    val validDensities = validStarFamilyDensities(id)
+    val densityIndex = validDensities.indexOf(id.q)
     Aside(attrs = { classes("transform-settings", "seed-settings") }) {
         GroupHeader("${seed.name} settings")
         TableBody {
-            ControlRow("Step q") {
+            ControlRow("Density") {
                 Input(type = InputType.Range, attrs = {
                     classes("seed-setting-slider")
-                    attr("aria-label", "Star polygon step")
+                    attr("aria-label", "Star polygon density")
                     attr("min", "2")
-                    attr("max", MAX_STAR_FAMILY_SEED_Q.toString())
+                    attr("max", validDensities.last().toString())
                     value(id.q.toString())
                     onInput { event ->
                         event.value?.toDouble()?.roundToInt()?.let(onChangeQ)
@@ -645,6 +647,14 @@ private fun SeedSettingsPopup(
                     Text(id.q.toString())
                 }
             }
+        }
+        Div(attrs = { classes("transform-settings-actions") }) {
+            SliderStepControls(
+                canStepBackward = densityIndex > 0,
+                canStepForward = densityIndex in 0 until validDensities.lastIndex,
+                previousLabel = "Previous density",
+                nextLabel = "Next density",
+            ) { delta -> onChangeQ(validDensities[densityIndex + delta]) }
         }
     }
 }
@@ -804,9 +814,12 @@ private fun adjacentValidStarFamilyN(id: StarFamilySeedId, delta: Int): StarFami
     return null
 }
 
-private fun nearestValidStarFamilyQ(id: StarFamilySeedId, requestedQ: Int): Int? =
+private fun validStarFamilyDensities(id: StarFamilySeedId): List<Int> =
     (2..MAX_STAR_FAMILY_SEED_Q)
         .filter { q -> runCatching { StarFamilySeedId(id.family, id.n, q) }.isSuccess }
+
+private fun nearestValidStarFamilyQ(id: StarFamilySeedId, requestedQ: Int): Int? =
+    validStarFamilyDensities(id)
         .minWithOrNull(compareBy<Int> { q -> kotlin.math.abs(q - requestedQ) }.thenBy { q -> q })
 
 @Composable
