@@ -570,20 +570,30 @@ to the input surface.
 
 ### Stellated (`S`)
 
-Stellation continues every source face-edge line and reconstructs the first larger closed
-two-manifold from intersections of those lines and the shared facial-plane constellation. It may
-change a face's winding step while preserving its plane and edge-line provenance. Disconnected
-compounds, open incidence, collapsed edges, non-planar sources, and invalid immersed surfaces are
-discarded. The classical cases are:
+Stellation constructs the bounded arrangement of all authoritative source-face planes. Each
+arrangement cell is identified by the set of source planes crossed from the convex core, so its
+cell power is its exact graph distance from that core. The main line adds complete successive
+power strata. It reconstructs a connected immersed source surface when the plane-diagram
+boundaries form one, and otherwise retains the proper physical stratum boundary. Results are
+ordered from the closest supported stratum outwards.
+
+The candidate search is entirely geometry-based: it does not inspect seed tags, catalog names, or
+stored catalog meshes. Disconnected source surfaces (compounds), open incidence, collapsed edges,
+non-planar sources, and invalid immersed surfaces are discarded. In particular, the icosahedron's
+`C` stratum is the compound of five octahedra and is not offered. Its supported main line therefore
+contains `B`, `D`, `E`, `F`, `G`, and `H`; `G` is recognized afterward as the Great icosahedron.
+The classical dodecahedral results are:
 
 | Input | Output |
 | --- | --- |
 | Dodecahedron | Stellated dodecahedron |
 | Great dodecahedron | Great stellated dodecahedron |
 
-Consequently, both `D -> G -> S` and `D -> S -> G` reach the great stellated dodecahedron. A
-qualifying non-catalog input is transformed directly from its own lines and planes. Result chooses
-among surviving strict outward extensions; the default remains the first.
+The dodecahedron's three outward strata are Stellated dodecahedron, Great dodecahedron, and Great
+stellated dodecahedron in that order. Consequently, both `D -> G -> S` and `D -> S -> G` reach the
+great stellated dodecahedron. A qualifying non-catalog input is transformed directly from its own
+planes. The Result gear enumerates only surviving supported strata; Result 1 is the closest and is
+omitted from serialization, while later results use `S~l=n`.
 
 Stellated is immediate for the same reason as Greatened: no connected, non-degenerate,
 topology-compatible interpolation has the required endpoint topology.

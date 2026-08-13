@@ -26,7 +26,7 @@ class Greatened : Transform() {
     override val asyncTransform: AsyncTransform = { poly, _ -> poly.greatenedAsync() }
 }
 
-/** Conway stellation: replace the regular pentagons by their pentagram realization. */
+/** Main-line stellation: add a complete next stratum of the source face-plane arrangement. */
 @Serializable
 class Stellated : Transform() {
     @Transient

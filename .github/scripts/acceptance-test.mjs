@@ -27,6 +27,12 @@ const cases = [
         labels: ["Greatened", "Stellated", "Dodecahedron"],
     },
     {
+        name: "farthest supported icosahedron main-line stellation",
+        hash: "#/s(I)t(S~l=6)",
+        counts: { faces: 20, edges: 90, vertices: 60 },
+        labels: ["Stellated", "Icosahedron"],
+    },
+    {
         name: "higher-winding resolution",
         hash: "#/s(SA7_3)t(R)",
         counts: { faces: 72, edges: 126, vertices: 56 },

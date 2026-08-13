@@ -238,6 +238,38 @@ class TransformSettingsUiTest {
         assertEquals("S~l=2", params.transforms.value.single().tag)
     }
 
+    @Test
+    fun stellationGearEnumeratesAllSupportedIcosahedronMainLineResults() {
+        val params = PolyParams("", null)
+        params.transforms.updateValue(listOf(Transform.Stellated))
+        val options = (1..6).map { result ->
+            CoreTransformTweakOption(result, FEV(result * 20, result * 30, result * 10 + 2))
+        }
+        params.updateTransformTweakRanges(
+            listOf(
+                listOf(
+                    CoreTransformTweakRange(
+                        TransformTweak.StellationResult,
+                        min = 1.0,
+                        max = 6.0,
+                        options = options,
+                    ),
+                ),
+            ),
+        )
+
+        composition = renderComposable(host) {
+            ControlPane(params, Popup.TransformSettings(0), togglePopup = {})
+        }
+        val slider = host.querySelector(".transform-setting-slider") as HTMLInputElement
+        assertEquals("1", slider.min)
+        assertEquals("6", slider.max)
+
+        slider.value = "6"
+        slider.dispatchEvent(Event("input"))
+        assertEquals("S~l=6", params.transforms.value.single().tag)
+    }
+
     private fun awaitRecomposition(): Promise<Unit> = Promise { resolve, _ ->
         window.requestAnimationFrame {
             window.requestAnimationFrame { resolve(Unit) }

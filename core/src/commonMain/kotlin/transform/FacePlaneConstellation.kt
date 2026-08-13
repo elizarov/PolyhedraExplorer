@@ -2,11 +2,14 @@ package polyhedra.core.transform
 
 import polyhedra.core.poly.polyhedron
 import polyhedra.core.poly.scaled
+import polyhedra.core.poly.signedVolume
 import polyhedra.core.poly.validateRenderableImmersion
 import polyhedra.core.poly.validateProperGeometry
 import polyhedra.core.util.runSynchronously
 import polyhedra.model.poly.FEV
+import polyhedra.model.poly.Edge
 import polyhedra.model.poly.Face
+import polyhedra.model.poly.FaceKind
 import polyhedra.model.poly.MutableFaceKindSource
 import polyhedra.model.poly.Polyhedron
 import polyhedra.model.poly.Scale
@@ -31,6 +34,11 @@ internal enum class ConstellationOperation { Greaten, Stellate }
 internal data class StellationCandidate(
     val poly: Polyhedron,
     val fev: FEV = poly.fev(),
+    val stratum: Int? = null,
+)
+
+private class CompoundStellationException(componentCount: Int) : IllegalArgumentException(
+    "Main-line candidate is a compound with $componentCount disconnected surface components",
 )
 
 private data class ConstellationPlane(
@@ -52,6 +60,22 @@ private data class ConstellationPlane(
 private data class RingKey(val size: Int, val radiusBin: Long)
 private data class FaceCircuit(val points: List<Vec3>, val step: Int, val radius: Double)
 private data class CandidateKey(val ring: RingKey, val step: Int)
+private data class DiagramEdge(val a: Int, val b: Int)
+private data class ArrangementCell(val outsidePlanes: List<Int>) {
+    val power: Int get() = outsidePlanes.size
+}
+private data class DiagramFacet(
+    val points: List<Vec3>,
+    val innerCell: ArrangementCell,
+    val outerCell: ArrangementCell,
+) {
+    val power: Int
+        get() {
+            check(outerCell.power == innerCell.power + 1)
+            return innerCell.power
+        }
+}
+private data class PlaneDiagram(val plane: ConstellationPlane, val facets: List<DiagramFacet>)
 
 private const val CONSTELLATION_EPS = 2e-7
 private const val MAX_CONSTELLATION_RADIUS = 1e6
@@ -82,7 +106,7 @@ internal suspend fun Polyhedron.stellationCandidatesAsync(
         return cached
     }
     val result = buildStellationCandidates(operation).map { candidate ->
-        StellationCandidate(candidate.poly.scaled(Scale.Circumradius))
+        candidate.copy(poly = candidate.poly.scaled(Scale.Circumradius))
     }
     candidateCache[key] = result
     while (candidateCache.size > CANDIDATE_CACHE_SIZE) {
@@ -105,12 +129,16 @@ private suspend fun Polyhedron.buildStellationCandidates(
         (first + 1 until planes.size).none { second -> planes[first].coincidesWith(planes[second], tolerance) }
     }) { "Face-plane constellation contains coincident source planes" }
 
-    val continuationCandidates = if (operation == ConstellationOperation.Stellate) {
-        edgeContinuationCandidates(planes, tolerance)
-    } else {
-        emptyList()
-    }
+    if (operation == ConstellationOperation.Stellate) return buildMainLineStellations(planes, tolerance)
+    return buildCircuitCandidates(planes, tolerance, operation)
+}
 
+private suspend fun Polyhedron.buildCircuitCandidates(
+    planes: List<ConstellationPlane>,
+    tolerance: Double,
+    operation: ConstellationOperation?,
+): List<StellationCandidate> {
+    val scale = circumradius.coerceAtLeast(1.0)
     val pointsByPlane = List(planes.size) { arrayListOf<Vec3>() }
     for (first in 0 until planes.size - 2) {
         for (second in first + 1 until planes.size - 1) {
@@ -137,7 +165,12 @@ private suspend fun Polyhedron.buildStellationCandidates(
         .sortedWith(compareBy<CandidateKey>({ it.ring.radiusBin }, { it.step }, { it.ring.size }))
         .mapNotNull { candidateKey ->
             val circuits = circuitsByPlane.map { planeCircuits -> planeCircuits.getValue(candidateKey) }
-            if (!qualifies(operation, planes, circuits, tolerance)) return@mapNotNull null
+            if (operation == ConstellationOperation.Greaten && !qualifiesGreatening(planes, circuits, tolerance)) {
+                return@mapNotNull null
+            }
+            if (operation == null && planes.indices.any { index ->
+                circuits[index].radius <= planes[index].sourceRadius + tolerance
+            }) return@mapNotNull null
             runCatching { buildCandidate(planes, circuits, tolerance) }
                 .getOrNull()
                 ?.takeUnless { candidate -> candidate.sameGeometryAs(this, tolerance) }
@@ -145,7 +178,7 @@ private suspend fun Polyhedron.buildStellationCandidates(
         }
         .distinctBy { candidate -> candidate.poly.coordinateSignature(tolerance) to candidate.poly.edgeSignature(tolerance) }
 
-    return (continuationCandidates + constellationCandidates)
+    return constellationCandidates
         .distinctBy { candidate -> candidate.poly.coordinateSignature(tolerance) to candidate.poly.edgeSignature(tolerance) }
         .sortedWith(compareBy(
         { candidate -> candidate.poly.meanFaceCircuitRadius() },
@@ -155,49 +188,329 @@ private suspend fun Polyhedron.buildStellationCandidates(
         ))
 }
 
-private suspend fun Polyhedron.edgeContinuationCandidates(
+/**
+ * Builds the main line directly from the arrangement of the source face planes. A point in an
+ * arrangement cell has one positive half-space bit for every source plane crossed from the convex
+ * core. Its power is therefore its exact graph distance from the core cell. The boundary between
+ * powers [power] and [power] + 1 consists of the diagram facets of power [power].
+ */
+private suspend fun Polyhedron.buildMainLineStellations(
     planes: List<ConstellationPlane>,
     tolerance: Double,
 ): List<StellationCandidate> {
-    val maximumStride = planes.minOf { plane -> (plane.face.fvs.size - 1) / 2 }
-    return (2..maximumStride).mapNotNull { stride ->
-        if (planes.any { plane -> greatestCommonDivisor(plane.face.fvs.size, stride) != 1 }) {
+    val diagrams = planes.indices.map { planeIndex ->
+        buildPlaneDiagram(planeIndex, planes, tolerance)
+    }
+    val commonPowers = diagrams
+        .map { diagram -> diagram.facets.mapTo(linkedSetOf(), DiagramFacet::power) }
+        .reduceOrNull(Set<Int>::intersect)
+        .orEmpty()
+        .filter { power -> power > 0 }
+        .sorted()
+    val physicalByPower = commonPowers.mapNotNull { power ->
+        runCatching { buildMainLinePhysicalBoundary(diagrams, power, tolerance) }
+            .getOrNull()
+            ?.let { physical -> power to physical }
+    }
+    val resolvedSource = runCatching { resolved(null) }.getOrNull()
+    val sourcePower = resolvedSource?.let { source ->
+        physicalByPower.lastOrNull { (_, physical) -> source.matchesPhysicalBoundary(physical, tolerance) }?.first
+    } ?: 0
+    val circuitCandidates = buildCircuitCandidates(planes, tolerance, operation = null)
+    val resolvedCircuits = circuitCandidates.mapNotNull { candidate ->
+        runCatching { candidate.poly.resolved(null) }.getOrNull()?.let { resolved -> candidate to resolved }
+    }
+    return physicalByPower.mapNotNull { (power, physical) ->
+        if (power <= sourcePower) return@mapNotNull null
+        val matchedCircuit = resolvedCircuits.firstOrNull { (_, resolved) ->
+            resolved.matchesPhysicalBoundary(physical, tolerance)
+        }?.first
+        val sourceResult = runCatching { buildMainLineCandidate(diagrams, power, tolerance) }
+        val sourceCandidate = sourceResult.getOrNull()
+        if (sourceResult.exceptionOrNull() is CompoundStellationException) {
             return@mapNotNull null
         }
-        val circuits = planes.map { plane ->
-            val face = plane.face
-            val lineOrder = List(face.fvs.size) { index -> (index * stride) % face.fvs.size }
-            val points = lineOrder.indices.map { index ->
-                val previousLine = lineOrder[(index + lineOrder.size - 1) % lineOrder.size]
-                val currentLine = lineOrder[index]
-                lineIntersection(
-                    face.fvs[previousLine],
-                    face.fvs[(previousLine + 1) % face.fvs.size],
-                    face.fvs[currentLine],
-                    face.fvs[(currentLine + 1) % face.fvs.size],
-                    tolerance,
-                )
-            }
-            val oriented = if (points.averagePlane().let { result -> result * plane.normal } >= 0.0) {
-                points
-            } else {
-                points.asReversed()
-            }
-            FaceCircuit(
-                oriented,
-                stride,
-                oriented.sumOf { point -> (point - plane.center).norm } / oriented.size,
-            )
-        }
-        runCatching { buildCandidate(planes, circuits, tolerance) }
-            .getOrNull()
-            ?.takeIf { circuits.indices.all { index ->
-                circuits[index].radius > planes[index].sourceRadius + tolerance
-            } }
-            ?.takeUnless { candidate -> candidate.sameGeometryAs(this, tolerance) }
-            ?.let(::StellationCandidate)
+        val candidate: Polyhedron = matchedCircuit?.poly ?: sourceCandidate ?: physical
+        candidate.takeUnless { result -> result.sameGeometryAs(this, tolerance) }
+            ?.let { result -> StellationCandidate(result, stratum = power) }
+    }.distinctBy { candidate ->
+        candidate.poly.coordinateSignature(tolerance) to candidate.poly.edgeSignature(tolerance)
     }
 }
+
+private fun Polyhedron.matchesPhysicalBoundary(other: Polyhedron, tolerance: Double): Boolean {
+    val scale = maxOf(circumradius, other.circumradius, 1.0)
+    if (abs(circumradius - other.circumradius) > tolerance * 32.0) return false
+    if (abs(signedVolume() - other.signedVolume()) > tolerance * scale * scale * 64.0) return false
+    if (vs.size != other.vs.size) return false
+    val vertexTolerance = tolerance * 32.0
+    return vs.all { vertex -> other.vs.any { candidate -> (candidate - vertex).norm <= vertexTolerance } } &&
+        other.vs.all { vertex -> vs.any { candidate -> (candidate - vertex).norm <= vertexTolerance } }
+}
+
+private fun buildPlaneDiagram(
+    planeIndex: Int,
+    planes: List<ConstellationPlane>,
+    tolerance: Double,
+): PlaneDiagram {
+    val plane = planes[planeIndex]
+    val points = arrayListOf<Vec3>()
+    fun pointIndex(point: Vec3): Int {
+        val existing = points.indexOfFirst { candidate -> (candidate - point).norm <= tolerance * 8.0 }
+        if (existing >= 0) return existing
+        points += point
+        return points.lastIndex
+    }
+
+    val edges = linkedSetOf<DiagramEdge>()
+    for (otherIndex in planes.indices) {
+        if (otherIndex == planeIndex) continue
+        val other = planes[otherIndex]
+        val direction = plane.normal cross other.normal
+        if (direction.norm <= CONSTELLATION_EPS) continue
+        val linePoints = arrayListOf<Vec3>()
+        for (thirdIndex in planes.indices) {
+            if (thirdIndex == planeIndex || thirdIndex == otherIndex) continue
+            val third = planes[thirdIndex]
+            val determinant = plane.normal * (other.normal cross third.normal)
+            if (abs(determinant) <= CONSTELLATION_EPS) continue
+            val point = planeIntersection(plane, other, third)
+            if (point.isFinite()) linePoints.addDistinct(point, tolerance * 8.0)
+        }
+        val ordered = linePoints.sortedBy { point -> point * direction }
+        for (index in 0 until ordered.lastIndex) {
+            val first = pointIndex(ordered[index])
+            val second = pointIndex(ordered[index + 1])
+            if (first == second) continue
+            edges += if (first < second) DiagramEdge(first, second) else DiagramEdge(second, first)
+        }
+    }
+
+    val neighbors = List(points.size) { arrayListOf<Int>() }
+    for (edge in edges) {
+        neighbors[edge.a] += edge.b
+        neighbors[edge.b] += edge.a
+    }
+    for (node in neighbors.indices) {
+        neighbors[node].sortBy { target ->
+            val direction = points[target] - points[node]
+            atan2(direction * plane.v, direction * plane.u)
+        }
+    }
+
+    val visited = hashSetOf<Pair<Int, Int>>()
+    val facets = arrayListOf<DiagramFacet>()
+    for (edge in edges) for ((start, next) in listOf(edge.a to edge.b, edge.b to edge.a)) {
+        if (!visited.add(start to next)) continue
+        val boundary = arrayListOf(start)
+        var previous = start
+        var current = next
+        while (current != start) {
+            boundary += current
+            val outgoing = neighbors[current]
+            val reverse = outgoing.indexOf(previous)
+            require(reverse >= 0) { "Stellation diagram contains an unlinked half-edge" }
+            val following = outgoing[(reverse + outgoing.size - 1) % outgoing.size]
+            previous = current
+            current = following
+            require(visited.add(previous to current)) { "Stellation diagram contains a non-closing walk" }
+            require(boundary.size <= edges.size * 2) { "Stellation diagram walk exceeds its edge count" }
+        }
+        val polygon = boundary.map(points::get)
+        val signedArea = polygon.indices.sumOf { index ->
+            ((polygon[index] - plane.center) cross
+                (polygon[(index + 1) % polygon.size] - plane.center)) * plane.normal
+        } / 2.0
+        if (signedArea <= tolerance * tolerance) continue
+        val sample = polygon.reduce(Vec3::plus) * (1.0 / polygon.size)
+        require(planes.indices.none { index ->
+            index != planeIndex && abs(planes[index].normal * sample - planes[index].distance) <= tolerance
+        }) { "Stellation facet sample lies on another source plane" }
+        val outside = planes.indices.filter { index ->
+            index != planeIndex && planes[index].normal * sample > planes[index].distance + tolerance
+        }
+        facets += DiagramFacet(
+            polygon,
+            ArrangementCell(outside),
+            ArrangementCell((outside + planeIndex).sorted()),
+        )
+    }
+    require(facets.isNotEmpty()) { "Face ${plane.face.id} has no bounded stellation facets" }
+    return PlaneDiagram(plane, facets)
+}
+
+private suspend fun buildMainLineCandidate(
+    diagrams: List<PlaneDiagram>,
+    power: Int,
+    tolerance: Double,
+): Polyhedron {
+    val positions = arrayListOf<Vec3>()
+    fun vertexIndex(point: Vec3): Int {
+        val existing = positions.indexOfFirst { candidate -> (candidate - point).norm <= tolerance * 8.0 }
+        if (existing >= 0) return existing
+        positions += point
+        return positions.lastIndex
+    }
+
+    val faces = diagrams.flatMap { diagram ->
+        val facets = diagram.facets.filter { facet -> facet.power == power }
+        require(facets.isNotEmpty()) { "Main-line stratum $power is absent from face ${diagram.plane.face.id}" }
+        reconstructFaceCircuits(facets, diagram.plane, tolerance).map { circuit ->
+            circuit.map(::vertexIndex) to diagram.plane.face.kind
+        }
+    }
+
+    val edgeUses = linkedMapOf<DiagramEdge, Int>()
+    for ((face, _) in faces) for (index in face.indices) {
+        val first = face[index]
+        val second = face[(index + 1) % face.size]
+        require(first != second) { "Main-line stratum $power contains a collapsed edge" }
+        val edge = if (first < second) DiagramEdge(first, second) else DiagramEdge(second, first)
+        edgeUses[edge] = edgeUses.getOrElse(edge) { 0 } + 1
+    }
+    require(edgeUses.values.all { uses -> uses == 2 }) {
+        "Main-line stratum $power is not a closed two-manifold"
+    }
+
+    val result = polyhedron(mergeIndistinguishableKinds = true) {
+        positions.forEach { point -> vertex(point, VertexKind(0)) }
+        faces.forEach { (face, kind) -> face(face, kind) }
+        faceKindSources(
+            diagrams.map { diagram ->
+                MutableFaceKindSource(diagram.plane.face.kind, diagram.plane.face.kind)
+            }.distinctBy { source -> source.kind },
+        )
+    }
+    val components = result.surfaceComponentCount()
+    if (components != 1) throw CompoundStellationException(components)
+    result.validateRenderableImmersion()
+    result.resolved(null).validateProperGeometry()
+    return result
+}
+
+private fun Polyhedron.surfaceComponentCount(): Int {
+    val visited = hashSetOf<Face>()
+    var components = 0
+    for (first in fs) {
+        if (first in visited) continue
+        components++
+        val pending = ArrayDeque<Face>()
+        pending += first
+        while (pending.isNotEmpty()) {
+            val face = pending.removeFirst()
+            if (!visited.add(face)) continue
+            face.directedEdges.mapTo(pending, Edge::l)
+        }
+    }
+    return components
+}
+
+private fun reconstructFaceCircuits(
+    facets: List<DiagramFacet>,
+    plane: ConstellationPlane,
+    tolerance: Double,
+): List<List<Vec3>> {
+    val points = arrayListOf<Vec3>()
+    fun pointIndex(point: Vec3): Int {
+        val existing = points.indexOfFirst { candidate -> (candidate - point).norm <= tolerance * 8.0 }
+        if (existing >= 0) return existing
+        points += point
+        return points.lastIndex
+    }
+    val edgeUses = linkedMapOf<DiagramEdge, Int>()
+    for (facet in facets) {
+        val ids = facet.points.map(::pointIndex)
+        for (index in ids.indices) {
+            val first = ids[index]
+            val second = ids[(index + 1) % ids.size]
+            val edge = if (first < second) DiagramEdge(first, second) else DiagramEdge(second, first)
+            edgeUses[edge] = edgeUses.getOrElse(edge) { 0 } + 1
+        }
+    }
+    val boundary = edgeUses.filterValues { uses -> uses == 1 }.keys
+    require(boundary.isNotEmpty()) { "Main-line face ${plane.face.id} has no boundary" }
+    val neighbors = List(points.size) { arrayListOf<Int>() }
+    for (edge in boundary) {
+        neighbors[edge.a] += edge.b
+        neighbors[edge.b] += edge.a
+    }
+    require(neighbors.filter(List<Int>::isNotEmpty).all { adjacent -> adjacent.size % 2 == 0 }) {
+        "Main-line face ${plane.face.id} has an open diagram boundary"
+    }
+
+    val remaining = boundary.toMutableSet()
+    val circuits = arrayListOf<List<Int>>()
+    while (remaining.isNotEmpty()) {
+        val firstEdge = remaining.minWith(compareBy(DiagramEdge::a, DiagramEdge::b))
+        val circuit = arrayListOf(firstEdge.a)
+        var previous = firstEdge.a
+        var current = firstEdge.b
+        remaining.remove(firstEdge)
+        while (current != circuit.first()) {
+            circuit += current
+            val incoming = (points[current] - points[previous]).unit
+            val candidates = neighbors[current].filter { next ->
+                val edge = if (current < next) DiagramEdge(current, next) else DiagramEdge(next, current)
+                edge in remaining
+            }
+            require(candidates.isNotEmpty()) { "Main-line face ${plane.face.id} contains a non-closing circuit" }
+            val next = candidates.maxWith(compareBy<Int> { candidate ->
+                incoming * (points[candidate] - points[current]).unit
+            }.thenByDescending { candidate -> candidate })
+            val edge = if (current < next) DiagramEdge(current, next) else DiagramEdge(next, current)
+            remaining.remove(edge)
+            previous = current
+            current = next
+            require(circuit.size <= boundary.size) { "Main-line face ${plane.face.id} circuit exceeds its edge count" }
+        }
+        circuits += circuit.removeInlineVertices(points, tolerance)
+    }
+    return circuits.map { circuit ->
+        val result = circuit.map(points::get)
+        if (result.averagePlane() * plane.normal >= 0.0) result else result.asReversed()
+    }
+}
+
+private fun buildMainLinePhysicalBoundary(
+    diagrams: List<PlaneDiagram>,
+    power: Int,
+    tolerance: Double,
+): Polyhedron {
+    val positions = arrayListOf<Vec3>()
+    fun vertexIndex(point: Vec3): Int {
+        val existing = positions.indexOfFirst { candidate -> (candidate - point).norm <= tolerance * 8.0 }
+        if (existing >= 0) return existing
+        positions += point
+        return positions.lastIndex
+    }
+    val faces = diagrams.flatMap { diagram ->
+        diagram.facets.filter { facet -> facet.power == power }.map { facet ->
+            val oriented = if (facet.points.averagePlane() * diagram.plane.normal >= 0.0) {
+                facet.points
+            } else {
+                facet.points.asReversed()
+            }
+            oriented.map(::vertexIndex) to diagram.plane.face.kind
+        }
+    }
+    val result = polyhedron(mergeIndistinguishableKinds = true) {
+        positions.forEach { point -> vertex(point, VertexKind(0)) }
+        faces.forEach { (face, kind) -> face(face, kind) }
+    }
+    val components = result.surfaceComponentCount()
+    if (components != 1) throw CompoundStellationException(components)
+    result.validateProperGeometry()
+    return result
+}
+
+private fun List<Int>.removeInlineVertices(points: List<Vec3>, tolerance: Double): List<Int> =
+    filterIndexed { index, current ->
+        val previous = this[(index + lastIndex) % size]
+        val next = this[(index + 1) % size]
+        val incoming = points[current] - points[previous]
+        val outgoing = points[next] - points[current]
+        (incoming cross outgoing).norm > tolerance * maxOf(incoming.norm, outgoing.norm)
+    }.also { result -> require(result.size >= 3) { "Main-line face collapsed below three vertices" } }
 
 private fun Face.toConstellationPlane(tolerance: Double): ConstellationPlane {
     var normal: Vec3 = this.unit
@@ -259,37 +572,16 @@ private fun ConstellationPlane.circuits(
     return result
 }
 
-private fun qualifies(
-    operation: ConstellationOperation,
+private fun qualifiesGreatening(
     planes: List<ConstellationPlane>,
     circuits: List<FaceCircuit>,
     tolerance: Double,
-): Boolean = when (operation) {
-    ConstellationOperation.Greaten -> planes.indices.all { index ->
+): Boolean = planes.indices.all { index ->
         val plane = planes[index]
         val circuit = circuits[index]
         circuit.points.size == plane.face.fvs.size &&
             circuit.step == plane.sourceStep &&
             circuit.radius > plane.sourceRadius + tolerance
-    }
-    ConstellationOperation.Stellate -> planes.indices.all { index ->
-        val source = planes[index].face.fvs
-        val circuit = circuits[index]
-        val candidate = circuit.points
-        circuit.radius > planes[index].sourceRadius + tolerance && candidate.indices.all { edge ->
-            val a = candidate[edge]
-            val b = candidate[(edge + 1) % candidate.size]
-            source.indices.any { sourceEdge ->
-                sameLine(
-                    a,
-                    b,
-                    source[sourceEdge],
-                    source[(sourceEdge + 1) % source.size],
-                    tolerance * 16.0,
-                )
-            }
-        }
-    }
 }
 
 private suspend fun buildCandidate(
@@ -321,9 +613,11 @@ private suspend fun buildCandidate(
         faceIndices.forEachIndexed { index, face -> face(face, planes[index].face.kind) }
         faceKindSources(
             planes.map { plane -> MutableFaceKindSource(plane.face.kind, plane.face.kind) }
-                .distinctBy { source -> source.kind },
+            .distinctBy { source -> source.kind },
         )
     }
+    val components = result.surfaceComponentCount()
+    if (components != 1) throw CompoundStellationException(components)
     result.validateRenderableImmersion()
     result.resolved(null).validateProperGeometry()
     return result
@@ -397,29 +691,6 @@ private fun List<Vec3>.isRegularRing(center: Vec3, tolerance: Double): Boolean {
     val radii = map { point -> (point - center).norm }
     val mean = radii.average()
     return radii.all { radius -> abs(radius - mean) <= tolerance * maxOf(1.0, mean) }
-}
-
-private fun sameLine(a: Vec3, b: Vec3, c: Vec3, d: Vec3, tolerance: Double): Boolean {
-    val ab = b - a
-    val cd = d - c
-    if ((ab cross cd).norm > tolerance * ab.norm * cd.norm) return false
-    return ((c - a) cross ab).norm <= tolerance * maxOf(1.0, ab.norm)
-}
-
-private fun lineIntersection(a: Vec3, b: Vec3, c: Vec3, d: Vec3, tolerance: Double): Vec3 {
-    val first = b - a
-    val second = d - c
-    val normal = first cross second
-    val denominator = normal * normal
-    require(denominator > tolerance * tolerance * first.norm * second.norm) {
-        "Stellation edge lines are parallel"
-    }
-    val parameter = (((c - a) cross second) * normal) / denominator
-    val point = a + first * parameter
-    require(((point - c) cross second).norm <= tolerance * maxOf(1.0, second.norm)) {
-        "Stellation edge lines are not coplanar"
-    }
-    return point
 }
 
 private fun comparePoints(

@@ -80,11 +80,9 @@ class KeplerPoinsotTest {
     }
 
     @Test
-    fun unsupportedGreateningAndStellationExplainWhenNoQualifyingExtensionExists() = runTest {
+    fun unsupportedGreateningExplainsWhenNoQualifyingExtensionExists() = runTest {
         val greatenError = assertFailsWith<IllegalArgumentException> { Seed.Cube.poly.greatenedAsync() }
         assertTrue(greatenError.message.orEmpty().contains("unavailable"))
-        val stellateError = assertFailsWith<IllegalArgumentException> { Seed.Icosahedron.poly.stellatedAsync() }
-        assertTrue(stellateError.message.orEmpty().contains("unavailable"))
     }
 
     @Test
