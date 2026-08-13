@@ -243,6 +243,16 @@ class StlApiTest {
     }
 
     @Test
+    fun exportsTruncatedStellatedOctahedronFoldedFacesAsRims() = runTest {
+        assertFoldedRimExport(listOf("S", "t"), expectedNonPlanarFaces = 6)
+    }
+
+    @Test
+    fun exportsRepeatedlyTruncatedStellatedOctahedronFoldedFacesAsRims() = runTest {
+        assertFoldedRimExport(listOf("S", "t", "t"), expectedNonPlanarFaces = 6)
+    }
+
+    @Test
     fun rejectsAnOpenTriangleWithoutReturningPartialGeometry() = runTest {
         val response = convertStl(
             CoreStlRequest(
@@ -320,6 +330,38 @@ private suspend fun assertHiddenRimExport(source: Polyhedron, hiddenFaceKinds: L
             presentation = CoreStlPresentation(
                 poly = source,
                 hiddenFaceKinds = hiddenFaceKinds,
+                scale = 20.0,
+                width = 0.1,
+                rim = 0.05,
+                expand = 0.0,
+            ),
+        ),
+    )
+
+    assertNull(response.error, response.error?.reason)
+    response.toValidationPolyhedron().validateProperGeometry()
+    assertTrue(response.signedVolume6() > 0.0)
+}
+
+private suspend fun assertFoldedRimExport(transforms: List<String>, expectedNonPlanarFaces: Int) {
+    val evaluation = evaluateCore(
+        CoreRequest(CoreState("O", transforms, "c"), rimWidth = 0.05),
+    )
+    assertNull(evaluation.error, evaluation.error?.detail)
+    val source = evaluation.poly
+    val hidden = source.nonPlanarFaceKinds.sorted()
+    assertEquals(expectedNonPlanarFaces, source.fs.count { face -> !face.isPlanar })
+    assertTrue(hidden.isNotEmpty())
+    val foldedRegions = evaluation.resolvedRims.filter { rim -> !source.fs[rim.sourceFaceId].isPlanar }
+        .flatMap { rim -> rim.regions }
+    assertTrue(foldedRegions.isNotEmpty())
+    assertTrue(foldedRegions.all { region -> region.triangulationPatch })
+
+    val response = convertStl(
+        CoreStlRequest(
+            presentation = CoreStlPresentation(
+                poly = source,
+                hiddenFaceKinds = emptyList(),
                 scale = 20.0,
                 width = 0.1,
                 rim = 0.05,

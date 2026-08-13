@@ -23,12 +23,14 @@ data class ResolvedRimCycle(
     }
 }
 
-/** One connected planar rim region with one outer cycle and zero or more holes. */
+/** One connected rim region with one outer cycle and zero or more holes. */
 @Serializable
 data class ResolvedRimRegion(
     val outer: ResolvedRimCycle,
     val holes: List<ResolvedRimCycle> = emptyList(),
     val sourceEdges: List<SourceEdgeOccurrence>,
+    /** True when the region is a clipped patch of one non-planar face triangle. */
+    val triangulationPatch: Boolean = false,
 )
 
 /** Polygonal hidden-face rim geometry. Triangulation deliberately belongs to each consumer. */

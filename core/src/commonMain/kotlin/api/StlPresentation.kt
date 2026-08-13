@@ -8,8 +8,11 @@ import polyhedra.model.api.CoreStlRequest
 import polyhedra.model.api.CoreStlTriangle
 import polyhedra.model.poly.Face
 import polyhedra.model.poly.FaceKind
+import polyhedra.model.poly.MutableFace
+import polyhedra.model.poly.MutableVertex
 import polyhedra.model.poly.Polyhedron
 import polyhedra.model.poly.ResolvedRimCycle
+import polyhedra.model.poly.VertexKind
 import polyhedra.model.poly.area
 import polyhedra.model.poly.essence
 import polyhedra.model.poly.get
@@ -18,6 +21,9 @@ import polyhedra.model.poly.triangulatePlanarPolygon
 import polyhedra.model.util.MutableVec3
 import polyhedra.model.util.Quat
 import polyhedra.model.util.Vec3
+import polyhedra.model.util.cross
+import polyhedra.model.util.minus
+import polyhedra.model.util.norm
 import polyhedra.model.util.plus
 import polyhedra.model.util.rotated
 import polyhedra.model.util.rotationBetweenQuat
@@ -33,7 +39,7 @@ internal suspend fun CoreStlPresentation.toTriangleRequest(
     require(expand.isFinite() && expand >= 0.0) { "STL expansion must be finite and non-negative" }
 
     val source = poly
-    val hiddenKinds = hiddenFaceKinds.toSet()
+    val hiddenKinds = (hiddenFaceKinds + source.nonPlanarFaceKinds).toSet()
     val allSourceFacesHidden = source.fs.all { face -> face.kind in hiddenKinds }
     val physical = if (allSourceFacesHidden) {
         reportProgress(20)
@@ -103,9 +109,9 @@ private class PresentationMeshBuilder(
     private var nextSolid = 0
     private val innerScale = (1.0 - settings.width / circumradius).coerceAtLeast(0.0)
 
-    private fun transformed(point: Vec3, face: Face, inner: Boolean): Vec3 {
+    private fun transformed(point: Vec3, expansionDirection: Vec3, inner: Boolean): Vec3 {
         val inset = if (inner) point * innerScale else point
-        return ((inset + face * settings.expand) * settings.scale).rotated(rotation)
+        return ((inset + expansionDirection * settings.expand) * settings.scale).rotated(rotation)
     }
 
     private fun vertex(point: Vec3): Int {
@@ -144,6 +150,7 @@ private class PresentationMeshBuilder(
     private fun addRimCycle(
         cycle: ResolvedRimCycle,
         face: Face,
+        expansionDirection: Vec3,
         inner: Boolean,
         hole: Boolean,
         solid: Int,
@@ -153,9 +160,9 @@ private class PresentationMeshBuilder(
         val counterClockwise = !hole
         for (part in triangulatePlanarPolygon(points, face, counterClockwise)) {
             triangle(
-                transformed(points[part.a], face, inner),
-                transformed(points[part.b], face, inner),
-                transformed(points[part.c], face, inner),
+                transformed(points[part.a], expansionDirection, inner),
+                transformed(points[part.b], expansionDirection, inner),
+                transformed(points[part.c], expansionDirection, inner),
                 surface,
                 reverse = inner xor hole,
                 solid = solid,
@@ -163,13 +170,13 @@ private class PresentationMeshBuilder(
         }
     }
 
-    private fun addRimWall(cycle: ResolvedRimCycle, face: Face, solid: Int) {
+    private fun addRimWall(cycle: ResolvedRimCycle, expansionDirection: Vec3, solid: Int) {
         for (index in cycle.vertices.indices) {
             val next = (index + 1) % cycle.vertices.size
-            val outerA = transformed(cycle.vertices[index], face, inner = false)
-            val outerB = transformed(cycle.vertices[next], face, inner = false)
-            val innerA = transformed(cycle.vertices[index], face, inner = true)
-            val innerB = transformed(cycle.vertices[next], face, inner = true)
+            val outerA = transformed(cycle.vertices[index], expansionDirection, inner = false)
+            val outerB = transformed(cycle.vertices[next], expansionDirection, inner = false)
+            val innerA = transformed(cycle.vertices[index], expansionDirection, inner = true)
+            val innerB = transformed(cycle.vertices[next], expansionDirection, inner = true)
             val surface = nextSurface++
             triangle(outerA, innerA, outerB, surface, solid = solid)
             triangle(innerA, innerB, outerB, surface, solid = solid)
@@ -177,15 +184,29 @@ private class PresentationMeshBuilder(
     }
 
     fun addRimRegion(region: polyhedra.model.poly.ResolvedRimRegion, face: Face) {
+        val regionFace = if (region.triangulationPatch) region.patchFace(face) else face
         val solid = if (settings.width > 0.0) nextSolid++ else -1
-        addRimCycle(region.outer, face, inner = false, hole = false, solid = solid)
-        region.holes.forEach { hole -> addRimCycle(hole, face, inner = false, hole = true, solid = solid) }
-        addRimCycle(region.outer, face, inner = true, hole = false, solid = solid)
-        region.holes.forEach { hole -> addRimCycle(hole, face, inner = true, hole = true, solid = solid) }
+        addRimCycle(region.outer, regionFace, face, inner = false, hole = false, solid = solid)
+        region.holes.forEach { hole ->
+            addRimCycle(hole, regionFace, face, inner = false, hole = true, solid = solid)
+        }
+        addRimCycle(region.outer, regionFace, face, inner = true, hole = false, solid = solid)
+        region.holes.forEach { hole ->
+            addRimCycle(hole, regionFace, face, inner = true, hole = true, solid = solid)
+        }
         if (settings.width > 0.0) {
             addRimWall(region.outer, face, solid)
             region.holes.forEach { hole -> addRimWall(hole, face, solid) }
         }
+    }
+
+    private fun polyhedra.model.poly.ResolvedRimRegion.patchFace(source: Face): Face {
+        val origin = outer.vertices.first()
+        val second = outer.vertices.first { point -> (point - origin).norm > 1e-12 }
+        val third = outer.vertices.first { point -> ((second - origin) cross (point - origin)).norm > 1e-12 }
+        val positions = listOf(origin, second, third)
+        val vertices = positions.mapIndexed { index, point -> MutableVertex(index, point, VertexKind(0)) }
+        return MutableFace(source.id, vertices, source.kind)
     }
 
     fun addFaceBoundaryWall(face: Face) {

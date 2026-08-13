@@ -45,6 +45,22 @@ private data class RimPlane(
     fun lift(point: RimPoint): Vec3 = origin + u * point.x + v * point.y
 }
 
+private data class RimTriangle(
+    val projected: List<RimPoint>,
+    val positions: List<Vec3>,
+) {
+    fun lift(point: RimPoint): Vec3 {
+        val projectedAB = projected[1] - projected[0]
+        val projectedAC = projected[2] - projected[0]
+        val offset = point - projected[0]
+        val denominator = projectedAB cross projectedAC
+        require(abs(denominator) > 0.0) { "Non-planar rim triangle has zero projected area" }
+        val b = (offset cross projectedAC) / denominator
+        val c = (projectedAB cross offset) / denominator
+        return positions[0] + (positions[1] - positions[0]) * b + (positions[2] - positions[0]) * c
+    }
+}
+
 private data class RimStrip(
     val polygon: List<RimPoint>,
     val sources: Set<SourceEdgeOccurrence>,
@@ -111,7 +127,9 @@ private fun Face.resolvedRim(
     require(maximumWidth.isFinite() && maximumWidth >= 0.0)
     val width = min(requestedWidth, maximumWidth)
     if (width <= 0.0) return ResolvedRimGeometry(id, kind, 0.0, emptyList(), maximumWidth)
-    if (!resolved.sourceBoundarySelfIntersects) return simpleRim(width, maximumWidth)
+    if (!resolved.sourceBoundarySelfIntersects) {
+        return if (isPlanar) simpleRim(width, maximumWidth) else nonPlanarRim(resolved, width, maximumWidth)
+    }
     return resolvedRimAtWidth(resolved, width).copy(maximumWidth = maximumWidth)
 }
 
@@ -250,6 +268,69 @@ private fun Face.simpleRim(width: Double, maximumWidth: Double): ResolvedRimGeom
     )
 }
 
+/**
+ * A simple non-planar face is the union of its deterministic resolved triangles. Construct the
+ * uniform projected rim band once, clip it by those triangles in the shared projection, then lift
+ * every clipped patch barycentrically onto its source triangle. The patches therefore retain the
+ * same piecewise-planar surface and folds used by rendering and export instead of cutting across
+ * them with one cap in the average plane.
+ */
+private fun Face.nonPlanarRim(
+    resolved: ResolvedFaceGeometry,
+    width: Double,
+    maximumWidth: Double,
+): ResolvedRimGeometry {
+    require(resolved.cells.size == 1 && !resolved.sourceBoundarySelfIntersects)
+    val plane = rimPlane(resolved)
+    val cell = resolved.cells.single()
+    val outer = fvs.map(plane::project)
+    val hasHole = width < maximumWidth * (1.0 - 1e-9)
+    val inner = if (hasHole) {
+        val faceRim = FaceRim(this)
+        fvs.mapIndexed { index, vertex -> plane.project(vertex + faceRim.rimDir[index] * width) }
+    } else {
+        emptyList()
+    }
+    val outerSources = fvs.indices.map { index -> setOf(SourceEdgeOccurrence(id, index)) }
+    val innerSources = outerSources
+    val regions = cell.triangles.flatMap { triangle ->
+        val indices = listOf(triangle.a, triangle.b, triangle.c)
+        val positions = indices.map { index -> resolved.vertices[index].position }
+        val projected = positions.map(plane::project)
+        val rimTriangle = RimTriangle(projected, positions)
+        val inputSegments = buildList {
+            projected.addSegmentsTo(this, emptySet())
+            outer.addSegmentsTo(this, outerSources)
+            if (hasHole) inner.addSegmentsTo(this, innerSources)
+        }
+        val boundary = inputSegments.splitAtIntersections(plane.tolerance).selectBoundary(
+            plane.tolerance,
+            inside = { point ->
+                projected.contains(point, plane.tolerance) &&
+                    outer.contains(point, plane.tolerance) &&
+                    (!hasHole || !inner.contains(point, plane.tolerance))
+            },
+        )
+        val cycles = boundary.toCycles(plane.tolerance, width)
+        val positive = cycles.filter { cycle -> cycle.points.signedArea() > 0.0 }
+        val negative = cycles.filter { cycle -> cycle.points.signedArea() < 0.0 }
+        positive.map { patchOuter ->
+            val holes = negative.filter { hole ->
+                patchOuter.points.contains(hole.points.first(), plane.tolerance)
+            }
+            val edgeSources = (patchOuter.segmentSources + holes.flatMap(RimCycle2::segmentSources))
+                .flatten().distinct().sortedBy(SourceEdgeOccurrence::sourceSegmentIndex)
+            ResolvedRimRegion(
+                patchOuter.toModel(rimTriangle::lift),
+                holes.map { hole -> hole.toModel(rimTriangle::lift) },
+                edgeSources,
+                triangulationPatch = true,
+            )
+        }
+    }
+    return ResolvedRimGeometry(id, kind, width, regions, maximumWidth)
+}
+
 private fun Face.orientedCycle(
     vertices: List<Vec3>,
     segmentSources: List<List<SourceEdgeOccurrence>>,
@@ -344,6 +425,18 @@ private fun List<RimPoint>.addSegmentsTo(
     }
 }
 
+private fun List<RimPoint>.addSegmentsTo(
+    target: MutableList<RimSegment>,
+    segmentSources: List<Set<SourceEdgeOccurrence>>,
+) {
+    require(segmentSources.size == size)
+    for (index in indices) {
+        val a = this[index]
+        val b = this[(index + 1) % size]
+        if ((b - a).norm > 0.0) target += RimSegment(a, b, segmentSources[index])
+    }
+}
+
 private fun List<RimSegment>.splitAtIntersections(tolerance: Double): List<RimSegment> {
     val parameters = List(size) { mutableListOf(0.0, 1.0) }
     for (first in indices) for (second in (first + 1) until size) {
@@ -425,6 +518,11 @@ private data class RimCycle2(
 ) {
     fun toModel(plane: RimPlane) = ResolvedRimCycle(
         points.map { point -> polyhedra.model.util.MutableVec3(plane.lift(point)) },
+        segmentSources.map { sources -> sources.sortedBy(SourceEdgeOccurrence::sourceSegmentIndex) },
+    )
+
+    fun toModel(lift: (RimPoint) -> Vec3) = ResolvedRimCycle(
+        points.map { point -> polyhedra.model.util.MutableVec3(lift(point)) },
         segmentSources.map { sources -> sources.sortedBy(SourceEdgeOccurrence::sourceSegmentIndex) },
     )
 }

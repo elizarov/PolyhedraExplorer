@@ -13,6 +13,8 @@ not affect either format.
 
 Visible faces contribute their resolved nonzero-winding regions. Hidden faces contribute the
 core-supplied polygonal rim regions. Simple non-planar faces use their shared deterministic
+triangles; because WebGL cannot fill one folded polygon as a single surface, their face orbits are
+also presentation-hidden automatically. Their rims are planar patches clipped to those shared
 triangles. These rules keep display and export on the same filled surface without requiring them to
 share a final tessellation.
 
@@ -86,7 +88,8 @@ Two output forms are used:
   its back boundary uses the same vertices scaled toward the origin. Adjacent pieces therefore
   share their complete inner edges and vertex endpoints instead of extending perpendicular blocks
   through one another. Planar regions preserve outer and hole paths, including pentagram rims;
-  non-planar regions are emitted as closed triangle pieces.
+  visible non-planar regions are emitted as closed triangle pieces, while hidden non-planar rims
+  preserve each clipped patch's polygon and holes in that patch's triangle plane.
 
 Every piece-union member has front and back caps and side walls. The application does not pre-union
 pieces from different faces and does not ask OpenSCAD to repair open sheets. OpenSCAD's geometry
@@ -101,8 +104,10 @@ pieces, and require hidden tetrahedron rims to share the same radial inner scale
 Shared regressions include immersed catalog solids, concave and non-planar faces,
 expanded pieces, hidden rims, Prism 5/2 with hidden caps, all-rim Antiprism 5/2 and Antiprism 7/3,
 the acute triangular rims of resolved Bipyramid 7/2, and Pyramid 7/2 with either only its immersed
-base or every face orbit hidden. The Antiprism 7/3 JVM regression also guards a complete conversion
-time below one second.
+base or every face orbit hidden. Folded-rim regressions include Truncated stellated octahedron and
+its second truncation; lower-level coverage also uses an asymmetric synthetic non-planar
+quadrilateral so the construction is not tied to a catalog transform. The Antiprism 7/3 JVM
+regression also guards a complete conversion time below one second.
 
 The opt-in deterministic STL stress campaign and its current corpus results are documented with the
 command that runs it in [Development](development.md).

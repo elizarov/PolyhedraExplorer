@@ -143,6 +143,38 @@ class ResolvedFaceRenderingTest {
         }
     }
 
+    @Test
+    fun foldedRimPatchesRenderAndExportWithoutInternalSeamWalls(): Promise<Unit> = scope.promise {
+        val response = evaluateCore(
+            CoreRequest(CoreState("O", listOf("S", "t"), "c"), rimWidth = 0.05),
+        )
+        val poly = response.poly
+        val params = RenderParams("", null)
+        params.poly.updateResolvedRims(response.resolvedRims)
+        val canvas = document.createElement("canvas") as HTMLCanvasElement
+        val gl = requireNotNull(canvas.getContext("webgl") as? WebGLRenderingContext)
+        val context = FaceContext(gl, params) { poly }
+        try {
+            context.performUpdate(null, 0.0)
+            val foldedRegions = response.resolvedRims
+                .filter { rim -> !poly.fs[rim.sourceFaceId].isPlanar }
+                .flatMap { rim -> rim.regions }
+            assertTrue(foldedRegions.isNotEmpty())
+            assertTrue(foldedRegions.all { region -> region.triangulationPatch })
+            assertTrue(foldedRegions.flatMap { region -> listOf(region.outer) + region.holes }
+                .flatMap { cycle -> cycle.segmentSources }.any { sources -> sources.isEmpty() })
+
+            var triangleCount = 0
+            context.exportTriangles(FaceExportParams(1.0, 0.1, 0.05, 0.0)) { a, b, c ->
+                assertTrue(((b - a) cross (c - a)).norm > 1e-12)
+                triangleCount++
+            }
+            assertEquals(context.indexSize / 3, triangleCount)
+        } finally {
+            context.destroy()
+        }
+    }
+
     private fun starPrism(n: Int, q: Int): Polyhedron = polyhedron {
         val bottom = List(n) { index ->
             val angle = 2.0 * PI * index / n

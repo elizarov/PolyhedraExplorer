@@ -50,16 +50,24 @@ replace the shared tessellation with a triangle fan or independently choose diag
 
 ## Simple hidden-face rims
 
-The core supplies hidden-face rims as polygonal regions rather than triangles. For a simple face,
-adjacent boundary lines are offset in the face's average plane while the original
-three-dimensional outer boundary is retained. Adjacent offset lines meet at their exact miter,
-including at acute corners; approximating that join can move the hole outside its source face and
-produce overlapping renderer triangles. The maximum selectable width stops at the first edge
-collapse or concave reflex-corner collision, so every emitted inset remains valid.
+The core supplies hidden-face rims as polygonal regions rather than final consumer triangles. For a
+simple planar face, adjacent boundary lines are offset in the face plane and meet at their exact
+miter. Approximating that join can move the hole outside its source face and produce overlapping
+renderer triangles. The maximum selectable width stops at the first edge collapse or concave
+reflex-corner collision, so every emitted inset remains valid.
+
+For a simple non-planar face, the same uniform inset band is built in the face's stable projection,
+clipped by each triangle of the shared deterministic face tessellation, and lifted barycentrically
+back to that triangle's plane. Each resulting region is therefore a planar patch, while their union
+retains the source face's folds. Patch cuts introduced only by face tessellation carry no source-edge
+provenance and do not become visible rim walls; source-boundary and inset segments do. This avoids
+both a cap cutting across the folds and visible seams between adjacent patches.
 
 Each `ResolvedRimGeometry` contains deterministic outer and hole cycles, source-edge provenance,
-the applied width, and its maximum. WebGL triangulates it for visible caps and walls; STL and
-OpenSCAD consume the same polygonal shape according to [Export](export.md). Immersed-face strip
+the applied width, and its maximum. A region also identifies when it is one clipped non-planar
+triangle patch so consumers use its local plane. WebGL triangulates the regions for visible caps
+and physical boundary walls; STL and OpenSCAD consume the same polygonal shape according to
+[Export](export.md). Immersed-face strip
 union and pentagram-rim semantics are specified separately in
 [Self-intersecting polyhedra](self-intersections.md#hidden-immersed-faces).
 

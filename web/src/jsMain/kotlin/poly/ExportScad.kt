@@ -101,7 +101,8 @@ fun Polyhedron.exportSolidToScad(
     resolvedRims: List<ResolvedRimGeometry>,
     embeddedBoundary: Boolean,
 ): String {
-    val closedBoundary = embeddedBoundary && hiddenFaceKinds.isEmpty() && exportParams.expand == 0.0
+    val presentationHiddenKinds = hiddenFaceKinds + nonPlanarFaceKinds
+    val closedBoundary = embeddedBoundary && presentationHiddenKinds.isEmpty() && exportParams.expand == 0.0
     return buildString {
         appendLine("// Solid: $name")
         appendLine("// $description")
@@ -118,7 +119,7 @@ fun Polyhedron.exportSolidToScad(
             // inner vertex innerScale * p, even when the joins at the edge's endpoints differ.
             val innerScale = (1.0 - exportParams.width / circumradius).coerceAtLeast(0.0)
             if (exportParams.rim > 0.0) {
-                val missingRims = fs.filter { face -> face.kind in hiddenFaceKinds && face.id !in rimByFace }
+                val missingRims = fs.filter { face -> face.kind in presentationHiddenKinds && face.id !in rimByFace }
                 require(missingRims.isEmpty()) {
                     "OpenSCAD export is waiting for polygonal rim geometry for face(s) " +
                         missingRims.joinToString { face -> face.id.toString() }
@@ -127,7 +128,7 @@ fun Polyhedron.exportSolidToScad(
             var emittedPieces = 0
             appendLine("union() {")
             for (face in fs) {
-                if (face.kind !in hiddenFaceKinds) {
+                if (face.kind !in presentationHiddenKinds) {
                     val resolved = resolvedFaces[face.id]
                     if (face.isPlanar) {
                         for (cell in resolved.cells) {
@@ -160,11 +161,15 @@ fun Polyhedron.exportSolidToScad(
                     }
                 } else if (exportParams.rim > 0.0) {
                     for ((index, region) in rimByFace[face.id]?.regions.orEmpty().withIndex()) {
+                        val regionFace = if (region.triangulationPatch) {
+                            planarPatchFace(face, region.outer.vertices)
+                        } else face
                         appendExtrudedRegion(
                             label = "hidden face ${face.id}, rim $index",
                             outer = region.outer.vertices,
                             holes = region.holes.map(ResolvedRimCycle::vertices),
-                            face = face,
+                            face = regionFace,
+                            expansionDirection = face,
                             exportParams = exportParams,
                             innerScale = innerScale,
                         )
@@ -225,6 +230,7 @@ private fun StringBuilder.appendExtrudedRegion(
     outer: List<Vec3>,
     holes: List<List<Vec3>>,
     face: Face,
+    expansionDirection: Vec3 = face,
     exportParams: FaceExportParams,
     innerScale: Double,
 ) {
@@ -237,8 +243,9 @@ private fun StringBuilder.appendExtrudedRegion(
     // Choosing the closest point on the face plane as the local 2-D origin makes OpenSCAD's
     // in-plane scale plus this face-specific depth exactly equal to global radial scaling.
     val origin = normal * face.d
-    val translatedOrigin = (origin + normal * exportParams.expand) * exportParams.scale
-    val extrusionHeight = face.d * (1.0 - innerScale) * exportParams.scale
+    val translatedOrigin = (origin + expansionDirection * exportParams.expand) * exportParams.scale
+    val depthDirection = if (face.d >= 0.0) -normal else normal
+    val extrusionHeight = abs(face.d) * (1.0 - innerScale) * exportParams.scale
     require(extrusionHeight > 0.0) { "OpenSCAD region $label has no positive radial thickness" }
     val cycles = listOf(outer) + holes
     val points = cycles.flatten()
@@ -251,9 +258,9 @@ private fun StringBuilder.appendExtrudedRegion(
 
     appendLine("  // $label")
     appendLine("  multmatrix([")
-    appendLine("    [${u.x}, ${v.x}, ${-normal.x}, ${translatedOrigin.x}],")
-    appendLine("    [${u.y}, ${v.y}, ${-normal.y}, ${translatedOrigin.y}],")
-    appendLine("    [${u.z}, ${v.z}, ${-normal.z}, ${translatedOrigin.z}],")
+    appendLine("    [${u.x}, ${v.x}, ${depthDirection.x}, ${translatedOrigin.x}],")
+    appendLine("    [${u.y}, ${v.y}, ${depthDirection.y}, ${translatedOrigin.y}],")
+    appendLine("    [${u.z}, ${v.z}, ${depthDirection.z}, ${translatedOrigin.z}],")
     appendLine("    [0, 0, 0, 1]")
     appendLine("  ]) linear_extrude(height = $extrusionHeight, scale = $innerScale, convexity = 20)")
     appendLine("    polygon(")
@@ -276,6 +283,16 @@ private fun triangleFace(
 ): Face {
     val vertices = listOf(triangle.a, triangle.b, triangle.c).mapIndexed { index, resolvedIndex ->
         MutableVertex(index, resolved.vertices[resolvedIndex].position, VertexKind(0))
+    }
+    return MutableFace(source.id, vertices, source.kind)
+}
+
+private fun planarPatchFace(source: Face, points: List<Vec3>): Face {
+    val origin = points.first()
+    val second = points.first { point -> (point - origin).norm > 1e-12 }
+    val third = points.first { point -> ((second - origin) cross (point - origin)).norm > 1e-12 }
+    val vertices = listOf(origin, second, third).mapIndexed { index, point ->
+        MutableVertex(index, point, VertexKind(0))
     }
     return MutableFace(source.id, vertices, source.kind)
 }

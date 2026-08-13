@@ -22,6 +22,7 @@ import polyhedra.model.util.minus
 import polyhedra.model.util.norm
 import polyhedra.model.util.plus
 import polyhedra.model.util.times
+import polyhedra.model.util.unit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -92,7 +93,7 @@ class ResolvedRimTest {
     }
 
     @Test
-    fun nonPlanarSimpleRimPreservesTheSourceVerticesInThreeDimensions() {
+    fun nonPlanarSimpleRimIsClippedToItsDeterministicTrianglePlanes() {
         val face = face(
             Vec3(-1.0, -0.7, 0.12),
             Vec3(1.1, -0.8, -0.08),
@@ -103,7 +104,23 @@ class ResolvedRimTest {
         val rim = face.resolvedRim(resolved, FaceRim(face).maxRim / 2.0)
 
         assertTrue(!face.isPlanar)
-        assertSamePointSet(face.fvs, rim.regions.single().outer.vertices)
+        assertTrue(rim.regions.size > 1)
+        assertTrue(rim.regions.all { region -> region.triangulationPatch })
+        val scale = face.fvs.maxOf(Vec3::norm).coerceAtLeast(1.0)
+        for (region in rim.regions) {
+            val points = region.outer.vertices + region.holes.flatMap { hole -> hole.vertices }
+            val a = region.outer.vertices[0]
+            val b = region.outer.vertices[1]
+            val c = region.outer.vertices.first { point -> ((b - a) cross (point - a)).norm > 1e-12 }
+            val normal = ((b - a) cross (c - a)).unit
+            assertTrue(points.all { point -> kotlin.math.abs((point - a) * normal) <= scale * 1e-8 })
+        }
+        assertEquals(
+            face.fvs.indices.toSet(),
+            rim.regions.flatMap { region -> region.sourceEdges }.map { edge -> edge.sourceSegmentIndex }.toSet(),
+        )
+        assertTrue(rim.regions.flatMap { region -> listOf(region.outer) + region.holes }
+            .flatMap { cycle -> cycle.segmentSources }.any { sources -> sources.isEmpty() })
         assertEquals(FaceRim(face).maxRim, rim.maximumWidth)
     }
 

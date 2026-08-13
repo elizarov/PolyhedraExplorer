@@ -129,11 +129,23 @@ class FaceContext(
                         bufferSize += 2 * rimVertexCount
                         indexSize += 2 * rimIndexCount
                         if (includeWidth) {
-                            val boundaryVertexCount = rimMeshes.sumOf { mesh ->
-                                mesh.cycles.sumOf { cycle -> cycle.vertices.size }
+                            val boundarySegmentCount = rimMeshes.sumOf { mesh ->
+                                mesh.cycles.sumOf { cycle ->
+                                    cycle.vertices.indices.count { index ->
+                                        !mesh.triangulationPatch || cycle.segmentSources[index].isNotEmpty()
+                                    }
+                                }
                             }
-                            bufferSize += 2 * boundaryVertexCount
-                            indexSize += 6 * boundaryVertexCount
+                            bufferSize += rimMeshes.sumOf { mesh ->
+                                mesh.cycles.sumOf { cycle ->
+                                    if (mesh.triangulationPatch) {
+                                        4 * cycle.segmentSources.count { sources -> sources.isNotEmpty() }
+                                    } else {
+                                        2 * cycle.vertices.size
+                                    }
+                                }
+                            }
+                            indexSize += 6 * boundarySegmentCount
                         }
                     } else {
                         if (includeRim) {
@@ -273,9 +285,9 @@ class FaceContext(
                 faceColor: Color,
                 inner: Boolean,
             ) {
-                val lNorm: Vec3 = if (inner) -f else f
                 val innerFlag = if (inner) 1 else 0
                 for (mesh in meshes) {
+                    val lNorm = if (inner) -mesh.normal else mesh.normal
                     val base = bufOfs
                     val surfaceId = nextSurfaceId++
                     for (position in mesh.vertices) {
@@ -294,7 +306,7 @@ class FaceContext(
                         val b = mesh.triangles[triangle + 1]
                         val c = mesh.triangles[triangle + 2]
                         val reversed = ((mesh.vertices[b] - mesh.vertices[a]) cross
-                            (mesh.vertices[c] - mesh.vertices[a])) * f < 0.0
+                            (mesh.vertices[c] - mesh.vertices[a])) * mesh.normal < 0.0
                         indexBuffer.indexTriangle(base + a, base + b, base + c, inner xor reversed, surfaceId)
                     }
                 }
@@ -305,30 +317,56 @@ class FaceContext(
                 meshes: List<TriangulatedRimRegion>,
                 faceColor: Color,
             ) {
-                for (cycle in meshes.flatMap(TriangulatedRimRegion::cycles)) {
-                    val base = bufOfs
-                    for (index in cycle.vertices.indices) {
-                        val a = cycle.vertices[index]
-                        val b = cycle.vertices[(index + 1) % cycle.vertices.size]
-                        val sideNormal = (b cross a).unit
-                        for (innerFlag in 0..1) {
-                            positionBuffer[bufOfs] = a
-                            lightNormalBuffer[bufOfs] = sideNormal
-                            expandDirBuffer[bufOfs] = f
-                            rimDirBuffer[bufOfs] = Vec3.ZERO
-                            rimMaxBuffer[bufOfs] = 0.0
-                            colorBuffer[bufOfs] = faceColor
-                            innerBuffer?.set(bufOfs, innerFlag)
-                            faceModeBuffer?.set(bufOfs, if (f.kind == selectedFace) FACE_SELECTED else FACE_NORMAL)
-                            bufOfs++
-                        }
-                    }
-                    if (indexBuffer != null) {
+                for (mesh in meshes) for (cycle in mesh.cycles) {
+                    if (!mesh.triangulationPatch) {
+                        val base = bufOfs
                         for (index in cycle.vertices.indices) {
+                            val position = cycle.vertices[index]
+                            val next = cycle.vertices[(index + 1) % cycle.vertices.size]
+                            val sideNormal = (next cross position).unit
+                            for (innerFlag in 0..1) {
+                                positionBuffer[bufOfs] = position
+                                lightNormalBuffer[bufOfs] = sideNormal
+                                expandDirBuffer[bufOfs] = f
+                                rimDirBuffer[bufOfs] = Vec3.ZERO
+                                rimMaxBuffer[bufOfs] = 0.0
+                                colorBuffer[bufOfs] = faceColor
+                                innerBuffer?.set(bufOfs, innerFlag)
+                                faceModeBuffer?.set(bufOfs, if (f.kind == selectedFace) FACE_SELECTED else FACE_NORMAL)
+                                bufOfs++
+                            }
+                        }
+                        if (indexBuffer != null) for (index in cycle.vertices.indices) {
                             val next = (index + 1) % cycle.vertices.size
                             val surfaceId = nextSurfaceId++
                             indexBuffer.indexTriangle(base + 2 * index, base + 2 * index + 1, base + 2 * next, false, surfaceId)
                             indexBuffer.indexTriangle(base + 2 * index + 1, base + 2 * next + 1, base + 2 * next, false, surfaceId)
+                        }
+                        continue
+                    }
+                    val segments = cycle.vertices.indices.filter { index ->
+                        cycle.segmentSources[index].isNotEmpty()
+                    }
+                    for (index in segments) {
+                        val base = bufOfs
+                        val a = cycle.vertices[index]
+                        val b = cycle.vertices[(index + 1) % cycle.vertices.size]
+                        val sideNormal = (b cross a).unit
+                        for (position in listOf(a, b)) for (innerFlag in 0..1) {
+                                positionBuffer[bufOfs] = position
+                                lightNormalBuffer[bufOfs] = sideNormal
+                                expandDirBuffer[bufOfs] = f
+                                rimDirBuffer[bufOfs] = Vec3.ZERO
+                                rimMaxBuffer[bufOfs] = 0.0
+                                colorBuffer[bufOfs] = faceColor
+                                innerBuffer?.set(bufOfs, innerFlag)
+                                faceModeBuffer?.set(bufOfs, if (f.kind == selectedFace) FACE_SELECTED else FACE_NORMAL)
+                                bufOfs++
+                        }
+                        if (indexBuffer != null) {
+                            val surfaceId = nextSurfaceId++
+                            indexBuffer.indexTriangle(base, base + 1, base + 2, false, surfaceId)
+                            indexBuffer.indexTriangle(base + 1, base + 3, base + 2, false, surfaceId)
                         }
                     }
                 }

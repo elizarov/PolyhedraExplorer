@@ -7,7 +7,10 @@ import polyhedra.core.poly.SeedType
 import polyhedra.core.poly.Seeds
 import polyhedra.core.poly.resolvedRims
 import polyhedra.core.poly.toSeedOrNull
+import polyhedra.core.api.evaluateCore
 import polyhedra.core.transform.resolved
+import polyhedra.model.api.CoreRequest
+import polyhedra.model.api.CoreState
 import polyhedra.model.api.SeedFamily
 import polyhedra.model.api.StarFamilySeedId
 import polyhedra.model.poly.*
@@ -204,6 +207,29 @@ class ExportScadTest {
             }
             assertTrue(innerEndpoints.all { point -> (point - vertex * innerScale).norm <= 1e-9 })
         }
+    }
+
+    @Test
+    fun foldedFacesAutomaticallyUseRimPatchUnion(): Promise<Unit> = scope.promise {
+        val response = evaluateCore(
+            CoreRequest(CoreState("O", listOf("S", "t"), "c"), rimWidth = exportParams.rim),
+        )
+        val source = response.poly
+        assertTrue(source.nonPlanarFaceKinds.isNotEmpty())
+
+        val scad = source.exportSolidToScad(
+            "truncated_stellated_octahedron",
+            "folded faces",
+            exportParams,
+            hiddenFaceKinds = emptySet(),
+            resolvedRims = response.resolvedRims,
+            embeddedBoundary = true,
+        )
+
+        assertContains(scad, "union() {")
+        assertTrue("polyhedron(" !in scad)
+        assertTrue(scad.lineSequence().any { line -> "hidden face" in line && "rim" in line })
+        assertTrue(scad.lineSequence().count { line -> "linear_extrude" in line } > source.fs.size)
     }
 
     private fun cube(): Polyhedron {

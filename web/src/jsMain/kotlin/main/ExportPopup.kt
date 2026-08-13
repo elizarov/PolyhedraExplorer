@@ -28,6 +28,7 @@ fun ExportPopup(params: RootParams, faces: FaceContext?, onPickColor: () -> Unit
     val faceWidth = params.render.view.faceWidth.targetValue
     val faceRim = params.render.view.faceRim.targetValue
     val expandFaces = params.render.view.expandFaces.targetValue
+    val effectiveHiddenFaceKinds = params.render.poly.hideFaces.value + poly.nonPlanarFaceKinds
     var stlBusy by remember { mutableStateOf(false) }
     var stlProgress by remember { mutableStateOf(0) }
     var stlError by remember { mutableStateOf<String?>(null) }
@@ -119,7 +120,7 @@ fun ExportPopup(params: RootParams, faces: FaceContext?, onPickColor: () -> Unit
                         name = name,
                         description = params.toString(),
                         exportParams = exportParams,
-                        hiddenFaceKinds = params.render.poly.hideFaces.value,
+                        hiddenFaceKinds = effectiveHiddenFaceKinds,
                         resolvedRims = params.render.poly.resolvedRims,
                         embeddedBoundary = params.render.poly.geometryAnalysis?.strongestContract ==
                             PolyhedronContract.EmbeddedBoundary,
