@@ -8,9 +8,6 @@ import polyhedra.model.util.fmt
 private const val TWEAK_SEPARATOR = "~"
 private const val TWEAK_ASSIGNMENT = "="
 
-/** Regular resolved Great-stellated-dodecahedron endpoint of Dodecahedron Stellate face. */
-const val GREAT_STELLATED_DODECAHEDRON_RADIUS = 0.4306
-
 /** Typed controls stored on a transform. A value of 1 is the regular/default choice. */
 enum class TransformTweak(val tag: String) {
     Depth("d"),
@@ -96,7 +93,7 @@ fun encodeTransformTag(
         append(TWEAK_SEPARATOR)
         append(tweak.tag)
         append(TWEAK_ASSIGNMENT)
-        append(value.fmt)
+        append(value.fmt(12))
     }
 }
 

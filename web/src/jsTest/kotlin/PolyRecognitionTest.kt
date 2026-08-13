@@ -18,11 +18,6 @@ import polyhedra.web.catalog.Transform
 import polyhedra.web.main.ControlPane
 import polyhedra.web.poly.PolyParams
 import polyhedra.web.poly.shouldDetectSeed
-import polyhedra.model.api.GREAT_STELLATED_DODECAHEDRON_RADIUS
-import polyhedra.model.api.TransformTweak
-import polyhedra.model.poly.FaceKind
-import polyhedra.web.catalog.StellateFace
-import polyhedra.web.catalog.withTweak
 import kotlin.js.Promise
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -65,24 +60,9 @@ class PolyRecognitionTest {
         assertEquals(true, shouldDetectSeed(family, family.copy(seedTag = "P5")))
         assertEquals(false, shouldDetectSeed(family, family.copy(scaleTag = "m")))
 
-        val regularStellateFace = CoreState(
-            "D",
-            listOf(
-                StellateFace(FaceKind(0)).withTweak(
-                    TransformTweak.Radius,
-                    GREAT_STELLATED_DODECAHEDRON_RADIUS,
-                ).tag
-            ),
-            "c",
-        )
-        assertEquals(true, shouldDetectSeed(null, regularStellateFace))
-        assertEquals(
-            false,
-            shouldDetectSeed(
-                regularStellateFace,
-                regularStellateFace.copy(transformTags = listOf(StellateFace(FaceKind(0)).withTweak(TransformTweak.Radius, 0.5).tag)),
-            ),
-        )
+        val stellateFace = CoreState("D", listOf("f[α]"), "c")
+        assertEquals(true, shouldDetectSeed(null, stellateFace))
+        assertEquals(false, shouldDetectSeed(stellateFace, stellateFace.copy(transformTags = listOf("f[α]~r=0.5"))))
     }
 
     @Test

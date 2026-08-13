@@ -10,9 +10,7 @@ import org.w3c.dom.HTMLElement
 import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.events.Event
 import polyhedra.model.api.CoreTransformTweakRange
-import polyhedra.model.api.CoreTransformTweakSnap
 import polyhedra.model.api.CoreTransformTweakOption
-import polyhedra.model.api.GREAT_STELLATED_DODECAHEDRON_RADIUS
 import polyhedra.model.api.TransformTweak
 import polyhedra.web.catalog.Transform
 import polyhedra.web.catalog.StellateFace
@@ -153,7 +151,8 @@ class TransformSettingsUiTest {
     }
 
     @Test
-    fun coreSuppliedRegularSnapSetsTheExactSerializedRadius() {
+    fun stellateFaceStepsPreciselyBetweenCoreSuppliedCoplanarityLandmarks(): Promise<Unit> {
+        val landmarks = listOf(0.4305986891668768, 0.8157378651666524, 1.8240453183331915)
         val params = PolyParams("", null)
         params.transforms.updateValue(listOf(StellateFace(FaceKind(0))))
         params.updateTransformTweakRanges(
@@ -163,12 +162,7 @@ class TransformSettingsUiTest {
                         TransformTweak.Radius,
                         min = 0.1,
                         max = 2.0,
-                        snaps = listOf(
-                            CoreTransformTweakSnap(
-                                "Great stellated",
-                                GREAT_STELLATED_DODECAHEDRON_RADIUS,
-                            )
-                        ),
+                        landmarks = landmarks,
                     )
                 )
             )
@@ -177,15 +171,42 @@ class TransformSettingsUiTest {
             ControlPane(params, Popup.TransformSettings(0), togglePopup = {})
         }
 
-        (host.querySelector(".transform-setting-snap") as HTMLButtonElement).click()
-
+        val previous = host.querySelector(".slider-step-previous") as HTMLButtonElement
+        val next = host.querySelector(".slider-step-next") as HTMLButtonElement
+        assertEquals("Previous coplanar radius", previous.getAttribute("aria-label"))
+        assertEquals("Next coplanar radius", next.getAttribute("aria-label"))
+        previous.click()
         assertEquals(
             StellateFace(FaceKind(0)).withTweak(
                 TransformTweak.Radius,
-                GREAT_STELLATED_DODECAHEDRON_RADIUS,
+                landmarks[1],
             ).tag,
             params.transforms.value.single().tag,
         )
+        return awaitRecomposition().then {
+            assertEquals("82", (host.querySelector(".transform-setting-slider") as HTMLInputElement).value)
+            (host.querySelector(".slider-step-previous") as HTMLButtonElement).click()
+            awaitRecomposition()
+        }.then {
+            assertEquals(
+                StellateFace(FaceKind(0)).withTweak(TransformTweak.Radius, landmarks[0]).tag,
+                params.transforms.value.single().tag,
+            )
+            (host.querySelector(".slider-step-next") as HTMLButtonElement).click()
+            awaitRecomposition()
+        }.then {
+            assertEquals(
+                StellateFace(FaceKind(0)).withTweak(TransformTweak.Radius, landmarks[1]).tag,
+                params.transforms.value.single().tag,
+            )
+            (host.querySelector(".slider-step-next") as HTMLButtonElement).click()
+            awaitRecomposition()
+        }.then {
+            assertEquals(
+                StellateFace(FaceKind(0)).withTweak(TransformTweak.Radius, landmarks[2]).tag,
+                params.transforms.value.single().tag,
+            )
+        }
     }
 
     @Test

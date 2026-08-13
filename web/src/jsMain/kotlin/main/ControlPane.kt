@@ -23,8 +23,10 @@ import polyhedra.web.components.SliderStepControls
 import polyhedra.web.components.observe
 import polyhedra.web.params.Param
 import polyhedra.web.poly.*
+import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
+import kotlin.math.max
 import kotlin.math.roundToInt
 
 @Composable
@@ -575,18 +577,22 @@ private fun TransformSettingsPopup(
             }
         }
         Div(attrs = { classes("transform-settings-actions") }) {
-            for (setting in transform.settings) {
-                for (snap in safeRanges?.get(setting.tweak)?.snaps.orEmpty()) {
-                    Button(attrs = {
-                        classes("transform-setting-snap")
-                        attr("aria-label", "Snap ${setting.label} to ${snap.label}")
-                        onClick { onChange(setting, snap.value) }
-                    }) {
-                        Text(snap.label)
-                        Aside(attrs = { classes("tooltip-text") }) {
-                            Text("Snap ${setting.label} to ${snap.label}")
-                        }
-                    }
+            transform.settings.singleOrNull { setting ->
+                setting.tweak == TransformTweak.Radius &&
+                    transform.operation == TransformOperation.StellateFace
+            }?.let { setting ->
+                val currentValue = transform.tweaks[setting.tweak] ?: 1.0
+                val landmarks = safeRanges?.get(setting.tweak)?.landmarks.orEmpty()
+                val tolerance = 1e-9 * max(1.0, abs(currentValue))
+                val previous = landmarks.lastOrNull { value -> value < currentValue - tolerance }
+                val next = landmarks.firstOrNull { value -> value > currentValue + tolerance }
+                SliderStepControls(
+                    canStepBackward = previous != null,
+                    canStepForward = next != null,
+                    previousLabel = "Previous coplanar radius",
+                    nextLabel = "Next coplanar radius",
+                ) { delta ->
+                    (if (delta < 0) previous else next)?.let { value -> onChange(setting, value) }
                 }
             }
             transform.settings.singleOrNull { setting ->

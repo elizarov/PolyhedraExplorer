@@ -347,20 +347,23 @@ private suspend fun safeTweakRange(
         return valid
     }
 
+    val minimum = findBoundary(envelope.min)
+    val maximum = findBoundary(envelope.max)
+    val landmarks = if (
+        spec.id.operation == TransformOperation.StellateFace &&
+        tweak == TransformTweak.Radius
+    ) {
+        val kind = spec.id.target as? FaceKind
+        kind?.let(inputPoly::stellateFaceCoplanarRadii).orEmpty()
+            .filter { value -> value in minimum..maximum && isValid(value) }
+    } else {
+        emptyList()
+    }
     return CoreTransformTweakRange(
         tweak = tweak,
-        min = findBoundary(envelope.min),
-        max = findBoundary(envelope.max),
-        snaps = if (
-            spec.id.operation == TransformOperation.StellateFace &&
-            tweak == TransformTweak.Radius &&
-            inputPoly.recognizedSeedOrNull()?.tag == "D" &&
-            isValid(GREAT_STELLATED_DODECAHEDRON_RADIUS)
-        ) {
-            listOf(CoreTransformTweakSnap("Great stellated", GREAT_STELLATED_DODECAHEDRON_RADIUS))
-        } else {
-            emptyList()
-        },
+        min = minimum,
+        max = maximum,
+        landmarks = landmarks,
     )
 }
 

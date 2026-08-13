@@ -10,13 +10,15 @@ import polyhedra.core.transform.canMoveRadially
 import polyhedra.core.transform.kisFacesWithApexKinds
 import polyhedra.core.transform.radialVertices
 import polyhedra.core.transform.resolved
+import polyhedra.core.transform.stellateFaceCoplanarRadii
 import polyhedra.core.transform.stellateFaces
 import polyhedra.model.api.CoreRequest
 import polyhedra.model.api.CoreState
 import polyhedra.model.api.TransformTweak
-import polyhedra.model.api.GREAT_STELLATED_DODECAHEDRON_RADIUS
 import polyhedra.model.api.PolyhedronContract
 import polyhedra.model.poly.FaceKind
+import polyhedra.model.poly.Polyhedron
+import polyhedra.model.poly.Scale
 import polyhedra.model.poly.VertexKind
 import polyhedra.model.poly.fev
 import polyhedra.model.util.minus
@@ -25,6 +27,7 @@ import polyhedra.model.util.times
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -81,19 +84,47 @@ class RadialTransformTest {
     }
 
     @Test
-    fun dynamicRadiusRangeContainsTheGreatStellatedGoldenEndpoint() = runTest {
-        val tag = StellateFace(FaceKind(0)).tag
-        val response = evaluateCore(CoreRequest(CoreState("D", listOf(tag), "c")))
+    fun coplanarityLandmarksReproduceBothClassicalDodecahedronStellations() = runTest {
+        val source = Seed.Dodecahedron.poly
+        val kind = source.faceKinds.keys.single()
+        val landmarks = source.stellateFaceCoplanarRadii(kind)
+        val targetSeeds = listOf(Seed.StellatedDodecahedron, Seed.GreatStellatedDodecahedron)
+        val targetRadii = targetSeeds.associateWith { seed ->
+            val target = seed.poly.resolved().scaled(Scale.Circumradius)
+            assertNotNull(
+                landmarks.singleOrNull { radius ->
+                    sameVertexGeometry(source.stellateFaces(kind, radius), target)
+                },
+                "No derived coplanarity landmark reproduces resolved ${seed.name}: $landmarks",
+            )
+        }
+
+        val response = evaluateCore(CoreRequest(CoreState("D", listOf(StellateFace(kind).tag), "c")))
         val radiusRange = response.transformTweakRanges.single().single { range ->
             range.tweak == TransformTweak.Radius
         }
-
         assertNull(response.error)
-        assertTrue(GREAT_STELLATED_DODECAHEDRON_RADIUS in radiusRange.min..radiusRange.max)
         assertEquals(
-            listOf("Great stellated" to GREAT_STELLATED_DODECAHEDRON_RADIUS),
-            radiusRange.snaps.map { snap -> snap.label to snap.value },
+            landmarks.filter { radius -> radius in radiusRange.min..radiusRange.max },
+            radiusRange.landmarks,
         )
+        assertTrue(targetRadii.values.all { radius -> radius in radiusRange.landmarks })
+
+        for ((seed, radius) in targetRadii) {
+            val resolvedResponse = evaluateCore(
+                CoreRequest(
+                    CoreState("D", listOf(StellateFace(kind, radius).tag, "R"), "c"),
+                    calculateTweakRanges = false,
+                ),
+            )
+            assertNull(resolvedResponse.error)
+            val expected = seed.poly.resolved().scaled(Scale.Circumradius)
+            assertEquals(expected.fev(), resolvedResponse.poly.fev(), seed.name)
+            assertTrue(
+                sameVertexGeometry(resolvedResponse.poly, expected),
+                "Derived Radius $radius did not reproduce resolved ${seed.name}",
+            )
+        }
     }
 
     @Test
@@ -116,42 +147,16 @@ class RadialTransformTest {
                 }
         }
         assertTrue(PolyhedronContract.EmbeddedBoundary in classes, observations.joinToString())
-        assertTrue(source.stellateFaces(kind, GREAT_STELLATED_DODECAHEDRON_RADIUS).let { !it.isConvexGeometry })
+        assertTrue(source.stellateFaces(kind, 0.4).let { !it.isConvexGeometry })
     }
+}
 
-    @Test
-    fun greatStellatedResolvedGeometryIdentifiesTheRequiredGoldenRadius() = runTest {
-        val source = Seed.Dodecahedron.poly
-        val kind = source.faceKinds.keys.first()
-        val kis = source.kisFacesWithApexKinds(setOf(kind))
-        val apexKind = kis.apexKinds.getValue(kind)
-        val target = requireNotNull("GSD".toSeedOrNull()).poly.resolved()
-
-        assertEquals(kis.poly.vs.size, target.vs.size)
-        val actual = source.stellateFaces(kind, GREAT_STELLATED_DODECAHEDRON_RADIUS)
-        val normalized = actual.vs.map { vertex -> vertex * (1.0 / actual.circumradius) }
-        assertTrue(normalized.all { point ->
-            target.vs.any { candidate -> (candidate - point).norm <= 2e-6 }
-        })
-        assertTrue(target.vs.all { point ->
-            normalized.any { candidate -> (candidate - point).norm <= 2e-6 }
-        })
-        assertEquals(null, actual.recognizedSeedOrNull())
-        assertTrue(actual.fev() != Seed.GreatStellatedDodecahedron.fev)
-        assertTrue(kis.poly.canMoveRadially(apexKind))
-
-        val response = evaluateCore(
-            CoreRequest(
-                state = CoreState(
-                    seedTag = "D",
-                    transformTags = listOf(
-                        StellateFace(kind, GREAT_STELLATED_DODECAHEDRON_RADIUS).tag,
-                    ),
-                    scaleTag = "c",
-                ),
-                detectSeed = true,
-            ),
-        )
-        assertEquals(null, response.recognizedSeedTag)
+private fun sameVertexGeometry(actual: Polyhedron, expected: Polyhedron): Boolean {
+    val normalized = actual.scaled(Scale.Circumradius)
+    if (normalized.vs.size != expected.vs.size) return false
+    return normalized.vs.all { point ->
+        expected.vs.any { candidate -> (candidate - point).norm <= 1e-8 }
+    } && expected.vs.all { point ->
+        normalized.vs.any { candidate -> (candidate - point).norm <= 1e-8 }
     }
 }

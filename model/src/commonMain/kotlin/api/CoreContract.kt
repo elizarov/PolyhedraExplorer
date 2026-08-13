@@ -63,12 +63,6 @@ data class CoreAnimationStep(
 )
 
 @Serializable
-data class CoreTransformTweakSnap(
-    val label: String,
-    val value: Double,
-)
-
-@Serializable
 data class CoreTransformTweakOption(
     val value: Int,
     val fev: FEV,
@@ -79,7 +73,7 @@ data class CoreTransformTweakRange(
     val tweak: TransformTweak,
     val min: Double,
     val max: Double,
-    val snaps: List<CoreTransformTweakSnap> = emptyList(),
+    val landmarks: List<Double> = emptyList(),
     val options: List<CoreTransformTweakOption> = emptyList(),
 )
 

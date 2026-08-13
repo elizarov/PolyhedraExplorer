@@ -357,9 +357,14 @@ inferred from orbit numbering.
 Radius `1` is ordinary Kis geometry. Values above `1` move the apexes farther
 from the origin; positive values below `1` move them inward and can form facets,
 dents, and immersed star surfaces. The worker computes the safe connected range
-for the actual input. On a regular dodecahedron the settings include an exact
-**Great stellated dodecahedron** snap at Radius `0.4306`; that resolved result is
-also recognized as its catalog seed and offered as an explicit replacement.
+for the actual input. It also derives every radius in that range where a new
+triangular facet becomes coplanar with another face of the result. The compact
+left/right controls step precisely to the preceding or following such geometric
+landmark; they are derived from the current mesh and have no catalog-specific
+values. On a dodecahedron, two of these landmarks resolve to the same physical
+geometries as the Stellated dodecahedron and Great stellated dodecahedron seeds.
+The authoritative triangular faces remain different from the immersed star-face
+seeds, so no catalog replacement is proposed before Resolved is applied.
 
 Applying or removing Stellate face animates one stable output topology: the new
 apexes start at their source-face centers and move to the requested radial

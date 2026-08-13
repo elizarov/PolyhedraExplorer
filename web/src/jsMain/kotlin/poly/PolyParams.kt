@@ -370,11 +370,7 @@ internal fun shouldDetectSeed(previous: CoreState?, current: CoreState): Boolean
         current.seedTag.toStarFamilySeedIdOrNull() != null) &&
         current.transformTags.all { tag ->
             val spec = tag.parseTransformTag() ?: return@all false
-            spec.tweaks.isEmpty() || spec.id.operation == TransformOperation.StellateFace &&
-                kotlin.math.abs(
-                    (spec.tweaks[TransformTweak.Radius] ?: Double.NaN) -
-                        GREAT_STELLATED_DODECAHEDRON_RADIUS
-                ) < 1e-9
+            spec.tweaks.isEmpty()
         } &&
         (previous == null || previous.seedTag != current.seedTag ||
             previous.transformTags != current.transformTags)
