@@ -56,6 +56,12 @@ keeps the distinct fixed axes of non-identity proper rotations and the improper
 involutions whose fixed set is a plane. Consequently, the UI can report a point
 group that becomes larger after a special construction.
 
+For a renderable immersion, this analysis uses the authoritative source topology and coordinates;
+derived face-arrangement cells do not weaken its symmetry or create abstract elements. After
+Resolve, the embedded boundary is a new authoritative polyhedron and its physical F/E/V elements
+are analyzed instead. Source provenance does not prevent the resolved result from acquiring a
+stronger symmetry.
+
 ## How symmetry can change
 
 Every transform is equivariant under the input's proper rotations: applying a

@@ -100,6 +100,32 @@ Result `1` is the default and is omitted, while later choices use tags such as `
 
 Dual, Drop, Quinto, Canonical, Resolve, and None have no continuous geometric setting.
 
+## Geometry domains
+
+Every primitive declares a machine-readable input contract, face requirement, topology
+requirement, locality flag, and output policy. An intentional crossing outside a local target does
+not disable the operation; the completed result must still satisfy its declared policy. Contract
+names and immersion semantics are defined in
+[Self-intersecting polyhedra](self-intersections.md#validation-contracts).
+
+| Operations | Additional geometry requirement | Output policy |
+| --- | --- | --- |
+| None | Oriented source map | Preserve the input contract |
+| Truncated, Rectified, Truncate vertex, Rectify vertex | Oriented source map; the target kind must exist for selective forms | Renderable immersion |
+| Dual, Cantellated, Bevelled, Snub | Every authoritative face has a planar, non-singular oriented plane | Renderable immersion; Snub preserves a stronger input contract |
+| Kis | Every authoritative face is simple and planar | Renderable immersion |
+| Kis face | Selected faces are simple and planar | Embedded boundary |
+| Chamfered | Every authoritative face is simple and planar | Embedded boundary |
+| Drop | Selected neighborhood is a simple planar local disk and closes after removal | Embedded boundary |
+| Radial vertex, Stellate face | Selected neighborhood passes the independent triangular-orbit checks | Renderable immersion |
+| Propeller, Whirl, Quinto, Canonical | Abstract topology is a canonicalizable sphere | Embedded canonical realization |
+| Greatened, Stellated | Planar authoritative faces produce a valid finite face-plane constellation | Renderable immersion |
+| Resolve | Valid resolved-face planar arrangement | Embedded boundary |
+
+Macros use the domain of their realized primitive sequence or fused kernel. They cannot use a later
+stage to conceal an undefined intermediate. Dynamic parameter ranges run the same output validation
+as the selected operation.
+
 ## Animations
 
 Transform animation is computed in the Wasm core and returned as one or more

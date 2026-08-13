@@ -18,6 +18,7 @@ import polyhedra.model.api.GREAT_STELLATED_DODECAHEDRON_RADIUS
 import polyhedra.model.api.PolyhedronContract
 import polyhedra.model.poly.FaceKind
 import polyhedra.model.poly.VertexKind
+import polyhedra.model.poly.fev
 import polyhedra.model.util.minus
 import polyhedra.model.util.norm
 import polyhedra.model.util.times
@@ -135,7 +136,8 @@ class RadialTransformTest {
         assertTrue(target.vs.all { point ->
             normalized.any { candidate -> (candidate - point).norm <= 2e-6 }
         })
-        assertEquals("GSD", actual.recognizedSeedOrNull()?.tag)
+        assertEquals(null, actual.recognizedSeedOrNull())
+        assertTrue(actual.fev() != Seed.GreatStellatedDodecahedron.fev)
         assertTrue(kis.poly.canMoveRadially(apexKind))
 
         val response = evaluateCore(
@@ -150,6 +152,6 @@ class RadialTransformTest {
                 detectSeed = true,
             ),
         )
-        assertEquals("GSD", response.recognizedSeedTag)
+        assertEquals(null, response.recognizedSeedTag)
     }
 }

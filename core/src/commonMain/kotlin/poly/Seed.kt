@@ -33,18 +33,6 @@ class Seed(
 ) : Tagged {
     val poly: Polyhedron by lazy { producer().scaled(seedScale) }
     internal val geometryFingerprint: PolyhedronGeometryFingerprint by lazy { poly.geometryFingerprint() }
-    internal val resolvedPoly: Polyhedron? by lazy {
-        if (type == SeedType.KeplerPoinsot) {
-            requireNotNull(poly.regularStarResolvedOracleOrNull()) {
-                "Kepler-Poinsot seed $tag has no embedded recognition oracle"
-            }.scaled(Scale.Circumradius)
-        } else {
-            null
-        }
-    }
-    internal val resolvedGeometryFingerprint: PolyhedronGeometryFingerprint? by lazy {
-        resolvedPoly?.geometryFingerprint()
-    }
     fun wikiURL(): String = "https://en.wikipedia.org/wiki/${wikiName.replace(' ', '_')}"
     override fun toString(): String = name + chirality?.suffix.orEmpty()
     companion object
@@ -52,25 +40,12 @@ class Seed(
 
 fun Polyhedron.recognizedSeedOrNull(): Seed? {
     val resultFev = fev()
-    val candidates = Seeds.filter { seed ->
-        seed.fev == resultFev || seed.type == SeedType.KeplerPoinsot
-    }
+    val candidates = Seeds.filter { seed -> seed.fev == resultFev }
     if (candidates.isEmpty()) return null
     val geometryFingerprint = geometryFingerprint()
     return candidates.firstOrNull { seed ->
-        (seed.fev == resultFev && geometryFingerprint.matches(seed.geometryFingerprint)) ||
-            seed.resolvedGeometryFingerprint?.let(geometryFingerprint::matches) == true ||
-            seed.resolvedPoly?.let { resolved -> matchesNormalizedVertexSet(resolved) } == true
+        geometryFingerprint.matches(seed.geometryFingerprint)
     }
-}
-
-private fun Polyhedron.matchesNormalizedVertexSet(other: Polyhedron): Boolean {
-    if (fev() != other.fev()) return false
-    val first = scaled(Scale.Circumradius)
-    val second = other.scaled(Scale.Circumradius)
-    val tolerance = 2e-6
-    return first.vs.all { point -> second.vs.any { candidate -> (candidate - point).norm <= tolerance } } &&
-        second.vs.all { point -> first.vs.any { candidate -> (candidate - point).norm <= tolerance } }
 }
 
 private val registeredSeeds = mutableListOf<Seed>()

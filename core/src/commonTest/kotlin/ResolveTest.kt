@@ -122,6 +122,22 @@ class ResolveTest {
     }
 
     @Test
+    fun resolvedClassicalStarIsNotRecognizedAsItsImmersedSeed() = runTest {
+        for (seed in Seeds.filter { it.type == SeedType.KeplerPoinsot }) {
+            val response = evaluateCore(
+                CoreRequest(
+                    CoreState(seed.tag, listOf("R"), "c"),
+                    detectSeed = true,
+                ),
+            )
+
+            assertNull(response.error, seed.tag)
+            assertNull(response.recognizedSeedTag, seed.tag)
+            assertTrue(response.poly.fev() != seed.fev, seed.tag)
+        }
+    }
+
+    @Test
     fun coreReportsBothImmersionClassesIndependentlyBeforeResolve() = runTest {
         val response = evaluateCore(CoreRequest(CoreState("SD", emptyList(), "c")))
         val analysis = requireNotNull(response.geometryAnalysis)

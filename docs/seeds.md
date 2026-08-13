@@ -76,7 +76,7 @@ rendering and picking without changing that topology. The explicit Resolve opera
 complete immersion to an embedded physical boundary when a downstream operation needs one. This
 category is last in the seed popup, whose entries use solid names only. See
 [Self-intersecting polyhedra](self-intersections.md) for the geometry contracts and resolution
-design.
+semantics.
 
 The conventional Conway forms are `sD`, `gD`, `sgD = gsD`, and `gI`. URL seed tags use the
 unambiguous uppercase `SD`, `GD`, `GSD`, and `GI`; lowercase `sD` denotes Snub dodecahedron.

@@ -47,6 +47,20 @@ successful output and no limit rejection. A regression fails if an ordinary fixt
 input error, a small fixture reaches a resource limit, fewer than 35% of candidates succeed, or an
 apparently successful result fails the independent final-mesh validator.
 
+## Geometry test ownership
+
+Every geometry algorithm has focused JVM unit tests for its own contract; browser acceptance is not
+a substitute. The suites separate planar face arrangement, layered validation and intersection
+classification, Resolve and provenance, hidden-rim construction, transform domains, generic
+stellation, STL presentation/arrangement/final validation, and OpenSCAD structure. Each suite covers
+determinism, reversed orientation, rotation and scale invariance, tolerance boundaries, and
+controlled rejection where those properties apply.
+
+Shared adversarial fixtures are reused across algorithms, but each test asserts only the output of
+the layer under test. Random stress cases are minimized before entering the normal suite. The full
+10,000-case STL corpus remains opt-in so `./gradlew test` stays suitable for quick development, while
+the minimized cases that exposed distinct failures remain permanent regressions.
+
 Serve `build/dist/browser/development` or `build/dist/browser/production` over HTTP. A minimal local server is:
 
 ```shell

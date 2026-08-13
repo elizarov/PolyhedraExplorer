@@ -127,15 +127,6 @@ internal fun Polyhedron.regularStarFormOrNull(): RegularStarForm? {
     }?.first
 }
 
-/** Embedded catalog oracle used for recognition without invoking a suspending Resolve operation. */
-internal fun Polyhedron.regularStarResolvedOracleOrNull(): Polyhedron? = when (regularStarFormOrNull()) {
-    RegularStarForm.StellatedDodecahedron -> KeplerPoinsotGeometry.stellatedDodecahedron
-    RegularStarForm.GreatDodecahedron -> KeplerPoinsotGeometry.greatDodecahedron
-    RegularStarForm.GreatStellatedDodecahedron -> KeplerPoinsotGeometry.greatStellatedDodecahedron
-    RegularStarForm.GreatIcosahedron -> KeplerPoinsotGeometry.greatIcosahedron
-    else -> null
-}
-
 /**
  * Returns the classical dual of a recognized Kepler-Poinsot surface.
  *
