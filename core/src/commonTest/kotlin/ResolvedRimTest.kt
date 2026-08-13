@@ -64,6 +64,22 @@ class ResolvedRimTest {
     }
 
     @Test
+    fun starPyramidSevenHalvesRimMitersTheCentralHeptagonSmoothly() {
+        val poly = requireNotNull("SY7_2".toSeedOrNull()).poly
+        val face = poly.fs.single { candidate -> candidate.fvs.size == 7 }
+        val rim = face.resolvedRim(poly.resolvedFaces[face.id], 0.05)
+        val holes = rim.regions.single().holes
+        val central = holes.single { hole -> hole.vertices.size != 3 }
+        val edgeLengths = central.vertices.indices.map { index ->
+            (central.vertices[(index + 1) % central.vertices.size] - central.vertices[index]).norm
+        }
+
+        assertEquals(8, holes.size)
+        assertEquals(7, central.vertices.size)
+        assertTrue(edgeLengths.max() - edgeLengths.min() <= 1e-7)
+    }
+
+    @Test
     fun immersedMaximumWidthClampsAtCompleteFillCoverage() {
         val poly = requireNotNull("SP5_2".toSeedOrNull()).poly
         val face = poly.fs.first { it.kind.id == 0 }

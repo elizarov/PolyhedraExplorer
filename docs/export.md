@@ -96,8 +96,9 @@ validation, every resource guard, deterministic output, and the no-partial-downl
 OpenSCAD tests distinguish closed-polyhedron and piece-union output and verify polygon paths and
 closed pieces. Shared regressions include immersed catalog solids, concave and non-planar faces,
 expanded pieces, hidden rims, Prism 5/2 with hidden caps, all-rim Antiprism 5/2 and Antiprism 7/3,
-and the acute triangular rims of resolved Bipyramid 7/2. The Antiprism 7/3 JVM regression also
-guards a complete conversion time below one second.
+the acute triangular rims of resolved Bipyramid 7/2, and Pyramid 7/2 with either only its immersed
+base or every face orbit hidden. The Antiprism 7/3 JVM regression also guards a complete conversion
+time below one second.
 
 The opt-in deterministic STL stress campaign and its current corpus results are documented with the
 command that runs it in [Development](development.md).

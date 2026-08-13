@@ -195,7 +195,7 @@ private fun Face.resolvedRimAtWidth(
                 allStrips.any { strip -> strip.polygon.contains(point, plane.tolerance) }
         },
     )
-    val cycles = boundarySegments.toCycles(plane.tolerance)
+    val cycles = boundarySegments.toCycles(plane.tolerance, width)
     val positive = cycles.filter { cycle -> cycle.points.signedArea() > 0.0 }
     val negative = cycles.filter { cycle -> cycle.points.signedArea() < 0.0 }
     val regions = positive.sortedByDescending { cycle -> abs(cycle.points.signedArea()) }.map { outer ->
@@ -429,7 +429,7 @@ private data class RimCycle2(
     )
 }
 
-private fun List<RimSegment>.toCycles(tolerance: Double): List<RimCycle2> {
+private fun List<RimSegment>.toCycles(tolerance: Double, rimWidth: Double): List<RimCycle2> {
     val nodes = ArrayList<RimNode>()
     val buckets = HashMap<Pair<Long, Long>, MutableList<Int>>()
     fun node(point: RimPoint): Int {
@@ -476,11 +476,84 @@ private fun List<RimSegment>.toCycles(tolerance: Double): List<RimCycle2> {
             edge = edge.second to outgoing.getValue(edge.second).single()
         } while (edge != start)
         simplifyCycle(points, sources, tolerance)
+        miterShortJoins(points, sources, rimWidth, tolerance)
         if (points.size >= 3 && abs(points.signedArea()) > tolerance * tolerance) {
             cycles += RimCycle2(points, sources)
         }
     }
     return cycles
+}
+
+/**
+ * Replaces the tiny stair-step left where several clipped strip caps meet with
+ * the exact intersection of the two adjacent offset edges. The distance guard
+ * keeps this local: genuinely short polygon features and acute unbounded miters
+ * remain unchanged.
+ */
+private fun miterShortJoins(
+    points: MutableList<RimPoint>,
+    sources: MutableList<Set<SourceEdgeOccurrence>>,
+    rimWidth: Double,
+    tolerance: Double,
+) {
+    if (points.size <= 3 || rimWidth <= tolerance) return
+    val shortLimit = rimWidth * 1.05 + tolerance
+    val longEdges = points.indices.filter { index ->
+        (points[(index + 1) % points.size] - points[index]).norm > shortLimit
+    }
+    if (longEdges.size < 3 || longEdges.size == points.size) return
+
+    val replacementPoints = ArrayList<RimPoint>(longEdges.size)
+    val replacementSources = ArrayList<Set<SourceEdgeOccurrence>>(longEdges.size)
+    val maximumMiter = rimWidth * 4.0 + tolerance
+    for (position in longEdges.indices) {
+        val current = longEdges[position]
+        val previous = longEdges[(position + longEdges.lastIndex) % longEdges.size]
+        val currentStart = points[current]
+        val previousEnd = points[(previous + 1) % points.size]
+        val adjacent = (previous + 1) % points.size == current
+        val point = if (adjacent) {
+            currentStart
+        } else {
+            val adjacentSources = sources[previous] + sources[current]
+            if (sources[previous].size != 1 || sources[current].size != 1 || adjacentSources.size != 2) return
+            var shortEdge = (previous + 1) % points.size
+            while (shortEdge != current) {
+                if (sources[shortEdge].isEmpty() || !adjacentSources.containsAll(sources[shortEdge])) return
+                shortEdge = (shortEdge + 1) % points.size
+            }
+            lineIntersection(
+                points[previous],
+                previousEnd,
+                currentStart,
+                points[(current + 1) % points.size],
+                tolerance,
+            ) ?: return
+        }
+        if ((point - previousEnd).norm > maximumMiter || (point - currentStart).norm > maximumMiter) return
+        replacementPoints += point
+        replacementSources += sources[current]
+    }
+    if (replacementPoints.signedArea() * points.signedArea() <= 0.0) return
+    points.clear()
+    points += replacementPoints
+    sources.clear()
+    sources += replacementSources
+}
+
+private fun lineIntersection(
+    firstA: RimPoint,
+    firstB: RimPoint,
+    secondA: RimPoint,
+    secondB: RimPoint,
+    tolerance: Double,
+): RimPoint? {
+    val first = firstB - firstA
+    val second = secondB - secondA
+    val denominator = first cross second
+    if (abs(denominator) <= tolerance * maxOf(first.norm, second.norm)) return null
+    val parameter = ((secondA - firstA) cross second) / denominator
+    return firstA + first * parameter
 }
 
 private fun simplifyCycle(

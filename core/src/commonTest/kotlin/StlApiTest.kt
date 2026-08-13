@@ -231,6 +231,18 @@ class StlApiTest {
     }
 
     @Test
+    fun exportsStarPyramidSevenHalvesWithEveryFaceHiddenAsRims() = runTest {
+        assertAllHiddenRimExport("SY7_2")
+    }
+
+    @Test
+    fun exportsStarPyramidSevenHalvesWithOnlyItsStarFaceHidden() = runTest {
+        val source = requireNotNull("SY7_2".toSeedOrNull()).poly
+        val starKind = source.fs.single { face -> face.fvs.size == 7 }.kind
+        assertHiddenRimExport(source, listOf(starKind))
+    }
+
+    @Test
     fun rejectsAnOpenTriangleWithoutReturningPartialGeometry() = runTest {
         val response = convertStl(
             CoreStlRequest(
@@ -295,6 +307,30 @@ class StlApiTest {
         assertTrue(response.vertices.isEmpty())
         assertTrue(response.triangles.isEmpty())
     }
+}
+
+private suspend fun assertAllHiddenRimExport(seedTag: String) {
+    val source = requireNotNull(seedTag.toSeedOrNull()).poly
+    assertHiddenRimExport(source, source.fs.map { face -> face.kind }.distinct())
+}
+
+private suspend fun assertHiddenRimExport(source: Polyhedron, hiddenFaceKinds: List<FaceKind>) {
+    val response = convertStl(
+        CoreStlRequest(
+            presentation = CoreStlPresentation(
+                poly = source,
+                hiddenFaceKinds = hiddenFaceKinds,
+                scale = 20.0,
+                width = 0.1,
+                rim = 0.05,
+                expand = 0.0,
+            ),
+        ),
+    )
+
+    assertNull(response.error, response.error?.reason)
+    response.toValidationPolyhedron().validateProperGeometry()
+    assertTrue(response.signedVolume6() > 0.0)
 }
 
 private fun Polyhedron.toStlRequest(

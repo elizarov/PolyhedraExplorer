@@ -161,7 +161,10 @@ face fill:
   side;
 - a segment with nonzero winding on both sides contributes half the width on each side; and
 - all strips are unioned in the face plane, so crossings have no duplicate surfaces or internal
-  seams.
+  seams; and
+- where adjacent offset edges meet through short strip-cap fragments, the fragments are replaced
+  by their exact local miter. This keeps internal star-polygon openings smooth without extending
+  an acute miter beyond four rim widths or changing genuine short features.
 
 The result is tessellation-free `ResolvedRimGeometry`: deterministic outer and hole cycles,
 source-edge provenance, the applied width, and the maximum width before the rim covers the complete
