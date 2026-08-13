@@ -56,7 +56,11 @@ class ValidatePolyhedra {
     fun validateSeeds() {
         testParameter("seed", Seeds) { seed ->
             val poly = seed.poly
-            poly.validate()
+            if (seed.type == SeedType.KeplerPoinsot) {
+                poly.validateRenderableImmersion()
+            } else {
+                poly.validate()
+            }
             when (seed.type) {
                 SeedType.Platonic -> {
                     check(poly.faceKinds.size == 1)
@@ -67,6 +71,7 @@ class ValidatePolyhedra {
 //                    check(poly.vertexKinds.size == 1)
                 }
                 SeedType.Families,
+                SeedType.StarFamilies,
                 SeedType.Catalan,
                 SeedType.KeplerPoinsot -> Unit
             }

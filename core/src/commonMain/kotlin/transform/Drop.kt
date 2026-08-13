@@ -10,7 +10,14 @@ import polyhedra.model.poly.*
 data class Drop(val kind: AnyKind) : Transform() {
     @Transient
     override val id = TransformId(TransformOperation.Drop, target = kind)
+    @Transient
+    override val support = TransformSupport(
+        faceRequirement = FaceRequirement.TargetSimplePlanar,
+        topologyRequirement = TopologyRequirement.LocalDisk,
+        local = true,
+    )
     override fun transform(poly: Polyhedron): Polyhedron = poly.drop(kind)
+    override fun isApplicable(poly: Polyhedron): Boolean = kind in poly.canDrop
     override fun toString(): String = "Drop $kind"
 }
 

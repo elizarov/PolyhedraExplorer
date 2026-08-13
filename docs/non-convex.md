@@ -62,10 +62,14 @@ subdivision, and STL export. OpenSCAD keeps a planar convex face as one polygon 
 triangles for concave or non-planar faces. Consequently, a concave notch is empty consistently in
 the view, picking, and exported geometry; no consumer can accidentally restore a triangle fan.
 
-Face rims offset adjacent edge lines in the face's average plane. Convex faces are limited by their
-first edge collapse. Concave faces additionally search for the earlier reflex-corner collision at
-which the inset would stop being a simple polygon. This keeps the rim width uniform while avoiding
-folded or crossing rim strips. The same construction remains defined for non-planar faces.
+Hidden-face rims are core-supplied polygonal regions. A simple face offsets adjacent edge lines in
+its average plane, preserves the original three-dimensional boundary of a non-planar face, and
+uses a four-width miter limit with a bevel beyond it. Its selectable width stops at the first edge
+collapse or earlier concave reflex-corner collision. An immersed planar face instead unions strips
+over its resolved nonzero-winding cells: exterior boundary segments receive the full configured
+width inward, internal immersed segments receive half on each side, and crossings contain no
+duplicate seams. The result carries deterministic outer/hole cycles and source-edge provenance;
+WebGL and export code triangulate it independently.
 
 ## Transform applicability
 
@@ -79,8 +83,9 @@ from the actual input mesh rather than a convex-only constant.
 | Truncated, Rectified | Unified edge-interpolation construction. Supported for a proper input when the resulting cuts remain proper. |
 | Cantellated, Bevelled | Unified face/edge construction. Concave inputs are supported for proper parameter ranges; the result check bounds or rejects unsafe ranges. |
 | Dual | For a recognized Kepler-Poinsot form, returns its classical star dual. Otherwise it tries the direct polar reciprocal of average face planes; if a reflex neighborhood makes that surface improper, it canonicalizes the input topology and reciprocates the convex realization. Singular or non-canonicalizable cases fail cleanly. |
-| Greaten / Stellate | Defined on the recognized regular dodecahedral/icosahedral forms listed in the transformation reference. They return a resolved Kepler-Poinsot boundary. Arbitrary inputs and compound-producing stellations are rejected with a domain explanation. |
+| Greaten / Stellate | Build candidates from the input's own planar face constellation. Greaten retains cyclic face type while selecting a larger circuit; Stellate retains continued source edge lines while permitting a new winding step. Closed renderable non-catalog results are accepted; compounds, open incidence, non-planar sources, and unavailable Result selections are rejected with `TransformNotApplicable`. |
 | Kis / Kis face | Full default Kis uses its Dual-Truncate-Dual definition and is accepted only when the result is proper. Continuous-height and orbit-targeted Kis require a topological dual and are deliberately unavailable on resolved regular-star meshes, whose classical dual has different physical cell topology. |
+| Radial vertex / Stellate face | Radial vertex accepts an eligible independent vertex orbit surrounded by simple planar triangles, even when unrelated regions are immersed. Stellate face inherits selective Kis restrictions and applies only when its created apex orbit passes the same radial checks. |
 | Join, Needle, Zip, Ortho, Meta | Their documented primitive expansions run under the same contract. Every Dual, Rectify, Truncate, Cantellate, or Bevel stage must be proper; a later stage cannot conceal an intersecting intermediate surface. |
 | Gyro | Its Dual-Snub-Dual expansion validates the Snub surface and uses a strict final polar dual. It does not use the standalone Dual operation's canonical fallback, because that fallback could otherwise replace an invalid chiral construction with an unrelated convex realization. |
 | Snub | Face rotation can overlap a concave boundary or a reflex neighborhood. Such inputs or settings are rejected by the intersection check. |

@@ -17,6 +17,8 @@ import polyhedra.model.poly.VertexKind
 import polyhedra.web.catalog.Drop
 import polyhedra.web.catalog.KisFace
 import polyhedra.web.catalog.RectifyVertex
+import polyhedra.web.catalog.RadialVertex
+import polyhedra.web.catalog.StellateFace
 import polyhedra.web.catalog.Transform
 import polyhedra.web.catalog.TruncateVertex
 import polyhedra.web.catalog.toTransformOrNull
@@ -60,6 +62,8 @@ class DropOrbitUiTest {
         assertEquals(KisFace(faceAlpha), KisFace(faceAlpha).tag.toTransformOrNull())
         assertEquals(TruncateVertex(vertexA), TruncateVertex(vertexA).tag.toTransformOrNull())
         assertEquals(RectifyVertex(vertexA), RectifyVertex(vertexA).tag.toTransformOrNull())
+        assertEquals(RadialVertex(vertexA), RadialVertex(vertexA).tag.toTransformOrNull())
+        assertEquals(StellateFace(faceAlpha), StellateFace(faceAlpha).tag.toTransformOrNull())
     }
 
     @Test
@@ -74,10 +78,12 @@ class DropOrbitUiTest {
                     Drop(vertexA),
                     KisFace(faceBeta),
                     KisFace(faceAlpha),
+                    StellateFace(faceAlpha),
                     TruncateVertex(vertexB),
                     TruncateVertex(vertexA),
                     RectifyVertex(vertexB),
                     RectifyVertex(vertexA),
+                    RadialVertex(vertexA),
                 ).map(Transform::tag),
             ),
         )
@@ -97,10 +103,12 @@ class DropOrbitUiTest {
                     "Drop edge",
                     "Drop vertex",
                     "Kis face",
+                    "Stellate face",
                     "Truncate vertex",
                     "Rectify vertex",
+                    "Radial vertex",
                 ),
-                "Star" to listOf("Greatened", "Stellated"),
+                "Star" to listOf("Greatened", "Stellated", "Resolve"),
             ),
             dropdownOptionsBySection(),
         )
@@ -160,6 +168,7 @@ class DropOrbitUiTest {
                 listOf(
                     Drop(faceAlpha),
                     KisFace(faceAlpha),
+                    StellateFace(faceAlpha),
                     KisFace(faceBeta),
                     TruncateVertex(vertexA),
                     RectifyVertex(vertexA),
@@ -235,6 +244,7 @@ class DropOrbitUiTest {
             listOf(
                 listOf(
                     KisFace(faceAlpha),
+                    StellateFace(faceAlpha),
                     Drop(faceBeta),
                     Drop(faceAlpha),
                     TruncateVertex(vertexA),
@@ -245,9 +255,13 @@ class DropOrbitUiTest {
         renderOrbitTargetActions(params, faceAlpha)
 
         val actions = orbitTargetActionButtons()
-        assertEquals(listOf("Drop face orbit $faceAlpha", "Kis face orbit $faceAlpha"), actions.map(::ariaLabel))
+        assertEquals(
+            listOf("Drop face orbit $faceAlpha", "Kis face orbit $faceAlpha", "Stellate face orbit $faceAlpha"),
+            actions.map(::ariaLabel),
+        )
         assertAction(actions[0], "fa-remove")
         assertAction(actions[1], "fa-caret-up")
+        assertAction(actions[2], "fa-star")
 
         actions[1].click()
         assertEquals(listOf(KisFace(faceAlpha)), params.transforms.value)
@@ -261,6 +275,7 @@ class DropOrbitUiTest {
                 listOf(
                     TruncateVertex(vertexA),
                     RectifyVertex(vertexA),
+                    RadialVertex(vertexA),
                     Drop(vertexB),
                     Drop(vertexA),
                     KisFace(faceAlpha),
@@ -275,12 +290,14 @@ class DropOrbitUiTest {
                 "Drop vertex orbit $vertexA",
                 "Truncate vertex orbit $vertexA",
                 "Rectify vertex orbit $vertexA",
+                "Radial vertex orbit $vertexA",
             ),
             actions.map(::ariaLabel),
         )
         assertAction(actions[0], "fa-remove")
         assertAction(actions[1], "fa-scissors")
         assertAction(actions[2], "fa-compress")
+        assertAction(actions[3], "fa-arrows-v")
 
         actions[0].click()
         assertEquals(listOf(Drop(vertexA)), params.transforms.value)
@@ -355,7 +372,8 @@ class DropOrbitUiTest {
             .single {
                 val text = it.textContent.orEmpty()
                 text.contains("Drop ") || text.contains("Kis ") ||
-                    text.contains("Truncate ") || text.contains("Rectify ")
+                text.contains("Truncate ") || text.contains("Rectify ")
+                    || text.contains("Stellate ") || text.contains("Radial ")
             }
     }
 

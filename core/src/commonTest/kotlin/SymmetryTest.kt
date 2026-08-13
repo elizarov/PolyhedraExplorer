@@ -110,6 +110,40 @@ class SymmetryTest {
     }
 
     @Test
+    fun classifiesStarFamilySymmetriesFromAuthoritativeTopology() {
+        assertSymmetry(
+            "SP7_2",
+            PointGroup(PointGroupFamily.Dihedral, 7, PointGroupSuffix.Horizontal),
+            8,
+            FEV(2, 2, 1),
+        )
+        assertSymmetry(
+            "SA7_2",
+            PointGroup(PointGroupFamily.Dihedral, 7, PointGroupSuffix.Horizontal),
+            8,
+            FEV(2, 3, 1),
+        )
+        assertSymmetry(
+            "SA7_3",
+            PointGroup(PointGroupFamily.Dihedral, 7, PointGroupSuffix.Diagonal),
+            7,
+            FEV(2, 3, 1),
+        )
+        assertSymmetry(
+            "SY7_2",
+            PointGroup(PointGroupFamily.Cyclic, 7, PointGroupSuffix.Vertical),
+            7,
+            FEV(2, 2, 2),
+        )
+        assertSymmetry(
+            "SB7_2",
+            PointGroup(PointGroupFamily.Dihedral, 7, PointGroupSuffix.Horizontal),
+            8,
+            FEV(1, 2, 2),
+        )
+    }
+
+    @Test
     fun reportsStrengthenedGeometryInsteadOfInheritedKinds() {
         val symmetry = Seed.Tetrahedron.poly.transformed(Transform.Snub).analyzeSymmetry()
 

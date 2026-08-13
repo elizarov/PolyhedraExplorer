@@ -22,6 +22,26 @@ private fun indicesAround(size: Int): List<Triple<Int, Int, Int>> = List(size) {
     Triple((current + size - 1) % size, current, (current + 1) % size)
 }
 
+/**
+ * Triangulates a simple planar cycle and returns counter-clockwise triangles when viewed along
+ * [normal]. The cycle orientation is explicit so derived polygonal regions do not need a [Face].
+ */
+fun triangulatePlanarPolygon(
+    vertices: List<Vec3>,
+    normal: Vec3,
+    counterClockwise: Boolean,
+): List<FaceTriangle> {
+    if (!counterClockwise) return triangulateFace(vertices, normal)
+    val lastIndex = vertices.lastIndex
+    return triangulateFace(vertices.asReversed(), normal).map { triangle ->
+        FaceTriangle(
+            lastIndex - triangle.a,
+            lastIndex - triangle.b,
+            lastIndex - triangle.c,
+        )
+    }
+}
+
 internal fun triangulateFace(vertices: List<Vec3>, normal: Vec3): List<FaceTriangle> {
     require(vertices.size >= 3) { "A face needs at least three vertices" }
     require(normal.norm > EPS) { "Face has no well-defined normal" }
@@ -56,6 +76,10 @@ internal fun triangulateFace(vertices: List<Vec3>, normal: Vec3): List<FaceTrian
                         )
                 }
             ) continue
+            if (remaining.size == 4) {
+                val final = remaining.filterIndexed { candidatePosition, _ -> candidatePosition != position }
+                if (abs(projected.cross(final[0], final[1], final[2])) <= areaTolerance) continue
+            }
 
             // Reverse the clockwise face boundary to produce an outward-facing triangle.
             result += FaceTriangle(previous, next, current)

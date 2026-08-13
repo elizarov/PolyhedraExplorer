@@ -7,9 +7,14 @@ import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.attributes.value
 import org.jetbrains.compose.web.dom.*
 import polyhedra.model.api.CoreTransformTweakRange
+import polyhedra.model.api.DEFAULT_STAR_FAMILY_SEED_N
+import polyhedra.model.api.DEFAULT_STAR_FAMILY_SEED_Q
 import polyhedra.model.api.MAX_FAMILY_SEED_N
+import polyhedra.model.api.MAX_STAR_FAMILY_SEED_Q
 import polyhedra.model.api.MIN_FAMILY_SEED_N
+import polyhedra.model.api.StarFamilySeedId
 import polyhedra.model.api.TransformTweak
+import polyhedra.model.api.TransformOperation
 import polyhedra.model.api.TransformPrefixReplacement
 import polyhedra.model.api.findTransformPrefixReplacement
 import polyhedra.model.util.updatedAt
@@ -32,10 +37,20 @@ internal fun ControlPane(
     var lastFamilyN by remember {
         mutableStateOf(params.seed.value.familyId?.n ?: MIN_FAMILY_SEED_N)
     }
+    var lastStarFamilyValues by remember {
+        mutableStateOf(
+            params.seed.value.starFamilyId?.let { id -> id.n to id.q }
+                ?: (DEFAULT_STAR_FAMILY_SEED_N to DEFAULT_STAR_FAMILY_SEED_Q)
+        )
+    }
     var addTransformSelection by remember { mutableStateOf(0) }
     val currentFamilyN = params.seed.value.familyId?.n
+    val currentStarFamilyId = params.seed.value.starFamilyId
     SideEffect {
         if (currentFamilyN != null) lastFamilyN = currentFamilyN
+        if (currentStarFamilyId != null) {
+            lastStarFamilyValues = currentStarFamilyId.n to currentStarFamilyId.q
+        }
     }
     val transforms = params.transforms.value
     val transformError = params.transformError
@@ -44,6 +59,15 @@ internal fun ControlPane(
         findTransformPrefixReplacement(transforms.map(Transform::spec))
     } else {
         null
+    }
+    val intersectionStatus = params.geometryAnalysis?.toIntersectionIndicatorOrNull()
+        ?.takeIf {
+            transformError == null && transforms.lastOrNull()?.operation != TransformOperation.Resolve
+        }
+
+    fun appendResolve() {
+        togglePopup(null)
+        params.transforms.updateValue(transforms + Transform.Resolve)
     }
 
     fun possibleTransformsAt(index: Int): Set<Transform> {
@@ -83,16 +107,31 @@ internal fun ControlPane(
         val current = params.seed.value
         val currentIndex = SeedOptions.indexOfFirst { seed -> seed.optionKey == current.optionKey }
         current.familyId?.let { lastFamilyN = it.n }
+        current.starFamilyId?.let { lastStarFamilyValues = it.n to it.q }
         val option = SeedOptions.getOrNull(currentIndex + delta) ?: return false
         togglePopup(null)
-        val seed = if (option.isFamily) option.withFamilyN(lastFamilyN) else option
+        val seed = when {
+            option.familyId != null -> option.withFamilyN(lastFamilyN)
+            option.starFamilyId != null -> option.withStarFamilyValues(
+                lastStarFamilyValues.first,
+                lastStarFamilyValues.second,
+            )
+            else -> option
+        }
         params.seed.updateValue(seed)
         return true
     }
 
     fun selectSeed(option: Seed) {
         togglePopup(null)
-        val seed = if (option.isFamily) option.withFamilyN(lastFamilyN) else option
+        val seed = when {
+            option.familyId != null -> option.withFamilyN(lastFamilyN)
+            option.starFamilyId != null -> option.withStarFamilyValues(
+                lastStarFamilyValues.first,
+                lastStarFamilyValues.second,
+            )
+            else -> option
+        }
         params.seed.updateValue(seed)
     }
 
@@ -104,6 +143,24 @@ internal fun ControlPane(
         lastFamilyN = n
         params.seed.updateValue(current.withFamilyN(n))
         return true
+    }
+
+    fun adjustStarFamilyN(delta: Int): Boolean {
+        val current = params.seed.value
+        val id = requireNotNull(current.starFamilyId)
+        val replacement = adjacentValidStarFamilyN(id, delta) ?: return false
+        togglePopup(null)
+        lastStarFamilyValues = replacement.n to replacement.q
+        params.seed.updateValue(current.withStarFamilyValues(replacement.n, replacement.q))
+        return true
+    }
+
+    fun updateStarFamilyQ(q: Int) {
+        val current = params.seed.value
+        val id = requireNotNull(current.starFamilyId)
+        val replacementQ = nearestValidStarFamilyQ(id, q) ?: return
+        lastStarFamilyValues = id.n to replacementQ
+        params.seed.updateValue(current.withStarFamilyValues(id.n, replacementQ))
     }
 
     fun adjustLastTransform(delta: Int): Boolean {
@@ -197,16 +254,23 @@ internal fun ControlPane(
             acceptPrefixReplacement(replacement)
             return true
         }
-        if (params.suggestedSeed == null) return false
-        togglePopup(null)
-        params.acceptSuggestedSeed()
-        return true
+        if (params.suggestedSeed != null) {
+            togglePopup(null)
+            params.acceptSuggestedSeed()
+            return true
+        }
+        if (intersectionStatus != null) {
+            appendResolve()
+            return true
+        }
+        return false
     }
 
     val addDisabled = transforms.size > errorIndex
     val isReset = transforms.isEmpty() &&
         params.seed.value == Seed.Tetrahedron &&
-        lastFamilyN == MIN_FAMILY_SEED_N
+        lastFamilyN == MIN_FAMILY_SEED_N &&
+        lastStarFamilyValues == (DEFAULT_STAR_FAMILY_SEED_N to DEFAULT_STAR_FAMILY_SEED_Q)
 
     fun toggleAddTransform(): Boolean {
         if (addDisabled) return false
@@ -222,6 +286,7 @@ internal fun ControlPane(
             params.transforms.updateValue(transforms.dropLast(1))
         } else {
             lastFamilyN = MIN_FAMILY_SEED_N
+            lastStarFamilyValues = DEFAULT_STAR_FAMILY_SEED_N to DEFAULT_STAR_FAMILY_SEED_Q
             params.clearRememberedOrbitTargets()
             params.seed.updateValue(Seed.Tetrahedron)
         }
@@ -240,6 +305,7 @@ internal fun ControlPane(
             when {
                 transforms.lastOrNull()?.orbitTargetOrNull() != null -> adjustLastOrbitTarget(delta)
                 transforms.isEmpty() && params.seed.value.familyId != null -> adjustFamilyN(-delta)
+                transforms.isEmpty() && params.seed.value.starFamilyId != null -> adjustStarFamilyN(-delta)
                 else -> false
             }
         }
@@ -274,8 +340,15 @@ internal fun ControlPane(
             val itemDisabled = index > errorIndex
             val itemPopup = Popup.ModifyTransform(index)
             val settingsPopup = Popup.TransformSettings(index)
-            val hasSettings = index == transforms.lastIndex &&
-                (transforms[index].settings.isNotEmpty() || transforms[index].isChiral)
+            val transformSafeRanges = params.transformTweakRangesAt(index)
+            val hasVariableStellationResult = transformSafeRanges
+                ?.get(TransformTweak.StellationResult)
+                ?.let { range -> range.max > range.min } == true
+            val hasSettings = index == transforms.lastIndex && (
+                transforms[index].settings.any { setting ->
+                    setting.tweak != TransformTweak.StellationResult || hasVariableStellationResult
+                } || transforms[index].isChiral
+                )
             val itemActive = popup == itemPopup || popup == settingsPopup
             Div(attrs = { classes("btn", *(if (itemActive) arrayOf("active") else emptyArray())) }) {
                 if (index == transforms.lastIndex) {
@@ -289,7 +362,7 @@ internal fun ControlPane(
                 if (popup == settingsPopup && hasSettings && !itemDisabled) {
                     TransformSettingsPopup(
                         transform = transforms[index],
-                        safeRanges = params.transformTweakRangesAt(index),
+                        safeRanges = transformSafeRanges,
                         canFlipChirality = index == transforms.lastIndex && transforms[index].isChiral,
                         onChange = { setting, value -> updateTransformTweak(index, setting, value) },
                         onFlipChirality = { flipTransformChirality(index) },
@@ -333,13 +406,18 @@ internal fun ControlPane(
                 } else {
                     params.transformWarnings.getOrNull(index)?.let { MessageButton(index, it, ::updateTransform) }
                 }
+                if (index == transforms.lastIndex && intersectionStatus != null) {
+                    IntersectionButton(intersectionStatus, ::appendResolve)
+                }
             }
             if (prefixReplacement?.startIndex == index) {
                 PrefixReplacementSuggestion(prefixReplacement, ::acceptPrefixReplacement)
             }
         }
 
-        Div(attrs = { classes("btn", *activeWhen(popup, Popup.Seed)) }) {
+        val seedSettingsAvailable = params.seed.value.starFamilyId != null
+        val seedActive = popup == Popup.Seed || popup == Popup.SeedSettings
+        Div(attrs = { classes("btn", *(if (seedActive) arrayOf("active") else emptyArray())) }) {
             if (transforms.isEmpty()) LeftRightSpinner(disabled = false) { adjustSeed(it) }
             if (popup == Popup.Seed) {
                 Aside(attrs = { classes("dropdown") }) {
@@ -360,6 +438,12 @@ internal fun ControlPane(
                     }
                 }
             }
+            if (popup == Popup.SeedSettings && seedSettingsAvailable) {
+                SeedSettingsPopup(
+                    seed = params.seed.value,
+                    onChangeQ = ::updateStarFamilyQ,
+                )
+            }
             Button(attrs = {
                 classes("txt", *activeWhen(popup, Popup.Seed))
                 onClick { togglePopup(Popup.Seed) }
@@ -367,11 +451,29 @@ internal fun ControlPane(
                 Text(params.seed.value.toString())
                 Aside(attrs = { classes("tooltip-text") }) { Text("Seed") }
             }
+            if (seedSettingsAvailable) {
+                Button(attrs = {
+                    classes("square", "seed-settings-button", *activeWhen(popup, Popup.SeedSettings))
+                    onClick { togglePopup(Popup.SeedSettings) }
+                }) {
+                    I(attrs = { classes("fa", "fa-cog") })
+                    Aside(attrs = { classes("tooltip-text") }) { Text("Seed settings") }
+                }
+            }
             params.seed.value.familyId?.let { familyId ->
                 FamilySeedControls(familyId.n) { adjustFamilyN(it) }
             }
+            params.seed.value.starFamilyId?.let { starFamilyId ->
+                FamilySeedControls(
+                    canIncrement = adjacentValidStarFamilyN(starFamilyId, 1) != null,
+                    canDecrement = adjacentValidStarFamilyN(starFamilyId, -1) != null,
+                ) { adjustStarFamilyN(it) }
+            }
             if (transforms.isEmpty() && params.seed.value.isChiral) {
                 ChiralityFlipButton(::flipSeedChirality)
+            }
+            if (transforms.isEmpty() && intersectionStatus != null) {
+                IntersectionButton(intersectionStatus, ::appendResolve)
             }
         }
 
@@ -444,7 +546,17 @@ private fun TransformSettingsPopup(
                         }
                     })
                     Span(attrs = { classes("transform-setting-value") }) {
-                        Text("${(currentValue * 100).roundToInt()}%")
+                        if (setting.tweak == TransformTweak.StellationResult) {
+                            val current = currentValue.roundToInt()
+                            val count = maximum.roundToInt()
+                            val fev = safeRange?.options?.singleOrNull { option -> option.value == current }?.fev
+                            Text(buildString {
+                                append("$current of $count")
+                                if (fev != null) append(" · F ${fev.f}, E ${fev.e}, V ${fev.v}")
+                            })
+                        } else {
+                            Text("${(currentValue * 100).roundToInt()}%")
+                        }
                     }
                 }
             }
@@ -453,6 +565,20 @@ private fun TransformSettingsPopup(
             }
         }
         Div(attrs = { classes("transform-settings-actions") }) {
+            for (setting in transform.settings) {
+                for (snap in safeRanges?.get(setting.tweak)?.snaps.orEmpty()) {
+                    Button(attrs = {
+                        classes("transform-setting-snap")
+                        attr("aria-label", "Snap ${setting.label} to ${snap.label}")
+                        onClick { onChange(setting, snap.value) }
+                    }) {
+                        Text(snap.label)
+                        Aside(attrs = { classes("tooltip-text") }) {
+                            Text("Snap ${setting.label} to ${snap.label}")
+                        }
+                    }
+                }
+            }
             Button(attrs = {
                 classes("transform-settings-reset")
                 attr("aria-label", "Reset transform settings")
@@ -461,6 +587,34 @@ private fun TransformSettingsPopup(
             }) {
                 I(attrs = { classes("fa", "fa-undo") })
                 Aside(attrs = { classes("tooltip-text") }) { Text("Reset transform settings") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SeedSettingsPopup(
+    seed: Seed,
+    onChangeQ: (Int) -> Unit,
+) {
+    val id = requireNotNull(seed.starFamilyId)
+    Aside(attrs = { classes("transform-settings", "seed-settings") }) {
+        GroupHeader("${seed.name} settings")
+        TableBody {
+            ControlRow("Step q") {
+                Input(type = InputType.Range, attrs = {
+                    classes("seed-setting-slider")
+                    attr("aria-label", "Star polygon step")
+                    attr("min", "2")
+                    attr("max", MAX_STAR_FAMILY_SEED_Q.toString())
+                    value(id.q.toString())
+                    onInput { event ->
+                        event.value?.toDouble()?.roundToInt()?.let(onChangeQ)
+                    }
+                })
+                Span(attrs = { classes("transform-setting-value", "seed-setting-value") }) {
+                    Text(id.q.toString())
+                }
             }
         }
     }
@@ -589,22 +743,42 @@ private fun OrbitTargetControls(disabled: Boolean, onAdjust: (Int) -> Unit) {
 }
 
 @Composable
-private fun FamilySeedControls(n: Int, onAdjust: (Int) -> Unit) {
+private fun FamilySeedControls(
+    n: Int? = null,
+    canIncrement: Boolean = n != null && n < MAX_FAMILY_SEED_N,
+    canDecrement: Boolean = n != null && n > MIN_FAMILY_SEED_N,
+    onAdjust: (Int) -> Unit,
+) {
     Div(attrs = { classes("vertical-controls", "family-seed-controls") }) {
         Button(attrs = {
             classes("family-seed-increment")
             attr("aria-label", "Increase family size")
-            if (n >= MAX_FAMILY_SEED_N) disabled()
+            if (!canIncrement) disabled()
             onClick { onAdjust(1) }
         }) { I(attrs = { classes("fa", "fa-angle-up") }) }
         Button(attrs = {
             classes("family-seed-decrement")
             attr("aria-label", "Decrease family size")
-            if (n <= MIN_FAMILY_SEED_N) disabled()
+            if (!canDecrement) disabled()
             onClick { onAdjust(-1) }
         }) { I(attrs = { classes("fa", "fa-angle-down") }) }
     }
 }
+
+private fun adjacentValidStarFamilyN(id: StarFamilySeedId, delta: Int): StarFamilySeedId? {
+    require(delta == -1 || delta == 1)
+    var n = id.n + delta
+    while (n in MIN_FAMILY_SEED_N..MAX_FAMILY_SEED_N) {
+        runCatching { StarFamilySeedId(id.family, n, id.q) }.getOrNull()?.let { return it }
+        n += delta
+    }
+    return null
+}
+
+private fun nearestValidStarFamilyQ(id: StarFamilySeedId, requestedQ: Int): Int? =
+    (2..MAX_STAR_FAMILY_SEED_Q)
+        .filter { q -> runCatching { StarFamilySeedId(id.family, id.n, q) }.isSuccess }
+        .minWithOrNull(compareBy<Int> { q -> kotlin.math.abs(q - requestedQ) }.thenBy { q -> q })
 
 @Composable
 private fun MessageButton(
@@ -621,5 +795,17 @@ private fun MessageButton(
                 SomeFacesNotPlanar -> updateTransform(index + 1, Transform.Canonical)
             }
         }
+    }) { MessageSpan(message) }
+}
+
+@Composable
+private fun IntersectionButton(
+    message: IndicatorMessage<String>,
+    appendResolve: () -> Unit,
+) {
+    Button(attrs = {
+        classes("msg", "intersection-indicator")
+        attr("aria-label", "Resolve self-intersections")
+        onClick { appendResolve() }
     }) { MessageSpan(message) }
 }

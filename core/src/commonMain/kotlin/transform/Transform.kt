@@ -5,6 +5,7 @@
 package polyhedra.core.transform
 
 import kotlinx.serialization.*
+import polyhedra.core.poly.analyzeGeometry
 import polyhedra.core.util.OperationProgressContext
 import polyhedra.model.api.*
 import polyhedra.model.poly.*
@@ -26,6 +27,12 @@ internal fun TransformSpec.toTransformOrNull(): Transform? {
 
 typealias AsyncTransform = suspend (poly: Polyhedron, progress: OperationProgressContext) -> Polyhedron
 
+/** A geometry-domain rejection that must cross the worker boundary as a structured issue. */
+class TransformApplicabilityException(
+    val issueCode: CoreIssueCode,
+    message: String,
+) : IllegalArgumentException(message)
+
 @Serializable
 sealed class Transform : Tagged {
     abstract val id: TransformId
@@ -35,6 +42,25 @@ sealed class Transform : Tagged {
 
     abstract fun transform(poly: Polyhedron): Polyhedron
     open fun isApplicable(poly: Polyhedron): Boolean = true // todo: not defined usefully now
+    open val support: TransformSupport
+        get() = TransformSupport()
+
+    fun applicability(poly: Polyhedron): TransformApplicability {
+        val inputAnalysis = poly.analyzeGeometry()
+        val outputContract = when (support.outputPolicy) {
+            TransformOutputPolicy.Preserve -> inputAnalysis.strongestContract
+            TransformOutputPolicy.RenderableImmersion -> PolyhedronContract.RenderableImmersion
+            TransformOutputPolicy.EmbeddedBoundary -> PolyhedronContract.EmbeddedBoundary
+        }
+        val rejection = when {
+            inputAnalysis.strongestContract.ordinal < support.inputContract.ordinal ->
+                "Requires ${support.inputContract}; input satisfies ${inputAnalysis.strongestContract}"
+            !isApplicable(poly) ->
+                "Requires ${support.faceRequirement} faces and ${support.topologyRequirement} topology"
+            else -> null
+        }
+        return TransformApplicability(support, outputContract, rejection)
+    }
     open fun truncationRatio(poly: Polyhedron): Double? = null
     open fun cantellationRatio(poly: Polyhedron): Double? = null
     open fun bevellingRatio(poly: Polyhedron): BevellingRatio? {
@@ -73,6 +99,7 @@ sealed class Transform : Tagged {
         val Canonical: Transform by Canonical()
         val Greatened: Transform by Greatened()
         val Stellated: Transform by Stellated()
+        val Resolve: Transform by Resolve()
 
         val Transforms: List<Transform> = registeredTransforms.toList()
 
@@ -97,6 +124,8 @@ class None : Transform() {
     override fun chamferingRatio(poly: Polyhedron) = 0.0
     override fun isIdentityTransform(poly: Polyhedron) = true
     @Transient
+    override val support = TransformSupport(outputPolicy = TransformOutputPolicy.Preserve)
+    @Transient
     override val fev = TransformFEV.ID
 }
 
@@ -106,6 +135,8 @@ class Truncated : Transform() {
     override val id = TransformId(TransformOperation.Truncated)
     override fun transform(poly: Polyhedron): Polyhedron = poly.truncated()
     override fun truncationRatio(poly: Polyhedron) = poly.regularTruncationRatio()
+    @Transient
+    override val support = TransformSupport(outputPolicy = TransformOutputPolicy.RenderableImmersion)
     @Transient
     override val fev = TransformFEV(
         1, 0, 1,
@@ -121,6 +152,8 @@ class Rectified : Transform() {
     override fun transform(poly: Polyhedron): Polyhedron = poly.rectified()
     override fun truncationRatio(poly: Polyhedron) = 1.0
     @Transient
+    override val support = TransformSupport(outputPolicy = TransformOutputPolicy.RenderableImmersion)
+    @Transient
     override val fev = TransformFEV(
         1, 0, 1,
         0, 2, 0,
@@ -134,6 +167,13 @@ class Cantellated : Transform() { // ~= Rectified, Rectified
     override val id = TransformId(TransformOperation.Cantellated)
     override fun transform(poly: Polyhedron): Polyhedron = poly.cantellated()
     override fun cantellationRatio(poly: Polyhedron) = poly.regularCantellationRatio()
+    override fun isApplicable(poly: Polyhedron): Boolean = poly.hasNonSingularFacePlanes()
+    @Transient
+    override val support = TransformSupport(
+        faceRequirement = FaceRequirement.NonSingularPlanar,
+        topologyRequirement = TopologyRequirement.FacePlanes,
+        outputPolicy = TransformOutputPolicy.RenderableImmersion,
+    )
     @Transient
     override val fev = TransformFEV(
         1, 1, 1,
@@ -148,6 +188,13 @@ class Dual : Transform() {
     override val id = TransformId(TransformOperation.Dual)
     override fun transform(poly: Polyhedron): Polyhedron = poly.dual()
     override fun cantellationRatio(poly: Polyhedron) = 1.0
+    override fun isApplicable(poly: Polyhedron): Boolean = poly.hasNonSingularFacePlanes()
+    @Transient
+    override val support = TransformSupport(
+        faceRequirement = FaceRequirement.NonSingularPlanar,
+        topologyRequirement = TopologyRequirement.FacePlanes,
+        outputPolicy = TransformOutputPolicy.RenderableImmersion,
+    )
     @Transient
     override val fev = TransformFEV(
         0, 0, 1,
@@ -162,6 +209,13 @@ class Bevelled : Transform() { // ~= Rectified, Truncated
     override val id = TransformId(TransformOperation.Bevelled)
     override fun transform(poly: Polyhedron): Polyhedron = poly.bevelled()
     override fun bevellingRatio(poly: Polyhedron) = poly.regularBevellingRatio()
+    override fun isApplicable(poly: Polyhedron): Boolean = poly.hasNonSingularFacePlanes()
+    @Transient
+    override val support = TransformSupport(
+        faceRequirement = FaceRequirement.NonSingularPlanar,
+        topologyRequirement = TopologyRequirement.FacePlanes,
+        outputPolicy = TransformOutputPolicy.RenderableImmersion,
+    )
     @Transient
     override val fev = TransformFEV(
         1, 1, 1,
@@ -180,6 +234,13 @@ class Snub(
     override fun snubbingRatio(poly: Polyhedron) = poly.regularSnubbingRatio().let { ratio ->
         if (chirality == Chirality.Flipped) ratio.copy(sa = -ratio.sa) else ratio
     }
+    override fun isApplicable(poly: Polyhedron): Boolean = poly.hasNonSingularFacePlanes()
+    @Transient
+    override val support = TransformSupport(
+        faceRequirement = FaceRequirement.NonSingularPlanar,
+        topologyRequirement = TopologyRequirement.FacePlanes,
+        outputPolicy = TransformOutputPolicy.Preserve,
+    )
     @Transient
     override val fev = TransformFEV(
         1, 2, 1,
@@ -200,6 +261,8 @@ private fun Transform.supportsTweaks(tweaks: Set<TransformTweak>): Boolean {
         is Bevelled -> setOf(TransformTweak.Distance, TransformTweak.Depth)
         is Snub -> setOf(TransformTweak.Inset, TransformTweak.Twist)
         is Chamfered -> setOf(TransformTweak.Width)
+        is Greatened,
+        is Stellated -> setOf(TransformTweak.StellationResult)
         else -> emptySet()
     }
     return tweaks.all { it in supported }
@@ -217,13 +280,25 @@ private data class TweakedTransform(
 
     override fun isApplicable(poly: Polyhedron): Boolean = base.isApplicable(poly)
 
+    override val support: TransformSupport
+        get() = base.support
+
     override fun transform(poly: Polyhedron): Polyhedron = when (base) {
         is Truncated -> poly.truncated(requireNotNull(truncationRatio(poly)))
         is Cantellated -> poly.cantellated(requireNotNull(cantellationRatio(poly)))
         is Bevelled -> poly.bevelled(requireNotNull(bevellingRatio(poly)))
         is Snub -> poly.snub(requireNotNull(snubbingRatio(poly)))
         is Chamfered -> poly.chamfered(requireNotNull(chamferingRatio(poly)))
+        is Greatened -> poly.greatened(integerResult())
+        is Stellated -> poly.stellated(integerResult())
         else -> error("Transform ${base.tag} has no continuous parameters")
+    }
+
+    @Transient
+    override val asyncTransform: AsyncTransform? = when (base) {
+        is Greatened -> { poly, _ -> poly.greatenedAsync(integerResult()) }
+        is Stellated -> { poly, _ -> poly.stellatedAsync(integerResult()) }
+        else -> null
     }
 
     override fun truncationRatio(poly: Polyhedron): Double? = when (base) {
@@ -255,6 +330,15 @@ private data class TweakedTransform(
 
     private fun factor(tweak: TransformTweak): Double = tweaks[tweak] ?: 1.0
 
+    private fun integerResult(): Int {
+        val value = factor(TransformTweak.StellationResult)
+        if (value % 1.0 != 0.0) throw TransformApplicabilityException(
+            CoreIssueCode.TransformNotApplicable,
+            "Stellation Result must be an integer, found $value",
+        )
+        return value.toInt()
+    }
+
     override fun toString(): String = base.toString()
 }
 
@@ -264,6 +348,8 @@ class Propeller(
 ) : Transform() {
     @Transient
     override val id = TransformId(TransformOperation.Propeller, chirality)
+    @Transient
+    override val support = TransformSupport(topologyRequirement = TopologyRequirement.CanonicalizableSphere)
     override fun transform(poly: Polyhedron): Polyhedron = poly.propeller(chirality)
     @Transient
     override val asyncTransform: AsyncTransform = { poly, progress -> poly.propeller(chirality, progress) }
@@ -283,6 +369,8 @@ class Whirl(
 ) : Transform() {
     @Transient
     override val id = TransformId(TransformOperation.Whirl, chirality)
+    @Transient
+    override val support = TransformSupport(topologyRequirement = TopologyRequirement.CanonicalizableSphere)
     override fun transform(poly: Polyhedron): Polyhedron = poly.whirl(chirality)
     @Transient
     override val asyncTransform: AsyncTransform = { poly, progress -> poly.whirl(chirality, progress) }
@@ -300,6 +388,8 @@ class Whirl(
 class Quinto : Transform() {
     @Transient
     override val id = TransformId(TransformOperation.Quinto)
+    @Transient
+    override val support = TransformSupport(topologyRequirement = TopologyRequirement.CanonicalizableSphere)
     override fun transform(poly: Polyhedron): Polyhedron = poly.quinto()
     @Transient
     override val asyncTransform: AsyncTransform = { poly, progress -> poly.quinto(progress) }
@@ -315,8 +405,13 @@ class Quinto : Transform() {
 class Chamfered : Transform() {
     @Transient
     override val id = TransformId(TransformOperation.Chamfered)
+    @Transient
+    override val support = TransformSupport(faceRequirement = FaceRequirement.SimplePlanar)
     override fun transform(poly: Polyhedron): Polyhedron = poly.chamfered()
     override fun chamferingRatio(poly: Polyhedron) = poly.chamferingRatio()
+    override fun isApplicable(poly: Polyhedron): Boolean = poly.fs.all { face ->
+        face.isPlanar && !poly.resolvedFaces[face.id].sourceBoundarySelfIntersects
+    }
     @Transient
     override val fev = TransformFEV(
         1, 1, 0,
@@ -329,6 +424,8 @@ class Chamfered : Transform() {
 class Canonical : Transform() {
     @Transient
     override val id = TransformId(TransformOperation.Canonical)
+    @Transient
+    override val support = TransformSupport(topologyRequirement = TopologyRequirement.CanonicalizableSphere)
     override fun transform(poly: Polyhedron): Polyhedron = poly.canonical()
     override fun isIdentityTransform(poly: Polyhedron): Boolean = poly.isCanonical()
     @Transient

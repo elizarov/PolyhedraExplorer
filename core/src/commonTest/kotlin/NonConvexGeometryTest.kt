@@ -5,6 +5,7 @@ import polyhedra.core.transform.*
 import polyhedra.model.api.PointGroup
 import polyhedra.model.api.PointGroupFamily
 import polyhedra.model.api.PointGroupSuffix
+import polyhedra.model.api.PolyhedronContract
 import polyhedra.model.poly.*
 import polyhedra.model.util.*
 import kotlin.math.abs
@@ -150,13 +151,13 @@ class NonConvexGeometryTest {
     }
 
     @Test
-    fun dualCanonicalizesAReflexInputWhenDirectPolarReciprocationCrosses() {
+    fun dualPreservesTheAbstractMapWhenAReflexPolarResultIsImmersed() {
         val source = dentedCube()
         source.validateProperGeometry()
 
         val dual = source.dual()
-        dual.validateProperGeometry()
-        assertTrue(dual.isConvexGeometry)
+        dual.validateRenderableImmersion()
+        assertEquals(PolyhedronContract.RenderableImmersion, dual.analyzeGeometry().strongestContract)
         assertEquals(source.fs.size, dual.vs.size)
         assertEquals(source.vs.size, dual.fs.size)
     }

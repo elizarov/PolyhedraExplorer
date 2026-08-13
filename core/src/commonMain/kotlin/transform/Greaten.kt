@@ -2,14 +2,10 @@ package polyhedra.core.transform
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
-import polyhedra.core.poly.KeplerPoinsotGeometry
-import polyhedra.core.poly.RegularStarForm
-import polyhedra.core.poly.regularStarFormOrNull
-import polyhedra.core.poly.scaled
 import polyhedra.model.api.TransformId
 import polyhedra.model.api.TransformOperation
+import polyhedra.model.api.CoreIssueCode
 import polyhedra.model.poly.Polyhedron
-import polyhedra.model.poly.Scale
 
 /** Conway greatening: retain the regular face type while moving to its great realization. */
 @Serializable
@@ -17,7 +13,17 @@ class Greatened : Transform() {
     @Transient
     override val id = TransformId(TransformOperation.Greatened)
 
+    @Transient
+    override val support = TransformSupport(
+        faceRequirement = FaceRequirement.Planar,
+        topologyRequirement = TopologyRequirement.FacePlaneConstellation,
+        outputPolicy = TransformOutputPolicy.RenderableImmersion,
+    )
+
     override fun transform(poly: Polyhedron): Polyhedron = poly.greatened()
+
+    @Transient
+    override val asyncTransform: AsyncTransform = { poly, _ -> poly.greatenedAsync() }
 }
 
 /** Conway stellation: replace the regular pentagons by their pentagram realization. */
@@ -26,22 +32,39 @@ class Stellated : Transform() {
     @Transient
     override val id = TransformId(TransformOperation.Stellated)
 
+    @Transient
+    override val support = TransformSupport(
+        faceRequirement = FaceRequirement.Planar,
+        topologyRequirement = TopologyRequirement.FacePlaneConstellation,
+        outputPolicy = TransformOutputPolicy.RenderableImmersion,
+    )
+
     override fun transform(poly: Polyhedron): Polyhedron = poly.stellated()
+
+    @Transient
+    override val asyncTransform: AsyncTransform = { poly, _ -> poly.stellatedAsync() }
 }
 
-fun Polyhedron.greatened(): Polyhedron = when (regularStarFormOrNull()) {
-    RegularStarForm.Dodecahedron -> KeplerPoinsotGeometry.greatDodecahedron
-    RegularStarForm.Icosahedron -> KeplerPoinsotGeometry.greatIcosahedron
-    RegularStarForm.StellatedDodecahedron -> KeplerPoinsotGeometry.greatStellatedDodecahedron
-    else -> throw IllegalArgumentException(
-        "Greatening currently requires a regular dodecahedron, icosahedron, or stellated dodecahedron",
-    )
-}.scaled(Scale.Circumradius)
+fun Polyhedron.greatened(result: Int = 1): Polyhedron =
+    stellationCandidates(ConstellationOperation.Greaten).selected("Greatening", result)
 
-fun Polyhedron.stellated(): Polyhedron = when (regularStarFormOrNull()) {
-    RegularStarForm.Dodecahedron -> KeplerPoinsotGeometry.stellatedDodecahedron
-    RegularStarForm.GreatDodecahedron -> KeplerPoinsotGeometry.greatStellatedDodecahedron
-    else -> throw IllegalArgumentException(
-        "Stellation currently requires a regular dodecahedron or great dodecahedron",
+fun Polyhedron.stellated(result: Int = 1): Polyhedron =
+    stellationCandidates(ConstellationOperation.Stellate).selected("Stellation", result)
+
+internal suspend fun Polyhedron.greatenedAsync(result: Int = 1): Polyhedron =
+    stellationCandidatesAsync(ConstellationOperation.Greaten).selected("Greatening", result)
+
+internal suspend fun Polyhedron.stellatedAsync(result: Int = 1): Polyhedron =
+    stellationCandidatesAsync(ConstellationOperation.Stellate).selected("Stellation", result)
+
+private fun List<StellationCandidate>.selected(operation: String, result: Int): Polyhedron {
+    if (result < 1) throw TransformApplicabilityException(
+        CoreIssueCode.TransformNotApplicable,
+        "$operation Result must be a positive integer",
     )
-}.scaled(Scale.Circumradius)
+    return getOrNull(result - 1)?.poly
+        ?: throw TransformApplicabilityException(
+            CoreIssueCode.TransformNotApplicable,
+            "$operation Result $result is unavailable; found $size result(s)",
+        )
+}

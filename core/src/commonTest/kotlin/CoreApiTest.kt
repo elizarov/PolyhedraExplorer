@@ -296,6 +296,51 @@ class CoreApiTest {
         assertEquals(response.polyName, decoded.polyName)
         assertEquals(response.poly.fev(), decoded.poly.fev())
         assertNotNull(decoded.poly)
+        assertEquals(
+            response.poly.resolvedFaces.map { face -> face.cells to face.edges },
+            decoded.poly.resolvedFaces.map { face -> face.cells to face.edges },
+        )
+        assertEquals(
+            response.poly.resolvedFaces.flatMap { face ->
+                face.vertices.map { vertex ->
+                    listOf(vertex.position.x, vertex.position.y, vertex.position.z) to vertex.provenance
+                }
+            },
+            decoded.poly.resolvedFaces.flatMap { face ->
+                face.vertices.map { vertex ->
+                    listOf(vertex.position.x, vertex.position.y, vertex.position.z) to vertex.provenance
+                }
+            },
+        )
+        assertEquals(response.geometryAnalysis, decoded.geometryAnalysis)
+    }
+
+    @Test
+    fun geometryContractsAndProvenanceRoundTripAcrossJsonBoundary() {
+        val analysis = CoreGeometryAnalysis(
+            strongestContract = PolyhedronContract.RenderableImmersion,
+            intersectionCounts = mapOf(
+                SurfaceIntersectionClass.SelfCrossingFace to 12,
+                SurfaceIntersectionClass.IntersectingFaces to 30,
+            ),
+        )
+        val provenance = ResolvedElementProvenance(
+            sourceVertexIds = listOf(2),
+            sourceEdgeIds = listOf(7, 9),
+            sourceFaceIds = listOf(3, 4),
+            sourceCellIds = listOf(1),
+            sourceSegmentPoints = listOf(SourceSegmentPoint(3, 2, 0.25)),
+        )
+
+        assertEquals(
+            analysis,
+            CoreJson.decodeFromString<CoreGeometryAnalysis>(CoreJson.encodeToString(analysis)),
+        )
+        assertEquals(
+            provenance,
+            CoreJson.decodeFromString<ResolvedElementProvenance>(CoreJson.encodeToString(provenance)),
+        )
+        assertTrue(analysis.hasIntersections)
     }
 
     @Test

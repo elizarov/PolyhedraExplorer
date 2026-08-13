@@ -8,7 +8,6 @@ import polyhedra.model.poly.*
 import polyhedra.model.util.*
 import kotlin.math.abs
 
-private const val MAX_DISPLAY_EDGES = (1 shl 15) - 1
 private const val ANIMATION_GAP = 1e-4
 // Eight bisections resolve even the widest envelope more finely than the UI's 0.01 step.
 private const val SAFE_RANGE_SEARCH_STEPS = 8
@@ -112,6 +111,7 @@ suspend fun evaluateCore(
         reportProgress,
         detectSeed = request.detectSeed,
         computeTweakRanges = request.calculateTweakRanges,
+        rimWidth = request.rimWidth,
     )
     val duration = request.animationDuration?.takeIf { it > 0.0 }
     val previousState = request.previousState
@@ -135,6 +135,7 @@ suspend fun evaluateCore(
         detectSeed = false,
         computeTweakRanges = false,
         symmetryOverride = current.response.symmetry,
+        rimWidth = null,
     )
     val animation = computeAnimation(previous, current, duration)
     reportCompletion(current, reportProgress)
@@ -161,6 +162,7 @@ private suspend fun evaluateState(
     detectSeed: Boolean,
     computeTweakRanges: Boolean = true,
     symmetryOverride: CoreSymmetry? = null,
+    rimWidth: Double? = null,
 ): Evaluation {
     val seed = state.seedTag.toSeedOrNull()
         ?: error("Unknown seed tag: ${state.seedTag}")
@@ -225,13 +227,15 @@ private suspend fun evaluateState(
         availableOrbitTransforms += poly.availableOrbitTransforms.map(Transform::tag).sorted()
     }
 
+    val displayPoly = poly.scaled(scale)
     val response = CoreResponse(
-        poly = poly.scaled(scale),
+        poly = displayPoly,
         polyName = polyName,
         symmetry = symmetryOverride ?: poly.analyzeSymmetry(),
         recognizedSeedTag = if (
             detectSeed && errorIndex == null &&
-            (validTransforms.isNotEmpty() || seed.type == SeedType.Families)
+            (validTransforms.isNotEmpty() || seed.type == SeedType.Families ||
+                seed.type == SeedType.StarFamilies)
         ) {
             poly.recognizedSeedOrNull()?.tag
         } else {
@@ -244,6 +248,8 @@ private suspend fun evaluateState(
         transformTweakRanges = transformTweakRanges,
         errorIndex = errorIndex,
         error = errorIssue,
+        geometryAnalysis = poly.analyzeGeometry(),
+        resolvedRims = rimWidth?.takeIf { it > 0.0 }?.let(displayPoly::resolvedRims).orEmpty(),
     )
     return Evaluation(state, seed, scale, validTransforms, poly, response)
 }
@@ -253,6 +259,29 @@ private suspend fun LogicalTransform.safeTweakRanges(
     inputPendingRectification: PendingRectification?,
     outputScale: Scale,
 ): List<CoreTransformTweakRange> {
+    when (spec.id.operation) {
+        TransformOperation.Greatened,
+        TransformOperation.Stellated -> {
+            val operation = if (spec.id.operation == TransformOperation.Greatened) {
+                ConstellationOperation.Greaten
+            } else {
+                ConstellationOperation.Stellate
+            }
+            val candidates = inputPoly.stellationCandidatesAsync(operation)
+            if (candidates.isEmpty()) return emptyList()
+            return listOf(
+                CoreTransformTweakRange(
+                    tweak = TransformTweak.StellationResult,
+                    min = 1.0,
+                    max = candidates.size.toDouble(),
+                    options = candidates.mapIndexed { index, candidate ->
+                        CoreTransformTweakOption(index + 1, candidate.fev)
+                    },
+                ),
+            )
+        }
+        else -> Unit
+    }
     val envelopes = spec.id.transformTweakRanges()
     if (envelopes.isEmpty()) return emptyList()
 
@@ -315,6 +344,16 @@ private suspend fun safeTweakRange(
         tweak = tweak,
         min = findBoundary(envelope.min),
         max = findBoundary(envelope.max),
+        snaps = if (
+            spec.id.operation == TransformOperation.StellateFace &&
+            tweak == TransformTweak.Radius &&
+            inputPoly.recognizedSeedOrNull()?.tag == "D" &&
+            isValid(GREAT_STELLATED_DODECAHEDRON_RADIUS)
+        ) {
+            listOf(CoreTransformTweakSnap("Great stellated", GREAT_STELLATED_DODECAHEDRON_RADIUS))
+        } else {
+            emptyList()
+        },
     )
 }
 
@@ -326,8 +365,10 @@ private suspend fun applyTransform(
     outputScale: Scale? = null,
 ): TransformApplication {
     var poly = inputPoly
+    val logicalInputContract = inputPoly.analyzeGeometry().strongestContract
     var pendingRectification = inputPendingRectification
     var isIdentity = false
+    var outputContract = PolyhedronContract.EmbeddedBoundary
 
     val primitiveCount = transform.primitiveTransforms.size
     for ((primitiveIndex, primitive) in transform.primitiveTransforms.withIndex()) {
@@ -335,13 +376,18 @@ private suspend fun applyTransform(
             reportProgress((primitiveIndex * 100 + done.coerceIn(0, 100)) / primitiveCount)
         }
         reportPrimitiveProgress(0)
-        if (!primitive.isApplicable(poly)) {
+        val applicability = primitive.applicability(poly)
+        if (!applicability.isApplicable) {
             return TransformApplication.Failure(
-                CoreIssue(CoreIssueCode.TransformNotApplicable, transform.tag)
+                CoreIssue(
+                    CoreIssueCode.TransformNotApplicable,
+                    transform.tag,
+                    detail = applicability.rejectionReason,
+                )
             )
         }
         val expectedFev = primitive.fev?.let { it * poly.fev() }
-        if (expectedFev != null && expectedFev.e > MAX_DISPLAY_EDGES) {
+        if (expectedFev != null && expectedFev.e > MAX_POLYHEDRON_EDGES) {
             return TransformApplication.Failure(
                 CoreIssue(CoreIssueCode.TooLarge, transform.tag, expectedFev)
             )
@@ -349,6 +395,7 @@ private suspend fun applyTransform(
 
         val primitiveInput = poly
         val pendingInput = pendingRectification
+        val primitiveOutputContract = applicability.outputContract
         try {
             poly = when {
                 pendingInput != null && primitive == Transform.Rectified ->
@@ -364,7 +411,11 @@ private suspend fun applyTransform(
 
                 transform.spec.id.operation == TransformOperation.Gyro &&
                     primitive is Dual && primitiveIndex == transform.primitiveTransforms.lastIndex ->
-                    poly.directDual()
+                    poly.directDual().also { result ->
+                        if (logicalInputContract == PolyhedronContract.EmbeddedBoundary) {
+                            result.validateProperGeometry()
+                        }
+                    }
 
                 else -> primitive.asyncTransform?.invoke(poly, OperationProgressContext(reportPrimitiveProgress))
                     ?: primitive.transform(poly)
@@ -372,7 +423,16 @@ private suspend fun applyTransform(
             // A later primitive (especially Dual's canonical fallback) must not turn an improper
             // intermediate into an apparently valid macro result. Each logical construction stage
             // is part of the operation's geometric meaning and must satisfy the surface contract.
-            poly.validateProperGeometry()
+            when (primitiveOutputContract) {
+                PolyhedronContract.RenderableImmersion -> poly.validateRenderableImmersion()
+                PolyhedronContract.EmbeddedBoundary -> poly.validateProperGeometry()
+                PolyhedronContract.AbstractSurface -> error("Primitive output must be renderable")
+            }
+            outputContract = primitiveOutputContract
+        } catch (cause: TransformApplicabilityException) {
+            return TransformApplication.Failure(
+                CoreIssue(cause.issueCode, transform.tag, detail = cause.message)
+            )
         } catch (cause: IllegalArgumentException) {
             return TransformApplication.Failure(
                 CoreIssue(CoreIssueCode.InvalidGeometry, transform.tag, detail = cause.message)
@@ -394,10 +454,25 @@ private suspend fun applyTransform(
     }
 
     try {
-        poly.validateProperGeometry()
+        when (outputContract) {
+            PolyhedronContract.RenderableImmersion -> poly.validateRenderableImmersion()
+            PolyhedronContract.EmbeddedBoundary -> poly.validateProperGeometry()
+            PolyhedronContract.AbstractSurface -> error("Transform output must be renderable")
+        }
         // Uniform positive scaling preserves intersections; only recheck finite coordinates and
         // orientation because a non-convex radius denominator can be zero or negative.
-        outputScale?.let { poly.scaled(it).validateMeshGeometry() }
+        outputScale?.let { scale ->
+            val scaled = poly.scaled(scale)
+            when (outputContract) {
+                PolyhedronContract.RenderableImmersion -> scaled.validateRenderableImmersion()
+                PolyhedronContract.EmbeddedBoundary -> scaled.validateMeshGeometry()
+                PolyhedronContract.AbstractSurface -> error("Transform output must be renderable")
+            }
+        }
+    } catch (cause: TransformApplicabilityException) {
+        return TransformApplication.Failure(
+            CoreIssue(cause.issueCode, transform.tag, detail = cause.message)
+        )
     } catch (cause: IllegalArgumentException) {
         return TransformApplication.Failure(
             CoreIssue(CoreIssueCode.InvalidGeometry, transform.tag, detail = cause.message)
@@ -683,6 +758,16 @@ private fun transformAnimation(
         (previousTransform is Dual || currentTransform is Dual)
     ) return emptyList()
     if (previousTransform is KisFace || currentTransform is KisFace) return emptyList()
+    if (previousTransform is StellateFace && currentTransform == Transform.None) {
+        return listOfNotNull(
+            stellateFaceAnimationStep(basePoly, scale, previousPoly, previousTransform, duration, applying = false)
+        )
+    }
+    if (previousTransform == Transform.None && currentTransform is StellateFace) {
+        return listOfNotNull(
+            stellateFaceAnimationStep(basePoly, scale, currentPoly, currentTransform, duration, applying = true)
+        )
+    }
     val changesOrbitTarget = previousTransform is OrbitTargetedAnimation &&
         currentTransform is OrbitTargetedAnimation &&
         previousTransform.targetKind != currentTransform.targetKind
@@ -855,6 +940,30 @@ private fun transformAnimation(
             ).withoutStationarySteps()
 
         else -> emptyList()
+    }
+}
+
+private fun stellateFaceAnimationStep(
+    basePoly: Polyhedron,
+    scale: Scale,
+    resultPoly: Polyhedron,
+    transform: StellateFace,
+    duration: Double,
+    applying: Boolean,
+): CoreAnimationStep? {
+    val result = resultPoly.scaled(scale).triangulatedForAnimation()
+    val originScale = 1.0 / basePoly.scaleDenominator(scale)
+    val origins = basePoly.vs + basePoly.fs.filter { face -> face.kind == transform.kind }.map { face ->
+        face.fvs.fold<Vertex, Vec3>(Vec3.ZERO) { sum, vertex -> sum + vertex } / face.size.toDouble()
+    }
+    if (origins.size != result.vs.size) return null
+    val nearCollapsed = result.withAnimationPositions(origins.mapIndexed { index, origin ->
+        ANIMATION_GAP.atSegment(origin * originScale, result.vs[index])
+    })
+    return if (applying) {
+        CoreAnimationStep(duration, nearCollapsed, ANIMATION_GAP, result, 1.0)
+    } else {
+        CoreAnimationStep(duration, result, 0.0, nearCollapsed, 1.0 - ANIMATION_GAP)
     }
 }
 

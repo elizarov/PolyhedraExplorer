@@ -9,6 +9,8 @@ import org.w3c.dom.HTMLElement
 import polyhedra.core.poly.Seed as CoreSeed
 import polyhedra.core.poly.SnubDodecahedron
 import polyhedra.core.poly.analyzeSymmetry
+import polyhedra.core.poly.recognizedSeedOrNull
+import polyhedra.core.poly.toSeedOrNull
 import polyhedra.model.api.CoreResponse
 import polyhedra.model.api.CoreState
 import polyhedra.web.catalog.Seeds
@@ -16,6 +18,11 @@ import polyhedra.web.catalog.Transform
 import polyhedra.web.main.ControlPane
 import polyhedra.web.poly.PolyParams
 import polyhedra.web.poly.shouldDetectSeed
+import polyhedra.model.api.GREAT_STELLATED_DODECAHEDRON_RADIUS
+import polyhedra.model.api.TransformTweak
+import polyhedra.model.poly.FaceKind
+import polyhedra.web.catalog.StellateFace
+import polyhedra.web.catalog.withTweak
 import kotlin.js.Promise
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -57,6 +64,25 @@ class PolyRecognitionTest {
         assertEquals(true, shouldDetectSeed(null, family))
         assertEquals(true, shouldDetectSeed(family, family.copy(seedTag = "P5")))
         assertEquals(false, shouldDetectSeed(family, family.copy(scaleTag = "m")))
+
+        val regularStellateFace = CoreState(
+            "D",
+            listOf(
+                StellateFace(FaceKind(0)).withTweak(
+                    TransformTweak.Radius,
+                    GREAT_STELLATED_DODECAHEDRON_RADIUS,
+                ).tag
+            ),
+            "c",
+        )
+        assertEquals(true, shouldDetectSeed(null, regularStellateFace))
+        assertEquals(
+            false,
+            shouldDetectSeed(
+                regularStellateFace,
+                regularStellateFace.copy(transformTags = listOf(StellateFace(FaceKind(0)).withTweak(TransformTweak.Radius, 0.5).tag)),
+            ),
+        )
     }
 
     @Test
@@ -70,6 +96,13 @@ class PolyRecognitionTest {
             shouldDetectSeed(tweakedSnubCube, regularSnubCube),
             "Resetting Snub to regular coordinates must restore its catalog suggestion",
         )
+    }
+
+    @Test
+    fun starFamilyRecognitionUsesPrebuiltKeplerPoinsotOraclesOnJs() {
+        val starPrism = requireNotNull("SP5_2".toSeedOrNull()).poly
+
+        assertNull(starPrism.recognizedSeedOrNull())
     }
 
     @Test

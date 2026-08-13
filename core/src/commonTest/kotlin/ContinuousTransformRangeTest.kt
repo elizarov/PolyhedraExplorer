@@ -91,7 +91,7 @@ class ContinuousTransformRangeTest {
                             calculateTweakRanges = false,
                         )
                     )
-                    response.poly.validateMeshGeometry()
+                    response.poly.validateRenderableImmersion()
                     val error = response.error
                     if (error == null) {
                         check(response.validTransformTags == listOf(tag)) {
@@ -129,7 +129,7 @@ class ContinuousTransformRangeTest {
 
         suspend fun validateRangesAt(tag: String) {
             val response = evaluateCore(CoreRequest(CoreState(seed.tag, listOf(tag), "c")))
-            response.poly.validateMeshGeometry()
+            response.poly.validateRenderableImmersion()
             check(response.error?.code != CoreIssueCode.TransformFailed) {
                 "Default construction crashed: ${response.error}"
             }
@@ -159,7 +159,7 @@ class ContinuousTransformRangeTest {
                             calculateTweakRanges = false,
                         )
                     )
-                    endpoint.poly.validateMeshGeometry()
+                    endpoint.poly.validateRenderableImmersion()
                     check(endpoint.error == null) {
                         "$tweak boundary $value was rejected: ${endpoint.error}"
                     }

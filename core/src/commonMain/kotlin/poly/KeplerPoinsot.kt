@@ -3,9 +3,11 @@ package polyhedra.core.poly
 import polyhedra.model.poly.FEV
 import polyhedra.model.poly.FaceKind
 import polyhedra.model.poly.Polyhedron
+import polyhedra.model.poly.Vertex
 import polyhedra.model.poly.VertexKind
 import polyhedra.model.poly.fev
 import polyhedra.model.util.Vec3
+import polyhedra.model.util.approx
 import polyhedra.model.util.cross
 import polyhedra.model.util.div
 import polyhedra.model.util.minus
@@ -19,16 +21,37 @@ import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.sqrt
 
-/**
- * Physical, embedded interpretations of the four Kepler-Poinsot polyhedra.
- *
- * Their classical regular faces form an immersed, self-intersecting surface. The project does not
- * admit such meshes: rendering and export require a connected embedded two-manifold. We therefore
- * partition every classical face at all face-plane intersections and retain the boundary between
- * zero and non-zero winding regions. This is the same physical-surface interpretation used when a
- * paper or printable model is split along all visible face intersections.
- */
+/** Classical immersed source surfaces and legacy resolved migration oracles for Kepler-Poinsot solids. */
 internal object KeplerPoinsotGeometry {
+    val stellatedDodecahedronSource: Polyhedron by lazy {
+        classicalSurface(
+            icosahedronGeometry.vs,
+            regularPentagonFaces(icosahedronGeometry.vs, star = true),
+        )
+    }
+
+    val greatDodecahedronSource: Polyhedron by lazy {
+        classicalSurface(
+            icosahedronGeometry.vs,
+            regularPentagonFaces(icosahedronGeometry.vs, star = false),
+        )
+    }
+
+    val greatStellatedDodecahedronSource: Polyhedron by lazy {
+        classicalSurface(
+            dodecahedronGeometry.vs,
+            regularPentagonFaces(dodecahedronGeometry.vs, star = true, innerPlanes = true),
+        )
+    }
+
+    val greatIcosahedronSource: Polyhedron by lazy {
+        classicalSurface(
+            icosahedronGeometry.vs,
+            greatIcosahedronFaces(icosahedronGeometry.vs),
+        )
+    }
+
+    // Retained only as a migration oracle for the generic Resolve implementation.
     val stellatedDodecahedron: Polyhedron by lazy {
         resolveStarSurface(
             regularPentagonFaces(icosahedronGeometry.vs, star = true),
@@ -58,6 +81,19 @@ internal object KeplerPoinsotGeometry {
     }
 }
 
+private fun classicalSurface(vertices: List<Vertex>, rawFaces: List<List<Vec3>>): Polyhedron = polyhedron {
+    vertices.forEach { source -> vertex(source, VertexKind(0)) }
+    for (rawFace in rawFaces) {
+        val ids = rawFace.map { point ->
+            vertices.indexOfFirst { source -> source === point || source approx point }
+                .also { require(it >= 0) { "Classical face vertex is not in the source vertex set" } }
+        }
+        // Raw plane polygons are counter-clockwise when viewed from outside; source face cycles
+        // use the project's clockwise convention.
+        face(ids.asReversed(), FaceKind(0))
+    }
+}
+
 internal enum class RegularStarForm {
     Dodecahedron,
     Icosahedron,
@@ -70,15 +106,18 @@ internal enum class RegularStarForm {
 /** Recognizes only the regular geometry, independent of scale and vertex numbering. */
 internal fun Polyhedron.regularStarFormOrNull(): RegularStarForm? {
     val candidates = when (fev()) {
-        FEV(12, 30, 20) -> listOf(RegularStarForm.Dodecahedron to dodecahedronGeometry)
-        FEV(20, 30, 12) -> listOf(RegularStarForm.Icosahedron to icosahedronGeometry)
-        FEV(60, 90, 32) -> listOf(
-            RegularStarForm.StellatedDodecahedron to KeplerPoinsotGeometry.stellatedDodecahedron,
-            RegularStarForm.GreatDodecahedron to KeplerPoinsotGeometry.greatDodecahedron,
-            RegularStarForm.GreatStellatedDodecahedron to KeplerPoinsotGeometry.greatStellatedDodecahedron,
+        FEV(12, 30, 20) -> listOf(
+            RegularStarForm.Dodecahedron to dodecahedronGeometry,
+            RegularStarForm.GreatStellatedDodecahedron to
+                KeplerPoinsotGeometry.greatStellatedDodecahedronSource,
         )
-        FEV(180, 270, 92) -> listOf(
-            RegularStarForm.GreatIcosahedron to KeplerPoinsotGeometry.greatIcosahedron,
+        FEV(20, 30, 12) -> listOf(
+            RegularStarForm.Icosahedron to icosahedronGeometry,
+            RegularStarForm.GreatIcosahedron to KeplerPoinsotGeometry.greatIcosahedronSource,
+        )
+        FEV(12, 30, 12) -> listOf(
+            RegularStarForm.StellatedDodecahedron to KeplerPoinsotGeometry.stellatedDodecahedronSource,
+            RegularStarForm.GreatDodecahedron to KeplerPoinsotGeometry.greatDodecahedronSource,
         )
         else -> return null
     }
@@ -86,6 +125,15 @@ internal fun Polyhedron.regularStarFormOrNull(): RegularStarForm? {
     return candidates.firstOrNull { (_, template) ->
         fingerprint.matches(template.geometryFingerprint())
     }?.first
+}
+
+/** Embedded catalog oracle used for recognition without invoking a suspending Resolve operation. */
+internal fun Polyhedron.regularStarResolvedOracleOrNull(): Polyhedron? = when (regularStarFormOrNull()) {
+    RegularStarForm.StellatedDodecahedron -> KeplerPoinsotGeometry.stellatedDodecahedron
+    RegularStarForm.GreatDodecahedron -> KeplerPoinsotGeometry.greatDodecahedron
+    RegularStarForm.GreatStellatedDodecahedron -> KeplerPoinsotGeometry.greatStellatedDodecahedron
+    RegularStarForm.GreatIcosahedron -> KeplerPoinsotGeometry.greatIcosahedron
+    else -> null
 }
 
 /**
@@ -96,10 +144,10 @@ internal fun Polyhedron.regularStarFormOrNull(): RegularStarForm? {
  * underlying regular star polyhedron.
  */
 internal fun Polyhedron.regularStarDualOrNull(): Polyhedron? = when (regularStarFormOrNull()) {
-    RegularStarForm.StellatedDodecahedron -> KeplerPoinsotGeometry.greatDodecahedron
-    RegularStarForm.GreatDodecahedron -> KeplerPoinsotGeometry.stellatedDodecahedron
-    RegularStarForm.GreatStellatedDodecahedron -> KeplerPoinsotGeometry.greatIcosahedron
-    RegularStarForm.GreatIcosahedron -> KeplerPoinsotGeometry.greatStellatedDodecahedron
+    RegularStarForm.StellatedDodecahedron -> KeplerPoinsotGeometry.greatDodecahedronSource
+    RegularStarForm.GreatDodecahedron -> KeplerPoinsotGeometry.stellatedDodecahedronSource
+    RegularStarForm.GreatStellatedDodecahedron -> KeplerPoinsotGeometry.greatIcosahedronSource
+    RegularStarForm.GreatIcosahedron -> KeplerPoinsotGeometry.greatStellatedDodecahedronSource
     else -> null
 }
 

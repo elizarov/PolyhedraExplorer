@@ -164,6 +164,7 @@ private fun Polyhedron.forceFaceKinds(forceFaceKinds: List<FaceKindSource>?): Po
         vertices(vs)
         faces(fs)
         faceKindSources(faceKindSources)
+        resolvedTopologyProvenance(resolvedTopologyProvenance)
         forceFaceKinds(forceFaceKinds)
     }
 }

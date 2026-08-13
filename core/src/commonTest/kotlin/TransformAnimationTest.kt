@@ -3,11 +3,17 @@ package polyhedra.core
 import kotlinx.coroutines.test.runTest
 import polyhedra.core.api.evaluateCore
 import polyhedra.core.transform.Transform
+import polyhedra.core.transform.StellateFace
 import polyhedra.model.api.CoreAnimationStep
 import polyhedra.model.api.CoreRequest
 import polyhedra.model.api.CoreResponse
 import polyhedra.model.api.CoreState
 import polyhedra.model.api.TransformMacros
+import polyhedra.model.api.TransformSpec
+import polyhedra.model.api.TransformTweak
+import polyhedra.model.api.parseTransformTag
+import polyhedra.model.api.tag
+import polyhedra.model.poly.FaceKind
 import polyhedra.model.poly.size
 import polyhedra.model.util.*
 import kotlin.math.abs
@@ -63,7 +69,10 @@ class TransformAnimationTest {
     fun everyStandardOperationPairAnimatesOutAndInUnlessItIsAChiralityFlip() = runTest {
         val operationTags = buildSet {
             Transform.Transforms
-                .filterNot { it == Transform.None || it == Transform.Greatened || it == Transform.Stellated }
+                .filterNot {
+                    it == Transform.None || it == Transform.Greatened || it == Transform.Stellated ||
+                        it == Transform.Resolve
+                }
                 .mapTo(this, Transform::tag)
             TransformMacros.mapTo(this) { it.tag }
             addAll(listOf("s'", "p'", "w'", "g'"))
@@ -153,7 +162,10 @@ class TransformAnimationTest {
         )
         assertEquals(
             Transform.Transforms
-                .filterNot { it == Transform.None || it == Transform.Greatened || it == Transform.Stellated }
+                .filterNot {
+                    it == Transform.None || it == Transform.Greatened || it == Transform.Stellated ||
+                        it == Transform.Resolve
+                }
                 .mapTo(linkedSetOf(), Transform::tag),
             cases.mapTo(linkedSetOf(), PrimitiveCase::tag),
         )
@@ -305,6 +317,33 @@ class TransformAnimationTest {
             assertEquals(null, response.error, "${current.seedTag} ${current.transformTags}")
             assertTrue(response.animation.isEmpty(), "${current.seedTag} ${current.transformTags}")
         }
+    }
+
+    @Test
+    fun radialAndStellateFaceApplyRemoveAndSettingChangesAnimate() = runTest {
+        val stellate = StellateFace(FaceKind(0))
+        val stellateState = state(listOf(stellate.tag), seedTag = "D")
+        val dodecahedron = state(emptyList(), seedTag = "D")
+        assertAnimated("apply Stellate face", stellateState, dodecahedron)
+        assertAnimated("remove Stellate face", dodecahedron, stellateState)
+
+        val adjustedStellate = state(
+            listOf(StellateFace(FaceKind(0), 0.8).tag),
+            seedTag = "D",
+        )
+        assertAnimated("change Stellate face Radius", adjustedStellate, stellateState)
+
+        val kisState = state(listOf("k"), seedTag = "C")
+        val kis = evaluate(kisState)
+        val radialTag = kis.availableOrbitTransforms.last().single { tag -> tag.startsWith("r[") }
+        val adjustedRadial = requireNotNull(radialTag.parseTransformTag()).let { spec ->
+            TransformSpec(spec.id, mapOf(TransformTweak.Radius to 1.2)).tag
+        }
+        assertAnimated(
+            "apply Radial vertex",
+            state(listOf("k", adjustedRadial), seedTag = "C"),
+            kisState,
+        )
     }
 
     private suspend fun assertAnimated(

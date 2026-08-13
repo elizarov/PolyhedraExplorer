@@ -8,6 +8,7 @@ import kotlinx.browser.*
 import org.w3c.dom.*
 import polyhedra.model.poly.*
 import polyhedra.model.util.*
+import kotlin.math.abs
 
 fun Polyhedron.exportGeometryToScad(name: String, description: String): String = buildString {
     val exportFaces = fs.flatMap { face ->
@@ -86,4 +87,185 @@ private data class ScadFace(
 )
 
 external fun encodeURIComponent(content: String): String
+
+/**
+ * Emits a directly renderable OpenSCAD solid while retaining polygonal face and rim regions.
+ * Embedded, presentation-closed geometry is one polyhedron. Immersed or opened presentation
+ * geometry is a union of individually closed extrusions and leaves the final Boolean to OpenSCAD.
+ */
+fun Polyhedron.exportSolidToScad(
+    name: String,
+    description: String,
+    exportParams: FaceExportParams,
+    hiddenFaceKinds: Set<FaceKind>,
+    resolvedRims: List<ResolvedRimGeometry>,
+    embeddedBoundary: Boolean,
+): String {
+    val closedBoundary = embeddedBoundary && hiddenFaceKinds.isEmpty() && exportParams.expand == 0.0
+    return buildString {
+        appendLine("// Solid: $name")
+        appendLine("// $description")
+        appendLine("// Polygonal geometry; OpenSCAD performs final tessellation and Boolean evaluation.")
+        appendLine()
+        if (closedBoundary) {
+            appendClosedPolyhedron(this@exportSolidToScad, exportParams.scale)
+        } else {
+            require(exportParams.width > 0.0) {
+                "OpenSCAD piece-union export requires a positive face width"
+            }
+            val rimByFace = resolvedRims.associateBy(ResolvedRimGeometry::sourceFaceId)
+            if (exportParams.rim > 0.0) {
+                val missingRims = fs.filter { face -> face.kind in hiddenFaceKinds && face.id !in rimByFace }
+                require(missingRims.isEmpty()) {
+                    "OpenSCAD export is waiting for polygonal rim geometry for face(s) " +
+                        missingRims.joinToString { face -> face.id.toString() }
+                }
+            }
+            var emittedPieces = 0
+            appendLine("union() {")
+            for (face in fs) {
+                if (face.kind !in hiddenFaceKinds) {
+                    val resolved = resolvedFaces[face.id]
+                    if (face.isPlanar) {
+                        for (cell in resolved.cells) {
+                            appendExtrudedRegion(
+                                label = "face ${face.id}, cell ${cell.id}",
+                                outer = cell.boundary.map { index -> resolved.vertices[index].position },
+                                holes = emptyList(),
+                                face = face,
+                                exportParams = exportParams,
+                            )
+                            emittedPieces++
+                        }
+                    } else {
+                        for ((index, triangle) in resolved.triangles.withIndex()) {
+                            appendExtrudedRegion(
+                                label = "non-planar face ${face.id}, triangle $index",
+                                outer = listOf(
+                                    resolved.vertices[triangle.a].position,
+                                    resolved.vertices[triangle.b].position,
+                                    resolved.vertices[triangle.c].position,
+                                ),
+                                holes = emptyList(),
+                                face = triangleFace(face, resolved, triangle),
+                                exportParams = exportParams,
+                            )
+                            emittedPieces++
+                        }
+                    }
+                } else if (exportParams.rim > 0.0) {
+                    for ((index, region) in rimByFace[face.id]?.regions.orEmpty().withIndex()) {
+                        appendExtrudedRegion(
+                            label = "hidden face ${face.id}, rim $index",
+                            outer = region.outer.vertices,
+                            holes = region.holes.map(ResolvedRimCycle::vertices),
+                            face = face,
+                            exportParams = exportParams,
+                        )
+                        emittedPieces++
+                    }
+                }
+            }
+            require(emittedPieces > 0) { "OpenSCAD presentation does not contain any solid pieces" }
+            appendLine("}")
+        }
+    }
+}
+
+private fun StringBuilder.appendClosedPolyhedron(poly: Polyhedron, scale: Double) {
+    val points = arrayListOf<Vec3>()
+    fun pointIndex(point: Vec3): Int {
+        val existing = points.indexOfFirst { candidate -> (candidate - point).norm <= 1e-10 * poly.circumradius }
+        if (existing >= 0) return existing
+        points += point
+        return points.lastIndex
+    }
+    val faces = arrayListOf<List<Int>>()
+    for (face in poly.fs) {
+        val resolved = poly.resolvedFaces[face.id]
+        if (face.isPlanar) {
+            for (cell in resolved.cells) {
+                faces += cell.boundary.map { index -> pointIndex(resolved.vertices[index].position) }
+            }
+        } else {
+            for (triangle in resolved.triangles) {
+                faces += listOf(triangle.c, triangle.b, triangle.a).map { index ->
+                    pointIndex(resolved.vertices[index].position)
+                }
+            }
+        }
+    }
+    appendLine("polyhedron(")
+    appendLine("  points = [")
+    points.forEachIndexed { index, point ->
+        append("    ${(point * scale).toPreciseString()}")
+        if (index != points.lastIndex) append(',')
+        appendLine()
+    }
+    appendLine("  ],")
+    appendLine("  faces = [")
+    faces.forEachIndexed { index, face ->
+        append("    [${face.joinToString()}]")
+        if (index != faces.lastIndex) append(',')
+        appendLine()
+    }
+    appendLine("  ],")
+    appendLine("  convexity = 20")
+    appendLine(");")
+}
+
+private fun StringBuilder.appendExtrudedRegion(
+    label: String,
+    outer: List<Vec3>,
+    holes: List<List<Vec3>>,
+    face: Face,
+    exportParams: FaceExportParams,
+) {
+    if (outer.size < 3) return
+    val normal = face.unit
+    require(normal.norm > 0.0 && face.d.isFinite()) { "OpenSCAD region $label has no finite plane" }
+    val axis = if (abs(normal.x) < 0.8) Vec3(1.0, 0.0, 0.0) else Vec3(0.0, 1.0, 0.0)
+    val u = (axis cross normal).unit
+    val v = (normal cross u).unit
+    val origin = normal * face.d
+    val translatedOrigin = (origin + normal * exportParams.expand) * exportParams.scale
+    val cycles = listOf(outer) + holes
+    val points = cycles.flatten()
+    val paths = arrayListOf<List<Int>>()
+    var offset = 0
+    for (cycle in cycles) {
+        paths += List(cycle.size) { index -> offset + index }
+        offset += cycle.size
+    }
+
+    appendLine("  // $label")
+    appendLine("  multmatrix([")
+    appendLine("    [${u.x}, ${v.x}, ${-normal.x}, ${translatedOrigin.x}],")
+    appendLine("    [${u.y}, ${v.y}, ${-normal.y}, ${translatedOrigin.y}],")
+    appendLine("    [${u.z}, ${v.z}, ${-normal.z}, ${translatedOrigin.z}],")
+    appendLine("    [0, 0, 0, 1]")
+    appendLine("  ]) linear_extrude(height = ${exportParams.width * exportParams.scale}, convexity = 20)")
+    appendLine("    polygon(")
+    appendLine("      points = [")
+    points.forEachIndexed { index, point ->
+        val relative = point - origin
+        append("        [${relative * u * exportParams.scale}, ${relative * v * exportParams.scale}]")
+        if (index != points.lastIndex) append(',')
+        appendLine()
+    }
+    appendLine("      ],")
+    appendLine("      paths = [${paths.joinToString { path -> "[${path.joinToString()}]" }}]")
+    appendLine("    );")
+}
+
+private fun triangleFace(
+    source: Face,
+    resolved: ResolvedFaceGeometry,
+    triangle: ResolvedFaceTriangle,
+): Face {
+    val vertices = listOf(triangle.a, triangle.b, triangle.c).mapIndexed { index, resolvedIndex ->
+        MutableVertex(index, resolved.vertices[resolvedIndex].position, VertexKind(0))
+    }
+    return MutableFace(source.id, vertices, source.kind)
+}
 

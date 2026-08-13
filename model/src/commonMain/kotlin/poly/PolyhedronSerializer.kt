@@ -8,6 +8,7 @@ import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.*
 import polyhedra.model.util.*
+import polyhedra.model.api.ResolvedTopologyProvenance
 
 class PolyhedronSerializer : KSerializer<Polyhedron> {
     private val serializer = SerializedPolyhedron.serializer()
@@ -23,7 +24,9 @@ class PolyhedronSerializer : KSerializer<Polyhedron> {
 @Serializable
 private class SerializedPolyhedron(
     val vs: List<SerializedVertex>,
-    val fs: List<SerializedFace>
+    val fs: List<SerializedFace>,
+    val resolvedFaces: List<ResolvedFaceGeometry> = emptyList(),
+    val resolvedTopologyProvenance: ResolvedTopologyProvenance? = null,
 )
 
 @Serializable
@@ -42,7 +45,9 @@ private class SerializedFace(
 
 private fun Polyhedron.toSerialized() = SerializedPolyhedron(
     vs.map { v -> SerializedVertex(v.x, v.y, v.z, v.kind) },
-    fs.map { f -> SerializedFace(f.fvs.map { it.id }, f.kind) }
+    fs.map { f -> SerializedFace(f.fvs.map { it.id }, f.kind) },
+    resolvedFaces,
+    resolvedTopologyProvenance,
 )
 
 private fun SerializedPolyhedron.toPolyhedron(): Polyhedron {
@@ -52,5 +57,11 @@ private fun SerializedPolyhedron.toPolyhedron(): Polyhedron {
     val faces = fs.mapIndexed { index, face ->
         MutableFace(index, face.fvs.map(vertices::get), face.kind)
     }
-    return Polyhedron(vertices, faces, faceKindSources = null)
+    return Polyhedron(
+        vertices,
+        faces,
+        faceKindSources = null,
+        resolvedFaceGeometry = resolvedFaces.takeIf { it.isNotEmpty() },
+        resolvedTopologyProvenance = resolvedTopologyProvenance,
+    )
 }

@@ -4,6 +4,7 @@
 
 package polyhedra.core.poly
 
+import polyhedra.model.api.PolyhedronContract
 import polyhedra.model.poly.*
 import polyhedra.model.util.*
 
@@ -21,8 +22,8 @@ fun Polyhedron.validateGeometry() {
     }
 }
 
-/** Validates the mesh properties required for safe rendering, while allowing non-planar faces. */
-fun Polyhedron.validateMeshGeometry() {
+/** Validates the abstract source surface and its derived presentation geometry. */
+fun Polyhedron.validateRenderableImmersion() {
     require(vs.isNotEmpty()) { "Polyhedron has no vertices" }
     require(fs.isNotEmpty()) { "Polyhedron has no faces" }
     for (v in vs) {
@@ -33,29 +34,38 @@ fun Polyhedron.validateMeshGeometry() {
     }
     val lengthTolerance = EPS * circumradius
     val areaTolerance = lengthTolerance * circumradius
+    for (first in vs.indices) for (second in (first + 1) until vs.size) {
+        require((vs[first] - vs[second]).norm > lengthTolerance) {
+            "Distinct source vertices $first and $second have coincident positions"
+        }
+    }
     // Validate edges
     for (e in es) {
         require((e.a - e.b).norm > lengthTolerance) {
             "$e non-degenerate"
         }
     }
-    // Validate faces
-    for (f in fs) {
-        for (triangle in f.triangles) {
-            val a = f[triangle.a]
-            val b = f[triangle.b]
-            val c = f[triangle.c]
+    require(resolvedFaces.size == fs.size)
+    for ((faceIndex, resolved) in resolvedFaces.withIndex()) {
+        val f = fs[faceIndex]
+        require(resolved.sourceFaceId == f.id && resolved.sourceFaceKind == f.kind)
+        require(resolved.cells.isNotEmpty()) { "$f has no resolved nonzero-winding cells" }
+        require(resolved.vertices.all { vertex ->
+            vertex.position.x.isFinite() && vertex.position.y.isFinite() && vertex.position.z.isFinite()
+        }) { "$f has a non-finite resolved vertex" }
+        for (triangle in resolved.triangles) {
+            require(triangle.a in resolved.vertices.indices &&
+                triangle.b in resolved.vertices.indices && triangle.c in resolved.vertices.indices
+            ) { "$f has an invalid resolved triangle index" }
+            val a = resolved.vertices[triangle.a].position
+            val b = resolved.vertices[triangle.b].position
+            val c = resolved.vertices[triangle.c].position
             val normal = (b - a) cross (c - a)
             require(normal.norm > areaTolerance) { "$f has a degenerate triangle" }
             require(normal * f > EPS * normal.norm) {
-                "$f has inconsistent boundary orientation"
+                "$f has inconsistent resolved-triangle orientation"
             }
         }
-    }
-    val signedVolume = signedVolume()
-    val volumeTolerance = EPS * circumradius * circumradius * circumradius
-    require(signedVolume > volumeTolerance) {
-        "Polyhedron surface is inward-facing or has zero signed volume"
     }
 
     // A disconnected closed mesh is a compound (or an unused nested shell), not one polyhedron.
@@ -77,11 +87,20 @@ fun Polyhedron.validateMeshGeometry() {
     }
 }
 
-fun Polyhedron.signedVolume(): Double = fs.sumOf { face ->
+/** Legacy rendering/export gate: renderable plus positive aggregate signed volume. */
+fun Polyhedron.validateMeshGeometry() {
+    validateRenderableImmersion()
+    val volumeTolerance = EPS * circumradius * circumradius * circumradius
+    require(signedVolume() > volumeTolerance) {
+        "Polyhedron surface is inward-facing or has zero signed volume"
+    }
+}
+
+fun Polyhedron.signedVolume(): Double = resolvedFaces.sumOf { face ->
     face.triangles.sumOf { triangle ->
-        val a = face[triangle.a]
-        val b = face[triangle.b]
-        val c = face[triangle.c]
+        val a = face.vertices[triangle.a].position
+        val b = face.vertices[triangle.b].position
+        val c = face.vertices[triangle.c].position
         a * (b cross c) / 6.0
     }
 }

@@ -21,6 +21,9 @@ fun Polyhedron.bevelled(
     scale: Scale? = null,
     forceFaceKinds: List<FaceKindSource>? = null
 ): Polyhedron = transformedPolyhedron(Transform.Bevelled, br, scale, forceFaceKinds) {
+    require(this@bevelled.hasNonSingularFacePlanes()) {
+        "Bevelling requires every authoritative source face to have a non-singular oriented plane"
+    }
     val (cr, tr) = br
     val rr = dualReciprocationRadius
     // vertices from the face-directed edges

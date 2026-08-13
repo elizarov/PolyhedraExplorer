@@ -1,6 +1,6 @@
 # Self-intersecting polyhedra
 
-This plan adds immersed polyhedra whose faces or face arrangements pass through themselves. The
+This design supports immersed polyhedra whose faces or face arrangements pass through themselves. The
 initial scope is regular star faces that wind around the center more than once. Degenerate
 polyhedra with coincident vertices and disconnected compounds remain invalid.
 
@@ -23,36 +23,63 @@ is one ten-sided concave star polygon. The even-odd rule, which would leave the 
 empty, is not used. A hidden face rim remains a separate presentation feature and follows the
 original five-edge pentagram path.
 
-## Current implementation baseline
+## Current implementation state
 
-The current implementation supports only connected, embedded surfaces:
-
-- `Polyhedron` requires every abstract edge to have exactly two oppositely oriented face uses and
-  every vertex link to be one manifold cycle.
-- A face is one boundary cycle. Its shared ear-clipping implementation rejects a self-intersecting
-  boundary before rendering, picking, animation, or export can use it.
-- `Polyhedron` serialization currently transfers only original vertex coordinates, vertex kinds,
-  face vertex IDs, and face kinds. It has no derived face geometry or provenance mapping.
-- `validateProperGeometry` rejects intersections between triangles from different faces unless the
-  intersection lies on their explicitly shared vertex or edge. Every completed primitive stage is
-  checked with this validator.
-- The four Kepler-Poinsot seeds are currently stored as resolved, embedded triangle surfaces. Their
-  classical star faces exist only as temporary input to a private resolver.
-- The existing family identifier stores only `(family, n)`, and the UI remembers only one `n`.
-  There is no seed-settings popup or `q` value in the worker state.
-- Greatened and Stellated return those resolved catalog surfaces. Dual recognizes them and
-  substitutes the corresponding resolved catalog dual; the general polar-dual path does not model
-  classical immersed duality. Animation is explicitly disabled for Greatened, Stellated, and Dual
-  on a recognized resolved regular-star surface.
-- STL export serializes the triangles produced by the WebGL face buffers. It rounds coordinates
-  and skips degenerate triangles, but it does not resolve intersections or perform a solid Boolean
-  repair.
-- The existing STL test validator checks triangle degeneracy, unoriented edge incidence, nonzero
-  signed-volume magnitude, and matching solid names. It does not detect triangle intersections or
-  require outward orientation, so it is not a sufficient postcondition for the new export repair.
-- The transform and issue contracts have no Resolve operation or self-intersection issue. These are
-  serialized across the Wasm worker boundary and therefore require coordinated model, core, worker,
-  and UI changes.
+- `Polyhedron` retains its connected abstract two-manifold and also carries one immutable resolved
+  geometry record per source face. The record includes nonzero-winding cells, presentation
+  triangles, boundary/internal edges, and source provenance, and it round-trips through the Wasm
+  worker response.
+- The planar arrangement kernel handles simple, concave, and self-crossing planar boundaries.
+  WebGL face fill and canvas face picking consume the supplied resolved records. Source topology
+  still drives F/E/V, edges, vertices, orbit metadata, and serialization identity.
+- Validation is layered into renderable immersion and embedded-boundary checks. Geometry analysis
+  classifies source-face and inter-face crossings without treating signed-volume cancellation as a
+  rendering error.
+- The four Kepler-Poinsot seeds use their classical immersed source topology. Greatened,
+  Stellated, and classical Dual preserve those forms, while the former embedded catalog meshes are
+  retained only as migration oracles for the generic Resolve implementation.
+- The four star families use typed canonical `(family, n, q)` identities. Core generation, URL
+  parsing, worker evaluation, symmetry/orbit analysis, popup selection, valid-value navigation,
+  remembered values, and the seed-settings control all use that identity.
+- Resolve generically corefines the supplied resolved-face triangles at actual transverse
+  intersections, selects the zero/nonzero-winding boundary, makes its edges conforming, safely
+  merges coplanar triangles, and returns one validated embedded component. Its final vertices,
+  edges, and faces carry serializable many-to-many source provenance and actual rotation-orbit
+  kinds. The former catalog meshes are used only as test oracles.
+- Evaluated geometry carries its cached intersection classification through the worker response.
+  A seed-only immersion displays its Resolve action on the seed pill; a transformed immersion
+  displays it only on the last transform pill. The tooltip reports source-face and inter-face
+  crossings independently, and activating it appends an explicit `R` operation.
+- Hidden planar faces receive core-supplied tessellation-free rim regions with deterministic outer
+  and hole cycles, source-edge provenance, and a computed complete-coverage width limit. Immersed
+  boundaries use full-width exterior and half-width internal strips with unioned crossings;
+  ordinary and simple non-planar faces retain the prior uniform inset semantics with bounded sharp
+  joins. WebGL and shadows triangulate those same regions in JS; solid export consumes the
+  polygonal regions independently.
+- Every primitive exposes a structured transform-domain record. Truncated, Rectified, Dual, and
+  Cantellated operate on authoritative immersed topology; full-depth truncation is the exact
+  rectification quotient, regular `{n/q}` truncation uses `PI q / n`, and Dual uses the general
+  non-singular oriented face-plane polar construction rather than catalog substitution. Each
+  primitive result is checked against its declared renderable or embedded output policy.
+- Radial vertex and Stellate face use typed worker-safe tags and dynamically bounded Radius
+  settings. Eligibility excludes adjacent same-orbit vertices and requires simple planar triangular
+  incident faces. Their popup, orbit-row actions, interpolation, serialization, and exact
+  dodecahedron-to-Great-stellated-dodecahedron snap are active.
+- Greatened and Stellated are generated from the authoritative input planes and face-edge lines.
+  Their shared normalized-signature cache stores validated main-line candidates; the worker returns
+  an integer Result range with per-candidate F/E/V, and no catalog seed is consulted during
+  construction. All classical identities and an affine non-catalog case are covered directly.
+- STL export sends authoritative polyhedron geometry and presentation settings to a dedicated
+  Wasm worker. The core resolves immersed geometry, retains source-face visibility and rim
+  semantics, constructs the printable shell, selects its three-dimensional nonzero-winding
+  boundary, keeps the resulting boundary triangulated, quantizes it, and validates the final mesh
+  before ASCII serialization is allowed. The deterministic 10,000-case JVM hardening corpus has
+  3,906 independently validated successes and 6,094 explicit topology rejections, with no invalid
+  successful output and no resource-limit masking.
+- OpenSCAD export emits a single merged polygonal `polyhedron` for an embedded closed presentation,
+  or an explicit union of closed planar face/rim extrusions for immersed, hidden, or expanded
+  presentations. Non-planar faces use their deterministic triangle pieces. Structural tests cover
+  both paths and preserve the hidden Prism 5/2 pentagram rims without browser triangulation.
 
 These constraints must be revised deliberately; merely accepting intersections in
 `validateProperGeometry` is insufficient.
@@ -103,7 +130,7 @@ by the extra cells introduced only for rendering or resolution. Classical dual p
 duals in both directions.
 
 Greatened and Stellated produce the corresponding classical immersed construction. Applying
-Resolve produces the embedded physical boundary that the catalog currently stores.
+Resolve produces its embedded physical reference boundary.
 
 The existing long-term seed tags remain unchanged:
 
@@ -512,21 +539,22 @@ required before export. The action has two possible outcomes: one validated embe
 solid, or a structured export error. It never downloads an empty, partial, intersecting, open,
 resource-truncated, or otherwise invalid STL.
 
-Export preparation is presentation-aware; it does not simply apply Resolve to the complete
-polyhedron and serialize that result. It constructs the requested printable geometry while it
-still has access to the original immersed face paths:
+Export preparation is presentation-aware; it does not merely serialize the display triangles. It
+constructs the requested printable geometry while it still has both the resolved physical boundary
+and the original immersed face paths:
 
-1. visible self-intersecting faces contribute the included cells from the shared polygon resolver;
+1. the core resolves an immersed source to its physical boundary and retains the source-face
+   provenance used to include or omit its visible regions;
 2. hidden faces contribute core-supplied ResolvedRim polygon regions that follow their original
-   immersed boundaries; STL preparation triangulates those regions;
-3. crossing rim segments are split and unioned into one printable region without replacing the
-   immersed path with the outer boundary of the resolved face fill;
-4. visibility, rim, width, and expansion geometry is generated before the final solid boundary is
-   selected;
-5. the three-dimensional resolver splits all remaining intersections, classifies solid cells,
-   merges coincident vertices, removes duplicate and degenerate triangles, and orients the outer
-   boundary; and
-6. the final coordinate-quantized mesh is validated, because rounding can reintroduce degeneracy.
+   immersed boundaries, so an internal crossing stroke is not replaced by the resolved fill's
+   outer silhouette;
+3. visible physical faces, hidden-face rims, rim walls, width, and expansion are assembled into a
+   presentation triangle soup; its inner shell uses one topology-preserving radial scale so newly
+   resolved intersection vertices cannot warp an otherwise planar face;
+4. the three-dimensional resolver splits all remaining intersections, classifies solid cells,
+   merges coincident vertices, removes duplicate and degenerate triangles, and keeps the oriented
+   outer boundary triangulated rather than merging and retriangulating its arrangement cells; and
+5. the final coordinate-quantized mesh is validated, because rounding can reintroduce degeneracy.
 
 Consequently, exporting **Prism 5/2** with its top and bottom face orbit hidden produces a
 watertight model with a clearly visible pentagram rim at both ends. Resolving the pentagram into a
@@ -958,77 +986,39 @@ cells. It remains scale- and rotation-independent, distinguishes chirality where
 recognize classical star seeds and transform results directly from their immersed representation.
 Recognition failure never changes transform applicability or inserts Resolve.
 
-## Implementation sequence
+## Implementation layers
 
-Implement the following steps in order. After each step, run its focused tests and the root
-`./gradlew test` gate; do not begin the next step until both pass. A failure found during later
-integration first becomes a minimized regression test in the owning focused suite. Steps that
-change the worker or browser also build `browserProductionDistribution` and run the production
-Wasm/browser acceptance test used by the release workflow.
+The implementation is organized in the following dependency order. Each layer has focused tests;
+the root `./gradlew test` gate covers core JVM and web JS behavior, while production worker changes
+also build `browserProductionDistribution` and run Wasm/browser acceptance.
 
-1. **Freeze the baseline.** Add golden fixtures for current URLs, saved states, Kepler-Poinsot
-   geometry, representative transforms, hidden-face rims, and exports. Gate on unchanged current
-   behavior and a green root test.
-2. **Establish typed contracts.** Add the new seed, operation, tweak, validation, issue,
-   provenance, and worker-transport types, plus the shared polyhedron complexity limit, without
-   changing geometry. Gate on exhaustive tag uniqueness, canonical round trips, malformed-input
-   rejection, and legacy golden states.
-3. **Build the planar arrangement kernel.** Implement normalized filtered predicates, exact
-   fallback, segment splitting, nonzero-winding cell selection, canonical ordering, and complete
-   source provenance as a standalone geometry component. Gate on the polygon-resolution suite and
-   a reproducible randomized JVM run.
-4. **Introduce resolved faces and layered validation.** Make every immutable polyhedron carry
-   resolved-face records; add the abstract-surface, renderable-immersion, and embedded-boundary
-   checks plus classified self-intersection analysis. Gate on the face-provenance, contract,
-   planarity, degeneracy, and intersection-detection suites.
-5. **Move presentation consumers to resolved geometry.** Serialize the records through the Wasm
-   worker and make WebGL triangulation, picking, shadows, preview, and animation buffers consume
-   them without resolving polygons in the browser. Gate on worker round trips, unchanged simple
-   and non-planar-face rendering, immersed-face rendering, and production browser acceptance.
-6. **Add immersed seeds.** Implement star-family `(n, q)` generation and migrate the four
-   Kepler-Poinsot seeds to their classical source topology, then connect parsing, recognition,
-   settings, family memory, and legacy loading. Gate on family enumeration, F/E/V, dual pairs,
-   symmetry/orbits, legacy compatibility, and seed UI tests.
-7. **Implement Resolve and resolved topology.** Build the generic three-dimensional arrangement,
-   nonzero-winding boundary selection, singular-contact handling, safe polygon merging,
-   many-to-many provenance, and final rotation orbits. Keep the specialized catalog resolver only
-   as a test oracle. Gate on the complete Resolve and resolved-topology suites, including identity,
-   idempotence, classical seeds, non-catalog inputs, determinism, and controlled inapplicability.
-8. **Expose intersection status and Resolve UX.** Cache detection with evaluated geometry, map its
-   issue and progress to the correct pill, and implement the pentagram action and Resolve identity
-   removal. Gate on seed-only and transformed ownership, both intersection classes, worker
-   cancellation/progress, keyboard behavior, and saved-state tests.
-9. **Implement polygonal hidden-face rims.** Produce `ResolvedRim` in the core and move rendering,
-   picking, and shadow consumers to its triangulated regions. Gate on the focused rim suite and the
-   hidden-top-and-bottom Prism 5/2 rendering regression.
-10. **Generalize the transform foundation.** Make Truncated, Rectified, Dual, Cantellated, and
-    their dependent macros honor the declared immersed-input contracts and share the corner and
-    quotient constructions. Gate every operation over the transform-domain matrix before enabling
-    it in the UI.
-11. **Add radial constructions.** Implement orbit-targeted Radial vertex, its safe range, and the
-    Stellate face expansion and controls. Gate eligibility, interpolation, degeneracy boundaries,
-    serialization, all four generated geometry classes, and the dodecahedron identity before
-    exposing the operations.
-12. **Replace catalog stellation paths.** Implement the reusable face-plane constellation and
-    main-line selection engine, Result control, repetition, caching, and generic Greatened and
-    Stellated transforms. Gate the focused construction suite, all catalog identities without
-    recognition shortcuts, representative non-catalog cases, and UI result selection.
-13. **Finish dependent behavior.** Add immersed Dual and transform animation paths, fused macro
-    animation, contract-aware scaling, symmetry, orbit targeting, and recognition. Gate endpoint
-    equivalence, safe intermediate frames, fallbacks at topology events, and the focused scaling,
-    symmetry, recognition, and animation suites.
-14. **Implement OpenSCAD export.** Add closed-boundary export and piecewise face/rim union export
-    directly from polygonal core geometry. Gate structural output first, then OpenSCAD CLI
-    acceptance and independent validation of its resulting meshes.
-15. **Implement exact STL conversion.** Build the separate tessellation-to-solid arrangement,
-    quantization, final validator, resource guards, structured errors, and OpenSCAD recovery path.
-    Gate every stage independently, then all presentation variants and the Prism 5/2 pentagram-rim
-    regression; never serialize a mesh that fails the final postconditions.
-16. **Harden and release-gate the feature.** Optimize only after correctness profiles identify
-    bottlenecks; add spatial caches, bounded cancellation, progress, and limit tests. Run the full
-    root suite, production Wasm/browser acceptance, benchmarks up to the shared polyhedron limit,
-    OpenSCAD acceptance, and the reproducible 10,000-case JVM export campaign. Minimize and commit
-    every distinct failure, rerun all gates, and update the live documentation before release.
+1. Golden compatibility fixtures cover URLs, saved states, classical star geometry, transforms,
+   hidden rims, and exports.
+2. Typed seed, operation, tweak, validation, issue, provenance, and worker contracts establish the
+   serialized boundary.
+3. The standalone planar arrangement kernel supplies filtered predicates, splitting,
+   nonzero-winding cells, deterministic ordering, and provenance.
+4. Immutable resolved-face records and layered validation distinguish abstract topology,
+   renderable immersion, and embedded boundaries.
+5. WebGL fill, picking, shadows, preview, and animation consume worker-supplied resolved geometry.
+6. Star families and the four classical Kepler-Poinsot seeds retain immersed source topology and
+   preserve legacy loading.
+7. Generic three-dimensional Resolve supplies the embedded boundary, many-to-many provenance, and
+   physical rotation orbits.
+8. Intersection classification, pill ownership, progress, and the Resolve action expose that model
+   without changing geometry automatically.
+9. Core `ResolvedRim` regions preserve immersed hidden-face strokes for rendering and export.
+10. Truncated, Rectified, Dual, Cantellated, and dependent macros obey declared immersed-input
+    contracts.
+11. Radial vertex and Stellate face provide bounded orbit-targeted non-convex construction.
+12. The reusable face-plane constellation engine drives generic Greatened and Stellated results;
+    discovery and validation remain suspending through the Wasm worker.
+13. Scaling, symmetry, recognition, targeting, and animations use the same layered contracts.
+14. OpenSCAD emits either one embedded polygonal boundary or a union of closed face/rim pieces.
+15. Exact STL conversion constructs presentation geometry, resolves its solid boundary, quantizes,
+    validates, and either serializes the complete mesh or returns a structured error.
+16. Bounded cancellation, progress, resource guards, production acceptance, and the deterministic
+    10,000-case STL campaign form the final hardening layer.
 
 ## Test coverage
 
@@ -1162,13 +1152,12 @@ Shared adversarial fixtures should be used across detection, resolution, STL pre
 OpenSCAD acceptance, but each suite asserts its own algorithm's contract. A passing browser smoke
 test is not a substitute for these unit tests.
 
-In addition to the committed unit tests, run a reproducible JVM stress campaign over at least
-10,000 randomly generated self-intersecting polygons. Embed each polygon in a closed prism- or
-pyramid-like fixture, then vary vertex count, winding, crossing layout, orientation, scale,
-extrusion depth, face visibility, and rim settings. Every generated export must pass the complete
-post-quantization STL validator or return the documented structured limit/topology error without
-serializing an STL. Track limit errors separately so the campaign cannot hide a regression by
-turning ordinary cases into rejections. The stress runner records its random seed and reduces any
-unexpected failure to a small reproducible fixture. Do not add all 10,000 generated cases to the
-normal unit-test suite; add only the minimized examples that exposed distinct bugs during
-development.
+The opt-in reproducible JVM stress campaign covers 10,000 randomly generated self-intersecting
+star polygons embedded in closed prism fixtures. It varies vertex count, winding, crossing layout,
+orientation, scale, extrusion depth, face visibility, rim settings, and occasional expansion.
+Every generated export either passes the complete independent post-quantization STL validator or
+returns the documented structured topology error without serializing an STL. Limit errors are
+tracked separately and are forbidden for this small-fixture corpus, so the gate cannot hide a
+regression by turning ordinary cases into resource rejections. The default seed is `20260813`;
+the current corpus produces 3,906 validated solids and 6,094 topology rejections. The normal unit
+suite contains only minimized examples that expose distinct behavior, not the generated corpus.

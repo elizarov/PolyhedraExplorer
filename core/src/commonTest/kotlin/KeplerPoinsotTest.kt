@@ -3,14 +3,16 @@ package polyhedra.core
 import kotlinx.coroutines.test.runTest
 import polyhedra.core.api.evaluateCore
 import polyhedra.core.poly.*
-import polyhedra.core.transform.greatened
-import polyhedra.core.transform.stellated
+import polyhedra.core.transform.greatenedAsync
+import polyhedra.core.transform.stellatedAsync
 import polyhedra.core.transform.dual
 import polyhedra.core.transform.availableOrbitTransforms
 import polyhedra.core.transform.KisFace
 import polyhedra.model.api.CoreIssueCode
 import polyhedra.model.api.CoreRequest
 import polyhedra.model.api.CoreState
+import polyhedra.model.api.PolyhedronContract
+import polyhedra.model.api.SurfaceIntersectionClass
 import polyhedra.model.api.TransformId
 import polyhedra.model.api.TransformOperation
 import polyhedra.model.api.TransformSpec
@@ -24,32 +26,40 @@ import kotlin.test.assertTrue
 
 class KeplerPoinsotTest {
     @Test
-    fun physicalSeedSurfacesAreConnectedEmbeddedManifolds() {
+    fun classicalSeedSurfacesPreserveRegularImmersedTopology() {
         val expected = mapOf(
-            "SD" to FEV(60, 90, 32),
-            "GD" to FEV(60, 90, 32),
-            "GSD" to FEV(60, 90, 32),
-            "GI" to FEV(180, 270, 92),
+            "SD" to FEV(12, 30, 12),
+            "GD" to FEV(12, 30, 12),
+            "GSD" to FEV(12, 30, 20),
+            "GI" to FEV(20, 30, 12),
         )
         val seeds = Seeds.filter { seed -> seed.type == SeedType.KeplerPoinsot }
         assertEquals(expected.keys, seeds.mapTo(linkedSetOf(), Seed::tag))
         assertEquals("Stellated dodecahedron", seeds.single { seed -> seed.tag == "SD" }.name)
         for (seed in seeds) {
             assertEquals(expected.getValue(seed.tag), seed.poly.fev(), seed.name)
-            seed.poly.validate()
+            seed.poly.validateRenderableImmersion()
+            val analysis = seed.poly.analyzeGeometry()
+            assertEquals(PolyhedronContract.RenderableImmersion, analysis.strongestContract, seed.name)
+            assertTrue(analysis.intersectionCounts.isNotEmpty(), seed.name)
+            assertTrue(
+                SurfaceIntersectionClass.SelfCrossingFace in analysis.intersectionCounts ||
+                    SurfaceIntersectionClass.IntersectingFaces in analysis.intersectionCounts,
+                seed.name,
+            )
         }
     }
 
     @Test
-    fun conwayConstructionsReachEveryKeplerPoinsotSeed() {
-        assertEquals("SD", Seed.Dodecahedron.poly.stellated().recognizedSeedOrNull()?.tag)
-        assertEquals("GD", Seed.Dodecahedron.poly.greatened().recognizedSeedOrNull()?.tag)
-        assertEquals("GI", Seed.Icosahedron.poly.greatened().recognizedSeedOrNull()?.tag)
+    fun conwayConstructionsReachEveryKeplerPoinsotSeed() = runTest {
+        assertEquals("SD", Seed.Dodecahedron.poly.stellatedAsync().recognizedSeedOrNull()?.tag)
+        assertEquals("GD", Seed.Dodecahedron.poly.greatenedAsync().recognizedSeedOrNull()?.tag)
+        assertEquals("GI", Seed.Icosahedron.poly.greatenedAsync().recognizedSeedOrNull()?.tag)
 
-        val greatDodecahedron = Seed.Dodecahedron.poly.greatened()
-        val stellatedDodecahedron = Seed.Dodecahedron.poly.stellated()
-        assertEquals("GSD", greatDodecahedron.stellated().recognizedSeedOrNull()?.tag)
-        assertEquals("GSD", stellatedDodecahedron.greatened().recognizedSeedOrNull()?.tag)
+        val greatDodecahedron = Seed.Dodecahedron.poly.greatenedAsync()
+        val stellatedDodecahedron = Seed.Dodecahedron.poly.stellatedAsync()
+        assertEquals("GSD", greatDodecahedron.stellatedAsync().recognizedSeedOrNull()?.tag)
+        assertEquals("GSD", stellatedDodecahedron.greatenedAsync().recognizedSeedOrNull()?.tag)
     }
 
     @Test
@@ -65,16 +75,16 @@ class KeplerPoinsotTest {
             val dual = source.dual()
             assertEquals(expectedTag, dual.recognizedSeedOrNull()?.tag, sourceTag)
             assertEquals(sourceTag, dual.dual().recognizedSeedOrNull()?.tag, "$sourceTag dual dual")
-            dual.validate()
+            dual.validateRenderableImmersion()
         }
     }
 
     @Test
-    fun unsupportedGreateningAndStellationExplainTheirDomain() {
-        val greatenError = assertFailsWith<IllegalArgumentException> { Seed.Cube.poly.greatened() }
-        assertTrue(greatenError.message.orEmpty().contains("requires a regular"))
-        val stellateError = assertFailsWith<IllegalArgumentException> { Seed.Icosahedron.poly.stellated() }
-        assertTrue(stellateError.message.orEmpty().contains("requires a regular"))
+    fun unsupportedGreateningAndStellationExplainWhenNoQualifyingExtensionExists() = runTest {
+        val greatenError = assertFailsWith<IllegalArgumentException> { Seed.Cube.poly.greatenedAsync() }
+        assertTrue(greatenError.message.orEmpty().contains("unavailable"))
+        val stellateError = assertFailsWith<IllegalArgumentException> { Seed.Icosahedron.poly.stellatedAsync() }
+        assertTrue(stellateError.message.orEmpty().contains("unavailable"))
     }
 
     @Test
@@ -84,14 +94,20 @@ class KeplerPoinsotTest {
         assertEquals("GD", greatened.recognizedSeedTag)
 
         val unsupported = evaluateCore(CoreRequest(CoreState("C", listOf("S"), "c")))
-        assertEquals(CoreIssueCode.InvalidGeometry, unsupported.error?.code)
-        assertTrue(unsupported.error?.detail.orEmpty().contains("requires a regular"))
+        assertEquals(CoreIssueCode.TransformNotApplicable, unsupported.error?.code)
+        assertTrue(unsupported.error?.detail.orEmpty().contains("unavailable"))
     }
 
     @Test
     fun everyGeneralTransformEitherProducesProperGeometryOrAControlledRejection() = runTest {
         val transformSpecs = TransformOperation.entries
-            .filter { operation -> operation != TransformOperation.None && operation != TransformOperation.Drop }
+            .filter { operation -> operation !in setOf(
+                TransformOperation.None,
+                TransformOperation.Drop,
+                TransformOperation.Resolve,
+                TransformOperation.Radial,
+                TransformOperation.StellateFace,
+            ) }
             .map { operation -> TransformSpec(TransformId(operation)) }
         val controlledErrors = setOf(
             CoreIssueCode.InvalidGeometry,
@@ -104,7 +120,7 @@ class KeplerPoinsotTest {
                 val response = evaluateCore(CoreRequest(CoreState(seed.tag, listOf(spec.tag), "c")))
                 val error = response.error
                 if (error == null) {
-                    response.poly.validateProperGeometry()
+                    response.poly.validateRenderableImmersion()
                 } else {
                     assertTrue(error.code in controlledErrors, "${seed.tag} ${spec.tag}: $error")
                     if (error.code == CoreIssueCode.InvalidGeometry) {
@@ -132,12 +148,12 @@ class KeplerPoinsotTest {
     }
 
     @Test
-    fun resolvedRegularStarsDoNotAdvertiseTopologicalSelectiveKis() = runTest {
+    fun localSelectiveKisOnAnImmersedSolidFailsOnlyIfItsConstructedGeometryIsInvalid() = runTest {
         val seed = Seed.GreatIcosahedron
         assertTrue(seed.poly.availableOrbitTransforms.none { transform -> transform is KisFace })
 
         val tag = KisFace(seed.poly.faceKinds.keys.first()).tag
         val response = evaluateCore(CoreRequest(CoreState(seed.tag, listOf(tag), "c")))
-        assertEquals(CoreIssueCode.TransformNotApplicable, response.error?.code)
+        assertEquals(CoreIssueCode.InvalidGeometry, response.error?.code)
     }
 }

@@ -19,6 +19,8 @@ data class CoreRequest(
     val animationDuration: Double? = null,
     val detectSeed: Boolean = false,
     val calculateTweakRanges: Boolean = true,
+    /** Presentation-space rim width; omitted when no polygonal rims are requested. */
+    val rimWidth: Double? = null,
 )
 
 data class CoreProgress(
@@ -34,6 +36,11 @@ enum class CoreIssueCode {
     TransformIsIdentity,
     TooLarge,
     SomeFacesNotPlanar,
+    GeometryContractNotSatisfied,
+    SelfIntersection,
+    NonPlanarSelfIntersection,
+    DisconnectedMaterial,
+    ScaleNotApplicable,
 }
 
 @Serializable
@@ -42,6 +49,8 @@ data class CoreIssue(
     val transformTag: String? = null,
     val fev: FEV? = null,
     val detail: String? = null,
+    val requiredContract: PolyhedronContract? = null,
+    val actualContract: PolyhedronContract? = null,
 )
 
 @Serializable
@@ -54,10 +63,24 @@ data class CoreAnimationStep(
 )
 
 @Serializable
+data class CoreTransformTweakSnap(
+    val label: String,
+    val value: Double,
+)
+
+@Serializable
+data class CoreTransformTweakOption(
+    val value: Int,
+    val fev: FEV,
+)
+
+@Serializable
 data class CoreTransformTweakRange(
     val tweak: TransformTweak,
     val min: Double,
     val max: Double,
+    val snaps: List<CoreTransformTweakSnap> = emptyList(),
+    val options: List<CoreTransformTweakOption> = emptyList(),
 )
 
 @Serializable
@@ -75,6 +98,8 @@ data class CoreResponse(
     val errorIndex: Int? = null,
     val error: CoreIssue? = null,
     val animation: List<CoreAnimationStep> = emptyList(),
+    val geometryAnalysis: CoreGeometryAnalysis? = null,
+    val resolvedRims: List<polyhedra.model.poly.ResolvedRimGeometry> = emptyList(),
 )
 
 val CoreJson = Json {

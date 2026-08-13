@@ -52,13 +52,17 @@ The Wasm core owns:
 
 - seed geometry construction;
 - primitive transform and macro-expansion evaluation, including composition-aware `aa` cantellation and `at` bevel fusion;
-- truncate, rectify, cantellate, dual, bevel, snub, propeller, whirl, quinto, chamfer, canonicalization (the UI's `Canonical` transform), Greaten, Stellate, drop, and orbit-targeted Kis/Truncate/Rectify geometry kernels;
+- truncate, rectify, cantellate, dual, bevel, snub, propeller, whirl, quinto, chamfer, canonicalization (the UI's `Canonical` transform), Greaten, Stellate, drop, and orbit-targeted Kis/Stellate/Truncate/Rectify/Radial geometry kernels;
 - regular Kepler-Poinsot face arrangements and their nonzero-winding embedded physical-boundary resolution;
+- normalized face-plane constellation construction for Greatened and Stellated, including symmetric circuit candidates, edge-line provenance filters, bounded LRU reuse, and discrete Result metadata;
+- tessellation-free hidden-face rim regions, including immersed-edge strip unions, bounded source-vertex joins, width limits, and source-edge provenance;
 - size guards, applicability checks, warnings, and progress;
 - fixed and parameterized-family seed geometry, scale normalization, and topology/drop analysis;
 - rotation-orbit refinement and geometric comparison with built-in seeds;
 - geometric full-point-group analysis, actual F/E/V proper-rotation orbits, rotation-axis directions, and reflection-plane normals;
 - topology-changing animation keyframe construction.
+
+Every primitive declares a machine-readable geometry domain: minimum input contract, face-plane or local-face requirement, topology requirement, locality, and output policy. The evaluator checks that record before construction and maps a rejection to `TransformNotApplicable`; it validates every completed primitive against the declared output contract. Truncate, Rectify, Dual, Cantellate, Bevel, and orbit-targeted cuts may therefore consume and return renderable immersions without treating intentional transverse crossings as corruption, while plane-based operations reject non-planar or center-crossing authoritative faces before division or construction. Snub preserves an embedded input's stronger contract so unsafe low-inset Gyro results remain outside its dynamic range.
 
 Continuous transform settings are stored as dimensionless multipliers in the
 logical transform tag. A regular/default multiplier of `1` is never serialized;
@@ -87,6 +91,24 @@ model's same deterministic ear-clipped indices; transform validation therefore c
 surface later rendered, picked, animated, and exported.
 
 The JS application owns DOM composition, user events, hash serialization, interpolation between returned keyframes, render-buffer generation, WebGL drawing, and file download. One document-level keyboard dispatcher maps unmodified keys to the same model actions used by the visible seed, transform, orbit, visibility, symmetry, rotation, and popup controls; editable DOM targets suppress it so native typing and slider/dropdown navigation win, while Escape remains globally available to dismiss the current popup. The right-column help popup derives its rows from the same command declarations and shows a build-generated application version: local builds use the Gradle project version, while release CI injects the semantic-version tag. F/E/V rollover is transient JS state: popup rows and CPU-side front-face canvas picking update the same orbit-kind selection. Face picking uses the full virtual polygon independently of manual visibility, while excluding non-planar faces that have no reliable surface. WebGL consumes that selection through face modes, a selected-edge index overlay, or generated vertex-marker geometry. Face fragments are shaded in linear light with one opaque-dielectric Cook-Torrance evaluation (GGX distribution, correlated Smith visibility, Schlick Fresnel from IOR, and energy-conserving Lambert diffuse) plus a constant-environment approximation. Face-buffer generation normally assigns orbit colors; enabled print preview instead converts its serialized OKLCH material color to gamut-mapped sRGB once per update and assigns it to every face, rim, inner surface, and wall without changing geometry or shaders. The edge context suppresses both normal and rollover edge passes in this mode, leaving only the material surfaces. One fixed key-light position is shared by every environment. The optional Table environment runs before the polyhedron pass: it draws a rough neutral dielectric plane, then projects the current animated face-buffer positions analytically from that same key onto the plane. Stencil unioning gives the sharp shadow one opacity contribution per receiver pixel, while separate RGB/alpha blending darkens the opaque table without exposing the page background. This produces a cast shadow without shadow maps, textures, offscreen framebuffers, extra light samples, or additional core geometry. The bottom symmetry pill renders the core-provided full Schoenflies point group with a semantic HTML subscript. The symmetry overlay triangulates reflection-plane normals into translucent circular disks and expands rotation-axis directions into thin black lines through the origin. Its serialized visibility parameter and View size parameters preserve the toggle and scale disk radii and axis half-lengths relative to the current circumradius. Edge-popup figures unfold each representative edge's adjacent faces around a centered vertical shared edge; the model projection preserves the edge's directed `l`/`r` ordering and the DOM renderer applies the corresponding face-orbit colors.
+
+Hidden-face buffers triangulate the worker's polygonal rim regions and build walls only on the final outer and hole cycles. Simple non-planar faces retain their three-dimensional source boundary; immersed planar faces arrive as already-unioned regions, so their crossings cannot acquire internal walls or duplicate shadow edges. These buffers feed WebGL and the table-shadow pass. Earcut is confined to that visual JS consumer: the serialized core contract contains polygon cycles, per-segment source provenance, the applied width, and the maximum selectable width, but no rim triangles.
+
+STL export is a separate Wasm-core consumer rather than a readback of those WebGL buffers. Its
+worker request carries the authoritative polyhedron, hidden face kinds, scale, shell width, rim,
+and expansion. The core first obtains the embedded physical boundary while retaining provenance,
+then combines its visible regions with rims derived from the original source-face paths. A
+topology-preserving scaled inner shell avoids warping derived intersection vertices. The resulting
+triangle soup passes through three-dimensional nonzero-winding arrangement, deterministic decimal
+quantization, positive-volume orientation, and full manifold/intersection validation. JS only
+serializes a successful response as ASCII STL; a structured stage or resource error produces no
+download and directs the user to the polygonal OpenSCAD path.
+
+OpenSCAD is a separate polygonal consumer. A known embedded boundary with no presentation seam is
+written as one `polyhedron` from resolved simple cycles. Otherwise each visible resolved cell,
+non-planar source triangle, or hidden core-supplied rim region becomes a closed extrusion inside one
+explicit `union()`. Rim outer/hole paths cross the JS boundary unchanged; OpenSCAD performs their
+tessellation and the final CGAL Boolean instead of reusing WebGL/STL triangles.
 
 ## State and data flow
 

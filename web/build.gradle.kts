@@ -73,6 +73,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-browser:0.5.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
                 implementation(npm("gl-matrix", "3.4.4"))
+                implementation(npm("earcut", "3.2.3"))
             }
         }
         jsTest.dependencies {

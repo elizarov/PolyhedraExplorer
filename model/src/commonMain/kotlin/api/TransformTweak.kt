@@ -8,7 +8,10 @@ import polyhedra.model.util.fmt
 private const val TWEAK_SEPARATOR = "~"
 private const val TWEAK_ASSIGNMENT = "="
 
-/** Continuous, dimensionless controls stored on a transform. A value of 1 is the regular default. */
+/** Regular resolved Great-stellated-dodecahedron endpoint of Dodecahedron Stellate face. */
+const val GREAT_STELLATED_DODECAHEDRON_RADIUS = 0.4306
+
+/** Typed controls stored on a transform. A value of 1 is the regular/default choice. */
 enum class TransformTweak(val tag: String) {
     Depth("d"),
     Distance("c"),
@@ -16,11 +19,13 @@ enum class TransformTweak(val tag: String) {
     Inset("i"),
     Twist("r"),
     Height("h"),
+    Radius("R"),
+    StellationResult("l"),
 }
 
 data class TransformTweakRange(val min: Double, val max: Double)
 
-/** Outer exploration bounds. The core narrows these to the range valid for the actual input geometry. */
+/** Outer exploration bounds. The core narrows these to the choices valid for the actual input geometry. */
 object TransformTweakRanges {
     val TruncationDepth = TransformTweakRange(0.1, 1.45)
     val RectificationDepth = TransformTweakRange(0.1, 1.0)
@@ -29,9 +34,11 @@ object TransformTweakRanges {
     val SnubInset = TransformTweakRange(0.1, 1.5)
     val SnubTwist = TransformTweakRange(0.0, 2.0)
     val KisHeight = TransformTweakRange(0.1, 1.5)
+    val RadialRadius = TransformTweakRange(0.05, 20.0)
+    val StellationResult = TransformTweakRange(1.0, 32767.0)
 }
 
-/** Continuous controls supported by a transform, in their UI display order. */
+/** Controls supported by a transform, in their UI display order. */
 fun TransformId.transformTweakRanges(): Map<TransformTweak, TransformTweakRange> {
     if (operation == TransformOperation.Kis && target != null) {
         return linkedMapOf(TransformTweak.Height to TransformTweakRanges.KisHeight)
@@ -41,6 +48,9 @@ fun TransformId.transformTweakRanges(): Map<TransformTweak, TransformTweakRange>
     }
     if (operation == TransformOperation.Rectified && target != null) {
         return linkedMapOf(TransformTweak.Depth to TransformTweakRanges.RectificationDepth)
+    }
+    if ((operation == TransformOperation.Radial || operation == TransformOperation.StellateFace) && target != null) {
+        return linkedMapOf(TransformTweak.Radius to TransformTweakRanges.RadialRadius)
     }
     return when (operation) {
         TransformOperation.Truncated,
@@ -62,6 +72,10 @@ fun TransformId.transformTweakRanges(): Map<TransformTweak, TransformTweakRange>
             TransformTweak.Twist to TransformTweakRanges.SnubTwist,
         )
         TransformOperation.Chamfered -> linkedMapOf(TransformTweak.Width to TransformTweakRanges.ChamferWidth)
+        TransformOperation.Greatened,
+        TransformOperation.Stellated -> linkedMapOf(
+            TransformTweak.StellationResult to TransformTweakRanges.StellationResult,
+        )
         else -> emptyMap()
     }
 }

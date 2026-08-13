@@ -74,6 +74,9 @@ fun Polyhedron.snub(
     scale: Scale? = null,
     forceFaceKinds: List<FaceKindSource>? = null
 ) : Polyhedron {
+    require(hasNonSingularFacePlanes()) {
+        "Snub requires every authoritative source face to have a non-singular oriented plane"
+    }
     if (sr.sa < 0.0) {
         return reflected()
             .snub(sr.copy(sa = -sr.sa), scale, forceFaceKinds)

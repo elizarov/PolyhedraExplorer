@@ -8,6 +8,10 @@ import polyhedra.model.util.*
 
 internal data class KisAll(val height: Double = 1.0) : Transform() {
     override val id = TransformId(TransformOperation.Kis)
+    override val support = TransformSupport(
+        faceRequirement = FaceRequirement.SimplePlanar,
+        outputPolicy = TransformOutputPolicy.RenderableImmersion,
+    )
     override val tweaks: Map<TransformTweak, Double>
         get() = mapOf(TransformTweak.Height to height)
 
@@ -19,6 +23,10 @@ internal data class KisAll(val height: Double = 1.0) : Transform() {
 
     override fun transform(poly: Polyhedron): Polyhedron =
         poly.kisFaces(poly.faceKinds.keys, height)
+
+    override fun isApplicable(poly: Polyhedron): Boolean = poly.fs.all { face ->
+        face.isPlanar && !poly.resolvedFaces[face.id].sourceBoundarySelfIntersects
+    }
 
     override fun toString(): String = "Kis"
 }
@@ -40,13 +48,21 @@ internal interface OrbitTargetedAnimation {
 data class KisFace(val kind: FaceKind, val height: Double = 1.0) : Transform() {
     @kotlinx.serialization.Transient
     override val id = TransformId(TransformOperation.Kis, target = kind)
+    @kotlinx.serialization.Transient
+    override val support = TransformSupport(
+        faceRequirement = FaceRequirement.TargetSimplePlanar,
+        topologyRequirement = TopologyRequirement.OrientedMap,
+        local = true,
+    )
     override val tweaks: Map<TransformTweak, Double>
         get() = mapOf(TransformTweak.Height to height)
 
     override fun transform(poly: Polyhedron): Polyhedron = poly.kisFaces(setOf(kind), height)
 
-    override fun isApplicable(poly: Polyhedron): Boolean =
-        kind in poly.faceKinds && (poly.isConvexGeometry || poly.regularStarFormOrNull() == null)
+    override fun isApplicable(poly: Polyhedron): Boolean = kind in poly.faceKinds &&
+        poly.fs.filter { face -> face.kind == kind }.all { face ->
+            face.isPlanar && !poly.resolvedFaces[face.id].sourceBoundarySelfIntersects
+        }
 
     override fun toString(): String = "Kis $kind"
 }
@@ -55,6 +71,8 @@ data class KisFace(val kind: FaceKind, val height: Double = 1.0) : Transform() {
 data class TruncateVertex(val kind: VertexKind, val depth: Double = 1.0) : Transform(), OrbitTargetedAnimation {
     @kotlinx.serialization.Transient
     override val id = TransformId(TransformOperation.Truncated, target = kind)
+    @kotlinx.serialization.Transient
+    override val support = TransformSupport(outputPolicy = TransformOutputPolicy.RenderableImmersion, local = true)
     override val tweaks: Map<TransformTweak, Double>
         get() = mapOf(TransformTweak.Depth to depth)
     override val targetKind: AnyKind
@@ -81,6 +99,8 @@ data class TruncateVertex(val kind: VertexKind, val depth: Double = 1.0) : Trans
 data class RectifyVertex(val kind: VertexKind, val depth: Double = 1.0) : Transform(), OrbitTargetedAnimation {
     @kotlinx.serialization.Transient
     override val id = TransformId(TransformOperation.Rectified, target = kind)
+    @kotlinx.serialization.Transient
+    override val support = TransformSupport(outputPolicy = TransformOutputPolicy.RenderableImmersion, local = true)
     override val tweaks: Map<TransformTweak, Double>
         get() = mapOf(TransformTweak.Depth to depth)
     override val targetKind: AnyKind
@@ -116,6 +136,12 @@ internal fun TransformSpec.toOrbitTargetedTransformOrNull(): Transform? {
         TransformOperation.Rectified -> if (kind is VertexKind && tweaks.keys.all { it == TransformTweak.Depth }) {
             RectifyVertex(kind, tweaks[TransformTweak.Depth] ?: 1.0)
         } else null
+        TransformOperation.Radial -> if (kind is VertexKind && tweaks.keys.all { it == TransformTweak.Radius }) {
+            RadialVertex(kind, tweaks[TransformTweak.Radius] ?: 1.0)
+        } else null
+        TransformOperation.StellateFace -> if (kind is FaceKind && tweaks.keys.all { it == TransformTweak.Radius }) {
+            StellateFace(kind, tweaks[TransformTweak.Radius] ?: 1.0)
+        } else null
         else -> null
     }
 }
@@ -123,32 +149,54 @@ internal fun TransformSpec.toOrbitTargetedTransformOrNull(): Transform? {
 val Polyhedron.availableOrbitTransforms: Set<Transform>
     get() = buildSet {
         canDrop.mapTo(this, ::Drop)
-        if (faceKinds.size > 1 && (isConvexGeometry || regularStarFormOrNull() == null)) {
-            faceKinds.keys.mapTo(this, ::KisFace)
+        if (faceKinds.size > 1) {
+            faceKinds.keys.map(::KisFace).filterTo(this) { transform -> transform.isApplicable(this@availableOrbitTransforms) }
         }
+        faceKinds.keys.map(::StellateFace)
+            .filterTo(this) { transform -> transform.isApplicable(this@availableOrbitTransforms) }
         if (vertexKinds.size > 1) {
             vertexKinds.keys.mapTo(this, ::TruncateVertex)
             vertexKinds.keys.mapTo(this, ::RectifyVertex)
         }
+        vertexKinds.keys.map(::RadialVertex)
+            .filterTo(this) { transform -> transform.isApplicable(this@availableOrbitTransforms) }
     }
 
 /** Kises the selected face orbits. Selecting every orbit is exactly the Kis macro geometry. */
 internal fun Polyhedron.kisFaces(
     kinds: Set<FaceKind>,
     height: Double = 1.0,
-): Polyhedron {
+): Polyhedron = kisFacesWithApexKinds(kinds, height).poly
+
+internal data class KisFacesResult(
+    val poly: Polyhedron,
+    val apexKinds: Map<FaceKind, VertexKind>,
+)
+
+internal fun Polyhedron.kisFacesWithApexKinds(
+    kinds: Set<FaceKind>,
+    height: Double = 1.0,
+): KisFacesResult {
     require(kinds.isNotEmpty() && kinds.all { it in faceKinds })
-    val fullKis = dual().truncated().dual()
-    if (height == 1.0 && kinds.size == faceKinds.size && kinds.containsAll(faceKinds.keys)) return fullKis
-    require(isConvexGeometry || regularStarFormOrNull() == null) {
-        "Continuous or orbit-targeted Kis is not available for resolved regular-star surfaces"
+    require(fs.filter { face -> face.kind in kinds }.all { face ->
+        face.isPlanar && !resolvedFaces[face.id].sourceBoundarySelfIntersects
+    }) { "Kis requires every target source face to be simple and planar" }
+    val fullKis = runCatching { dual().truncated().dual() }.getOrElse { directFailure ->
+        if (analyzeGeometry().strongestContract != PolyhedronContract.EmbeddedBoundary) throw directFailure
+        canonical().dual().truncated().dual()
+    }
+    if (height == 1.0 && kinds.size == faceKinds.size && kinds.containsAll(faceKinds.keys)) {
+        val apexKinds = fs.groupBy(Face::kind).mapValues { (_, faces) ->
+            faces.map { face -> fullKis.vs[vs.size + face.id].kind }.distinct().single()
+        }
+        return KisFacesResult(fullKis, apexKinds)
     }
     require(fullKis.vs.size == vs.size + fs.size) {
         "Continuous or orbit-targeted Kis requires a topological dual; it is not available for " +
             "this resolved regular-star surface"
     }
 
-    return transformedPolyhedron(KisFace::class, kinds to height) {
+    val result = transformedPolyhedron(KisFace::class, kinds to height) {
         // Full Kis retains one vertex for each input vertex, followed by one apex per input face.
         val outputVertices = HashMap<Vertex, Vertex>()
         for (vertex in vs) {
@@ -186,6 +234,18 @@ internal fun Polyhedron.kisFaces(
         }
         mergeIndistinguishableKinds()
     }
+    val apexKinds = linkedMapOf<FaceKind, VertexKind>()
+    var apexIndex = vs.size
+    for (sourceFace in fs) {
+        if (sourceFace.kind !in kinds) continue
+        val apexKind = result.vs[apexIndex++].kind
+        val previous = apexKinds[sourceFace.kind]
+        if (previous == null) apexKinds[sourceFace.kind] = apexKind
+        require(previous == null || previous == apexKind) {
+            "Kis source face orbit ${sourceFace.kind} split into multiple apex orbits"
+        }
+    }
+    return KisFacesResult(result, apexKinds)
 }
 
 /** Truncates the selected vertex orbits. Selecting every orbit is exactly full truncation. */

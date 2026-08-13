@@ -29,7 +29,7 @@ internal class CanvasOrbitPicker(
         var nearestDepth = Double.POSITIVE_INFINITY
         for (face in poly.fs) {
             if (face.kind in excludedFaces) continue
-            val projected = projectFace(face) ?: continue
+            val projected = projectResolvedFace(face) ?: continue
             val depth = projected.depthAt(x, y) ?: continue
             if (depth < nearestDepth) {
                 nearestDepth = depth
@@ -44,11 +44,12 @@ internal class CanvasOrbitPicker(
         var nearestDistance = EDGE_HIT_RADIUS * EDGE_HIT_RADIUS
         var nearestDepth = Double.POSITIVE_INFINITY
         for (face in poly.fs) {
-            val projected = projectFace(face) ?: continue
+            if (!isFaceFront(face)) continue
+            val projected = projectSourceBoundary(face) ?: continue
             for (index in 0 until face.size) {
                 val next = (index + 1) % face.size
-                val a = projected.points[index]
-                val b = projected.points[next]
+                val a = projected[index]
+                val b = projected[next]
                 val segment = segmentHit(x, y, a, b)
                 if (segment.distanceSquared > nearestDistance + SCREEN_EPSILON) continue
                 if (segment.distanceSquared < nearestDistance - SCREEN_EPSILON || segment.depth < nearestDepth) {
@@ -64,7 +65,7 @@ internal class CanvasOrbitPicker(
     fun hitVertex(x: Double, y: Double): VertexKind? {
         val frontVertexIds = BooleanArray(poly.vs.size)
         for (face in poly.fs) {
-            if (projectFace(face) != null) {
+            if (isFaceFront(face)) {
                 for (vertex in face) frontVertexIds[vertex.id] = true
             }
         }
@@ -108,7 +109,25 @@ internal class CanvasOrbitPicker(
         return project(interpolate(vertex, previous))
     }
 
-    private fun projectFace(face: Face): ProjectedFace? {
+    private fun projectResolvedFace(face: Face): ProjectedFace? {
+        val resolved = poly.resolvedFaces[face.id]
+        val previousResolved = animation?.prevPoly?.resolvedFaces?.get(face.id)
+            ?.takeIf { it.vertices.size == resolved.vertices.size }
+        val previousFace = animation?.prevPoly?.fs?.get(face.id)
+        val expandDirection = previousFace?.let { interpolate(face, it) } ?: face
+        val points = resolved.vertices.mapIndexed { index, vertex ->
+            val point = previousResolved?.let { previous ->
+                interpolate(vertex.position, previous.vertices[index].position)
+            } ?: vertex.position
+            project(point, expandDirection) ?: return null
+        }
+        if (!isFront(points, resolved.triangles)) return null
+        return ProjectedFace(points, resolved.triangles)
+    }
+
+    private fun isFaceFront(face: Face): Boolean = projectResolvedFace(face) != null
+
+    private fun projectSourceBoundary(face: Face): List<ScreenPoint>? {
         val points = ArrayList<ScreenPoint>(face.size)
         val previousFace = animation?.prevPoly?.fs?.get(face.id)
         val expandDirection = previousFace?.let { interpolate(face, it) } ?: face
@@ -116,16 +135,7 @@ internal class CanvasOrbitPicker(
             val point = previousFace?.let { interpolate(face[index], it[index]) } ?: face[index]
             points += project(point, expandDirection) ?: return null
         }
-        var signedArea = 0.0
-        for (index in points.indices) {
-            val next = points[(index + 1) % points.size]
-            signedArea += points[index].x * next.y - next.x * points[index].y
-        }
-        // FaceContext reverses the clockwise stored boundary when it emits
-        // triangles. A rendered front face is therefore positive in the
-        // Y-down canvas coordinates used here.
-        if (signedArea <= SCREEN_EPSILON) return null
-        return ProjectedFace(points, face.triangles)
+        return points
     }
 
     private fun interpolate(target: Vec3, previous: Vec3): Vec3 {
@@ -150,7 +160,7 @@ private data class ClipPoint(val x: Double, val y: Double, val z: Double, val w:
 
 private data class ProjectedFace(
     val points: List<ScreenPoint>,
-    val triangles: List<FaceTriangle>,
+    val triangles: List<ResolvedFaceTriangle>,
 ) {
     fun depthAt(x: Double, y: Double): Double? {
         var nearest: Double? = null
@@ -167,6 +177,16 @@ private data class ProjectedFace(
         return nearest
     }
 }
+
+private fun isFront(points: List<ScreenPoint>, triangles: List<ResolvedFaceTriangle>): Boolean =
+    triangles.any { triangle ->
+        val a = points[triangle.a]
+        val b = points[triangle.b]
+        val c = points[triangle.c]
+        (a.x * b.y - b.x * a.y) +
+            (b.x * c.y - c.x * b.y) +
+            (c.x * a.y - a.x * c.y) < -SCREEN_EPSILON
+    }
 
 private data class SegmentHit(val distanceSquared: Double, val depth: Double)
 

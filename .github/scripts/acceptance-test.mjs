@@ -23,7 +23,7 @@ const cases = [
     {
         name: "Kepler-Poinsot construction",
         hash: "#/s(D)t(S,G)",
-        counts: { faces: 60, edges: 90, vertices: 32 },
+        counts: { faces: 12, edges: 30, vertices: 20 },
         labels: ["Greatened", "Stellated", "Dodecahedron"],
     },
 ]
@@ -102,6 +102,73 @@ async function runCase(sessionId, testCase, index) {
     throw new Error(`${testCase.name} did not become ready: ${JSON.stringify(state)}`)
 }
 
+async function runStlExportCase(sessionId) {
+    const testCase = {
+        name: "immersed STL worker export",
+        hash: "#/s(SP5_2)hf(α)",
+        counts: { faces: 7, edges: 15, vertices: 10 },
+        labels: ["Prism 5/2"],
+    }
+    await runCase(sessionId, testCase, cases.length)
+    await webdriver("POST", `/session/${sessionId}/execute/sync`, {
+        script: `
+            window.__acceptedStlDownload = null;
+            window.__acceptedStlHref = null;
+            const originalClick = HTMLAnchorElement.prototype.click;
+            HTMLAnchorElement.prototype.click = function() {
+                if (this.download?.endsWith(".stl")) {
+                    window.__acceptedStlDownload = this.download;
+                    window.__acceptedStlHref = this.href;
+                    return;
+                }
+                return originalClick.call(this);
+            };
+            document.dispatchEvent(new KeyboardEvent("keydown", { key: "x", code: "KeyX", bubbles: true }));
+        `,
+        args: [],
+    })
+
+    const controlDeadline = Date.now() + 5_000
+    let started = false
+    while (!started && Date.now() < controlDeadline) {
+        started = await webdriver("POST", `/session/${sessionId}/execute/sync`, {
+            script: `
+                const button = [...document.querySelectorAll("button")]
+                    .find(candidate => candidate.textContent.trim() === "Export to STL");
+                if (!button) return false;
+                button.click();
+                return true;
+            `,
+            args: [],
+        })
+        if (!started) await sleep(50)
+    }
+    if (!started) throw new Error("STL export control did not open")
+
+    const deadline = Date.now() + 30_000
+    while (Date.now() < deadline) {
+        const state = await webdriver("POST", `/session/${sessionId}/execute/sync`, {
+            script: `
+                return {
+                    download: window.__acceptedStlDownload,
+                    href: window.__acceptedStlHref,
+                    error: document.querySelector(".save-error")?.textContent?.trim() ?? null,
+                    status: document.querySelector(".core-status")?.textContent?.trim() ?? null,
+                };
+            `,
+            args: [],
+        })
+        if (state.status?.startsWith("Wasm core error:")) throw new Error(state.status)
+        if (state.error) throw new Error(`STL export failed: ${state.error}`)
+        if (state.download && state.href?.startsWith("data:text/plain;charset=utf-8,solid%20")) {
+            console.log(`PASS: ${testCase.name} (${state.download})`)
+            return
+        }
+        await sleep(250)
+    }
+    throw new Error("immersed STL worker export did not complete")
+}
+
 let sessionId
 try {
     await waitForWebDriver()
@@ -122,6 +189,7 @@ try {
     for (const [index, testCase] of cases.entries()) {
         await runCase(sessionId, testCase, index)
     }
+    await runStlExportCase(sessionId)
     console.log("Production acceptance test passed")
 } finally {
     if (sessionId) {

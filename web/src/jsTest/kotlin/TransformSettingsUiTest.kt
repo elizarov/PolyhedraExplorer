@@ -10,8 +10,12 @@ import org.w3c.dom.HTMLElement
 import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.events.Event
 import polyhedra.model.api.CoreTransformTweakRange
+import polyhedra.model.api.CoreTransformTweakSnap
+import polyhedra.model.api.CoreTransformTweakOption
+import polyhedra.model.api.GREAT_STELLATED_DODECAHEDRON_RADIUS
 import polyhedra.model.api.TransformTweak
 import polyhedra.web.catalog.Transform
+import polyhedra.web.catalog.StellateFace
 import polyhedra.web.catalog.withTweak
 import polyhedra.web.main.ControlPane
 import polyhedra.web.main.Popup
@@ -26,6 +30,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import polyhedra.model.poly.FaceKind
+import polyhedra.model.poly.FEV
 
 class TransformSettingsUiTest {
     private lateinit var host: HTMLDivElement
@@ -144,6 +150,92 @@ class TransformSettingsUiTest {
             restored.render.poly.transforms.value.map { it.tag },
         )
         assertEquals("t", Transform.Truncated.withTweak(TransformTweak.Depth, 1.0).tag)
+    }
+
+    @Test
+    fun coreSuppliedRegularSnapSetsTheExactSerializedRadius() {
+        val params = PolyParams("", null)
+        params.transforms.updateValue(listOf(StellateFace(FaceKind(0))))
+        params.updateTransformTweakRanges(
+            listOf(
+                listOf(
+                    CoreTransformTweakRange(
+                        TransformTweak.Radius,
+                        min = 0.1,
+                        max = 2.0,
+                        snaps = listOf(
+                            CoreTransformTweakSnap(
+                                "Great stellated",
+                                GREAT_STELLATED_DODECAHEDRON_RADIUS,
+                            )
+                        ),
+                    )
+                )
+            )
+        )
+        composition = renderComposable(host) {
+            ControlPane(params, Popup.TransformSettings(0), togglePopup = {})
+        }
+
+        (host.querySelector(".transform-setting-snap") as HTMLButtonElement).click()
+
+        assertEquals(
+            StellateFace(FaceKind(0)).withTweak(
+                TransformTweak.Radius,
+                GREAT_STELLATED_DODECAHEDRON_RADIUS,
+            ).tag,
+            params.transforms.value.single().tag,
+        )
+    }
+
+    @Test
+    fun stellationResultGearAppearsOnlyForAlternativesAndUsesDiscreteMetadata() {
+        val params = PolyParams("", null)
+        params.transforms.updateValue(listOf(Transform.Stellated))
+        params.updateTransformTweakRanges(
+            listOf(
+                listOf(
+                    CoreTransformTweakRange(
+                        TransformTweak.StellationResult,
+                        min = 1.0,
+                        max = 1.0,
+                        options = listOf(CoreTransformTweakOption(1, FEV(12, 30, 12))),
+                    ),
+                ),
+            ),
+        )
+        composition = renderComposable(host) { ControlPane(params, popup = null, togglePopup = {}) }
+        assertNull(host.querySelector(".transform-settings-button"))
+
+        composition?.dispose()
+        host.textContent = ""
+        params.updateTransformTweakRanges(
+            listOf(
+                listOf(
+                    CoreTransformTweakRange(
+                        TransformTweak.StellationResult,
+                        min = 1.0,
+                        max = 3.0,
+                        options = listOf(
+                            CoreTransformTweakOption(1, FEV(12, 30, 12)),
+                            CoreTransformTweakOption(2, FEV(24, 60, 38)),
+                            CoreTransformTweakOption(3, FEV(32, 90, 60)),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        composition = renderComposable(host) {
+            ControlPane(params, Popup.TransformSettings(0), togglePopup = {})
+        }
+        val slider = host.querySelector(".transform-setting-slider") as HTMLInputElement
+        assertEquals("1", slider.min)
+        assertEquals("3", slider.max)
+        assertEquals("1 of 3 · F 12, E 30, V 12", host.querySelector(".transform-setting-value")?.textContent)
+
+        slider.value = "2"
+        slider.dispatchEvent(Event("input"))
+        assertEquals("S~l=2", params.transforms.value.single().tag)
     }
 
     private fun awaitRecomposition(): Promise<Unit> = Promise { resolve, _ ->

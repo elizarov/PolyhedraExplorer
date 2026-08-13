@@ -7,6 +7,8 @@ import org.jetbrains.compose.web.renderComposable
 import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLDivElement
 import org.w3c.dom.HTMLElement
+import org.w3c.dom.HTMLInputElement
+import org.w3c.dom.events.Event
 import polyhedra.core.poly.Cube
 import polyhedra.core.poly.Seed as CoreSeed
 import polyhedra.core.poly.analyzeSymmetry
@@ -14,8 +16,10 @@ import polyhedra.model.api.CoreResponse
 import polyhedra.model.api.CoreState
 import polyhedra.model.api.FamilySeedId
 import polyhedra.model.api.SeedFamily
+import polyhedra.model.api.StarFamilySeedId
 import polyhedra.web.catalog.FamilySeeds
 import polyhedra.web.catalog.Seeds
+import polyhedra.web.catalog.StarFamilySeeds
 import polyhedra.web.catalog.Transform
 import polyhedra.web.main.ControlPane
 import polyhedra.web.main.Popup
@@ -54,7 +58,14 @@ class SeedFamilyUiTest {
         composition = renderComposable(host) { ControlPane(params, popup = Popup.Seed, togglePopup = {}) }
 
         assertEquals(
-            listOf("Platonic", "Families", "Archimedean", "Catalan", "Kepler-Poinsot"),
+            listOf(
+                "Platonic",
+                "Families",
+                "Archimedean",
+                "Catalan",
+                "Star families",
+                "Kepler-Poinsot",
+            ),
             elements(".dropdown .header").map { it.textContent.orEmpty().trim() },
         )
         assertEquals(
@@ -69,6 +80,70 @@ class SeedFamilyUiTest {
 
         elements(".dropdown .item").single { it.textContent == "Prism" }.click()
         assertEquals("P3", params.seed.value.tag)
+    }
+
+    @Test
+    fun starFamilyPopupUsesNamesAndPreservesRememberedPair() {
+        val params = PolyParams("", null)
+        params.seed.updateValue(starFamilySeed(SeedFamily.Prism, 7, 3))
+        composition = renderComposable(host) { ControlPane(params, popup = Popup.Seed, togglePopup = {}) }
+
+        val starItems = elements(".dropdown .header")[4].parentElement?.let { headerRow ->
+            generateSequence(headerRow.nextElementSibling) { it.nextElementSibling }
+                .takeWhile { it.querySelector(".header") == null }
+                .map { it.textContent.orEmpty().trim() }
+                .toList()
+        }
+        assertEquals(
+            listOf("Star prism", "Star antiprism", "Star pyramid", "Star bipyramid"),
+            starItems,
+        )
+
+        dropdownItem("Star bipyramid").click()
+        assertEquals("SB7_3", params.seed.value.tag)
+    }
+
+    @Test
+    fun starFamilyDefaultsToFiveTwoAndSkipsInvalidSizes() {
+        val params = PolyParams("", null)
+        composition = renderComposable(host) { ControlPane(params, popup = Popup.Seed, togglePopup = {}) }
+
+        dropdownItem("Star prism").click()
+        assertEquals("SP5_2", params.seed.value.tag)
+
+        composition?.dispose()
+        composition = renderComposable(host) { ControlPane(params, popup = null, togglePopup = {}) }
+        (host.querySelector(".family-seed-increment") as HTMLButtonElement).click()
+        assertEquals("SP7_2", params.seed.value.tag)
+    }
+
+    @Test
+    fun starFamilyStepSettingUsesOnlyValidValuesAndRoundTrips(): Promise<Unit> {
+        val params = PolyParams("", null)
+        params.seed.updateValue(starFamilySeed(SeedFamily.Antiprism, 7, 2))
+        composition = renderComposable(host) {
+            ControlPane(params, popup = Popup.SeedSettings, togglePopup = {})
+        }
+
+        val slider = host.querySelector(".seed-setting-slider") as HTMLInputElement
+        assertEquals("2", slider.value)
+        slider.value = "3"
+        slider.dispatchEvent(Event("input"))
+        assertEquals("SA7_3", params.seed.value.tag)
+
+        return awaitRecomposition().then {
+            val updated = host.querySelector(".seed-setting-slider") as HTMLInputElement
+            assertEquals("3", updated.value)
+            updated.value = "4"
+            updated.dispatchEvent(Event("input"))
+            assertEquals("SA7_3", params.seed.value.tag)
+
+            val source = RootParams()
+            source.render.poly.seed.updateValue(starFamilySeed(SeedFamily.Pyramid, 23, 10))
+            val restored = RootParams()
+            restored.loadFromString(source.toString())
+            assertEquals("SY23_10", restored.render.poly.seed.value.tag)
+        }
     }
 
     @Test
@@ -251,6 +326,9 @@ class SeedFamilyUiTest {
 
     private fun familySeed(family: SeedFamily, n: Int) =
         FamilySeeds.single { it.familyId == FamilySeedId(family, n) }
+
+    private fun starFamilySeed(family: SeedFamily, n: Int, q: Int) =
+        StarFamilySeeds.single { it.starFamilyId == StarFamilySeedId(family, n, q) }
 
     private fun seedButton(): HTMLElement = elements(".ctrl-pane > .btn > button.txt")
         .single { it.textContent.orEmpty().contains("Pyramid") }

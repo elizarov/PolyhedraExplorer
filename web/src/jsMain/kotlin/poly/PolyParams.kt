@@ -23,6 +23,10 @@ class RenderParams(tag: String, val animationParams: ViewAnimationParams?) : Par
     val view = using(ViewParams("v", animationParams))
     val lighting = using(LightingParams("l", animationParams))
     val printPreview = using(PrintPreviewParams("p"))
+
+    init {
+        poly.connectRimWidth(view.faceRim)
+    }
 }
 
 private val defaultSeed = Seed.Tetrahedron
@@ -58,6 +62,10 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
     var suggestedSeed: Seed? = null
         private set
     var symmetry: CoreSymmetry? = null
+        private set
+    var geometryAnalysis: CoreGeometryAnalysis? = null
+        private set
+    var resolvedRims: List<ResolvedRimGeometry> = emptyList()
         private set
 
     val targetPoly: Polyhedron
@@ -135,6 +143,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         selectedVertex.updateValue(null)
     }
     private var requestedState: CoreState? = null
+    private var requestedRimWidth: Double? = null
     private var appliedState: CoreState? = null
     private var suggestedSeedKey: Pair<String, List<String>>? = null
 
@@ -154,7 +163,8 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         transforms.value.forEach(::rememberOrbitTarget)
         if (!coreStarted) return
         val state = currentState()
-        if (state == requestedState) return
+        val rimWidth = rimWidthProvider().takeIf { it > 0.0 }
+        if (state == requestedState && rimWidth == requestedRimWidth) return
 
         val stateKey = state.seedDetectionKey()
         if (suggestedSeedKey != null && suggestedSeedKey != stateKey) {
@@ -163,6 +173,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         }
 
         requestedState = state
+        requestedRimWidth = rimWidth
         coreError = null
         resetTransformProgress()
         transformProgress = 0
@@ -179,6 +190,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
                 previousState = previousState,
                 animationDuration = duration,
                 detectSeed = detectSeed,
+                rimWidth = rimWidth,
             ),
             reportProgress = progress@{ progress ->
                 if (requestId != activeRequestId) return@progress
@@ -267,6 +279,8 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         poly = response.poly
         polyName = response.polyName
         symmetry = response.symmetry
+        updateGeometryAnalysis(response.geometryAnalysis)
+        updateResolvedRims(response.resolvedRims)
         transformedPolys = response.transformedPolys
         updateTransformTweakRanges(response.transformTweakRanges)
         updateAvailableOrbitTransforms(response.availableOrbitTransforms)
@@ -287,9 +301,27 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         }
     }
 
+    internal fun updateGeometryAnalysis(analysis: CoreGeometryAnalysis?) {
+        geometryAnalysis = analysis
+    }
+
+    internal fun updateResolvedRims(rims: List<ResolvedRimGeometry>) {
+        resolvedRims = rims
+    }
+
+    private var rimWidthProvider: () -> Double = { 0.0 }
+    private var rimWidthDependency: Param.Dependency? = null
+
+    internal fun connectRimWidth(param: DoubleParam) {
+        rimWidthDependency?.destroy()
+        rimWidthProvider = { param.targetValue }
+        rimWidthDependency = param.onNotifyUpdated(Param.TargetValue, ::computeDerivedTargetValues)
+    }
+
     internal fun updateSuggestedSeed(state: CoreState, response: CoreResponse) {
         val seedTag = response.recognizedSeedTag ?: return
-        val familySeed = state.seedTag.toFamilySeedIdOrNull() != null
+        val familySeed = state.seedTag.toFamilySeedIdOrNull() != null ||
+            state.seedTag.toStarFamilySeedIdOrNull() != null
         if ((!familySeed && state.transformTags.isEmpty()) ||
             response.validTransformTags != state.transformTags
         ) return
@@ -327,13 +359,23 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         resetTransformProgress()
         cancelCoreRequest?.invoke()
         cancelCoreRequest = null
+        rimWidthDependency?.destroy()
+        rimWidthDependency = null
         super.destroy()
     }
 }
 
 internal fun shouldDetectSeed(previous: CoreState?, current: CoreState): Boolean =
-    (current.transformTags.isNotEmpty() || current.seedTag.toFamilySeedIdOrNull() != null) &&
-        current.transformTags.all { it.parseTransformTag()?.tweaks?.isEmpty() == true } &&
+    (current.transformTags.isNotEmpty() || current.seedTag.toFamilySeedIdOrNull() != null ||
+        current.seedTag.toStarFamilySeedIdOrNull() != null) &&
+        current.transformTags.all { tag ->
+            val spec = tag.parseTransformTag() ?: return@all false
+            spec.tweaks.isEmpty() || spec.id.operation == TransformOperation.StellateFace &&
+                kotlin.math.abs(
+                    (spec.tweaks[TransformTweak.Radius] ?: Double.NaN) -
+                        GREAT_STELLATED_DODECAHEDRON_RADIUS
+                ) < 1e-9
+        } &&
         (previous == null || previous.seedTag != current.seedTag ||
             previous.transformTags != current.transformTags)
 
@@ -363,6 +405,11 @@ private fun CoreIssue.toIndicatorMessage(): IndicatorMessage<*> {
         CoreIssueCode.TransformIsIdentity -> TransformIsId(transform)
         CoreIssueCode.TooLarge -> TooLarge(requireNotNull(fev))
         CoreIssueCode.SomeFacesNotPlanar -> SomeFacesNotPlanar()
+        CoreIssueCode.GeometryContractNotSatisfied,
+        CoreIssueCode.SelfIntersection,
+        CoreIssueCode.NonPlanarSelfIntersection,
+        CoreIssueCode.DisconnectedMaterial,
+        CoreIssueCode.ScaleNotApplicable -> InvalidGeometry(detail ?: code.name)
     }
 }
 

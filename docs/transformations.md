@@ -5,18 +5,17 @@ Let `F`, `E`, and `V` be the input counts of faces, edges, and vertices, and let
 topological: they describe a valid closed polyhedron and do not specify its exact
 coordinates. Different operations can therefore have the same count formula.
 
-The formulas apply to ordinary topological meshes. A resolved Kepler-Poinsot mesh contains extra
-physical cells at classical face intersections; Dual, Greatened, and Stellated intentionally act
-on its recognized abstract regular-star form instead. Their resolved output counts are listed in
-the [seed catalog](seeds.md), and no misleading linear formula is inferred from the physical cells.
+The formulas apply to ordinary topological meshes. Classical Kepler-Poinsot inputs retain their
+immersed abstract faces; Dual, Greatened, and Stellated act on that source topology. Resolve instead
+constructs a new physical boundary whose counts depend on the actual arrangement. Those counts are
+listed in the [seed catalog](seeds.md), and no misleading linear formula is inferred.
 
 Macro expansions are written in project execution order, from first applied to
 last applied. Traditional Conway notation is read in the opposite direction; for
 example, the project expansion `a -> t` is conventionally written `ta`.
 
 The transform popup is ordered as `Transform`, `Macro`, `Orbit-targeted`, then
-`Star`. The final `Star` section contains the primitive Greatened and Stellated
-operations, whose exact domain is the regular-star catalog.
+`Star`. The final `Star` section contains Greatened, Stellated, and Resolve.
 
 ## Summary
 
@@ -32,12 +31,15 @@ operations, whose exact domain is the regular-star catalog.
 | Quinto | - | `q` | - | `F + 2E` | `6E` | `V + 3E` |
 | Chamfered | Chamfer, edge chamfering | `c` | - | `F + E` | `4E` | `V + 2E` |
 | Canonical | Canonicalization | `o` | - | `F` | `E` | `V` |
-| Greatened | Greatening | `G` | - | regular-star-dependent | regular-star-dependent | regular-star-dependent |
-| Stellated | Stellation | `S` | - | regular-star-dependent | regular-star-dependent | regular-star-dependent |
+| Greatened | Greatening | `G` | - | constellation-dependent | constellation-dependent | constellation-dependent |
+| Stellated | Stellation | `S` | - | constellation-dependent | constellation-dependent | constellation-dependent |
+| Resolve | Nonzero-winding resolution | `R` | - | arrangement-dependent | arrangement-dependent | arrangement-dependent |
 | Drop | Orbit deletion | `x[kind]` | - | input-dependent | input-dependent | input-dependent |
 | Kis face | Selective akisation | `k[face]` | - | input-dependent | input-dependent | input-dependent |
+| Stellate face | Selective akisation and radial apex movement | `f[face]` | Kis selected faces, then Radial created apexes | input-dependent | input-dependent | input-dependent |
 | Truncate vertex | Selective vertex truncation | `t[vertex]` | - | input-dependent | input-dependent | input-dependent |
 | Rectify vertex | Selective vertex rectification | `a[vertex]` | - | input-dependent | input-dependent | input-dependent |
+| Radial vertex | Radial orbit displacement, spike/facet | `r[vertex]` | - | `F` | `E` | `V` |
 | Kis | Akisation, Kleetope, cumulation, pyramid augmentation | `k` | `d -> t -> d` | `2E` | `3E` | `F + V` |
 | Join | Dual ambo | `j` | `d -> a -> d` | `E` | `2E` | `F + V` |
 | Needle | Dual truncation | `N` | `t -> d` | `2E` | `3E` | `F + V` |
@@ -78,6 +80,8 @@ rejected with a warning while the last valid mesh remains displayed.
 | --- | --- | --- |
 | Truncated, Needle, Zip | Depth | `d` |
 | Kis, Kis face | Height | `h` |
+| Stellate face, Radial vertex | Radius | `R` |
+| Greatened, Stellated | Result | `l` |
 | Cantellated, Ortho | Distance | `c` |
 | Bevelled, Meta | Distance, depth | `c`, `d` |
 | Snub, Gyro | Inset, twist | `i`, `r` |
@@ -90,7 +94,11 @@ continuous coordinate control because their preliminary construction is
 canonicalized; their gear therefore contains only chirality. Rectified and Join
 are also fixed because moving a shared edge midpoint splits it into two vertices
 and becomes truncation rather than a coordinate variation of rectification.
-Dual, Drop, Quinto, Canonical, Greatened, Stellated, and None have no continuous geometric setting.
+Result is a discrete integer setting rather than a percentage. The worker lists the available
+main-line candidates for the actual input; the row displays `n of N` and that candidate's F/E/V.
+Result `1` is the default and is omitted, while later choices use tags such as `S~l=2`.
+
+Dual, Drop, Quinto, Canonical, Resolve, and None have no continuous geometric setting.
 
 ## Animations
 
@@ -118,7 +126,7 @@ Three constructions are used:
   face center. The constructions visibly open into their canonical outputs while
   preserving the input surface at the first frame and working under Midradius
   scaling.
-- **Coordinate interpolation.** Canonicalization and changes to continuous
+- **Coordinate interpolation.** Canonicalization, Radial vertex, and changes to continuous
   settings keep connectivity fixed and interpolate corresponding vertices
   directly.
 
@@ -132,7 +140,8 @@ including Kis Height, are included in the same fused target.
 
 Animation is intentionally omitted where no stable, non-self-intersecting mesh
 correspondence exists: Drop, adding/removing or retargeting selective Kis face,
-Greatened, Stellated, and chirality flips. The regular-star operations change
+Greatened, Stellated, Resolve, and chirality flips. Resolve changes the physical arrangement
+topology; the regular-star operations change
 the resolved intersection-cell topology, and their classical collapsed forms would be immersed
 rather than proper meshes. A selective Kis Height change still interpolates because
 its topology is already present. A chirality flip is immediate rather than
@@ -155,7 +164,9 @@ Truncation cuts off every original vertex. Each original face remains with twice
 as many sides, and each original vertex produces one new face. Two output
 vertices lie on every original edge, which produces three output edge segments.
 The default cut depth is chosen from the representative regular-face geometry;
-the Depth setting scales it continuously.
+for a regular star `{n/q}` it uses the actual half-step angle `PI q / n`, not
+the convex `PI / n` angle. The Depth setting scales it continuously. A singular
+regular snap is rejected while nearby validated depths remain usable.
 
 For animation, the two cut points on each directed edge begin arbitrarily close
 to their source vertex and move to the selected cut ratio. The new vertex faces
@@ -166,8 +177,11 @@ Depth changes interpolate the ratio directly without collapsing the topology.
 
 Rectification, or ambo, places one output vertex at every original edge midpoint.
 Every original face becomes a face through its edge midpoints, and every original
-vertex becomes a face through the midpoints of its incident edges. It is the full
-midpoint limit of truncation and has no independent continuous parameter.
+vertex becomes a face through the midpoints of its incident edges. It is the exact
+full-depth quotient of the shared directed-edge truncation construction: the two
+directed cut points are identified as one reversal-invariant edge point. A common
+midsphere tangency point is used when every edge has one in its segment; otherwise
+the Euclidean midpoint is used. Rectified has no independent continuous parameter.
 
 Rectified uses the same cut topology as Truncated and animates its cut points to
 the shared edge-midpoint limit. On removal they return toward their source
@@ -176,11 +190,13 @@ vertices before the input mesh replaces the near-degenerate keyframe.
 ### Dual (`d`)
 
 Duality exchanges faces and vertices while preserving a one-to-one correspondence
-between edges. The implementation places a dual vertex for every face and builds
-one dual face around every original vertex. Applying Dual twice restores the
-original topology. On a recognized Kepler-Poinsot seed it instead exchanges the
-classical pairs Stellated dodecahedron / Great dodecahedron and Great stellated
-dodecahedron / Great icosahedron; the extra resolved intersection cells are not dualized.
+between edges. The implementation places the polar reciprocal of every authoritative
+oriented face plane and builds one dual face around every original vertex. It requires
+all source faces to be planar with a nonzero offset from the symmetry center. Applying
+Dual twice restores the original topology and normalized coordinates. The same general
+construction exchanges the classical Kepler-Poinsot pairs Stellated dodecahedron /
+Great dodecahedron and Great stellated dodecahedron / Great icosahedron; catalog
+recognition only names the result and resolved intersection cells are never dualized.
 
 Dual is animated through the limiting cantellation family. Face-, edge-, and
 vertex-derived regions move toward the reciprocal face points until the mesh is
@@ -302,6 +318,27 @@ some apexes leaves unstable zero-area triangles and cannot define a valid
 interpolation. This limitation does not apply to the full Kis macro, whose
 Dual/Truncated/Dual expansion uses stable primitive limiting meshes.
 
+### Stellate face (`f[face]`)
+
+Stellate face is a face-targeted macro: it applies Kis face to one source face
+orbit, then moves the resulting apex vertex orbit radially. It is offered only
+when the created apex orbit is independent, is surrounded exclusively by simple
+planar triangles, and is not adjacent to another vertex of its own orbit. This
+also excludes targets whose apex would touch a self-intersecting or non-planar
+source face. The source-face-to-apex mapping is retained explicitly rather than
+inferred from orbit numbering.
+
+Radius `1` is ordinary Kis geometry. Values above `1` move the apexes farther
+from the origin; positive values below `1` move them inward and can form facets,
+dents, and immersed star surfaces. The worker computes the safe connected range
+for the actual input. On a regular dodecahedron the settings include an exact
+**Great stellated dodecahedron** snap at Radius `0.4306`; that resolved result is
+also recognized as its catalog seed and offered as an explicit replacement.
+
+Applying or removing Stellate face animates one stable output topology: the new
+apexes start at their source-face centers and move to the requested radial
+positions. Radius changes interpolate the existing apex coordinates directly.
+
 ### Truncate vertex (`t[vertex]`)
 
 Truncate vertex cuts off every vertex in one selected vertex orbit. Each selected
@@ -332,12 +369,26 @@ topology until shared cut points reach the midpoint limit. Adding and removal
 run that ratio forward or backward; changing target orbit uses the same
 old-target-out/new-target-in sequence as Truncate vertex.
 
+### Radial vertex (`r[vertex]`)
+
+Radial vertex multiplies the position of every vertex in one selected rotation
+orbit by a positive Radius while preserving all faces, edges, and vertex IDs.
+Radius `1` is the identity; larger values form outward spikes and smaller values
+form inward facets or dents. It is offered only for an independent vertex orbit
+whose incident faces are simple planar triangles. In particular, vertices next
+to self-crossing or non-planar faces are excluded. The worker derives a safe
+connected Radius interval from the entering geometry.
+
+Because connectivity is unchanged, applying, removing, retargeting on a
+compatible topology, and changing Radius use direct vertex interpolation.
+
 The transform popup presents valid selective operations in its
 `Orbit-targeted` section, immediately before `Star`. Entries use one global order: Drop face, Drop edge, Drop
-vertex, Kis face, Truncate vertex, Rectify vertex. The F/E/V orbit rows show every
+vertex, Kis face, Stellate face, Truncate vertex, Rectify vertex, Radial vertex. The F/E/V orbit rows show every
 operation currently available for that exact orbit at the right edge in the same
-order, using × for Drop, an upward caret for Kis face, scissors for Truncate
-vertex, and compress for Rectify vertex; hover tooltips name the operation and
+order, using × for Drop, an upward caret for Kis face, a star for Stellate face,
+scissors for Truncate vertex, compress for Rectify vertex, and vertical arrows
+for Radial vertex; hover tooltips name the operation and
 target orbit. Choosing one stores its first concrete target. When an orbit-targeted
 operation is the last chain item, its up/down controls cycle through all currently
 valid targets of that same operation and wrap at both ends. The UI remembers the
@@ -345,7 +396,7 @@ last face, edge, and vertex target separately. Changing operation type through
 the popup or left/right controls reuses that target when the new operation
 supports it, so `Truncate B` changes to `Rectify B` instead of resetting to A.
 The URL retains the
-concrete `x[kind]`, `k[face]`, `t[vertex]`, or `a[vertex]` tag, so the selected
+concrete `x[kind]`, `k[face]`, `f[face]`, `t[vertex]`, `a[vertex]`, or `r[vertex]` tag, so the selected
 orbit round-trips.
 
 Truncate vertex and Rectify vertex share one selective cut topology on a common
@@ -465,13 +516,16 @@ immediate to avoid passing through the invalid opposite-twist intermediate.
 
 ## Star transformations
 
-Greatened and Stellated are primitive transforms grouped in the final Star popup section.
-Their regular-star domains and immediate animation behavior are described below.
+Greatened, Stellated, and Resolve are primitive transforms grouped in the final Star popup section.
+The first two share a geometry-derived face-plane constellation engine.
 
 ### Greatened (`G`)
 
-Greatening selects the other regular realization that retains the relevant regular face family.
-It is a geometry-recognizing operation, not a general incidence formula. Its exact domain is:
+Greatening extends all authoritative source-face planes and selects the first larger closed
+two-manifold whose faces retain each input face's side count, winding step, and face-kind word.
+Candidate vertices are computed from triple plane intersections, grouped into symmetric circuits,
+then independently validated as renderable immersions. Catalog recognition runs only afterward.
+This produces the classical identities:
 
 | Input | Output |
 | --- | --- |
@@ -479,33 +533,47 @@ It is a geometry-recognizing operation, not a general incidence formula. Its exa
 | Icosahedron | Great icosahedron |
 | Stellated dodecahedron | Great stellated dodecahedron |
 
-Recognition ignores scale, orientation, and vertex numbering but requires the regular geometry;
-an arbitrary deformed polyhedron with the same counts is not silently replaced. Outputs use the
-embedded nonzero-winding physical boundary described in [Non-convex geometry](non-convex.md).
-Inputs outside the table return an `InvalidGeometry` domain explanation instead of a compound or
-self-intersecting mesh.
+The operation also applies to non-catalog plane constellations when the same geometric criteria
+produce a finite connected surface. Candidate data is cached by a circumradius-normalized plane,
+boundary, and kind signature. If several strict extensions survive, the Result setting selects
+them in increasing circuit-radius order. A missing or out-of-range result reports
+`TransformNotApplicable` rather than substituting a catalog mesh.
 
-Greatened is immediate. Its resolved output cells do not have a proper collapsed correspondence to
-the input surface, so interpolating them would pass through the classical immersed star surface.
+Greatened is immediate because its changed immersed topology has no stable collapsed correspondence
+to the input surface.
 
 ### Stellated (`S`)
 
-Stellation continues a regular face-plane arrangement and selects the next supported
-Kepler-Poinsot form. The operation is intentionally narrower than unrestricted geometric
-stellation, because many other stellations are compounds or self-intersecting arrangements that
-violate the project surface contract. The exact domain is:
+Stellation continues every source face-edge line and reconstructs the first larger closed
+two-manifold from intersections of those lines and the shared facial-plane constellation. It may
+change a face's winding step while preserving its plane and edge-line provenance. Disconnected
+compounds, open incidence, collapsed edges, non-planar sources, and invalid immersed surfaces are
+discarded. The classical cases are:
 
 | Input | Output |
 | --- | --- |
 | Dodecahedron | Stellated dodecahedron |
 | Great dodecahedron | Great stellated dodecahedron |
 
-Consequently, both `D -> G -> S` and `D -> S -> G` reach the great stellated dodecahedron. As with
-Greatened, the result is the resolved non-intersecting physical boundary, and unsupported inputs
-return a precise `InvalidGeometry` result.
+Consequently, both `D -> G -> S` and `D -> S -> G` reach the great stellated dodecahedron. A
+qualifying non-catalog input is transformed directly from its own lines and planes. Result chooses
+among surviving strict outward extensions; the default remains the first.
 
 Stellated is immediate for the same reason as Greatened: no connected, non-degenerate,
-non-self-intersecting interpolation has the required endpoint topology.
+topology-compatible interpolation has the required endpoint topology.
+
+### Resolve (`R`)
+
+Resolve turns a renderable immersion into the embedded boundary of its nonzero-winding material.
+It corefines the supplied face triangles only at actual surface intersections, keeps fragments
+that separate zero from nonzero winding, joins conforming fragments into a manifold, and safely
+merges coplanar triangles into polygons. The result has new arrangement-dependent F/E/V counts,
+actual rotation-orbit kinds, and many-to-many provenance back to the source surface.
+
+Resolve is an identity on an already embedded surface and keeps its explicit chain item, where the
+recycle action can remove it. An immersed seed or transformed result shows a pentagram action on
+the pill that owns the current geometry status; activating it appends `R`. Resolve is immediate
+because its physical topology cannot be collapsed onto the immersed input without intersections.
 
 ## Sources of truth
 

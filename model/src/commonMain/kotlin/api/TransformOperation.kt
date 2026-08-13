@@ -32,6 +32,11 @@ enum class TransformOperation(
     Meta("m"),
     Gyro("g", isChiral = true),
     Drop("x"),
+    // Keep newly introduced entries at the end so existing enum ordinals remain stable across
+    // separately cached Kotlin/JS modules. Serialized identity still comes exclusively from tag.
+    Resolve("R"),
+    Radial("r"),
+    StellateFace("f"),
 }
 
 /** Type-safe identity of a transform before continuous tweak values are applied. */
@@ -48,6 +53,8 @@ data class TransformId(
                 TransformOperation.Kis -> target == null || target is FaceKind
                 TransformOperation.Truncated,
                 TransformOperation.Rectified -> target == null || target is VertexKind
+                TransformOperation.Radial -> target is VertexKind
+                TransformOperation.StellateFace -> target is FaceKind
                 else -> target == null
             }
         )

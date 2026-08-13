@@ -5,6 +5,7 @@
 package polyhedra.model.poly
 
 import kotlinx.serialization.*
+import polyhedra.model.api.ResolvedTopologyProvenance
 import polyhedra.model.util.*
 import kotlin.jvm.*
 
@@ -12,12 +13,17 @@ import kotlin.jvm.*
 class Polyhedron(
     mutableVertices: List<MutableVertex>,
     mutableFaces: List<MutableFace>,
-    val faceKindSources: List<FaceKindSource>? // non-null when polyhedron was transformed
+    val faceKindSources: List<FaceKindSource>?, // non-null when polyhedron was transformed
+    resolvedFaceGeometry: List<ResolvedFaceGeometry>? = null,
+    val resolvedTopologyProvenance: ResolvedTopologyProvenance? = null,
 )  {
     val vs: List<Vertex> = mutableVertices
     val fs: List<Face> = mutableFaces
     val es: List<Edge>
     val directedEdges: List<Edge>
+    val resolvedFaces: List<ResolvedFaceGeometry> by lazy {
+        resolvedFaceGeometry ?: fs.map(::resolveFaceGeometry)
+    }
 
     // `build edges (unidirectional & directed) and link them with vertices and faces
     init {
@@ -74,6 +80,18 @@ class Polyhedron(
         for (f in mutableFaces) f.directedEdges.sortFaceAdjacentEdges(f)
         this.es = es
         this.directedEdges = directedEdges
+        resolvedTopologyProvenance?.let { provenance ->
+            require(provenance.vertices.size == vs.size)
+            require(provenance.edges.size == es.size)
+            require(provenance.faces.size == fs.size)
+        }
+        if (resolvedFaceGeometry != null) {
+            require(resolvedFaceGeometry.size == mutableFaces.size)
+            require(resolvedFaceGeometry.indices.all { index ->
+                val resolved = resolvedFaceGeometry[index]
+                resolved.sourceFaceId == index && resolved.sourceFaceKind == mutableFaces[index].kind
+            }) { "Resolved face geometry does not match source faces" }
+        }
     }
 
     val vertexKinds: IdMap<VertexKind, Vertex> by lazy { vs.associateById({ it.kind }, { it }) }

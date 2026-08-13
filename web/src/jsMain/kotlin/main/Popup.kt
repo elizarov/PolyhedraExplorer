@@ -7,6 +7,7 @@ sealed class Popup {
     object Saves : Popup()
     object Help : Popup()
     object Seed : Popup()
+    object SeedSettings : Popup()
     object AddTransform : Popup()
     data class ModifyTransform(val index: Int) : Popup()
     data class TransformSettings(val index: Int) : Popup()

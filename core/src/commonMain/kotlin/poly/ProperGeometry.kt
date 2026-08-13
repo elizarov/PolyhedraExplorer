@@ -1,5 +1,8 @@
 package polyhedra.core.poly
 
+import polyhedra.model.api.CoreGeometryAnalysis
+import polyhedra.model.api.PolyhedronContract
+import polyhedra.model.api.SurfaceIntersectionClass
 import polyhedra.model.poly.*
 import polyhedra.model.util.*
 import kotlin.math.abs
@@ -13,11 +16,36 @@ private const val INTERSECTION_EPS = 1e-7
  */
 fun Polyhedron.validateProperGeometry() {
     validateMeshGeometry()
+    val analysis = analyzeGeometry()
+    require(analysis.strongestContract == PolyhedronContract.EmbeddedBoundary) {
+        if (SurfaceIntersectionClass.SelfCrossingFace in analysis.intersectionCounts) {
+            "Face boundary intersects itself; polyhedron is an immersed rather than embedded " +
+                "surface: ${analysis.intersectionCounts}"
+        } else {
+            "Faces intersect outside their shared boundary; polyhedron is an immersed rather than " +
+                "embedded surface: ${analysis.intersectionCounts}"
+        }
+    }
+}
+
+/** Classifies intentional immersion after the source and resolved-face contracts are validated. */
+fun Polyhedron.analyzeGeometry(): CoreGeometryAnalysis {
+    validateRenderableImmersion()
+    val counts = linkedMapOf<SurfaceIntersectionClass, Int>()
+    val selfCrossings = resolvedFaces.sumOf { face ->
+        if (!face.sourceBoundarySelfIntersects) 0 else face.vertices.count { vertex ->
+            vertex.provenance.sourceSegmentPoints.map { it.sourceSegmentIndex }.distinct().size > 1
+        }.coerceAtLeast(1)
+    }
+    if (selfCrossings > 0) counts[SurfaceIntersectionClass.SelfCrossingFace] = selfCrossings
+
     val tolerance = INTERSECTION_EPS * circumradius
     val triangles = fs.flatMap { face ->
-        face.triangles.map { triangle -> SurfaceTriangle(face, triangle) }
+        val resolved = resolvedFaces[face.id]
+        resolved.triangles.map { triangle -> SurfaceTriangle(face, resolved, triangle) }
     }.sortedBy(SurfaceTriangle::minX)
 
+    var interFaceCrossings = 0
     for (firstIndex in triangles.indices) {
         val first = triangles[firstIndex]
         for (secondIndex in (firstIndex + 1) until triangles.size) {
@@ -27,21 +55,41 @@ fun Polyhedron.validateProperGeometry() {
             val intersections = triangleIntersection(first, second, tolerance)
             if (intersections.isEmpty()) continue
             val sharedVertices = first.vertexIds.intersect(second.vertexIds).map { id -> vs[id] }
-            require(intersections.all { point -> point.onSharedFeature(sharedVertices, tolerance * 10.0) }) {
-                "Faces ${first.face.id} and ${second.face.id} intersect outside their shared " +
-                    "boundary (shared vertices: ${sharedVertices.map { vertex -> "${vertex.id}:${vertex.toPreciseString()}" }}; " +
-                    "intersection: ${intersections.joinToString(transform = Vec3::toPreciseString)})"
+            if (intersections.any { point -> !point.onSharedFeature(sharedVertices, tolerance * 10.0) }) {
+                interFaceCrossings++
             }
         }
     }
+    if (interFaceCrossings > 0) counts[SurfaceIntersectionClass.IntersectingFaces] = interFaceCrossings
+    return CoreGeometryAnalysis(
+        strongestContract = if (counts.isEmpty()) {
+            PolyhedronContract.EmbeddedBoundary
+        } else {
+            PolyhedronContract.RenderableImmersion
+        },
+        intersectionCounts = counts,
+    )
 }
 
-private class SurfaceTriangle(face: Face, triangle: FaceTriangle) {
+fun Polyhedron.validateContract(required: PolyhedronContract): CoreGeometryAnalysis {
+    val analysis = analyzeGeometry()
+    require(analysis.strongestContract.ordinal >= required.ordinal) {
+        "Geometry satisfies ${analysis.strongestContract}, but $required is required"
+    }
+    return analysis
+}
+
+private class SurfaceTriangle(
+    face: Face,
+    resolved: ResolvedFaceGeometry,
+    triangle: ResolvedFaceTriangle,
+) {
     val face: Face = face
-    val a: Vec3 = face[triangle.a]
-    val b: Vec3 = face[triangle.b]
-    val c: Vec3 = face[triangle.c]
-    val vertexIds: Set<Int> = setOf(face[triangle.a].id, face[triangle.b].id, face[triangle.c].id)
+    val a: Vec3 = resolved.vertices[triangle.a].position
+    val b: Vec3 = resolved.vertices[triangle.b].position
+    val c: Vec3 = resolved.vertices[triangle.c].position
+    val vertexIds: Set<Int> = listOf(triangle.a, triangle.b, triangle.c)
+        .flatMapTo(linkedSetOf()) { index -> resolved.vertices[index].provenance.sourceVertexIds }
     val minX = minOf(a.x, b.x, c.x)
     val maxX = maxOf(a.x, b.x, c.x)
     private val minY = minOf(a.y, b.y, c.y)

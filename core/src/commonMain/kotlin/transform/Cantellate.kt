@@ -31,6 +31,7 @@ fun Polyhedron.cantellated(
     scale: Scale? = null,
     forceFaceKinds: List<FaceKindSource>? = null
 ): Polyhedron = transformedPolyhedron(Transform.Cantellated, cr, scale, forceFaceKinds) {
+    require(fs.all(Face::isPlanar)) { "Cantellation requires a planar authoritative face for every source face" }
     val rr = dualReciprocationRadius
     // vertices from the directed edges
     val ev = directedEdges.associateWith { e ->
@@ -67,24 +68,16 @@ fun Polyhedron.cantellated(
 }
 
 fun Polyhedron.dual(): Polyhedron {
-    // The physical Kepler-Poinsot meshes resolve every classical face intersection. Dualize the
-    // underlying regular star form, not those implementation-detail cells.
-    if (!isConvexGeometry) {
-        regularStarDualOrNull()?.let { dual -> return dual.scaled(Scale.Circumradius) }
+    val planeTolerance = EPS * circumradius
+    require(fs.all { face -> face.isPlanar && abs(face.d) > planeTolerance }) {
+        "Dual requires every authoritative source face to have a non-singular oriented plane"
     }
-
-    val direct = polarDual()
-    if (isConvexGeometry || runCatching { direct.validateProperGeometry() }.isSuccess) return direct
-
-    // Polar reciprocation of a reflex vertex can produce a self-crossing dual face even when the
-    // origin lies inside the input. Duality is topological, so use the canonical realization as a
-    // deterministic slower fallback and then reciprocate its supporting planes.
-    return canonical().polarDual().also { it.validateProperGeometry() }
+    return polarDual().also { dual -> dual.validateRenderableImmersion() }
 }
 
 /** Direct polar dual used when a continuous construction must not change meaning via fallback. */
 internal fun Polyhedron.directDual(): Polyhedron =
-    polarDual().also { dual -> dual.validateProperGeometry() }
+    polarDual().also { dual -> dual.validateRenderableImmersion() }
 
 private fun Polyhedron.polarDual(): Polyhedron = transformedPolyhedron(Transform.Dual) {
     val rr = dualReciprocationRadius

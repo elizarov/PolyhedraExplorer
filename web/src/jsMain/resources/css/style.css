@@ -813,6 +813,22 @@ aside.transform-settings .transform-settings-actions {
     padding: 0.25em 0.5em 0.5em;
 }
 
+aside.transform-settings button.transform-setting-snap {
+    position: relative;
+    height: 1.5em;
+    margin-right: auto;
+    padding: 0 0.65em;
+    border: 0;
+    border-radius: 0.75em;
+    color: var(--button-color);
+    background-color: var(--button-background-color);
+    cursor: pointer;
+}
+
+aside.transform-settings button.transform-setting-snap:hover {
+    color: var(--hover-color);
+}
+
 aside.transform-settings button.transform-settings-reset {
     position: relative;
     width: 2em;

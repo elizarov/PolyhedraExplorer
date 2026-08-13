@@ -1,3 +1,5 @@
+import org.gradle.process.CommandLineArgumentProvider
+
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
@@ -45,4 +47,18 @@ tasks.named<org.jetbrains.kotlin.gradle.targets.js.ir.KotlinJsIrLink>(
     // Kotlin 2.4.10's incremental Wasm linker intermittently loses stdlib declarations
     // while linking this multi-platform test executable.
     incrementalWasm = false
+}
+
+val jvmTestCompilation = kotlin.targets.getByName<org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget>("jvm")
+    .compilations.getByName("test")
+
+tasks.register<JavaExec>("stlStressCampaign") {
+    group = "verification"
+    description = "Runs the reproducible opt-in 10,000-case exact STL export campaign."
+    dependsOn("jvmTestClasses")
+    mainClass.set("polyhedra.core.StlStressCampaignKt")
+    classpath = jvmTestCompilation.output.allOutputs + jvmTestCompilation.runtimeDependencyFiles
+    val cases = providers.gradleProperty("stlStressCases").orElse("10000")
+    val seed = providers.gradleProperty("stlStressSeed").orElse("20260813")
+    argumentProviders.add(CommandLineArgumentProvider { listOf(cases.get(), seed.get()) })
 }

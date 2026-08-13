@@ -1,6 +1,7 @@
 package polyhedra.core.poly
 
 import polyhedra.model.poly.*
+import polyhedra.model.api.ResolvedTopologyProvenance
 import polyhedra.model.util.*
 
 private const val DEBUG_MERGE_KINDS = false
@@ -12,6 +13,7 @@ class PolyhedronBuilder(
     private val fs: ArrayList<MutableFace> = ArrayList()
     private val faceKindSources: ArrayList<MutableFaceKindSource> = ArrayList()
     private var forceFaceKinds: List<FaceKindSource>? = null
+    private var resolvedTopologyProvenance: ResolvedTopologyProvenance? = null
 
     fun vertex(p: Vec3, kind: VertexKind = VertexKind(0)): Vertex =
         MutableVertex(vs.size, p, kind).also { vs.add(it) }
@@ -55,6 +57,10 @@ class PolyhedronBuilder(
     fun faceKindSources(faceKindSources: List<FaceKindSource>?) {
         if (faceKindSources == null) return
         for (fks in faceKindSources) faceKindSource(fks.kind, fks.source)
+    }
+
+    fun resolvedTopologyProvenance(provenance: ResolvedTopologyProvenance?) {
+        resolvedTopologyProvenance = provenance
     }
 
     // Optimization: in sync with the corresponding methods of Polyhedron
@@ -116,7 +122,10 @@ class PolyhedronBuilder(
         // Build poly
         // NOTE: New poly needs faceKindSources only when they were not forced
         val poly = Polyhedron(
-            vs, fs, faceKindSources.takeIf { faceKindSources.isNotEmpty() && forceFaceKinds == null }
+            vs,
+            fs,
+            faceKindSources.takeIf { faceKindSources.isNotEmpty() && forceFaceKinds == null },
+            resolvedTopologyProvenance = resolvedTopologyProvenance,
         )
         // return the result if face kind merging is not requested
         if (!mergeIndistinguishableKinds) return poly
@@ -142,7 +151,7 @@ class PolyhedronBuilder(
         fs.renumberKinds(fkg) { FaceKind(it) }
         faceKindSources.renumberKinds(fkg) { FaceKind(it) }
         // Rebuild polyhedron with renumbered kinds
-        return polyhedronCopy(vs, fs, faceKindSources)
+        return polyhedronCopy(vs, fs, faceKindSources, resolvedTopologyProvenance = resolvedTopologyProvenance)
     }
 
     fun debugDump() {
@@ -171,12 +180,14 @@ fun polyhedronCopy(
     vs: List<Vertex>,
     fs: List<Face>,
     faceKindSources: List<FaceKindSource>? = null,
-    mergeIndistinguishableKinds: Boolean = false
+    mergeIndistinguishableKinds: Boolean = false,
+    resolvedTopologyProvenance: ResolvedTopologyProvenance? = null,
 ) =
     polyhedron(mergeIndistinguishableKinds) {
         vertices(vs)
         faces(fs)
         faceKindSources(faceKindSources)
+        resolvedTopologyProvenance(resolvedTopologyProvenance)
     }
 
 private fun <K : Id> Set<Set<K>>.countGroupOccurrences(): IdMap<K, Int> {

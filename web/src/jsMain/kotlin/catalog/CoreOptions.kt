@@ -14,6 +14,7 @@ enum class SeedType(private val displayName: String) {
     Families("Families"),
     Archimedean("Archimedean"),
     Catalan("Catalan"),
+    StarFamilies("Star families"),
     KeplerPoinsot("Kepler-Poinsot"),
     ;
 
@@ -26,16 +27,22 @@ data class Seed(
     val type: SeedType,
     val chirality: Chirality? = null,
     val familyId: FamilySeedId? = null,
+    val starFamilyId: StarFamilySeedId? = null,
 ) : Tagged {
     init {
         require((type == SeedType.Families) == (familyId != null))
+        require((type == SeedType.StarFamilies) == (starFamilyId != null))
+        require(familyId == null || starFamilyId == null)
         require(familyId == null || baseTag == familyId.tag)
+        require(starFamilyId == null || baseTag == starFamilyId.tag)
     }
 
     override val tag: String get() = baseTag.withChirality(chirality)
     val isChiral: Boolean get() = chirality != null
-    val isFamily: Boolean get() = familyId != null
-    override fun toString(): String = (familyId?.toString() ?: name) + chirality?.suffix.orEmpty()
+    val isFamily: Boolean get() = familyId != null || starFamilyId != null
+    val isStarFamily: Boolean get() = starFamilyId != null
+    override fun toString(): String =
+        (familyId?.toString() ?: starFamilyId?.toString() ?: name) + chirality?.suffix.orEmpty()
 
     companion object {
         val Tetrahedron = Seed("T", "Tetrahedron", SeedType.Platonic)
@@ -53,6 +60,29 @@ private val FamilySeedsById: Map<FamilySeedId, Seed> =
 
 private val DefaultFamilySeedOptions: List<Seed> = SeedFamily.entries.map { family ->
     FamilySeedsById.getValue(FamilySeedId(family, MIN_FAMILY_SEED_N))
+}
+
+val StarFamilySeeds: List<Seed> = SeedFamily.entries.flatMap { family ->
+    (MIN_FAMILY_SEED_N..MAX_FAMILY_SEED_N).flatMap { n ->
+        (2..MAX_STAR_FAMILY_SEED_Q).mapNotNull { q ->
+            runCatching { StarFamilySeedId(family, n, q) }.getOrNull()?.let { id ->
+                Seed(
+                    id.tag,
+                    "Star ${family.displayName.lowercase()}",
+                    SeedType.StarFamilies,
+                    starFamilyId = id,
+                )
+            }
+        }
+    }
+}
+private val StarFamilySeedsById: Map<StarFamilySeedId, Seed> =
+    StarFamilySeeds.associateBy { requireNotNull(it.starFamilyId) }
+
+private val DefaultStarFamilySeedOptions: List<Seed> = SeedFamily.entries.map { family ->
+    StarFamilySeedsById.getValue(
+        StarFamilySeedId(family, DEFAULT_STAR_FAMILY_SEED_N, DEFAULT_STAR_FAMILY_SEED_Q)
+    )
 }
 
 val SeedOptions: List<Seed> = listOf(
@@ -88,6 +118,7 @@ val SeedOptions: List<Seed> = listOf(
     Seed("deD", "Deltoidal hexecontahedron", SeedType.Catalan),
     Seed("dbD", "Disdyakis triacontahedron", SeedType.Catalan),
     Seed("dsD", "Pentagonal hexecontahedron", SeedType.Catalan, Chirality.Default),
+) + DefaultStarFamilySeedOptions + listOf(
     Seed("SD", "Stellated dodecahedron", SeedType.KeplerPoinsot),
     Seed("GD", "Great dodecahedron", SeedType.KeplerPoinsot),
     Seed("GSD", "Great stellated dodecahedron", SeedType.KeplerPoinsot),
@@ -96,15 +127,23 @@ val SeedOptions: List<Seed> = listOf(
 
 val Seeds: List<Seed> = SeedOptions.filterNot(Seed::isFamily).flatMap { seed ->
     if (seed.isChiral) listOf(seed, seed.copy(chirality = Chirality.Flipped)) else listOf(seed)
-} + FamilySeeds
+} + FamilySeeds + StarFamilySeeds
 
 fun Seed.withFamilyN(n: Int): Seed {
     val family = requireNotNull(familyId).family
     return FamilySeedsById.getValue(FamilySeedId(family, n))
 }
 
+fun Seed.withStarFamilyValues(n: Int, q: Int): Seed {
+    val family = requireNotNull(starFamilyId).family
+    return StarFamilySeedsById.getValue(StarFamilySeedId(family, n, q))
+}
+
+fun Seed.withStarFamilyId(id: StarFamilySeedId): Seed =
+    StarFamilySeedsById.getValue(id.copy(family = requireNotNull(starFamilyId).family))
+
 val Seed.optionKey: String
-    get() = familyId?.family?.tagPrefix ?: baseTag
+    get() = familyId?.family?.tagPrefix ?: starFamilyId?.family?.starTagPrefix ?: baseTag
 
 fun Seed.flippedChirality(): Seed {
     val flipped = requireNotNull(chirality).flipped()
@@ -140,6 +179,7 @@ data class Transform(
         val Canonical = transform(TransformOperation.Canonical, "Canonical")
         val Greatened = transform(TransformOperation.Greatened, "Greatened", TransformCategory.Star)
         val Stellated = transform(TransformOperation.Stellated, "Stellated", TransformCategory.Star)
+        val Resolve = transform(TransformOperation.Resolve, "Resolve", TransformCategory.Star)
 
         val Kis = macro(TransformOperation.Kis)
         val Join = macro(TransformOperation.Join)
@@ -187,8 +227,10 @@ enum class OrbitTargetedOperation(
     DropEdge("Drop edge", "fa-remove"),
     DropVertex("Drop vertex", "fa-remove"),
     KisFace("Kis face", "fa-caret-up"),
+    StellateFace("Stellate face", "fa-star"),
     TruncateVertex("Truncate vertex", "fa-scissors"),
-    RectifyVertex("Rectify vertex", "fa-compress");
+    RectifyVertex("Rectify vertex", "fa-compress"),
+    RadialVertex("Radial vertex", "fa-arrows-v");
 }
 
 val PrimitiveTransforms: List<Transform> = listOf(
@@ -204,6 +246,7 @@ val PrimitiveTransforms: List<Transform> = listOf(
     Transform.Canonical,
     Transform.Greatened,
     Transform.Stellated,
+    Transform.Resolve,
 )
 
 val MacroTransforms: List<Transform> = listOf(
@@ -245,7 +288,13 @@ data class TransformSetting(
 
 val Transform.settings: List<TransformSetting>
     get() = id.transformTweakRanges().map { (tweak, range) ->
-        TransformSetting(tweak, tweak.name, range.min, range.max)
+        TransformSetting(
+            tweak,
+            if (tweak == TransformTweak.StellationResult) "Result" else tweak.name,
+            range.min,
+            range.max,
+            step = if (tweak == TransformTweak.StellationResult) 1.0 else 0.01,
+        )
     }
 
 fun Transform.withTweak(tweak: TransformTweak, value: Double): Transform =
@@ -284,6 +333,20 @@ fun RectifyVertex(kind: VertexKind): Transform =
         TransformCategory.OrbitTargeted,
     )
 
+fun RadialVertex(kind: VertexKind): Transform =
+    Transform(
+        TransformId(TransformOperation.Radial, target = kind),
+        "Radial $kind",
+        TransformCategory.OrbitTargeted,
+    )
+
+fun StellateFace(kind: FaceKind): Transform =
+    Transform(
+        TransformId(TransformOperation.StellateFace, target = kind),
+        "Stellate $kind",
+        TransformCategory.OrbitTargeted,
+    )
+
 data class OrbitTarget(
     val operation: OrbitTargetedOperation,
     val kind: AnyKind,
@@ -294,10 +357,12 @@ fun Transform.orbitTargetOrNull(): OrbitTarget? {
     val operation = when {
         id.operation == TransformOperation.Drop && kind is FaceKind -> OrbitTargetedOperation.DropFace
         id.operation == TransformOperation.Kis && kind is FaceKind -> OrbitTargetedOperation.KisFace
+        id.operation == TransformOperation.StellateFace && kind is FaceKind -> OrbitTargetedOperation.StellateFace
         id.operation == TransformOperation.Drop && kind is EdgeKind -> OrbitTargetedOperation.DropEdge
         id.operation == TransformOperation.Drop && kind is VertexKind -> OrbitTargetedOperation.DropVertex
         id.operation == TransformOperation.Truncated && kind is VertexKind -> OrbitTargetedOperation.TruncateVertex
         id.operation == TransformOperation.Rectified && kind is VertexKind -> OrbitTargetedOperation.RectifyVertex
+        id.operation == TransformOperation.Radial && kind is VertexKind -> OrbitTargetedOperation.RadialVertex
         else -> return null
     }
     return OrbitTarget(operation, kind)
@@ -317,6 +382,8 @@ fun String.toTransformOrNull(): Transform? {
         TransformOperation.Kis -> KisFace(kind as? FaceKind ?: return null)
         TransformOperation.Truncated -> TruncateVertex(kind as? VertexKind ?: return null)
         TransformOperation.Rectified -> RectifyVertex(kind as? VertexKind ?: return null)
+        TransformOperation.Radial -> RadialVertex(kind as? VertexKind ?: return null)
+        TransformOperation.StellateFace -> StellateFace(kind as? FaceKind ?: return null)
         else -> return null
     }
     if (!transform.accepts(spec.tweaks)) return null

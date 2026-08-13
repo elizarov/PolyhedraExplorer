@@ -5,6 +5,8 @@
 package polyhedra.web.poly
 
 import org.khronos.webgl.*
+import polyhedra.model.api.CoreStlPresentation
+import polyhedra.model.api.CoreStlRequest
 import polyhedra.model.poly.*
 import polyhedra.model.util.*
 import polyhedra.web.glsl.*
@@ -30,6 +32,7 @@ class FaceContext(
     val printLightness by { params.printPreview.lightness.value }
     val printChroma by { params.printPreview.chroma.value }
     val printHue by { params.printPreview.hue.value }
+    val resolvedRims by { params.poly.resolvedRims }
     
     // effectively hidden faces
     val hiddenFaces by {
@@ -48,6 +51,7 @@ class FaceContext(
     val innerBuffer = createUint8Buffer(gl)
     val faceModeBuffer = createUint8Buffer(gl)
     val indexBuffer = createUint32Buffer(gl)
+    private val targetSurfaceIds = arrayListOf<Int>()
 
     init { setup() }
 
@@ -57,7 +61,15 @@ class FaceContext(
         val altFaceKind = animation?.let {
             { f: Face -> it.prevPoly.fs[f.id].kind }
         }
-        indexSize = target.update(poly, altFaceKind, innerBuffer, faceModeBuffer, indexBuffer)
+        targetSurfaceIds.clear()
+        indexSize = target.update(
+            poly,
+            altFaceKind,
+            innerBuffer,
+            faceModeBuffer,
+            indexBuffer,
+            surfaceIds = targetSurfaceIds,
+        )
         animation?.let {
             val prevIndexSize = prev.update(it.prevPoly, { f -> poly.fs[f.id].kind })
             check(prevIndexSize == indexSize)
@@ -78,32 +90,63 @@ class FaceContext(
             innerBuffer: Uint8Buffer? = null,
             faceModeBuffer: Uint8Buffer? = null,
             indexBuffer: Uint32Buffer? = null,
+            exportParams: FaceExportParams? = null,
+            surfaceIds: MutableList<Int>? = null,
         ): Int {
             fun faceShown(f: Face): Boolean =
                 f.kind !in hiddenFaces && (altFaceKind == null || altFaceKind(f) !in hiddenFaces)
 
+            val includeExpand = exportParams?.let { it.expand > 0.0 } ?: hasExpand
+            val includeRim = exportParams?.let { it.rim > 0.0 } ?: hasRim
+            val includeWidth = exportParams?.let { it.width > 0.0 } ?: hasWidth
+            val hasHiddenFaces = hiddenFaces.isNotEmpty()
+
             var bufferSize = 0
             var indexSize = 0
-            val hasHiddenFaces = hiddenFaces.isNotEmpty()
+            val resolvedRimByFace = if (animation == null) {
+                resolvedRims.associateBy { rim -> rim.sourceFaceId }
+            } else {
+                emptyMap()
+            }
+            val rimMeshesByFace = resolvedRimByFace.mapValues { (faceId, rim) ->
+                val face = poly.fs[faceId]
+                rim.regions.map { region -> region.triangulate(face) }
+            }
             for (f in poly.fs) {
+                val resolved = poly.resolvedFaces[f.id]
                 if (faceShown(f)) {
-                    bufferSize += f.size
-                    indexSize += f.triangles.size * 3
-                    if (hasHiddenFaces || hasExpand) {
-                        bufferSize += f.size
-                        indexSize += f.triangles.size * 3
+                    bufferSize += resolved.vertices.size
+                    indexSize += resolved.triangles.size * 3
+                    if (hasHiddenFaces || includeExpand) {
+                        bufferSize += resolved.vertices.size
+                        indexSize += resolved.triangles.size * 3
                     }
                 } else {
-                    if (hasRim) {
-                        bufferSize += 2 * 2 * f.size
-                        indexSize += 2 * 6 * f.size
-                    }
-                    if (hasWidth) {
-                        bufferSize += 2 * f.size
-                        indexSize += 6 * f.size
+                    val rimMeshes = rimMeshesByFace[f.id]
+                    if (rimMeshes != null && includeRim) {
+                        val rimVertexCount = rimMeshes.sumOf { mesh -> mesh.vertices.size }
+                        val rimIndexCount = rimMeshes.sumOf { mesh -> mesh.triangles.size }
+                        bufferSize += 2 * rimVertexCount
+                        indexSize += 2 * rimIndexCount
+                        if (includeWidth) {
+                            val boundaryVertexCount = rimMeshes.sumOf { mesh ->
+                                mesh.cycles.sumOf { cycle -> cycle.vertices.size }
+                            }
+                            bufferSize += 2 * boundaryVertexCount
+                            indexSize += 6 * boundaryVertexCount
+                        }
+                    } else {
+                        if (includeRim) {
+                            bufferSize += 2 * 2 * f.size
+                            indexSize += 2 * 6 * f.size
+                        }
+                        if (includeWidth) {
+                            bufferSize += 2 * f.size
+                            indexSize += 6 * f.size
+                        }
                     }
                 }
-                if (hasExpand && hasWidth) {
+                if (includeExpand && includeWidth) {
                     bufferSize += 2 * f.size
                     indexSize += 6 * f.size
                 }
@@ -120,9 +163,10 @@ class FaceContext(
 
             var idxOfs = 0
             var bufOfs = 0
+            var nextSurfaceId = 0
             val printColor = if (printPreview) oklchColor(printLightness, printChroma, printHue) else null
 
-            fun Uint32Buffer.indexTriangle(a: Int, b: Int, c: Int, invert: Boolean) {
+            fun Uint32Buffer.indexTriangle(a: Int, b: Int, c: Int, invert: Boolean, surfaceId: Int) {
                 this[idxOfs++] = a
                 if (invert) {
                     this[idxOfs++] = c
@@ -131,15 +175,21 @@ class FaceContext(
                     this[idxOfs++] = b
                     this[idxOfs++] = c
                 }
+                surfaceIds?.add(surfaceId)
             }
 
-            fun makeFace(f: Face, faceColor: Color, inner: Boolean) {
-                val n = f.size
+            fun makeFace(
+                f: Face,
+                resolved: ResolvedFaceGeometry,
+                faceColor: Color,
+                inner: Boolean,
+            ) {
+                val n = resolved.vertices.size
                 var ofs = bufOfs
                 val lNorm: Vec3 = if (inner) -f else f
                 val innerFlag = if (inner) 1 else 0
                 for (i in 0 until n) {
-                    positionBuffer[ofs] = f[i]
+                    positionBuffer[ofs] = resolved.vertices[i].position
                     lightNormalBuffer[ofs] = lNorm
                     expandDirBuffer[ofs] = f
                     rimDirBuffer[ofs] = Vec3.ZERO
@@ -150,23 +200,27 @@ class FaceContext(
                     ofs++
                 }
                 if (indexBuffer != null) {
-                    for (triangle in f.triangles) {
+                    val surfaceId = nextSurfaceId++
+                    for (triangle in resolved.triangles) {
                         indexBuffer.indexTriangle(
                             bufOfs + triangle.a,
                             bufOfs + triangle.b,
                             bufOfs + triangle.c,
                             inner,
+                            surfaceId,
                         )
                     }
                 }
                 bufOfs = ofs
             }
 
-            fun Uint32Buffer.indexRectangles(n: Int, invert: Boolean) {
+            fun Uint32Buffer.indexRectangles(n: Int, invert: Boolean, separateSurfaces: Boolean) {
+                val commonSurfaceId = if (separateSurfaces) -1 else nextSurfaceId++
                 for (i in 0 until n) {
                     val j = (i + 1) % n
-                    indexTriangle(bufOfs + 2 * i, bufOfs + 2 * i + 1, bufOfs + 2 * j, invert)
-                    indexTriangle(bufOfs + 2 * i + 1, bufOfs + 2 * j + 1, bufOfs + 2 * j, invert)
+                    val surfaceId = if (separateSurfaces) nextSurfaceId++ else commonSurfaceId
+                    indexTriangle(bufOfs + 2 * i, bufOfs + 2 * i + 1, bufOfs + 2 * j, invert, surfaceId)
+                    indexTriangle(bufOfs + 2 * i + 1, bufOfs + 2 * j + 1, bufOfs + 2 * j, invert, surfaceId)
                 }
             }
 
@@ -188,7 +242,7 @@ class FaceContext(
                         ofs++
                     }
                 }
-                indexBuffer?.indexRectangles(n, inner)
+                indexBuffer?.indexRectangles(n, inner, separateSurfaces = false)
                 bufOfs = ofs
             }
 
@@ -209,28 +263,103 @@ class FaceContext(
                         ofs++
                     }
                 }
-                indexBuffer?.indexRectangles(f.size, noRim)
+                indexBuffer?.indexRectangles(f.size, noRim, separateSurfaces = true)
                 bufOfs = ofs
+            }
+
+            fun makeResolvedRim(
+                f: Face,
+                meshes: List<TriangulatedRimRegion>,
+                faceColor: Color,
+                inner: Boolean,
+            ) {
+                val lNorm: Vec3 = if (inner) -f else f
+                val innerFlag = if (inner) 1 else 0
+                for (mesh in meshes) {
+                    val base = bufOfs
+                    val surfaceId = nextSurfaceId++
+                    for (position in mesh.vertices) {
+                        positionBuffer[bufOfs] = position
+                        lightNormalBuffer[bufOfs] = lNorm
+                        expandDirBuffer[bufOfs] = f
+                        rimDirBuffer[bufOfs] = Vec3.ZERO
+                        rimMaxBuffer[bufOfs] = 0.0
+                        colorBuffer[bufOfs] = faceColor
+                        innerBuffer?.set(bufOfs, innerFlag)
+                        faceModeBuffer?.set(bufOfs, if (f.kind == selectedFace) FACE_SELECTED else FACE_NORMAL)
+                        bufOfs++
+                    }
+                    if (indexBuffer != null) for (triangle in mesh.triangles.indices step 3) {
+                        val a = mesh.triangles[triangle]
+                        val b = mesh.triangles[triangle + 1]
+                        val c = mesh.triangles[triangle + 2]
+                        val reversed = ((mesh.vertices[b] - mesh.vertices[a]) cross
+                            (mesh.vertices[c] - mesh.vertices[a])) * f < 0.0
+                        indexBuffer.indexTriangle(base + a, base + b, base + c, inner xor reversed, surfaceId)
+                    }
+                }
+            }
+
+            fun makeResolvedRimBorders(
+                f: Face,
+                meshes: List<TriangulatedRimRegion>,
+                faceColor: Color,
+            ) {
+                for (cycle in meshes.flatMap(TriangulatedRimRegion::cycles)) {
+                    val base = bufOfs
+                    for (index in cycle.vertices.indices) {
+                        val a = cycle.vertices[index]
+                        val b = cycle.vertices[(index + 1) % cycle.vertices.size]
+                        val sideNormal = (b cross a).unit
+                        for (innerFlag in 0..1) {
+                            positionBuffer[bufOfs] = a
+                            lightNormalBuffer[bufOfs] = sideNormal
+                            expandDirBuffer[bufOfs] = f
+                            rimDirBuffer[bufOfs] = Vec3.ZERO
+                            rimMaxBuffer[bufOfs] = 0.0
+                            colorBuffer[bufOfs] = faceColor
+                            innerBuffer?.set(bufOfs, innerFlag)
+                            faceModeBuffer?.set(bufOfs, if (f.kind == selectedFace) FACE_SELECTED else FACE_NORMAL)
+                            bufOfs++
+                        }
+                    }
+                    if (indexBuffer != null) {
+                        for (index in cycle.vertices.indices) {
+                            val next = (index + 1) % cycle.vertices.size
+                            val surfaceId = nextSurfaceId++
+                            indexBuffer.indexTriangle(base + 2 * index, base + 2 * index + 1, base + 2 * next, false, surfaceId)
+                            indexBuffer.indexTriangle(base + 2 * index + 1, base + 2 * next + 1, base + 2 * next, false, surfaceId)
+                        }
+                    }
+                }
             }
 
             for (f in poly.fs) {
                 val faceColor = printColor ?: PolyStyle.faceColor(f)
+                val resolved = poly.resolvedFaces[f.id]
                 // Note: In GL front faces are CCW
                 if (faceShown(f)) {
-                    makeFace(f, faceColor,false)
-                    if (hasHiddenFaces || hasExpand) {
-                        makeFace(f, faceColor, true)
+                    makeFace(f, resolved, faceColor,false)
+                    if (hasHiddenFaces || includeExpand) {
+                        makeFace(f, resolved, faceColor, true)
                     }
                 } else {
-                    if (hasRim) {
-                        makeRim(f, poly.faceRim(f), faceColor, false)
-                        makeRim(f, poly.faceRim(f), faceColor, true)
-                    }
-                    if (hasWidth) {
-                        makeBorder(f, poly.faceRim(f), faceColor, false)
+                    val rimMeshes = rimMeshesByFace[f.id]
+                    if (rimMeshes != null && includeRim) {
+                        makeResolvedRim(f, rimMeshes, faceColor, false)
+                        makeResolvedRim(f, rimMeshes, faceColor, true)
+                        if (includeWidth) makeResolvedRimBorders(f, rimMeshes, faceColor)
+                    } else {
+                        if (includeRim) {
+                            makeRim(f, poly.faceRim(f), faceColor, false)
+                            makeRim(f, poly.faceRim(f), faceColor, true)
+                        }
+                        if (includeWidth) {
+                            makeBorder(f, poly.faceRim(f), faceColor, false)
+                        }
                     }
                 }
-                if (hasExpand && hasWidth) {
+                if (includeExpand && includeWidth) {
                     makeBorder(f, poly.faceRim(f), faceColor, true)
                 }
             }
@@ -293,6 +422,19 @@ class FaceContext(
             setIndex(v3, indexBuffer[i + 2])
             block(v1, v2, v3)
         }
+    }
+
+    fun buildStlRequest(exportParams: FaceExportParams): CoreStlRequest {
+        return CoreStlRequest(
+            presentation = CoreStlPresentation(
+                poly = poly,
+                hiddenFaceKinds = hiddenFaces.sorted(),
+                scale = exportParams.scale,
+                width = exportParams.width,
+                rim = exportParams.rim,
+                expand = exportParams.expand,
+            ),
+        )
     }
 }
 

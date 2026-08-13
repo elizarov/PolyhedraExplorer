@@ -68,7 +68,7 @@ class TransformMacroUiTest {
             listOf("Kis", "Join", "Needle", "Zip", "Cantellated", "Bevelled", "Ortho", "Meta", "Gyro"),
             optionsBySection.getValue("Macro"),
         )
-        assertEquals(listOf("Greatened", "Stellated"), optionsBySection.getValue("Star"))
+        assertEquals(listOf("Greatened", "Stellated", "Resolve"), optionsBySection.getValue("Star"))
     }
 
     @Test

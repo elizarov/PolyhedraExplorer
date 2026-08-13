@@ -13,6 +13,7 @@ private object ScaledKey
 fun Polyhedron.scaled(factor: Double): Polyhedron = transformedPolyhedron(ScaledKey, factor) {
     for (v in vs) vertex(factor * v, v.kind)
     for (f in fs) face(f)
+    resolvedTopologyProvenance(resolvedTopologyProvenance)
 
 }
                                                               

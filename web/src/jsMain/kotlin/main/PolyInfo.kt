@@ -164,7 +164,11 @@ private fun FacesPopup(params: RenderParams, poly: Polyhedron) {
                                 FaceVisibilityControl(
                                     params.poly.hideFaces,
                                     kind,
-                                    faceRim >= poly.faceRim(face).maxRim,
+                                    faceRim >= (
+                                        params.poly.resolvedRims.firstOrNull { rim ->
+                                            rim.sourceFaceKind == kind
+                                        }?.maximumWidth ?: poly.faceRim(face).maxRim
+                                    ),
                                 )
                             }
                         }

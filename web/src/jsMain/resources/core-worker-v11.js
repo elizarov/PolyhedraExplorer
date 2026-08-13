@@ -4,11 +4,18 @@ self.onmessage = async event => {
     let request
     try {
         request = JSON.parse(event.data)
-        coreModulePromise ??= import("./core-v7/PolyhedraExplorer-core.mjs")
+        coreModulePromise ??= import("./core-v11/PolyhedraExplorer-core.mjs")
         const core = await coreModulePromise
-        const response = await core.evaluateCoreJson(request.requestJson, (transformIndex, done) => {
-            self.postMessage(JSON.stringify({ id: request.id, type: "progress", transformIndex, done }))
-        })
+        let response
+        if (request.kind === "stl") {
+            response = await core.convertStlJson(request.requestJson, done => {
+                self.postMessage(JSON.stringify({ id: request.id, type: "progress", done }))
+            })
+        } else {
+            response = await core.evaluateCoreJson(request.requestJson, (transformIndex, done) => {
+                self.postMessage(JSON.stringify({ id: request.id, type: "progress", transformIndex, done }))
+            })
+        }
         self.postMessage(JSON.stringify({
             id: request.id,
             type: "success",
