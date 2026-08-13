@@ -51,7 +51,7 @@ internal object KeplerPoinsotGeometry {
         )
     }
 
-    // Retained only as a migration oracle for the generic Resolve implementation.
+    // Retained only as a migration oracle for the generic Resolved implementation.
     val stellatedDodecahedron: Polyhedron by lazy {
         resolveStarSurface(
             regularPentagonFaces(icosahedronGeometry.vs, star = true),

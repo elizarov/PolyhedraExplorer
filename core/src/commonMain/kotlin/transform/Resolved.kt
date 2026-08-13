@@ -33,9 +33,9 @@ import kotlin.math.floor
 
 /** Selects the embedded zero/nonzero-winding interface of an immersed source surface. */
 @Serializable
-class Resolve : Transform() {
+class Resolved : Transform() {
     @Transient
-    override val id = TransformId(TransformOperation.Resolve)
+    override val id = TransformId(TransformOperation.Resolved)
     @Transient
     override val support = TransformSupport(
         topologyRequirement = TopologyRequirement.PlanarArrangement,
@@ -130,9 +130,9 @@ private suspend fun resolveSurface(
     toleranceFloor: Double,
     validateResult: Boolean,
 ): Polyhedron {
-    require(radius.isFinite() && radius > 0.0) { "Resolve requires a finite nonzero circumradius" }
+    require(radius.isFinite() && radius > 0.0) { "Resolved requires a finite nonzero circumradius" }
     val tolerance = maxOf(EPS * radius * 32.0, 1e-12 * radius, toleranceFloor)
-    require(source.isNotEmpty()) { "Resolve requires presentation triangles" }
+    require(source.isNotEmpty()) { "Resolved requires presentation triangles" }
     val windingClassifier = WindingClassifier(source, tolerance)
 
     val cuts = List(source.size) { mutableListOf<CutLine>() }
@@ -149,7 +149,7 @@ private suspend fun resolveSurface(
                 if (!allowCoplanarOverlap) {
                     throw TransformApplicabilityException(
                         CoreIssueCode.TransformNotApplicable,
-                        "Resolve does not support coincident or positive-area overlapping source faces",
+                        "Resolved does not support coincident or positive-area overlapping source faces",
                     )
                 }
                 // STL pieces can overlap in their own plane (for example a visible face and a
@@ -196,7 +196,7 @@ private suspend fun resolveSurface(
     if (fragments.isEmpty()) {
         throw TransformApplicabilityException(
             CoreIssueCode.TransformNotApplicable,
-            "Resolve found no zero/nonzero-winding boundary",
+            "Resolved found no zero/nonzero-winding boundary",
         )
     }
 
@@ -235,7 +235,7 @@ private suspend fun resolveSurface(
     if (componentCount != 1) {
         throw TransformApplicabilityException(
             CoreIssueCode.DisconnectedMaterial,
-            "Resolve produced $componentCount disconnected material components",
+            "Resolved produced $componentCount disconnected material components",
         )
     }
     progress?.reportProgress(90)
@@ -917,7 +917,7 @@ private fun TriangleBoundary.mergeCoplanarFaces(tolerance: Double): PolygonBound
     outputEdgeUses.entries.firstOrNull { it.value.size != 2 }?.let { edge ->
         throw TransformApplicabilityException(
             CoreIssueCode.TransformNotApplicable,
-            "Merged Resolve edge ${edge.key} has ${edge.value.size} incident faces ${edge.value}; " +
+            "Merged Resolved edge ${edge.key} has ${edge.value.size} incident faces ${edge.value}; " +
                 "positions=${positions[edge.key.a]},${positions[edge.key.b]}; details=${edge.value.map { faceIndex ->
                     val face = orderedFaces[faceIndex]
                     val a = positions[face.vertexIds[0]]

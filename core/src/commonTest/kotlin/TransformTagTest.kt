@@ -81,7 +81,7 @@ class TransformTagTest {
     @Test
     fun newOperationAndTweakTagsHaveCanonicalForms() {
         assertEquals(
-            TransformSpec(TransformId(TransformOperation.Resolve)),
+            TransformSpec(TransformId(TransformOperation.Resolved)),
             "R".parseTransformTag(),
         )
         assertEquals(

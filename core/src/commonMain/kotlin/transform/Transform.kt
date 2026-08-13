@@ -99,7 +99,7 @@ sealed class Transform : Tagged {
         val Canonical: Transform by Canonical()
         val Greatened: Transform by Greatened()
         val Stellated: Transform by Stellated()
-        val Resolve: Transform by Resolve()
+        val Resolved: Transform by Resolved()
 
         val Transforms: List<Transform> = registeredTransforms.toList()
 

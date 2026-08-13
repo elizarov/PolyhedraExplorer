@@ -22,7 +22,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
-class ResolveTest {
+class ResolvedTest {
     @Test
     fun embeddedInputIsAnIdentity() {
         assertSame(Seed.Cube.poly, Seed.Cube.poly.resolved())
@@ -139,7 +139,7 @@ class ResolveTest {
     }
 
     @Test
-    fun serializedResolveRunsThroughCoreApi() = runTest {
+    fun serializedResolvedRunsThroughCoreApi() = runTest {
         val response = evaluateCore(CoreRequest(CoreState("SD", listOf("R"), "c")))
 
         assertNull(response.error)
@@ -168,7 +168,7 @@ class ResolveTest {
     }
 
     @Test
-    fun coreReportsBothImmersionClassesIndependentlyBeforeResolve() = runTest {
+    fun coreReportsBothImmersionClassesIndependentlyBeforeResolvedTransform() = runTest {
         val response = evaluateCore(CoreRequest(CoreState("SD", emptyList(), "c")))
         val analysis = requireNotNull(response.geometryAnalysis)
 

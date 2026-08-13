@@ -196,6 +196,18 @@ class CoreApiTest {
     }
 
     @Test
+    fun usesResolvedInGeneratedPolyhedronName() = runTest {
+        val response = evaluateCore(
+            CoreRequest(
+                state = CoreState("T", listOf("R"), "c"),
+            )
+        )
+
+        assertNull(response.error)
+        assertEquals("Resolved Tetrahedron", response.polyName)
+    }
+
+    @Test
     fun recognizesCatalogSeedReachedThroughEquivalentConstruction() = runTest {
         val response = evaluateCore(
             CoreRequest(

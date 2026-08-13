@@ -54,7 +54,7 @@ class IntersectionStatusUiTest {
         assertTrue(tooltip.contains("Crossings between face surfaces: 7"))
 
         indicator.click()
-        assertEquals(listOf(Transform.Resolve), params.transforms.value)
+        assertEquals(listOf(Transform.Resolved), params.transforms.value)
         return awaitRecomposition().then {
             assertNull(host.querySelector(".intersection-indicator"))
         }
@@ -78,7 +78,7 @@ class IntersectionStatusUiTest {
         )
         assertTrue(owner?.textContent.orEmpty().contains("Canonical"))
         assertTrue(keyboard.acceptSuggestion(), "Enter action must accept the visible Resolved action")
-        assertEquals(listOf(Transform.Canonical, Transform.Resolve), params.transforms.value)
+        assertEquals(listOf(Transform.Canonical, Transform.Resolved), params.transforms.value)
     }
 
     @Test

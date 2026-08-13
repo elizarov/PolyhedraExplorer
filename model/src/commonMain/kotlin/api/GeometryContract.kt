@@ -55,7 +55,7 @@ data class ResolvedElementProvenance(
     val sourceSegmentPoints: List<SourceSegmentPoint> = emptyList(),
 )
 
-/** Many-to-many source mapping for the final topology emitted by Resolve. */
+/** Many-to-many source mapping for the final topology emitted by the Resolved transform. */
 @Serializable
 data class ResolvedTopologyProvenance(
     val vertices: List<ResolvedElementProvenance>,

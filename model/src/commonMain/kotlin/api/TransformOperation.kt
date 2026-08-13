@@ -34,7 +34,7 @@ enum class TransformOperation(
     Drop("x"),
     // Keep newly introduced entries at the end so existing enum ordinals remain stable across
     // separately cached Kotlin/JS modules. Serialized identity still comes exclusively from tag.
-    Resolve("R"),
+    Resolved("R"),
     Radial("r"),
     StellateFace("f"),
 }

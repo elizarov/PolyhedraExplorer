@@ -104,7 +104,7 @@ class KeplerPoinsotTest {
             .filter { operation -> operation !in setOf(
                 TransformOperation.None,
                 TransformOperation.Drop,
-                TransformOperation.Resolve,
+                TransformOperation.Resolved,
                 TransformOperation.Radial,
                 TransformOperation.StellateFace,
             ) }

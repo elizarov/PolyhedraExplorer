@@ -36,7 +36,7 @@ class TransformSupportTest {
         assertEquals(TopologyRequirement.FacePlanes, Transform.Dual.support.topologyRequirement)
         assertEquals(FaceRequirement.NonSingularPlanar, Transform.Cantellated.support.faceRequirement)
         assertEquals(TransformOutputPolicy.RenderableImmersion, Transform.Stellated.support.outputPolicy)
-        assertEquals(TopologyRequirement.PlanarArrangement, Transform.Resolve.support.topologyRequirement)
+        assertEquals(TopologyRequirement.PlanarArrangement, Transform.Resolved.support.topologyRequirement)
     }
 
     @Test

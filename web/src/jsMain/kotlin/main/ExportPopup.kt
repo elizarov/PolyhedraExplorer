@@ -16,6 +16,8 @@ import polyhedra.web.util.oklchColor
 import polyhedra.web.util.toHexString
 import polyhedra.web.worker.convertStlInWasm
 
+internal fun String.toExportFileBaseName(): String = replace(' ', '_').lowercase()
+
 @Composable
 fun ExportPopup(params: RootParams, faces: FaceContext?, onPickColor: () -> Unit = {}) {
     params.observe()
@@ -60,7 +62,7 @@ fun ExportPopup(params: RootParams, faces: FaceContext?, onPickColor: () -> Unit
             if (!hasFaces || stlBusy) disabled()
             onClick {
                 val faceContext = faces ?: return@onClick
-                val name = polyName.replace(' ', '_').lowercase()
+                val name = polyName.toExportFileBaseName()
                 val exportParams = FaceExportParams(scale, faceWidth, faceRim, expandFaces)
                 stlError = null
                 stlProgress = 0
@@ -109,7 +111,7 @@ fun ExportPopup(params: RootParams, faces: FaceContext?, onPickColor: () -> Unit
     Div(attrs = { classes("control", "row") }) {
         Button(attrs = {
             onClick {
-                val name = polyName.replace(' ', '_').lowercase()
+                val name = polyName.toExportFileBaseName()
                 val exportParams = FaceExportParams(scale, faceWidth, faceRim, expandFaces)
                 download(
                     "$name.scad",

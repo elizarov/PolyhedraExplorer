@@ -12,6 +12,7 @@ import polyhedra.core.poly.Seed
 import polyhedra.model.api.CoreStlPresentation
 import polyhedra.model.api.CoreStlRequest
 import polyhedra.model.poly.FaceKind
+import polyhedra.web.main.toExportFileBaseName
 import polyhedra.web.poly.FaceContext
 import polyhedra.web.poly.FaceExportParams
 import polyhedra.web.poly.RenderParams
@@ -30,6 +31,11 @@ class ExportStlTest {
     @AfterTest
     fun tearDown() {
         scope.cancel()
+    }
+
+    @Test
+    fun usesResolvedInProposedExportFileName() {
+        assertEquals("resolved_tetrahedron", "Resolved Tetrahedron".toExportFileBaseName())
     }
 
     @Test

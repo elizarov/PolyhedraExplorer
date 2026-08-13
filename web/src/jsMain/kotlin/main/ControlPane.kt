@@ -62,12 +62,12 @@ internal fun ControlPane(
     }
     val intersectionStatus = params.geometryAnalysis?.toIntersectionIndicatorOrNull()
         ?.takeIf {
-            transformError == null && transforms.lastOrNull()?.operation != TransformOperation.Resolve
+            transformError == null && transforms.lastOrNull()?.operation != TransformOperation.Resolved
         }
 
-    fun appendResolve() {
+    fun appendResolved() {
         togglePopup(null)
-        params.transforms.updateValue(transforms + Transform.Resolve)
+        params.transforms.updateValue(transforms + Transform.Resolved)
     }
 
     fun possibleTransformsAt(index: Int): Set<Transform> {
@@ -260,7 +260,7 @@ internal fun ControlPane(
             return true
         }
         if (intersectionStatus != null) {
-            appendResolve()
+            appendResolved()
             return true
         }
         return false
@@ -407,7 +407,7 @@ internal fun ControlPane(
                     params.transformWarnings.getOrNull(index)?.let { MessageButton(index, it, ::updateTransform) }
                 }
                 if (index == transforms.lastIndex && intersectionStatus != null) {
-                    IntersectionButton(intersectionStatus, ::appendResolve)
+                    IntersectionButton(intersectionStatus, ::appendResolved)
                 }
             }
             if (prefixReplacement?.startIndex == index) {
@@ -473,7 +473,7 @@ internal fun ControlPane(
                 ChiralityFlipButton(::flipSeedChirality)
             }
             if (transforms.isEmpty() && intersectionStatus != null) {
-                IntersectionButton(intersectionStatus, ::appendResolve)
+                IntersectionButton(intersectionStatus, ::appendResolved)
             }
         }
 
@@ -801,11 +801,11 @@ private fun MessageButton(
 @Composable
 private fun IntersectionButton(
     message: IndicatorMessage<String>,
-    appendResolve: () -> Unit,
+    appendResolved: () -> Unit,
 ) {
     Button(attrs = {
         classes("msg", "intersection-indicator")
         attr("aria-label", "Add Resolved transform")
-        onClick { appendResolve() }
+        onClick { appendResolved() }
     }) { MessageSpan(message) }
 }

@@ -131,7 +131,7 @@ private suspend fun runCampaignCase(index: Int, fixtureSeed: Long): CampaignOutc
 
 private fun CoreStlError.campaignCategory(): String {
     val category = when {
-        "Merged Resolve edge" in reason -> "merged boundary is not two-manifold"
+        "Merged Resolved edge" in reason -> "merged boundary is not two-manifold"
         "Resolved boundary edge" in reason -> "triangulated boundary is not two-manifold"
         "disconnected material components" in reason -> "resolved material is disconnected"
         "degenerate triangle" in reason -> "arrangement contains a degenerate triangle"
