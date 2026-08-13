@@ -81,9 +81,12 @@ Two output forms are used:
   expansion is emitted as one `polyhedron`. Planar resolved cells remain polygon cycles; simple
   non-planar faces use their deterministic triangles.
 - **Piece union.** An immersed presentation, hidden face orbit, or nonzero expansion is emitted as
-  one explicit `union()` of individually closed face or rim extrusions. Planar regions preserve
-  outer and hole paths, including pentagram rims; non-planar regions are emitted as closed triangle
-  pieces.
+  one explicit `union()` of individually closed face or rim extrusions. Each extrusion tapers by
+  the presentation's shared radial inner scale: its front boundary uses the displayed surface and
+  its back boundary uses the same vertices scaled toward the origin. Adjacent pieces therefore
+  share their complete inner edges and vertex endpoints instead of extending perpendicular blocks
+  through one another. Planar regions preserve outer and hole paths, including pentagram rims;
+  non-planar regions are emitted as closed triangle pieces.
 
 Every piece-union member has front and back caps and side walls. The application does not pre-union
 pieces from different faces and does not ask OpenSCAD to repair open sheets. OpenSCAD's geometry
@@ -93,8 +96,9 @@ engine removes internal walls and produces the final solid when the script is re
 
 Focused core tests cover presentation construction, arrangement, quantization, final STL
 validation, every resource guard, deterministic output, and the no-partial-download rule. Structural
-OpenSCAD tests distinguish closed-polyhedron and piece-union output and verify polygon paths and
-closed pieces. Shared regressions include immersed catalog solids, concave and non-planar faces,
+OpenSCAD tests distinguish closed-polyhedron and piece-union output, verify polygon paths and closed
+pieces, and require hidden tetrahedron rims to share the same radial inner scale and endpoints.
+Shared regressions include immersed catalog solids, concave and non-planar faces,
 expanded pieces, hidden rims, Prism 5/2 with hidden caps, all-rim Antiprism 5/2 and Antiprism 7/3,
 the acute triangular rims of resolved Bipyramid 7/2, and Pyramid 7/2 with either only its immersed
 base or every face orbit hidden. The Antiprism 7/3 JVM regression also guards a complete conversion

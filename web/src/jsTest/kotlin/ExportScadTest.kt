@@ -11,7 +11,7 @@ import polyhedra.core.transform.resolved
 import polyhedra.model.api.SeedFamily
 import polyhedra.model.api.StarFamilySeedId
 import polyhedra.model.poly.*
-import polyhedra.model.util.Vec3
+import polyhedra.model.util.*
 import polyhedra.web.poly.exportGeometryToScad
 import polyhedra.web.poly.exportSolidToScad
 import polyhedra.web.poly.FaceExportParams
@@ -142,6 +142,70 @@ class ExportScadTest {
         assertTrue("polyhedron(" !in scad)
     }
 
+    @Test
+    fun hiddenTetrahedronRimsTaperTowardTheirSharedInnerVertices() {
+        val source = requireNotNull("T".toSeedOrNull()).poly
+        val hidden = source.fs.mapTo(linkedSetOf(), Face::kind)
+        val scad = source.exportSolidToScad(
+            "tetrahedron",
+            "hidden faces",
+            exportParams,
+            hiddenFaceKinds = hidden,
+            resolvedRims = source.resolvedRims(exportParams.rim),
+            embeddedBoundary = true,
+        )
+        val expectedInnerScale = 1.0 - exportParams.width / source.circumradius
+        val expectedHeight = source.fs.first().d * (1.0 - expectedInnerScale) * exportParams.scale
+        val extrusions = scad.lineSequence().filter { line -> "linear_extrude" in line }.toList()
+
+        assertEquals(source.fs.size, extrusions.size)
+        extrusions.forEach { line ->
+            assertContains(line, "height = $expectedHeight")
+            assertContains(line, "scale = $expectedInnerScale")
+        }
+    }
+
+    @Test
+    fun radialTaperSharesInnerEndpointsWhenTheTwoEndJoinsDiffer() {
+        val source = asymmetricTetrahedron()
+        val hidden = source.fs.mapTo(linkedSetOf(), Face::kind)
+        val scad = source.exportSolidToScad(
+            "asymmetric_tetrahedron",
+            "different vertex joins",
+            exportParams,
+            hiddenFaceKinds = hidden,
+            resolvedRims = source.resolvedRims(exportParams.rim),
+            embeddedBoundary = true,
+        )
+        val innerScale = 1.0 - exportParams.width / source.circumradius
+        val extrusions = scad.lineSequence().filter { line -> "linear_extrude" in line }.toList()
+
+        assertEquals(source.fs.size, extrusions.size)
+        source.fs.zip(extrusions).forEach { (face, line) ->
+            assertContains(line, "height = ${face.d * (1.0 - innerScale) * exportParams.scale}")
+            assertContains(line, "scale = $innerScale")
+        }
+        for (vertex in source.vs) {
+            val incident = source.fs.filter { face -> vertex in face.fvs }
+            assertTrue(incident.size >= 3)
+            val innerEndpoints = incident.map { face ->
+                val normal = face.unit
+                val axis = if (kotlin.math.abs(normal.x) < 0.8) {
+                    Vec3(1.0, 0.0, 0.0)
+                } else {
+                    Vec3(0.0, 1.0, 0.0)
+                }
+                val u = (axis cross normal).unit
+                val v = (normal cross u).unit
+                val origin = normal * face.d
+                val relative = vertex - origin
+                origin + u * (relative * u * innerScale) + v * (relative * v * innerScale) -
+                    normal * (face.d * (1.0 - innerScale))
+            }
+            assertTrue(innerEndpoints.all { point -> (point - vertex * innerScale).norm <= 1e-9 })
+        }
+    }
+
     private fun cube(): Polyhedron {
         val vertices = listOf(
             Vec3(1.0, 1.0, -1.0),
@@ -163,6 +227,18 @@ class ExportScadTest {
         )
         val faces = faceVertexIds.mapIndexed { index, ids ->
             MutableFace(index, ids.map(vertices::get), FaceKind(0))
+        }
+        return Polyhedron(vertices, faces, faceKindSources = null)
+    }
+
+    private fun asymmetricTetrahedron(): Polyhedron {
+        val regular = requireNotNull("T".toSeedOrNull()).poly
+        val radii = listOf(0.78, 1.0, 1.24, 1.43)
+        val vertices = regular.vs.mapIndexed { index, point ->
+            MutableVertex(index, point * radii[index], point.kind)
+        }
+        val faces = regular.fs.map { face ->
+            MutableFace(face.id, face.fvs.map { vertex -> vertices[vertex.id] }, face.kind)
         }
         return Polyhedron(vertices, faces, faceKindSources = null)
     }
