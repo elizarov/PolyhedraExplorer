@@ -1,10 +1,16 @@
 package polyhedra.web
 
 import kotlinx.browser.document
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.promise
 import org.khronos.webgl.WebGLRenderingContext
 import org.w3c.dom.HTMLCanvasElement
 import polyhedra.core.poly.polyhedron
 import polyhedra.core.poly.resolvedRims
+import polyhedra.core.api.evaluateCore
+import polyhedra.model.api.CoreRequest
+import polyhedra.model.api.CoreState
 import polyhedra.model.poly.FaceKind
 import polyhedra.model.poly.Polyhedron
 import polyhedra.model.util.Vec3
@@ -20,11 +26,20 @@ import kotlin.math.abs
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.js.Promise
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class ResolvedFaceRenderingTest {
+    private val scope = MainScope()
+
+    @AfterTest
+    fun tearDown() {
+        scope.cancel()
+    }
+
     @Test
     fun faceBuffersConsumeWorkerSuppliedPentagramCells() {
         val poly = starPrism(5, 2)
@@ -96,6 +111,34 @@ class ResolvedFaceRenderingTest {
                 val expectedArea = cycleArea(region.outer.vertices) -
                     region.holes.sumOf { hole -> cycleArea(hole.vertices) }
                 assertTrue(abs(triangleArea - expectedArea) <= expectedArea * 1e-7 + 1e-10)
+            }
+        }
+    }
+
+    @Test
+    fun resolvedStarBipyramidRimTriangulationCoversOnlyItsRimRegions(): Promise<Unit> = scope.promise {
+        val response = evaluateCore(
+            CoreRequest(CoreState("SB7_2", listOf("R"), "c"), rimWidth = 0.05),
+        )
+        for (rim in response.resolvedRims) {
+            val face = response.poly.fs[rim.sourceFaceId]
+            for (region in rim.regions) {
+                val mesh = region.triangulate(face)
+                val triangleArea = mesh.triangles.chunked(3).sumOf { (a, b, c) ->
+                    abs(((mesh.vertices[b] - mesh.vertices[a]) cross
+                        (mesh.vertices[c] - mesh.vertices[a])) * face) / 2.0
+                }
+                fun cycleArea(vertices: List<polyhedra.model.util.MutableVec3>) = abs(
+                    vertices.indices.sumOf { index ->
+                        (vertices[index] cross vertices[(index + 1) % vertices.size]) * face
+                    } / 2.0
+                )
+                val expectedArea = cycleArea(region.outer.vertices) -
+                    region.holes.sumOf { hole -> cycleArea(hole.vertices) }
+                assertTrue(
+                    abs(triangleArea - expectedArea) <= expectedArea * 1e-7 + 1e-10,
+                    "Face ${face.id} rim triangulation area $triangleArea != $expectedArea",
+                )
             }
         }
     }

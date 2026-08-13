@@ -1,7 +1,7 @@
 # Self-intersecting polyhedra
 
 This document specifies intentional surface immersion, per-face resolution, and the explicit
-Resolve operation. General concave and non-planar embedded faces are specified in
+Resolved operation. General concave and non-planar embedded faces are specified in
 [Non-convex geometry](non-convex.md). Seed identities belong to the [Seed catalog](seeds.md),
 operation names and applicability belong to [Transformations and macros](transformations.md), and
 printable conversion belongs to [Export](export.md).
@@ -14,7 +14,7 @@ An immersed polyhedron and its resolved physical boundary are different polyhedr
 | --- | --- | --- |
 | Source surface | Transform input, F/E/V, symmetry, orbit kinds, serialization, and duality | The original vertices, edges, and directed face boundaries |
 | Resolved face geometry | Rendering and picking one source face | Derived presentation cells and triangles; crossings are not source vertices |
-| Resolved physical boundary | Embedded result of the `Resolve` transform | The zero/nonzero-winding interface, including intersection-created elements |
+| Resolved physical boundary | Embedded result of the `Resolved` transform | The zero/nonzero-winding interface, including intersection-created elements |
 
 Every immutable `Polyhedron` carries one `ResolvedFaceGeometry` record per source face. The record
 contains presentation vertices, nonzero-winding cells, triangles, boundary and internal arrangement
@@ -22,8 +22,8 @@ edges, and provenance back to source vertices, edges, faces, and boundary-segmen
 serialized through the Wasm worker with the source mesh. Browser code consumes it directly and
 does not repeat polygon arrangement.
 
-Until Resolve is applied, source F/E/V and rotation orbits remain the displayed topology. Applying
-Resolve creates a new embedded polyhedron whose own physical F/E/V and orbits become authoritative.
+Until Resolved is applied, source F/E/V and rotation orbits remain the displayed topology. Applying
+Resolved creates a new embedded polyhedron whose own physical F/E/V and orbits become authoritative.
 Derived presentation triangles inside one physical polygon are not counted as faces or edges.
 
 ## Nonzero-winding fill
@@ -58,7 +58,7 @@ intersection would invent geometry. The core rejects that stage instead of displ
 an ambiguous surface.
 
 Per-face resolution does not remove intersections between different faces. WebGL can depth-test
-the resulting triangles, while the explicit Resolve transform or the STL conversion pipeline is
+the resulting triangles, while the explicit Resolved transform or the STL conversion pipeline is
 responsible for constructing an embedded solid boundary.
 
 ## Validation contracts
@@ -68,7 +68,7 @@ Geometry checks are layered, and each stronger contract contains the preceding g
 | Contract | Guarantees | Principal consumers |
 | --- | --- | --- |
 | `AbstractSurface` | One connected, consistently oriented combinatorial two-manifold with valid source incidence | Topological operations, F/E/V, and orbit analysis |
-| `RenderableImmersion` | Valid resolved-face records with finite, consistently oriented, non-degenerate presentation triangles | WebGL, picking, intersection analysis, and Resolve |
+| `RenderableImmersion` | Valid resolved-face records with finite, consistently oriented, non-degenerate presentation triangles | WebGL, picking, intersection analysis, and Resolved |
 | `EmbeddedBoundary` | A renderable immersion with no contact between unrelated surface features | Operations that require a physical boundary |
 
 Renderable immersions may contain transverse self-crossings within a source face, intersections
@@ -83,9 +83,9 @@ intersection summary with its response, so the UI can reuse it. `SelfCrossingFac
 output policy; an unsupported geometry returns a structured applicability issue rather than
 reaching the renderer.
 
-## Resolve
+## Resolved
 
-`Resolve` (`R`) converts a renderable immersion into one connected embedded boundary of its
+`Resolved` (`R`) converts a renderable immersion into one connected embedded boundary of its
 nonzero-winding material. It is a generic geometry operation, not a catalog-seed substitution.
 Its production path:
 
@@ -106,14 +106,14 @@ Its production path:
 8. Builds an outward-oriented polyhedron, records many-to-many source provenance, merges
    geometrically indistinguishable kinds, and validates the result as an embedded boundary.
 
-Resolve is identity on an embedded input, and repeated Resolve makes no further geometric change.
+Resolved is identity on an embedded input, and repeated Resolved makes no further geometric change.
 The explicit transform remains in the chain and can be removed with its recycle action. If
 nonzero-winding material has multiple components, no boundary, unsupported coplanar overlap, or an
-oversized result, Resolve returns a structured error; it never drops components or invents
+oversized result, Resolved returns a structured error; it never drops components or invents
 connections.
 
 The four Kepler-Poinsot meshes retained as historical embedded fixtures are test oracles only. They
-do not select production Resolve output and are not used by catalog recognition. A resolved solid
+do not select production Resolved output and are not used by catalog recognition. A resolved solid
 is not catalog-equivalent to its immersed source because their authoritative faces and topology
 differ.
 
@@ -126,12 +126,12 @@ Resolved output elements have two independent classifications:
 - **Kind** identifies the element's proper-rotation orbit in the final embedded geometry.
 
 One source orbit can split into several physical orbits, and an intersection element can have
-several sources. Resolve therefore assigns output kinds from the completed geometry instead of
+several sources. Resolved therefore assigns output kinds from the completed geometry instead of
 reusing source kinds. Face colors, popup rows, visibility, rollover, and later orbit-targeted
 operations use those output kinds; provenance remains available to diagnostics and downstream
 geometry consumers.
 
-Resolve ordering and merging are deterministic for the same indexed input. Scaling or rotating
+Resolved ordering and merging are deterministic for the same indexed input. Scaling or rotating
 the input does not change its physical incidence, and subsequent symmetry analysis may discover a
 point group stronger than the source provenance alone implies.
 
@@ -142,7 +142,7 @@ The UI exposes immersion without changing geometry automatically:
 - A seed-only immersed result shows a pentagram action on the seed pill.
 - With a non-empty transform chain, only the last transform pill can show the action.
 - The tooltip reports self-crossing source faces and inter-face crossings independently.
-- Activating the action appends an explicit Resolve operation; it never rewrites the seed or an
+- Activating the action appends an explicit Resolved operation; it never rewrites the seed or an
   earlier transform.
 
 The cached analysis belongs to the evaluated geometry stage. Camera movement, automatic rotation,
@@ -175,8 +175,8 @@ remain owned by [Non-convex geometry](non-convex.md); export postconditions are 
 - Source topology is never rewritten merely to make an immersion renderable.
 - Resolved-face geometry is derived data and never becomes transform input implicitly.
 - Face and solid fill use the same nonzero-winding semantics.
-- A successful Resolve result is one connected embedded boundary; compounds are rejected.
-- Catalog recognition compares authoritative geometry, so Resolve output cannot be proposed as its
+- A successful Resolved result is one connected embedded boundary; compounds are rejected.
+- Catalog recognition compares authoritative geometry, so Resolved output cannot be proposed as its
   immersed source seed.
 - All numerically sensitive arrangement work runs in the Wasm core or export worker, not in DOM or
   WebGL code.

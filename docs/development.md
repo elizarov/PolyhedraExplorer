@@ -51,7 +51,7 @@ apparently successful result fails the independent final-mesh validator.
 
 Every geometry algorithm has focused JVM unit tests for its own contract; browser acceptance is not
 a substitute. The suites separate planar face arrangement, layered validation and intersection
-classification, Resolve and provenance, hidden-rim construction, transform domains, generic
+classification, the Resolved transform and provenance, hidden-rim construction, transform domains, generic
 stellation, STL presentation/arrangement/final validation, and OpenSCAD structure. Each suite covers
 determinism, reversed orientation, rotation and scale invariance, tolerance boundaries, and
 controlled rejection where those properties apply.

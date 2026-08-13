@@ -20,6 +20,8 @@ data class CoreStlTriangle(
     val c: Int,
     /** Logical presentation surface; negative means the core must infer coplanar groups. */
     val surface: Int = -1,
+    /** Independently closed presentation solid; negative means the input is one global soup. */
+    val solid: Int = -1,
 )
 
 @Serializable

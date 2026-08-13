@@ -30,7 +30,7 @@ fun registerBrowserDistribution(
         // Keep the directory version in sync with CoreClient and the worker resource whenever
         // the serialized CoreRequest/CoreResponse contract changes. A distinct directory also
         // cache-busts every generated Wasm support module, not only the entry point.
-        into("core-v13")
+        into("core-v14")
     }
     into(layout.buildDirectory.dir("dist/browser/$mode"))
 }

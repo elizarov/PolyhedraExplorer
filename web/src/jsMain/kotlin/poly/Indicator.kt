@@ -30,7 +30,7 @@ val FaceNotPlanar = Indicator<Unit>("emoji", "⚠️", "Face is not planar")
 val TransformIsId = Indicator<Transform>("fa fa-recycle", "", "{} transformation is not doing anything here")
 val TransformNotApplicable = Indicator<Transform>("emoji", "🛑", "{} transformation is not applicable")
 val TooLarge = Indicator<FEV>("fa fa-ban", "", "Polyhedron is too large to display ({})")
-val ImmersedSurface = Indicator<String>("fa fa-star-o", "", "{}. Click to add Resolve")
+val ImmersedSurface = Indicator<String>("fa fa-star-o", "", "{}. Click to add Resolved")
 
 fun CoreGeometryAnalysis.toIntersectionIndicatorOrNull(): IndicatorMessage<String>? {
     if (!hasIntersections) return null

@@ -1,6 +1,6 @@
 package polyhedra.core.api
 
-import polyhedra.core.poly.resolvedRims
+import polyhedra.core.poly.resolvedRimsForExport
 import polyhedra.core.transform.resolved
 import polyhedra.core.util.OperationProgressContext
 import polyhedra.model.api.CoreStlPresentation
@@ -33,13 +33,19 @@ internal suspend fun CoreStlPresentation.toTriangleRequest(
     require(expand.isFinite() && expand >= 0.0) { "STL expansion must be finite and non-negative" }
 
     val source = poly
-    val physical = source.resolved(OperationProgressContext { progress -> reportProgress(progress / 5) })
     val hiddenKinds = hiddenFaceKinds.toSet()
+    val allSourceFacesHidden = source.fs.all { face -> face.kind in hiddenKinds }
+    val physical = if (allSourceFacesHidden) {
+        reportProgress(20)
+        source
+    } else {
+        source.resolved(OperationProgressContext { progress -> reportProgress(progress / 5) })
+    }
     val hiddenPhysicalFaces = physical.fs.filterTo(linkedSetOf()) { face ->
         physical.sourceFaceKinds(face, source, physical !== source).any(hiddenKinds::contains)
     }
     val rimBySourceFace = if (rim > 0.0 && hiddenKinds.isNotEmpty()) {
-        source.resolvedRims(rim).associateBy { geometry -> geometry.sourceFaceId }
+        source.resolvedRimsForExport(rim).associateBy { geometry -> geometry.sourceFaceId }
     } else {
         emptyMap()
     }
@@ -60,14 +66,7 @@ internal suspend fun CoreStlPresentation.toTriangleRequest(
     if (rim > 0.0) for (face in source.fs.filter { candidate -> candidate.kind in hiddenKinds }) {
         val geometry = rimBySourceFace[face.id] ?: continue
         for (region in geometry.regions) {
-            builder.addRimCycle(region.outer, face, inner = false, hole = false)
-            region.holes.forEach { hole -> builder.addRimCycle(hole, face, inner = false, hole = true) }
-            builder.addRimCycle(region.outer, face, inner = true, hole = false)
-            region.holes.forEach { hole -> builder.addRimCycle(hole, face, inner = true, hole = true) }
-            if (width > 0.0) {
-                builder.addRimWall(region.outer, face)
-                region.holes.forEach { hole -> builder.addRimWall(hole, face) }
-            }
+            builder.addRimRegion(region, face)
         }
     }
     return builder.request()
@@ -101,6 +100,7 @@ private class PresentationMeshBuilder(
     private val vertexIds = linkedMapOf<Triple<Double, Double, Double>, Int>()
     private val triangles = arrayListOf<CoreStlTriangle>()
     private var nextSurface = 0
+    private var nextSolid = 0
     private val innerScale = (1.0 - settings.width / circumradius).coerceAtLeast(0.0)
 
     private fun transformed(point: Vec3, face: Face, inner: Boolean): Vec3 {
@@ -116,9 +116,16 @@ private class PresentationMeshBuilder(
         }
     }
 
-    private fun triangle(a: Vec3, b: Vec3, c: Vec3, surface: Int, reverse: Boolean = false) {
+    private fun triangle(
+        a: Vec3,
+        b: Vec3,
+        c: Vec3,
+        surface: Int,
+        reverse: Boolean = false,
+        solid: Int = -1,
+    ) {
         val ids = if (reverse) listOf(vertex(a), vertex(c), vertex(b)) else listOf(vertex(a), vertex(b), vertex(c))
-        if (ids.toSet().size == 3) triangles += CoreStlTriangle(ids[0], ids[1], ids[2], surface)
+        if (ids.toSet().size == 3) triangles += CoreStlTriangle(ids[0], ids[1], ids[2], surface, solid)
     }
 
     fun addFace(face: Face, inner: Boolean) {
@@ -134,7 +141,13 @@ private class PresentationMeshBuilder(
         }
     }
 
-    fun addRimCycle(cycle: ResolvedRimCycle, face: Face, inner: Boolean, hole: Boolean) {
+    private fun addRimCycle(
+        cycle: ResolvedRimCycle,
+        face: Face,
+        inner: Boolean,
+        hole: Boolean,
+        solid: Int,
+    ) {
         val points = cycle.vertices
         val surface = nextSurface++
         val counterClockwise = !hole
@@ -145,11 +158,12 @@ private class PresentationMeshBuilder(
                 transformed(points[part.c], face, inner),
                 surface,
                 reverse = inner xor hole,
+                solid = solid,
             )
         }
     }
 
-    fun addRimWall(cycle: ResolvedRimCycle, face: Face) {
+    private fun addRimWall(cycle: ResolvedRimCycle, face: Face, solid: Int) {
         for (index in cycle.vertices.indices) {
             val next = (index + 1) % cycle.vertices.size
             val outerA = transformed(cycle.vertices[index], face, inner = false)
@@ -157,8 +171,20 @@ private class PresentationMeshBuilder(
             val innerA = transformed(cycle.vertices[index], face, inner = true)
             val innerB = transformed(cycle.vertices[next], face, inner = true)
             val surface = nextSurface++
-            triangle(outerA, innerA, outerB, surface)
-            triangle(innerA, innerB, outerB, surface)
+            triangle(outerA, innerA, outerB, surface, solid = solid)
+            triangle(innerA, innerB, outerB, surface, solid = solid)
+        }
+    }
+
+    fun addRimRegion(region: polyhedra.model.poly.ResolvedRimRegion, face: Face) {
+        val solid = if (settings.width > 0.0) nextSolid++ else -1
+        addRimCycle(region.outer, face, inner = false, hole = false, solid = solid)
+        region.holes.forEach { hole -> addRimCycle(hole, face, inner = false, hole = true, solid = solid) }
+        addRimCycle(region.outer, face, inner = true, hole = false, solid = solid)
+        region.holes.forEach { hole -> addRimCycle(hole, face, inner = true, hole = true, solid = solid) }
+        if (settings.width > 0.0) {
+            addRimWall(region.outer, face, solid)
+            region.holes.forEach { hole -> addRimWall(hole, face, solid) }
         }
     }
 

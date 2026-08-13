@@ -4,6 +4,7 @@ import kotlinx.coroutines.test.runTest
 import polyhedra.core.api.convertStl
 import polyhedra.core.api.evaluateCore
 import polyhedra.core.poly.*
+import polyhedra.core.transform.resolved
 import polyhedra.model.api.CoreRequest
 import polyhedra.model.api.CoreState
 import polyhedra.model.api.CoreStlPresentation
@@ -29,6 +30,8 @@ import kotlin.test.assertTrue
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.time.measureTime
+import kotlin.time.Duration.Companion.seconds
 
 class StlApiTest {
     @Test
@@ -153,6 +156,70 @@ class StlApiTest {
                     scale = 1.0,
                     width = 0.07498040337059061,
                     rim = 0.020393189456004112,
+                    expand = 0.0,
+                ),
+            ),
+        )
+
+        assertNull(response.error, response.error?.reason)
+        response.toValidationPolyhedron().validateProperGeometry()
+        assertTrue(response.signedVolume6() > 0.0)
+    }
+
+    @Test
+    fun exportsStarAntiprismSevenThirdsWithEveryFaceHiddenAsRimsQuickly() = runTest {
+        val source = requireNotNull("SA7_3".toSeedOrNull()).poly
+        val presentation = CoreStlPresentation(
+            poly = source,
+            hiddenFaceKinds = source.fs.map { face -> face.kind }.distinct(),
+            scale = 20.0,
+            width = 0.1,
+            rim = 0.05,
+            expand = 0.0,
+        )
+        lateinit var response: polyhedra.model.api.CoreStlResponse
+        val elapsed = measureTime {
+            response = convertStl(CoreStlRequest(presentation = presentation))
+        }
+
+        assertNull(response.error, response.error?.reason)
+        response.toValidationPolyhedron().validateProperGeometry()
+        assertTrue(response.signedVolume6() > 0.0)
+        assertTrue(elapsed < 1.seconds, "Rim-only SA7_3 STL export took $elapsed")
+    }
+
+    @Test
+    fun exportsSmallerStarAntiprismFiveHalvesWithEveryFaceHiddenAsRims() = runTest {
+        val source = requireNotNull("SA5_2".toSeedOrNull()).poly
+        val response = convertStl(
+            CoreStlRequest(
+                presentation = CoreStlPresentation(
+                    poly = source,
+                    hiddenFaceKinds = source.fs.map { face -> face.kind }.distinct(),
+                    scale = 20.0,
+                    width = 0.1,
+                    rim = 0.05,
+                    expand = 0.0,
+                ),
+            ),
+        )
+
+        assertNull(response.error, response.error?.reason)
+        response.toValidationPolyhedron().validateProperGeometry()
+        assertTrue(response.signedVolume6() > 0.0)
+    }
+
+    @Test
+    fun exportsResolvedStarBipyramidSevenHalvesWithEveryFaceHiddenAsRims() = runTest {
+        val source = requireNotNull("SB7_2".toSeedOrNull()).poly.resolved()
+        val response = convertStl(
+            CoreStlRequest(
+                presentation = CoreStlPresentation(
+                    poly = source,
+                    hiddenFaceKinds = source.fs.map { face -> face.kind }.distinct(),
+                    scale = 20.0,
+                    width = 0.1,
+                    rim = 0.05,
                     expand = 0.0,
                 ),
             ),

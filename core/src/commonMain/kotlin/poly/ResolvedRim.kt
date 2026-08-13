@@ -78,6 +78,19 @@ fun Polyhedron.resolvedRims(width: Double): List<ResolvedRimGeometry> {
     }
 }
 
+/** Computes only the requested STL geometry; export does not consume the UI's exact width limit. */
+fun Polyhedron.resolvedRimsForExport(width: Double): List<ResolvedRimGeometry> {
+    require(width.isFinite() && width >= 0.0) { "Rim width must be finite and non-negative" }
+    return fs.map { face ->
+        val resolved = resolvedFaces[face.id]
+        if (resolved.sourceBoundarySelfIntersects && width > 0.0) {
+            face.resolvedRimAtWidth(resolved, width)
+        } else {
+            face.resolvedRim(resolved, width)
+        }
+    }
+}
+
 /** Builds the Boolean union of source-edge strips, clipped to the face's nonzero-winding fill. */
 fun Face.resolvedRim(resolved: ResolvedFaceGeometry, width: Double): ResolvedRimGeometry {
     require(width.isFinite() && width >= 0.0) { "Rim width must be finite and non-negative" }
@@ -223,23 +236,9 @@ private fun Face.simpleRim(width: Double, maximumWidth: Double): ResolvedRimGeom
     val innerVertices = ArrayList<Vec3>()
     val innerSources = ArrayList<List<SourceEdgeOccurrence>>()
     for (index in fvs.indices) {
-        val previous = (index + fvs.lastIndex) % fvs.size
         val miter = faceRim.rimDir[index] * width
-        if (miter.norm <= width * MITER_LIMIT + EPS) {
-            innerVertices += fvs[index] + miter
-            innerSources += listOf(occurrences[index])
-        } else {
-            val incoming = fvs[index] - fvs[previous]
-            val outgoing = fvs[(index + 1) % fvs.size] - fvs[index]
-            val incomingProjected = incoming - this * (incoming * this)
-            val outgoingProjected = outgoing - this * (outgoing * this)
-            val incomingOffset = (incomingProjected.unit cross this) * width
-            val outgoingOffset = (outgoingProjected.unit cross this) * width
-            innerVertices += fvs[index] + incomingOffset
-            innerSources += listOf(occurrences[previous], occurrences[index])
-            innerVertices += fvs[index] + outgoingOffset
-            innerSources += listOf(occurrences[index])
-        }
+        innerVertices += fvs[index] + miter
+        innerSources += listOf(occurrences[index])
     }
     val inner = orientedCycle(innerVertices, innerSources, counterClockwise = false)
     return ResolvedRimGeometry(
@@ -272,8 +271,6 @@ private fun Face.orientedCycle(
         reversedSources,
     )
 }
-
-private const val MITER_LIMIT = 4.0
 
 private fun Face.projectedArea(vertices: List<Vec3>): Double = vertices.indices.sumOf { index ->
     val a = vertices[index]

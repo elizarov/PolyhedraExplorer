@@ -1,7 +1,7 @@
 # Non-convex geometry
 
 This document owns concave and simple non-planar face behavior for embedded polyhedra. Intentional
-face or surface crossings, nonzero-winding fill, and Resolve belong to
+face or surface crossings, nonzero-winding fill, and Resolved belong to
 [Self-intersecting polyhedra](self-intersections.md).
 
 ## Embedded surface contract
@@ -52,9 +52,10 @@ replace the shared tessellation with a triangle fan or independently choose diag
 
 The core supplies hidden-face rims as polygonal regions rather than triangles. For a simple face,
 adjacent boundary lines are offset in the face's average plane while the original
-three-dimensional outer boundary is retained. Sharp convex corners use a miter up to four rim
-widths and a bevel beyond that bound. The maximum selectable width stops at the first edge collapse
-or concave reflex-corner collision.
+three-dimensional outer boundary is retained. Adjacent offset lines meet at their exact miter,
+including at acute corners; approximating that join can move the hole outside its source face and
+produce overlapping renderer triangles. The maximum selectable width stops at the first edge
+collapse or concave reflex-corner collision, so every emitted inset remains valid.
 
 Each `ResolvedRimGeometry` contains deterministic outer and hole cycles, source-edge provenance,
 the applied width, and its maximum. WebGL triangulates it for visible caps and walls; STL and

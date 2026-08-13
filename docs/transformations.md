@@ -6,7 +6,7 @@ topological: they describe a valid closed polyhedron and do not specify its exac
 coordinates. Different operations can therefore have the same count formula.
 
 The formulas apply to ordinary topological meshes. Classical Kepler-Poinsot inputs retain their
-immersed abstract faces; Dual, Greatened, and Stellated act on that source topology. Resolve instead
+immersed abstract faces; Dual, Greatened, and Stellated act on that source topology. Resolved instead
 constructs a new physical boundary whose counts depend on the actual arrangement. Those counts are
 listed in the [seed catalog](seeds.md), and no misleading linear formula is inferred.
 
@@ -15,7 +15,7 @@ last applied. Traditional Conway notation is read in the opposite direction; for
 example, the project expansion `a -> t` is conventionally written `ta`.
 
 The transform popup is ordered as `Transform`, `Macro`, `Orbit-targeted`, then
-`Star`. The final `Star` section contains Greatened, Stellated, and Resolve.
+`Star`. The final `Star` section contains Greatened, Stellated, and Resolved.
 
 ## Summary
 
@@ -33,7 +33,7 @@ The transform popup is ordered as `Transform`, `Macro`, `Orbit-targeted`, then
 | Canonical | Canonicalization | `o` | - | `F` | `E` | `V` |
 | Greatened | Greatening | `G` | - | constellation-dependent | constellation-dependent | constellation-dependent |
 | Stellated | Stellation | `S` | - | constellation-dependent | constellation-dependent | constellation-dependent |
-| Resolve | Nonzero-winding resolution | `R` | - | arrangement-dependent | arrangement-dependent | arrangement-dependent |
+| Resolved | Nonzero-winding resolution | `R` | - | arrangement-dependent | arrangement-dependent | arrangement-dependent |
 | Drop | Orbit deletion | `x[kind]` | - | input-dependent | input-dependent | input-dependent |
 | Kis face | Selective akisation | `k[face]` | - | input-dependent | input-dependent | input-dependent |
 | Stellate face | Selective akisation and radial apex movement | `f[face]` | Kis selected faces, then Radial created apexes | input-dependent | input-dependent | input-dependent |
@@ -98,7 +98,7 @@ Result is a discrete integer setting rather than a percentage. The worker lists 
 main-line candidates for the actual input; the row displays `n of N` and that candidate's F/E/V.
 Result `1` is the default and is omitted, while later choices use tags such as `S~l=2`.
 
-Dual, Drop, Quinto, Canonical, Resolve, and None have no continuous geometric setting.
+Dual, Drop, Quinto, Canonical, Resolved, and None have no continuous geometric setting.
 
 ## Geometry domains
 
@@ -120,7 +120,7 @@ names and immersion semantics are defined in
 | Radial vertex, Stellate face | Selected neighborhood passes the independent triangular-orbit checks | Renderable immersion |
 | Propeller, Whirl, Quinto, Canonical | Abstract topology is a canonicalizable sphere | Embedded canonical realization |
 | Greatened, Stellated | Planar authoritative faces produce a valid finite face-plane constellation | Renderable immersion |
-| Resolve | Valid resolved-face planar arrangement | Embedded boundary |
+| Resolved | Valid resolved-face planar arrangement | Embedded boundary |
 
 Macros use the domain of their realized primitive sequence or fused kernel. They cannot use a later
 stage to conceal an undefined intermediate. Dynamic parameter ranges run the same output validation
@@ -166,7 +166,7 @@ including Kis Height, are included in the same fused target.
 
 Animation is intentionally omitted where no stable, non-self-intersecting mesh
 correspondence exists: Drop, adding/removing or retargeting selective Kis face,
-Greatened, Stellated, Resolve, and chirality flips. Resolve changes the physical arrangement
+Greatened, Stellated, Resolved, and chirality flips. Resolved changes the physical arrangement
 topology; the regular-star operations change
 the resolved intersection-cell topology, and their classical collapsed forms would be immersed
 rather than proper meshes. A selective Kis Height change still interpolates because
@@ -542,7 +542,7 @@ immediate to avoid passing through the invalid opposite-twist intermediate.
 
 ## Star transformations
 
-Greatened, Stellated, and Resolve are primitive transforms grouped in the final Star popup section.
+Greatened, Stellated, and Resolved are primitive transforms grouped in the final Star popup section.
 The first two share a geometry-derived face-plane constellation engine.
 
 ### Greatened (`G`)
@@ -588,17 +588,17 @@ among surviving strict outward extensions; the default remains the first.
 Stellated is immediate for the same reason as Greatened: no connected, non-degenerate,
 topology-compatible interpolation has the required endpoint topology.
 
-### Resolve (`R`)
+### Resolved (`R`)
 
-Resolve turns a renderable immersion into the embedded boundary of its nonzero-winding material.
+Resolved turns a renderable immersion into the embedded boundary of its nonzero-winding material.
 It corefines the supplied face triangles only at actual surface intersections, keeps fragments
 that separate zero from nonzero winding, joins conforming fragments into a manifold, and safely
 merges coplanar triangles into polygons. The result has new arrangement-dependent F/E/V counts,
 actual rotation-orbit kinds, and many-to-many provenance back to the source surface.
 
-Resolve is an identity on an already embedded surface and keeps its explicit chain item, where the
+Resolved is an identity on an already embedded surface and keeps its explicit chain item, where the
 recycle action can remove it. An immersed seed or transformed result shows a pentagram action on
-the pill that owns the current geometry status; activating it appends `R`. Resolve is immediate
+the pill that owns the current geometry status; activating it appends `R`. Resolved is immediate
 because its physical topology cannot be collapsed onto the immersed input without intersections.
 
 ## Sources of truth

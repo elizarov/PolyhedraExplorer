@@ -66,6 +66,7 @@ internal data class TriangleSoupTriangle(
     val b: Vec3,
     val c: Vec3,
     val sourceFaceId: Int,
+    val solidId: Int = -1,
 )
 
 /** Resolves presentation triangles without requiring an abstract manifold before arrangement. */
@@ -79,7 +80,7 @@ internal suspend fun resolvedTriangleSoup(
     val points = triangles.flatMap { triangle -> listOf(triangle.a, triangle.b, triangle.c) }
     val radius = points.maxOfOrNull(Vec3::norm) ?: 0.0
     val source = triangles.map { triangle ->
-        SourceTriangle(triangle.sourceFaceId, triangle.a, triangle.b, triangle.c)
+        SourceTriangle(triangle.sourceFaceId, triangle.a, triangle.b, triangle.c, solidId = triangle.solidId)
     }
     return resolveSurface(
         source,
@@ -132,6 +133,7 @@ private suspend fun resolveSurface(
     require(radius.isFinite() && radius > 0.0) { "Resolve requires a finite nonzero circumradius" }
     val tolerance = maxOf(EPS * radius * 32.0, 1e-12 * radius, toleranceFloor)
     require(source.isNotEmpty()) { "Resolve requires presentation triangles" }
+    val windingClassifier = WindingClassifier(source, tolerance)
 
     val cuts = List(source.size) { mutableListOf<CutLine>() }
     val ordered = source.indices.sortedWith(compareBy({ source[it].minX }, { it }))
@@ -181,8 +183,8 @@ private suspend fun resolveSurface(
                 val offset = maxOf(tolerance * 8.0, fragment.shortestEdge * 1e-7)
                 val center = fragment.center
                 val normal = fragment.normal
-                val minusInside = source.hasNonzeroWinding(center - normal * offset, tolerance)
-                val plusInside = source.hasNonzeroWinding(center + normal * offset, tolerance)
+                val minusInside = windingClassifier.hasNonzeroWinding(center - normal * offset)
+                val plusInside = windingClassifier.hasNonzeroWinding(center + normal * offset)
                 when {
                     minusInside && !plusInside -> fragments += fragment
                     plusInside && !minusInside -> fragments += fragment.reversed()
@@ -198,12 +200,16 @@ private suspend fun resolveSurface(
         )
     }
 
-    val triangulatedBoundary = buildTriangleBoundary(fragments.conformEdges(tolerance), tolerance)
+    val conformedFragments = fragments.conformEdges(tolerance)
+    progress?.reportProgress(82)
+    val triangulatedBoundary = buildTriangleBoundary(conformedFragments, tolerance)
+    progress?.reportProgress(84)
     val boundary = if (mergeFaces) {
         triangulatedBoundary.mergeCoplanarFaces(tolerance)
     } else {
         triangulatedBoundary.asTrianglePolygons()
     }
+    progress?.reportProgress(88)
     val boundaryEdges = boundary.edgeKeys()
     val incidentFaces = HashMap<IndexEdge, MutableList<Int>>()
     boundary.faceVertexIds.forEachIndexed { faceIndex, face ->
@@ -254,15 +260,20 @@ private data class SourceTriangle(
     val c: Vec3,
     /** Absolute source-face winding represented by this one presentation triangle. */
     val windingMultiplicity: Int = 1,
+    /** Independently closed STL presentation piece, or negative for one global winding soup. */
+    val solidId: Int = -1,
 ) {
-    val normal: Vec3 = ((b - a) cross (c - a)).unit
+    val ab: Vec3 = b - a
+    val ac: Vec3 = c - a
+    val edgeScale: Double = maxOf(ab.norm, ac.norm, (c - b).norm)
+    val normal: Vec3 = (ab cross ac).unit
     val planeDistance: Double = normal * a
     val minX = minOf(a.x, b.x, c.x)
     val maxX = maxOf(a.x, b.x, c.x)
-    private val minY = minOf(a.y, b.y, c.y)
-    private val maxY = maxOf(a.y, b.y, c.y)
-    private val minZ = minOf(a.z, b.z, c.z)
-    private val maxZ = maxOf(a.z, b.z, c.z)
+    val minY = minOf(a.y, b.y, c.y)
+    val maxY = maxOf(a.y, b.y, c.y)
+    val minZ = minOf(a.z, b.z, c.z)
+    val maxZ = maxOf(a.z, b.z, c.z)
     val edges: List<Segment3>
         get() = listOf(Segment3(a, b), Segment3(b, c), Segment3(c, a))
 
@@ -496,29 +507,82 @@ private data class OrientedTriangle(
 
 /** Splits both sides of every T-junction before vertex indexing and manifold validation. */
 private fun List<OrientedTriangle>.conformEdges(tolerance: Double): List<OrientedTriangle> {
-    val points = flatMap { triangle -> listOf(triangle.a, triangle.b, triangle.c) }
-        .fold(ArrayList<Vec3>()) { distinct, point ->
-            if (distinct.none { existing -> (existing - point).norm <= tolerance }) distinct += point
-            distinct
+    val points = ArrayList<Vec3>()
+    val buckets = HashMap<Bucket, MutableList<Int>>()
+    fun bucket(point: Vec3) = Bucket(
+        floor(point.x / tolerance).toLong(),
+        floor(point.y / tolerance).toLong(),
+        floor(point.z / tolerance).toLong(),
+    )
+    fun pointIndex(point: Vec3): Int {
+        val key = bucket(point)
+        for (dx in -1L..1L) for (dy in -1L..1L) for (dz in -1L..1L) {
+            for (candidate in buckets[Bucket(key.x + dx, key.y + dy, key.z + dz)].orEmpty()) {
+                if ((points[candidate] - point).norm <= tolerance) return candidate
+            }
         }
+        val index = points.size
+        points += point
+        buckets.getOrPut(key, ::arrayListOf) += index
+        return index
+    }
+    val trianglePointIds = map { triangle ->
+        listOf(pointIndex(triangle.a), pointIndex(triangle.b), pointIndex(triangle.c))
+    }
+    val sortedPointIds = List(3) { axis ->
+        points.indices.sortedBy { index -> points[index].component(axis) }
+    }
+    fun List<Int>.lowerBound(value: Double, axis: Int): Int {
+        var low = 0
+        var high = size
+        while (low < high) {
+            val middle = (low + high) ushr 1
+            if (points[this[middle]].component(axis) < value) low = middle + 1 else high = middle
+        }
+        return low
+    }
+    val edgeSplits = HashMap<IndexEdge, List<Int>>()
+    fun splitPoints(first: Int, second: Int): List<Int> {
+        val key = indexEdge(first, second)
+        val canonical = edgeSplits.getOrPut(key) {
+            val a = points[key.a]
+            val b = points[key.b]
+            val edge = b - a
+            val length = edge.norm
+            val lengthSquared = edge * edge
+            val axis = edge.dominantAxis()
+            val minimum = minOf(a.component(axis), b.component(axis)) - tolerance
+            val maximum = maxOf(a.component(axis), b.component(axis)) + tolerance
+            val candidates = sortedPointIds[axis]
+            val start = candidates.lowerBound(minimum, axis)
+            buildList {
+                for (position in start until candidates.size) {
+                    val pointId = candidates[position]
+                    val point = points[pointId]
+                    if (point.component(axis) > maximum) break
+                    if (point.x !in minOf(a.x, b.x) - tolerance..maxOf(a.x, b.x) + tolerance ||
+                        point.y !in minOf(a.y, b.y) - tolerance..maxOf(a.y, b.y) + tolerance ||
+                        point.z !in minOf(a.z, b.z) - tolerance..maxOf(a.z, b.z) + tolerance
+                    ) continue
+                    val fraction = ((point - a) * edge) / lengthSquared
+                    if (fraction <= tolerance / length || fraction >= 1.0 - tolerance / length) continue
+                    if ((a + edge * fraction - point).norm <= tolerance) add(fraction to pointId)
+                }
+            }.sortedBy(Pair<Double, Int>::first).map(Pair<Double, Int>::second)
+        }
+        return if (first == key.a) canonical else canonical.asReversed()
+    }
+
     val result = ArrayList<OrientedTriangle>()
-    for (triangle in this) {
-        val corners = listOf(triangle.a, triangle.b, triangle.c)
+    for ((triangleIndex, triangle) in withIndex()) {
+        val corners = trianglePointIds[triangleIndex]
         val boundary = ArrayList<Vec3>()
         for (index in corners.indices) {
             val a = corners[index]
             val b = corners[(index + 1) % corners.size]
-            val edge = b - a
-            val lengthSquared = edge * edge
-            boundary += a
-            points.asSequence().mapNotNull { point ->
-                val fraction = ((point - a) * edge) / lengthSquared
-                if (fraction <= tolerance / edge.norm || fraction >= 1.0 - tolerance / edge.norm) {
-                    return@mapNotNull null
-                }
-                val projected = a + edge * fraction
-                if ((projected - point).norm <= tolerance) fraction to point else null
-            }.sortedBy { it.first }.forEach { (_, point) ->
+            boundary += points[a]
+            splitPoints(a, b).forEach { pointIndex ->
+                val point = points[pointIndex]
                 if ((boundary.last() - point).norm > tolerance) boundary += point
             }
         }
@@ -542,7 +606,107 @@ private fun List<OrientedTriangle>.conformEdges(tolerance: Double): List<Oriente
     return result
 }
 
-private fun List<SourceTriangle>.hasNonzeroWinding(point: Vec3, tolerance: Double): Boolean {
+private fun Vec3.component(axis: Int): Double = when (axis) {
+    0 -> x
+    1 -> y
+    else -> z
+}
+
+private fun Vec3.dominantAxis(): Int = when {
+    abs(x) >= abs(y) && abs(x) >= abs(z) -> 0
+    abs(y) >= abs(z) -> 1
+    else -> 2
+}
+
+private class WindingClassifier(
+    source: List<SourceTriangle>,
+    private val tolerance: Double,
+) {
+    private val independentSolids = source.all { triangle -> triangle.solidId >= 0 }
+    private val groups: List<WindingGroup> = if (independentSolids) {
+        source.groupBy(SourceTriangle::solidId).entries.sortedBy { entry -> entry.key }.map { (solidId, triangles) ->
+            WindingGroup(solidId, triangles, useRayClassifier = true)
+        }
+    } else {
+        listOf(WindingGroup(-1, source, useRayClassifier = false))
+    }
+
+    fun hasNonzeroWinding(point: Vec3): Boolean = groups.any { group ->
+        group.contains(point, tolerance)
+    }
+
+}
+
+private class WindingGroup(
+    val solidId: Int,
+    val triangles: List<SourceTriangle>,
+    private val useRayClassifier: Boolean,
+) {
+    private val minX = triangles.minOf(SourceTriangle::minX)
+    private val maxX = triangles.maxOf(SourceTriangle::maxX)
+    private val minY = triangles.minOf { triangle -> minOf(triangle.a.y, triangle.b.y, triangle.c.y) }
+    private val maxY = triangles.maxOf { triangle -> maxOf(triangle.a.y, triangle.b.y, triangle.c.y) }
+    private val minZ = triangles.minOf { triangle -> minOf(triangle.a.z, triangle.b.z, triangle.c.z) }
+    private val maxZ = triangles.maxOf { triangle -> maxOf(triangle.a.z, triangle.b.z, triangle.c.z) }
+
+    fun boundsContain(point: Vec3, tolerance: Double): Boolean =
+        point.x in minX - tolerance..maxX + tolerance &&
+            point.y in minY - tolerance..maxY + tolerance &&
+            point.z in minZ - tolerance..maxZ + tolerance
+
+    fun contains(point: Vec3, tolerance: Double): Boolean {
+        if (!boundsContain(point, tolerance)) return false
+        if (useRayClassifier && triangles.size >= 64) for (axis in 0..2) {
+            triangles.rayWindingOrNull(point, axis, tolerance)?.let { winding -> return winding != 0 }
+        }
+        return triangles.hasNonzeroSolidAngleWinding(point, tolerance)
+    }
+}
+
+private fun List<SourceTriangle>.rayWindingOrNull(
+    point: Vec3,
+    axis: Int,
+    tolerance: Double,
+): Int? {
+    val direction = when (axis) {
+        0 -> Vec3(1.0, 0.0, 0.0)
+        1 -> Vec3(0.0, 1.0, 0.0)
+        else -> Vec3(0.0, 0.0, 1.0)
+    }
+    var winding = 0
+    for (triangle in this) {
+        val projectionContainsPoint = when (axis) {
+            0 -> point.y in triangle.minY - tolerance..triangle.maxY + tolerance &&
+                point.z in triangle.minZ - tolerance..triangle.maxZ + tolerance
+            1 -> point.x in triangle.minX - tolerance..triangle.maxX + tolerance &&
+                point.z in triangle.minZ - tolerance..triangle.maxZ + tolerance
+            else -> point.x in triangle.minX - tolerance..triangle.maxX + tolerance &&
+                point.y in triangle.minY - tolerance..triangle.maxY + tolerance
+        }
+        if (!projectionContainsPoint) continue
+        val p = direction cross triangle.ac
+        val determinant = triangle.ab * p
+        if (abs(determinant) <= tolerance * triangle.edgeScale) continue
+        val inverse = 1.0 / determinant
+        val offset = point - triangle.a
+        val u = (offset * p) * inverse
+        val q = offset cross triangle.ab
+        val v = (direction * q) * inverse
+        val barycentricTolerance = tolerance / triangle.edgeScale
+        if (u < -barycentricTolerance || v < -barycentricTolerance ||
+            u + v > 1.0 + barycentricTolerance
+        ) continue
+        val distance = (triangle.ac * q) * inverse
+        if (distance < -tolerance) continue
+        if (distance <= tolerance || u <= barycentricTolerance || v <= barycentricTolerance ||
+            1.0 - u - v <= barycentricTolerance
+        ) return null
+        winding += triangle.windingMultiplicity * if (triangle.normal * direction > 0.0) 1 else -1
+    }
+    return winding
+}
+
+private fun List<SourceTriangle>.hasNonzeroSolidAngleWinding(point: Vec3, tolerance: Double): Boolean {
     var solidAngle = 0.0
     for (triangle in this) {
         val a = triangle.a - point
@@ -779,37 +943,48 @@ private fun simplifyDegreeTwoVertices(
     tolerance: Double,
 ): List<PolygonRecord> {
     val faces = inputFaces.map { face -> face.vertexIds.toMutableList() }
-    var changed = true
-    while (changed) {
-        changed = false
-        val neighbors = HashMap<Int, MutableSet<Int>>()
-        val incidentFaces = HashMap<Int, MutableSet<Int>>()
-        for ((faceIndex, face) in faces.withIndex()) {
-            for (index in face.indices) {
-                val vertex = face[index]
-                neighbors.getOrPut(vertex, ::linkedSetOf) += face[(index + face.size - 1) % face.size]
-                neighbors.getOrPut(vertex, ::linkedSetOf) += face[(index + 1) % face.size]
-                incidentFaces.getOrPut(vertex, ::linkedSetOf) += faceIndex
-            }
+    val incidentFaces = List(positions.size) { linkedSetOf<Int>() }
+    for ((faceIndex, face) in faces.withIndex()) {
+        for (vertex in face) incidentFaces[vertex] += faceIndex
+    }
+    val pending = ArrayDeque<Int>()
+    val queued = BooleanArray(positions.size)
+    fun enqueue(vertex: Int) {
+        if (!queued[vertex] && incidentFaces[vertex].isNotEmpty()) {
+            queued[vertex] = true
+            pending += vertex
         }
-        val candidate = incidentFaces.keys.sorted().firstOrNull { vertex ->
-            val incident = incidentFaces.getValue(vertex)
-            incident.isNotEmpty() && incident.all { faceIndex ->
+    }
+    positions.indices.forEach(::enqueue)
+    while (pending.isNotEmpty()) {
+        val candidate = pending.removeFirst()
+        queued[candidate] = false
+        val incident = incidentFaces[candidate]
+        if (incident.isEmpty()) continue
+        val occurrences = incident.map { faceIndex ->
+            val face = faces[faceIndex]
+            faceIndex to face.indexOf(candidate)
+        }
+        if (occurrences.any { (faceIndex, index) ->
                 val face = faces[faceIndex]
-                if (face.size <= 3) return@all false
-                val index = face.indexOf(vertex)
+                if (face.size <= 3 || index < 0) return@any true
                 val previous = positions[face[(index + face.size - 1) % face.size]]
-                val current = positions[vertex]
+                val current = positions[candidate]
                 val next = positions[face[(index + 1) % face.size]]
                 val a = previous - current
                 val b = next - current
-                (a cross b).norm <= tolerance * maxOf(a.norm, b.norm) && a * b < 0.0
+                (a cross b).norm > tolerance * maxOf(a.norm, b.norm) || a * b >= 0.0
             }
-        } ?: break
-        for (faceIndex in requireNotNull(incidentFaces[candidate])) {
-            faces[faceIndex].remove(candidate)
+        ) continue
+        for ((faceIndex, index) in occurrences) {
+            val face = faces[faceIndex]
+            val previous = face[(index + face.size - 1) % face.size]
+            val next = face[(index + 1) % face.size]
+            face.removeAt(index)
+            enqueue(previous)
+            enqueue(next)
         }
-        changed = true
+        incident.clear()
     }
     return faces.mapIndexed { index, vertexIds ->
         PolygonRecord(vertexIds, inputFaces[index].sourceFaceIds)

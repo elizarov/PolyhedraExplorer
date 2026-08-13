@@ -16,7 +16,7 @@ private const val INTERSECTION_EPS = 1e-7
  */
 fun Polyhedron.validateProperGeometry() {
     validateMeshGeometry()
-    val analysis = analyzeGeometry()
+    val analysis = analyzeGeometryAfterRenderableValidation()
     require(analysis.strongestContract == PolyhedronContract.EmbeddedBoundary) {
         if (SurfaceIntersectionClass.SelfCrossingFace in analysis.intersectionCounts) {
             "Face boundary intersects itself; polyhedron is an immersed rather than embedded " +
@@ -31,6 +31,11 @@ fun Polyhedron.validateProperGeometry() {
 /** Classifies intentional immersion after the source and resolved-face contracts are validated. */
 fun Polyhedron.analyzeGeometry(): CoreGeometryAnalysis {
     validateRenderableImmersion()
+    return analyzeGeometryAfterRenderableValidation()
+}
+
+/** Classifies intersections after the caller has already validated the renderable surface. */
+private fun Polyhedron.analyzeGeometryAfterRenderableValidation(): CoreGeometryAnalysis {
     val counts = linkedMapOf<SurfaceIntersectionClass, Int>()
     val selfCrossings = resolvedFaces.sumOf { face ->
         if (!face.sourceBoundarySelfIntersects) 0 else face.vertices.count { vertex ->

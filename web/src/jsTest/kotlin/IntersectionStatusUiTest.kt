@@ -40,12 +40,13 @@ class IntersectionStatusUiTest {
     }
 
     @Test
-    fun seedOnlyImmersionOwnsTheIndicatorAndClickAppendsResolve(): Promise<Unit> {
+    fun seedOnlyImmersionOwnsTheIndicatorAndClickAppendsResolved(): Promise<Unit> {
         val params = immersedParams()
         params.seed.updateValue(Seeds.single { it.tag == "SD" })
         composition = renderComposable(host) { ControlPane(params, popup = null, togglePopup = {}) }
 
         val indicator = requireNotNull(host.querySelector(".intersection-indicator")) as HTMLButtonElement
+        assertEquals("Add Resolved transform", indicator.getAttribute("aria-label"))
         val owner = requireNotNull(indicator.parentElement)
         assertTrue(owner.textContent.orEmpty().contains("Stellated dodecahedron"))
         val tooltip = indicator.querySelector(".tooltip-text")?.textContent.orEmpty()
@@ -76,7 +77,7 @@ class IntersectionStatusUiTest {
             "Transforms render last-first, so the last transform must own status",
         )
         assertTrue(owner?.textContent.orEmpty().contains("Canonical"))
-        assertTrue(keyboard.acceptSuggestion(), "Enter action must accept the visible Resolve action")
+        assertTrue(keyboard.acceptSuggestion(), "Enter action must accept the visible Resolved action")
         assertEquals(listOf(Transform.Canonical, Transform.Resolve), params.transforms.value)
     }
 

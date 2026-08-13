@@ -37,7 +37,7 @@ private data class Bounds(
 )
 
 private data class PointKey(val x: Double, val y: Double, val z: Double)
-private data class InputTriangle(val points: List<Vec3>, val surface: Int)
+private data class InputTriangle(val points: List<Vec3>, val surface: Int, val solid: Int)
 private data class WeldBucket(val x: Long, val y: Long, val z: Long)
 
 suspend fun convertStl(
@@ -179,16 +179,16 @@ private suspend fun convertStlInternal(
         reportProgress(5)
 
         stage = CoreStlStage.Arrangement
-        val distinctTriangles = linkedMapOf<List<PointKey>, InputTriangle>()
+        val distinctTriangles = linkedMapOf<Pair<List<PointKey>, Int>, InputTriangle>()
         for (triangle in request.triangles) {
             val points = triangle.points(inputVertices)
             if (points.toSetByCoordinates().size < 3 ||
                 ((points[1] - points[0]) cross (points[2] - points[0])).norm <= minimumArea2
             ) continue
             val key = points.map { point -> PointKey(point.x, point.y, point.z) }
-                .sortedWith(compareBy(PointKey::x, PointKey::y, PointKey::z))
+                .sortedWith(compareBy(PointKey::x, PointKey::y, PointKey::z)) to triangle.solid
             if (key !in distinctTriangles) {
-                distinctTriangles[key] = InputTriangle(points, triangle.surface)
+                distinctTriangles[key] = InputTriangle(points, triangle.surface, triangle.solid)
             }
         }
         val surfaces = distinctTriangles.values.toList()
@@ -240,7 +240,7 @@ private suspend fun convertStlInternal(
                 inferredOffset + inferredSurfaceIds.getOrPut(find(index)) { inferredSurfaceIds.size }
             }
             val points = triangle.points
-            TriangleSoupTriangle(points[0], points[1], points[2], surfaceId)
+            TriangleSoupTriangle(points[0], points[1], points[2], surfaceId, triangle.solid)
         }
         val directBoundary = runCatching {
             val positions = arrayListOf<Vec3>()
@@ -273,7 +273,10 @@ private suspend fun convertStlInternal(
                 },
                 maximumEdges = Int.MAX_VALUE,
                 toleranceFloor = weldTolerance,
-                mergeFaces = false,
+                // Independent closed presentation pieces produce many coplanar arrangement
+                // fragments, so merge them before final tessellation. A global soup can carry
+                // coincident logical surfaces whose polygon merge is intentionally deferred.
+                mergeFaces = triangleSoup.all { triangle -> triangle.solidId >= 0 },
             )
         val arrangementTriangles = resolved.fs.sumOf { face -> face.triangles.size }
         checkLimit(
@@ -282,10 +285,9 @@ private suspend fun convertStlInternal(
             MAX_STL_ARRANGEMENT_FRAGMENTS.toLong(),
             arrangementTriangles.toLong(),
         )
-        // Never let a numerically unsupported arrangement advance to serialization. A successful
-        // STL response is an embedded two-manifold; an arrangement that cannot establish that
-        // contract is a topology rejection, not a malformed partial export.
-        resolved.validateProperGeometry()
+        // The arrangement already enforces a connected two-manifold boundary. Its quantized
+        // tessellation receives the full embedded-surface validation below, avoiding the same
+        // quadratic triangle-intersection pass twice.
         reportProgress(86)
 
         stage = CoreStlStage.Quantization

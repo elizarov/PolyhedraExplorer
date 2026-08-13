@@ -30,7 +30,7 @@ const cases = [
         name: "higher-winding resolution",
         hash: "#/s(SA7_3)t(R)",
         counts: { faces: 72, edges: 126, vertices: 56 },
-        labels: ["Resolve", "Antiprism 7/3"],
+        labels: ["Resolved", "Antiprism 7/3"],
     },
 ]
 

@@ -30,7 +30,9 @@ partial, open, intersecting, or resource-truncated mesh.
 2. Weld only representation-scale input noise, discard degenerate or duplicate input triangles,
    and group coplanar pieces into logical surfaces.
 3. Accept an already embedded triangle boundary directly; otherwise corefine the complete triangle
-   soup and select its three-dimensional zero/nonzero-winding interface.
+   soup and select its three-dimensional zero/nonzero-winding interface. Independently closed rim
+   extrusions retain piece identities, allowing winding tests to reject non-overlapping bounding
+   boxes and classify large pieces by accelerated ray crossings without changing Boolean semantics.
 4. Require one connected, outward-oriented embedded boundary and keep its final boundary
    triangulated.
 5. Quantize coordinates to eight decimal places, rebuild indexed triangles, orient positive volume,
@@ -42,7 +44,7 @@ edge, one connected component, outward positive volume, no duplicate triangles, 
 surface intersections. These are postconditions of STL conversion, not properties inferred from
 the input `Polyhedron`.
 
-An explicit Resolve transform is unnecessary. Export performs its own presentation-aware solid
+An explicit Resolved transform is unnecessary. Export performs its own presentation-aware solid
 conversion and preserves hidden immersed rims before resolving the complete three-dimensional
 arrangement. In particular, Prism 5/2 with its two cap faces hidden exports a watertight solid with
 a visible pentagram rim at each end.
@@ -93,7 +95,9 @@ Focused core tests cover presentation construction, arrangement, quantization, f
 validation, every resource guard, deterministic output, and the no-partial-download rule. Structural
 OpenSCAD tests distinguish closed-polyhedron and piece-union output and verify polygon paths and
 closed pieces. Shared regressions include immersed catalog solids, concave and non-planar faces,
-expanded pieces, hidden rims, and Prism 5/2 with hidden caps.
+expanded pieces, hidden rims, Prism 5/2 with hidden caps, all-rim Antiprism 5/2 and Antiprism 7/3,
+and the acute triangular rims of resolved Bipyramid 7/2. The Antiprism 7/3 JVM regression also
+guards a complete conversion time below one second.
 
 The opt-in deterministic STL stress campaign and its current corpus results are documented with the
 command that runs it in [Development](development.md).

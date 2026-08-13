@@ -86,7 +86,7 @@ finite-coordinate, manifold-edge, connectedness, triangle-orientation, or surfac
 it can reach WebGL.
 
 The mesh contract is split by concern: [Non-convex geometry](non-convex.md) owns simple concave and
-non-planar faces, [Self-intersecting polyhedra](self-intersections.md) owns immersion and Resolve,
+non-planar faces, [Self-intersecting polyhedra](self-intersections.md) owns immersion and the Resolved transform,
 and [Export](export.md) owns printable conversion. Every face consumer uses the model's supplied
 resolved-face triangles, so validation checks the same surface later rendered, picked, animated,
 and exported.
@@ -142,7 +142,7 @@ The site must be served over HTTP; loading it directly from the filesystem is un
 - Transform order is significant and intermediate topology metadata corresponds to the same order.
 - A macro occupies one logical transform stage even though the core may execute several primitive operations for it.
 - A displayed polyhedron never exceeds 32,767 edges.
-- Every displayed polyhedron satisfies at least the renderable-immersion contract. Resolve output
+- Every displayed polyhedron satisfies at least the renderable-immersion contract. Resolved output
   and every successful STL satisfy the stronger connected embedded-boundary contract; compounds
   are rejected, while simple non-planar faces remain valid through their shared triangulation.
 - JS and Wasm benchmarks run the same common source and must produce the same checksum.

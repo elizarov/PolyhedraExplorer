@@ -13,7 +13,7 @@ specifications.
 - [Lighting and plastic material](lighting.md) — dielectric microfacet model, PLA defaults, controls, performance, and limitations.
 - [Architecture](architecture.md) — module boundaries, runtime flow, and invariants.
 - [Non-convex geometry](non-convex.md) — surface validity, shared triangulation, rims, and transform applicability.
-- [Self-intersecting polyhedra](self-intersections.md) — immersed surfaces, nonzero-winding face geometry, Resolve, and intersection UI.
+- [Self-intersecting polyhedra](self-intersections.md) — immersed surfaces, nonzero-winding face geometry, Resolved, and intersection UI.
 - [Export](export.md) — STL conversion, OpenSCAD construction, validation, and browser resource limits.
 - [Features](features.md) — user-visible capabilities and supported operations.
 - [Glossary](glossary.md) — project terminology and notation.

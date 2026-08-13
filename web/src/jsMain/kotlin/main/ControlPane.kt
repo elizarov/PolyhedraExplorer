@@ -805,7 +805,7 @@ private fun IntersectionButton(
 ) {
     Button(attrs = {
         classes("msg", "intersection-indicator")
-        attr("aria-label", "Resolve self-intersections")
+        attr("aria-label", "Add Resolved transform")
         onClick { appendResolve() }
     }) { MessageSpan(message) }
 }

@@ -17,12 +17,14 @@ import polyhedra.model.poly.ResolvedRimGeometry
 import polyhedra.model.poly.VertexKind
 import polyhedra.model.poly.resolveFaceGeometry
 import polyhedra.model.util.Vec3
+import polyhedra.model.util.cross
 import polyhedra.model.util.minus
 import polyhedra.model.util.norm
 import polyhedra.model.util.plus
 import polyhedra.model.util.times
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ResolvedRimTest {
@@ -90,7 +92,7 @@ class ResolvedRimTest {
     }
 
     @Test
-    fun sharpSimpleCornerUsesABoundedBevelInsteadOfAnUnboundedMiter() {
+    fun sharpSimpleCornerUsesTheExactSafeInset() {
         val face = face(
             Vec3(-1.0, 0.0, 0.0),
             Vec3(1.0, 0.0, 0.0),
@@ -99,11 +101,11 @@ class ResolvedRimTest {
         val width = FaceRim(face).maxRim * 0.25
         val rim = face.resolvedRim(resolveFaceGeometry(face), width)
         val inner = rim.regions.single().holes.single()
+        val expected = FaceRim(face).rimDir.mapIndexed { index, direction ->
+            face.fvs[index] + direction * width
+        }
 
-        assertTrue(inner.vertices.size > face.fvs.size, "The sharp corner must be bevelled")
-        assertTrue(inner.vertices.all { point ->
-            face.fvs.minOf { source -> (point - source).norm } <= width * 4.0 + 1e-9
-        })
+        assertSamePointSet(expected, inner.vertices)
     }
 
     @Test
@@ -173,6 +175,29 @@ class ResolvedRimTest {
         assertTrue(response.resolvedRims.take(2).all { rim -> rim.regions.isNotEmpty() })
         val encoded = CoreJson.encodeToString(response)
         assertEquals(encoded, CoreJson.encodeToString(CoreJson.decodeFromString<CoreResponse>(encoded)))
+    }
+
+    @Test
+    fun resolvedStarBipyramidRimsStayInsideTheirAcuteTriangularFaces() = runTest {
+        val response = evaluateCore(
+            CoreRequest(CoreState("SB7_2", listOf("R"), "c"), rimWidth = 0.05)
+        )
+        assertNull(response.error)
+        assertEquals(response.poly.fs.size, response.resolvedRims.size)
+        for ((face, rim) in response.poly.fs.zip(response.resolvedRims)) {
+            val region = rim.regions.single()
+            val hole = region.holes.single()
+            assertEquals(face.fvs.size, hole.vertices.size, "Face ${face.id}")
+            val tolerance = response.poly.circumradius * 1e-8
+            for (point in hole.vertices) for (index in face.fvs.indices) {
+                val a = face.fvs[index]
+                val b = face.fvs[(index + 1) % face.fvs.size]
+                assertTrue(
+                    ((b - a) cross (point - a)) * face <= tolerance,
+                    "Face ${face.id} rim point $point is outside edge $index",
+                )
+            }
+        }
     }
 
     private fun assertSamePointSet(expected: List<Vec3>, actual: List<Vec3>) {

@@ -179,7 +179,7 @@ data class Transform(
         val Canonical = transform(TransformOperation.Canonical, "Canonical")
         val Greatened = transform(TransformOperation.Greatened, "Greatened", TransformCategory.Star)
         val Stellated = transform(TransformOperation.Stellated, "Stellated", TransformCategory.Star)
-        val Resolve = transform(TransformOperation.Resolve, "Resolve", TransformCategory.Star)
+        val Resolve = transform(TransformOperation.Resolve, "Resolved", TransformCategory.Star)
 
         val Kis = macro(TransformOperation.Kis)
         val Join = macro(TransformOperation.Join)

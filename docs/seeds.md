@@ -72,7 +72,7 @@ A Kepler-Poinsot solid is a regular non-convex polyhedron: every classical face 
 regular polygon or pentagram, and every classical vertex has the same vertex figure. Exactly four
 exist. The authoritative polyhedron is the classical immersed source surface, so the UI reports
 its abstract F/E/V and regular-map orbits. Each face also carries derived nonzero-winding cells for
-rendering and picking without changing that topology. The explicit Resolve operation converts the
+rendering and picking without changing that topology. The explicit Resolved operation converts the
 complete immersion to an embedded physical boundary when a downstream operation needs one. This
 category is last in the seed popup, whose entries use solid names only. See
 [Self-intersecting polyhedra](self-intersections.md) for the geometry contracts and resolution
