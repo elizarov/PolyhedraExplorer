@@ -19,6 +19,7 @@ import polyhedra.model.api.TransformPrefixReplacement
 import polyhedra.model.api.findTransformPrefixReplacement
 import polyhedra.model.util.updatedAt
 import polyhedra.web.catalog.*
+import polyhedra.web.components.SliderStepControls
 import polyhedra.web.components.observe
 import polyhedra.web.params.Param
 import polyhedra.web.poly.*
@@ -374,7 +375,7 @@ internal fun ControlPane(
                     if (itemDisabled) disabled()
                     onClick { togglePopup(itemPopup) }
                 }) {
-                    Text(transforms[index].toString())
+                    TransformPillLabel(transforms[index])
                     Aside(attrs = { classes("tooltip-text") }) { Text("Modify transform") }
                 }
                 if (hasSettings) {
@@ -508,6 +509,17 @@ internal fun ControlPane(
 }
 
 @Composable
+private fun TransformPillLabel(transform: Transform) {
+    Text(transform.toString())
+    if (transform.operation == TransformOperation.Stellated) {
+        transform.tweaks[TransformTweak.StellationResult]
+            ?.roundToInt()
+            ?.takeIf { result -> result > 1 }
+            ?.let { result -> Sub { Text(result.toString()) } }
+    }
+}
+
+@Composable
 private fun TransformSettingsPopup(
     transform: Transform,
     safeRanges: Map<TransformTweak, CoreTransformTweakRange>?,
@@ -527,17 +539,15 @@ private fun TransformSettingsPopup(
                 val minTick = ceil(minimum / setting.step - 1e-9).toInt()
                 val maxTick = floor(maximum / setting.step + 1e-9).toInt()
                 val rangeAvailable = safeRanges == null || safeRange != null && minTick <= maxTick
+                val currentTick = (currentValue / setting.step).roundToInt()
+                    .coerceIn(minTick, maxTick.coerceAtLeast(minTick))
                 ControlRow(setting.label) {
                     Input(type = InputType.Range, attrs = {
                         classes("transform-setting-slider")
                         attr("aria-label", setting.label)
                         attr("min", minTick.toString())
                         attr("max", maxTick.coerceAtLeast(minTick).toString())
-                        value(
-                            (currentValue / setting.step).roundToInt()
-                                .coerceIn(minTick, maxTick.coerceAtLeast(minTick))
-                                .toString()
-                        )
+                        value(currentTick.toString())
                         if (!rangeAvailable) disabled()
                         onInput { event ->
                             event.value?.toDouble()?.let { sliderValue ->
@@ -578,6 +588,25 @@ private fun TransformSettingsPopup(
                         }
                     }
                 }
+            }
+            transform.settings.singleOrNull { setting ->
+                setting.tweak == TransformTweak.StellationResult
+            }?.let { setting ->
+                val currentValue = transform.tweaks[setting.tweak] ?: 1.0
+                val safeRange = safeRanges?.get(setting.tweak)
+                val minimum = safeRange?.min ?: setting.min
+                val maximum = safeRange?.max ?: setting.max
+                val minTick = ceil(minimum / setting.step - 1e-9).toInt()
+                val maxTick = floor(maximum / setting.step + 1e-9).toInt()
+                val rangeAvailable = safeRanges == null || safeRange != null && minTick <= maxTick
+                val currentTick = (currentValue / setting.step).roundToInt()
+                    .coerceIn(minTick, maxTick.coerceAtLeast(minTick))
+                SliderStepControls(
+                    canStepBackward = rangeAvailable && currentTick > minTick,
+                    canStepForward = rangeAvailable && currentTick < maxTick,
+                    previousLabel = "Previous stellation",
+                    nextLabel = "Next stellation",
+                ) { delta -> onChange(setting, (currentTick + delta) * setting.step) }
             }
             Button(attrs = {
                 classes("transform-settings-reset")

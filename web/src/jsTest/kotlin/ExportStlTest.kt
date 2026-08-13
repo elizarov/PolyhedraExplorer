@@ -36,6 +36,7 @@ class ExportStlTest {
     @Test
     fun usesResolvedInProposedExportFileName() {
         assertEquals("resolved_tetrahedron", "Resolved Tetrahedron".toExportFileBaseName())
+        assertEquals("stellated_2_icosahedron", "Stellated 2 Icosahedron".toExportFileBaseName())
     }
 
     @Test

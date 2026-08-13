@@ -597,7 +597,10 @@ The dodecahedron's three outward strata are Stellated dodecahedron, Great dodeca
 stellated dodecahedron in that order. Consequently, both `D -> G -> S` and `D -> S -> G` reach the
 great stellated dodecahedron. A qualifying non-catalog input is transformed directly from its own
 planes. The Result gear enumerates only surviving supported strata; Result 1 is the closest and is
-omitted from serialization, while later results use `S~l=n`.
+omitted from serialization, while later results use `S~l=n`. A non-first result is shown as an HTML
+subscript on the Stellated transform pill and as `_n` in generated export filenames. The slider's
+compact tap controls share the popup's bottom action row with Reset, select the previous or next
+available result, and keep the slider position synchronized.
 
 Stellated is immediate for the same reason as Greatened: no connected, non-degenerate,
 topology-compatible interpolation has the required endpoint topology.

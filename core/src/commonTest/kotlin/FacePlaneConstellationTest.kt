@@ -55,6 +55,7 @@ class FacePlaneConstellationTest {
         val response = evaluateCore(CoreRequest(CoreState("I", listOf("S~l=2"), "c")))
 
         assertEquals(null, response.error)
+        assertEquals("Stellated 2 Icosahedron", response.polyName)
         assertEquals(FEV(3, 5, 4), response.symmetry.orbitCounts)
         assertEquals(response.symmetry.orbitCounts.f, response.poly.faceKinds.size)
         assertEquals(response.symmetry.orbitCounts.e, response.poly.edgeKinds.size)

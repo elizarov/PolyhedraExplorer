@@ -796,6 +796,36 @@ aside.transform-settings .transform-setting-value {
     text-align: right;
 }
 
+aside.transform-settings tr.control > td {
+    vertical-align: middle;
+}
+
+.slider-step-controls {
+    display: flex;
+    gap: 0.25em;
+    margin-right: auto;
+}
+
+.slider-step-controls button {
+    width: 1.75em;
+    height: 1.5em;
+    padding: 0;
+    border: 0;
+    border-radius: 0.75em;
+    color: var(--button-color);
+    background-color: var(--button-background-color);
+    cursor: pointer;
+}
+
+.slider-step-controls button:hover:not(:disabled) {
+    color: var(--hover-color);
+}
+
+.slider-step-controls button:disabled {
+    color: var(--disabled-color);
+    cursor: default;
+}
+
 aside.transform-settings button.chirality-flip {
     position: relative;
     min-width: 2em;

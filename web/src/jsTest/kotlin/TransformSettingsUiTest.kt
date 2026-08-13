@@ -189,7 +189,7 @@ class TransformSettingsUiTest {
     }
 
     @Test
-    fun stellationResultGearAppearsOnlyForAlternativesAndUsesDiscreteMetadata() {
+    fun stellationResultGearAppearsOnlyForAlternativesAndUsesDiscreteMetadata(): Promise<Unit> {
         val params = PolyParams("", null)
         params.transforms.updateValue(listOf(Transform.Stellated))
         params.updateTransformTweakRanges(
@@ -233,9 +233,29 @@ class TransformSettingsUiTest {
         assertEquals("3", slider.max)
         assertEquals("1 of 3 · F 12, E 30, V 12", host.querySelector(".transform-setting-value")?.textContent)
 
-        slider.value = "2"
-        slider.dispatchEvent(Event("input"))
+        assertNull(host.querySelector("button.txt sub"))
+        val previous = host.querySelector(".slider-step-previous") as HTMLButtonElement
+        val next = host.querySelector(".slider-step-next") as HTMLButtonElement
+        assertTrue(previous.parentElement?.parentElement?.classList?.contains("transform-settings-actions") == true)
+        assertTrue(previous.parentElement?.nextElementSibling?.classList?.contains("transform-settings-reset") == true)
+        assertEquals("Previous stellation", previous.getAttribute("aria-label"))
+        assertEquals("Next stellation", next.getAttribute("aria-label"))
+        assertTrue(previous.disabled)
+        assertTrue(!next.disabled)
+
+        next.click()
         assertEquals("S~l=2", params.transforms.value.single().tag)
+        return awaitRecomposition().then {
+            assertEquals("2", (host.querySelector(".transform-setting-slider") as HTMLInputElement).value)
+            assertEquals("2", host.querySelector("button.txt sub")?.textContent)
+            assertTrue(!(host.querySelector(".slider-step-previous") as HTMLButtonElement).disabled)
+            (host.querySelector(".slider-step-previous") as HTMLButtonElement).click()
+            awaitRecomposition()
+        }.then {
+            assertEquals("S", params.transforms.value.single().tag)
+            assertEquals("1", (host.querySelector(".transform-setting-slider") as HTMLInputElement).value)
+            assertNull(host.querySelector("button.txt sub"))
+        }
     }
 
     @Test
