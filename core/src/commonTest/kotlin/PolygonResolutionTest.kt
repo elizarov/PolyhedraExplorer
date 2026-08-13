@@ -94,7 +94,9 @@ class PolygonResolutionTest {
             Vec3(1.0, -1.0, -0.08),
         )
         assertTrue(!simple.isPlanar)
-        assertEquals(2, resolveFaceGeometry(simple).triangles.size)
+        val simpleResolved = resolveFaceGeometry(simple)
+        assertEquals(simple.fvs.size + 1, simpleResolved.vertices.size)
+        assertEquals(simple.fvs.size, simpleResolved.triangles.size)
 
         val star = starPoints(5, 2).toMutableList()
         star[0] = Vec3(star[0].x, star[0].y, 0.1)

@@ -288,7 +288,9 @@ class MutableFace(
     override val directedEdges: MutableList<Edge> = ArrayList() // edges are properly ordered clockwise
 ) : Face, MutablePlane(fvs.averagePlane()), MutableKind<FaceKind> {
     override val isPlanar = fvs.all { it in this }
-    override val triangles: List<FaceTriangle> by lazy { triangulateFace(fvs, this) }
+    override val triangles: List<FaceTriangle> by lazy {
+        triangulateFace(fvs, this, preferLocalDiagonals = !isPlanar)
+    }
 
     override fun equals(other: Any?): Boolean = other is Face && id == other.id
     override fun hashCode(): Int = id

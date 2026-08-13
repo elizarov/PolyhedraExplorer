@@ -33,17 +33,23 @@ is specified in [Self-intersecting polyhedra](self-intersections.md#validation-c
 ## Shared face triangulation
 
 The model computes one scale-aware deterministic triangulation for every simple face. A planar or
-non-planar boundary is projected along the dominant component of its average normal and ear-clipped
-in that stable two-dimensional basis. For a non-planar face, the lifted triangles define the face's
-actual surface; consumers do not infer a different curved or planar patch.
+non-planar boundary is projected along the dominant component of its average normal. Planar faces
+are ear-clipped in that stable two-dimensional basis. A folded face whose average projected point
+sees every boundary edge receives a symmetry-preserving interior vertex and triangle fan; this
+avoids choosing one privileged corner of a symmetric fold. Other non-planar faces are ear-clipped
+using the shortest available three-dimensional diagonals, which keeps each fold local. The lifted
+triangles define a non-planar face's actual surface; consumers do not infer a different curved or
+planar patch.
 
 The same resolved-face triangle indices drive:
 
 - WebGL face fill and table shadows;
 - canvas face hit testing;
-- topology-compatible animation buffers;
 - STL presentation construction; and
 - OpenSCAD output for concave or non-planar regions.
+
+Temporary animation topology remains boundary-only so interpolation does not change F/E/V or its
+vertex correspondence; the completed mesh swaps to the shared resolved surface.
 
 Consequently, a concave notch remains empty in rendering, picking, and export. No consumer may
 replace the shared tessellation with a triangle fan or independently choose diagonals.

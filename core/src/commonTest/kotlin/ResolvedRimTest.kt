@@ -16,6 +16,7 @@ import polyhedra.model.poly.MutableVertex
 import polyhedra.model.poly.ResolvedRimGeometry
 import polyhedra.model.poly.VertexKind
 import polyhedra.model.poly.resolveFaceGeometry
+import polyhedra.model.poly.size
 import polyhedra.model.util.Vec3
 import polyhedra.model.util.cross
 import polyhedra.model.util.minus
@@ -122,6 +123,42 @@ class ResolvedRimTest {
         assertTrue(rim.regions.flatMap { region -> listOf(region.outer) + region.holes }
             .flatMap { cycle -> cycle.segmentSources }.any { sources -> sources.isEmpty() })
         assertEquals(FaceRim(face).maxRim, rim.maximumWidth)
+    }
+
+    @Test
+    fun truncatedStellatedOctahedronUsesSymmetricCenterFacetsAtEveryEquivalentFace() = runTest {
+        val response = evaluateCore(
+            CoreRequest(CoreState("O", listOf("S", "t"), "c"), rimWidth = 0.05)
+        )
+        assertNull(response.error)
+        val foldedFaces = response.poly.fs.filterNot { face -> face.isPlanar }
+
+        assertEquals(6, foldedFaces.size)
+        for (face in foldedFaces) {
+            val resolved = response.poly.resolvedFaces[face.id]
+            assertEquals(face.size + 1, resolved.vertices.size)
+            assertEquals(face.size, resolved.triangles.size)
+            val vertexUse = IntArray(resolved.vertices.size)
+            resolved.triangles.forEach { triangle ->
+                vertexUse[triangle.a]++
+                vertexUse[triangle.b]++
+                vertexUse[triangle.c]++
+            }
+            assertEquals(
+                List(face.size) { 2 } + face.size,
+                vertexUse.sorted(),
+                "Folded face ${face.id} must fan through one symmetric interior vertex",
+            )
+            val rim = response.resolvedRims[face.id]
+            assertTrue(rim.regions.isNotEmpty())
+            assertTrue(rim.regions.all { region -> region.triangulationPatch })
+            assertEquals(
+                face.fvs.indices.toSet(),
+                rim.regions.flatMap { region -> region.sourceEdges }
+                    .map { edge -> edge.sourceSegmentIndex }
+                    .toSet(),
+            )
+        }
     }
 
     @Test

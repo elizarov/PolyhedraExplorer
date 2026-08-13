@@ -42,7 +42,11 @@ fun triangulatePlanarPolygon(
     }
 }
 
-internal fun triangulateFace(vertices: List<Vec3>, normal: Vec3): List<FaceTriangle> {
+internal fun triangulateFace(
+    vertices: List<Vec3>,
+    normal: Vec3,
+    preferLocalDiagonals: Boolean = false,
+): List<FaceTriangle> {
     require(vertices.size >= 3) { "A face needs at least three vertices" }
     require(normal.norm > EPS) { "Face has no well-defined normal" }
 
@@ -58,13 +62,12 @@ internal fun triangulateFace(vertices: List<Vec3>, normal: Vec3): List<FaceTrian
     val remaining = vertices.indices.toMutableList()
     val result = ArrayList<FaceTriangle>(vertices.size - 2)
     while (remaining.size > 3) {
-        var clipped = false
-        for (position in remaining.indices) {
+        val ears = remaining.indices.filter { position ->
             val previous = remaining[(position + remaining.size - 1) % remaining.size]
             val current = remaining[position]
             val next = remaining[(position + 1) % remaining.size]
             val turn = orientation * projected.cross(previous, current, next)
-            if (turn <= areaTolerance) continue
+            if (turn <= areaTolerance) return@filter false
             if (remaining.any { candidate ->
                     candidate != previous && candidate != current && candidate != next &&
                         projected[candidate].insideOrOnTriangle(
@@ -75,19 +78,30 @@ internal fun triangulateFace(vertices: List<Vec3>, normal: Vec3): List<FaceTrian
                             areaTolerance,
                         )
                 }
-            ) continue
+            ) return@filter false
             if (remaining.size == 4) {
                 val final = remaining.filterIndexed { candidatePosition, _ -> candidatePosition != position }
-                if (abs(projected.cross(final[0], final[1], final[2])) <= areaTolerance) continue
+                if (abs(projected.cross(final[0], final[1], final[2])) <= areaTolerance) return@filter false
             }
-
-            // Reverse the clockwise face boundary to produce an outward-facing triangle.
-            result += FaceTriangle(previous, next, current)
-            remaining.removeAt(position)
-            clipped = true
-            break
+            true
         }
-        require(clipped) { "Face cannot be triangulated without overlap or degeneracy" }
+        require(ears.isNotEmpty()) { "Face cannot be triangulated without overlap or degeneracy" }
+        val position = if (preferLocalDiagonals) {
+            ears.minBy { candidate ->
+                val previous = remaining[(candidate + remaining.size - 1) % remaining.size]
+                val next = remaining[(candidate + 1) % remaining.size]
+                val diagonal = vertices[next] - vertices[previous]
+                diagonal * diagonal
+            }
+        } else {
+            ears.first()
+        }
+        val previous = remaining[(position + remaining.size - 1) % remaining.size]
+        val current = remaining[position]
+        val next = remaining[(position + 1) % remaining.size]
+        // Reverse the clockwise face boundary to produce an outward-facing triangle.
+        result += FaceTriangle(previous, next, current)
+        remaining.removeAt(position)
     }
     result += FaceTriangle(remaining[0], remaining[2], remaining[1])
     return result

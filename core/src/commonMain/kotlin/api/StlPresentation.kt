@@ -11,6 +11,7 @@ import polyhedra.model.poly.FaceKind
 import polyhedra.model.poly.MutableFace
 import polyhedra.model.poly.MutableVertex
 import polyhedra.model.poly.Polyhedron
+import polyhedra.model.poly.ResolvedFaceGeometry
 import polyhedra.model.poly.ResolvedRimCycle
 import polyhedra.model.poly.VertexKind
 import polyhedra.model.poly.area
@@ -61,8 +62,9 @@ internal suspend fun CoreStlPresentation.toTriangleRequest(
 
     physical.fs.forEachIndexed { index, face ->
         if (face !in hiddenPhysicalFaces) {
-            builder.addFace(face, inner = false)
-            if (hasHiddenFaces || expand > 0.0) builder.addFace(face, inner = true)
+            val geometry = physical.resolvedFaces[face.id]
+            builder.addFace(face, geometry, inner = false)
+            if (hasHiddenFaces || expand > 0.0) builder.addFace(face, geometry, inner = true)
         } else if (rim <= 0.0 && width > 0.0) {
             builder.addFaceBoundaryWall(face)
         }
@@ -134,13 +136,13 @@ private class PresentationMeshBuilder(
         if (ids.toSet().size == 3) triangles += CoreStlTriangle(ids[0], ids[1], ids[2], surface, solid)
     }
 
-    fun addFace(face: Face, inner: Boolean) {
+    fun addFace(face: Face, geometry: ResolvedFaceGeometry, inner: Boolean) {
         val surface = nextSurface++
-        for (triangle in face.triangles) {
+        for (triangle in geometry.triangles) {
             triangle(
-                transformed(face[triangle.a], face, inner),
-                transformed(face[triangle.b], face, inner),
-                transformed(face[triangle.c], face, inner),
+                transformed(geometry.vertices[triangle.a].position, face, inner),
+                transformed(geometry.vertices[triangle.b].position, face, inner),
+                transformed(geometry.vertices[triangle.c].position, face, inner),
                 surface,
                 reverse = inner,
             )

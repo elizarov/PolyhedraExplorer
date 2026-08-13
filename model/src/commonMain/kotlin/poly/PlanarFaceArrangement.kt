@@ -172,7 +172,7 @@ private fun ProjectedBoundary.segmentIntersection(
 }
 
 private fun Face.directResolvedGeometry(): ResolvedFaceGeometry {
-    val vertices = fvs.map { vertex ->
+    val vertices = fvs.mapTo(arrayListOf()) { vertex ->
         ResolvedFaceVertex(
             MutableVec3(vertex),
             ResolvedElementProvenance(
@@ -181,8 +181,20 @@ private fun Face.directResolvedGeometry(): ResolvedFaceGeometry {
             ),
         )
     }
-    val triangles = triangles.map { triangle ->
-        ResolvedFaceTriangle(triangle.a, triangle.b, triangle.c, sourceCellId = 0)
+    val center = if (isPlanar) null else resolvedFanCenterOrNull()
+    val triangles = if (center == null) {
+        triangles.map { triangle ->
+            ResolvedFaceTriangle(triangle.a, triangle.b, triangle.c, sourceCellId = 0)
+        }
+    } else {
+        val centerIndex = vertices.size
+        vertices += ResolvedFaceVertex(
+            center,
+            ResolvedElementProvenance(sourceFaceIds = listOf(id)),
+        )
+        fvs.indices.map { index ->
+            ResolvedFaceTriangle(centerIndex, (index + 1) % fvs.size, index, sourceCellId = 0)
+        }
     }
     val cell = ResolvedFaceCell(0, winding = if (signedProjectedArea() >= 0.0) 1 else -1, fvs.indices.toList(), triangles)
     val edges = fvs.indices.map { index ->
@@ -194,6 +206,29 @@ private fun Face.directResolvedGeometry(): ResolvedFaceGeometry {
         )
     }
     return ResolvedFaceGeometry(id, kind, sourceBoundarySelfIntersects = false, vertices, listOf(cell), edges)
+}
+
+/**
+ * Returns a symmetry-preserving interior vertex when the average projected point sees every
+ * boundary edge. The resulting fan is preferable to privileging one arbitrary diagonal of a
+ * folded face. Concave faces whose average is outside their kernel retain ear clipping.
+ */
+private fun Face.resolvedFanCenterOrNull(): MutableVec3? {
+    val center = MutableVec3(
+        fvs.sumOf(Vertex::x) / fvs.size,
+        fvs.sumOf(Vertex::y) / fvs.size,
+        fvs.sumOf(Vertex::z) / fvs.size,
+    )
+    val scale = fvs.maxOf { vertex -> (vertex - center).norm }
+    val areaTolerance = EPS * scale * scale
+    return center.takeIf {
+        fvs.indices.all { index ->
+            val current = fvs[index]
+            val next = fvs[(index + 1) % fvs.size]
+            val triangleNormal = (next - center) cross (current - center)
+            triangleNormal.norm > areaTolerance && triangleNormal * this > EPS * triangleNormal.norm
+        }
+    }
 }
 
 private fun Face.signedProjectedArea(): Double {
