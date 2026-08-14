@@ -12,12 +12,14 @@ import org.jetbrains.compose.web.renderComposable
 import org.w3c.dom.HTMLDivElement
 import org.w3c.dom.HTMLElement
 import polyhedra.model.api.CoreProgress
+import polyhedra.model.api.CoreState
 import polyhedra.web.catalog.Transform
 import polyhedra.web.main.ControlPane
 import polyhedra.web.main.RootPane
 import polyhedra.web.main.RootParams
 import polyhedra.web.poly.PolyParams
 import polyhedra.web.poly.WORKER_PROGRESS_GRACE_MS
+import polyhedra.web.worker.CoreWorkerException
 import kotlin.js.Promise
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
@@ -123,6 +125,21 @@ class WorkerProgressUiTest {
         params.updateTransformProgress(CoreProgress(transformIndex = 1, done = 100))
         awaitRecomposition()
         assertEquals(0, host.querySelectorAll("button.msg").length)
+    }
+
+    @Test
+    fun workerFailureIsAssignedToTheStageReportedByTheWorker() {
+        val params = PolyParams("", null)
+        params.transforms.updateValue(listOf(Transform.Greatened, Transform.Dual))
+
+        params.handleCoreFailure(
+            CoreState("deD", listOf("G", "d"), "c"),
+            CoreWorkerException(1, "animation failed"),
+        )
+
+        assertEquals(1, params.transformError?.index)
+        assertEquals(Transform.Dual, params.transformError?.msg?.value)
+        assertEquals("animation failed", params.coreError)
     }
 
     private fun assertProgressPill(transformName: String, progress: String) {

@@ -1,6 +1,7 @@
 package polyhedra.core
 
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.encodeToString
 import polyhedra.core.api.evaluateCore
 import polyhedra.core.poly.*
 import polyhedra.core.transform.ConstellationOperation
@@ -8,10 +9,17 @@ import polyhedra.core.transform.sameGeometryAs
 import polyhedra.core.transform.stellationCandidatesAsync
 import polyhedra.core.transform.resolved
 import polyhedra.model.api.CoreRequest
+import polyhedra.model.api.CoreJson
 import polyhedra.model.api.CoreState
+import polyhedra.model.poly.FEV
+import polyhedra.model.poly.fev
+import polyhedra.model.util.minus
+import polyhedra.model.util.norm
+import kotlin.math.roundToLong
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class GenericGreateningTest {
@@ -93,6 +101,37 @@ class GenericGreateningTest {
         assertEquals(3.0, range.max)
         assertEquals(listOf(1, 2, 3), range.options.map { option -> option.value })
     }
+
+    @Test
+    fun deltoidalHexecontahedronGreateningHasOneCompleteAuthoritativeFaceOrbit() = runTest {
+        val greatened = Seed.DeltoidalHexecontahedron.poly.greatenings().single().poly
+
+        assertEquals(FEV(60, 210, 56), greatened.fev())
+        assertEquals(1, greatened.faceKinds.size)
+        assertEquals(1, greatened.analyzeSymmetry().orbitCounts.f)
+        assertEquals(1, greatened.resolvedFaceMetricSignatures().size)
+
+        val resolved = greatened.resolved()
+        assertEquals(FEV(240, 420, 182), resolved.fev())
+        assertEquals(4, resolved.faceKinds.size)
+        assertEquals(4, resolved.analyzeSymmetry().orbitCounts.f)
+    }
+
+    @Test
+    fun dualAfterGreatenedImmersionSkipsUnsafeAnimationButKeepsTheTransform() = runTest {
+        val response = evaluateCore(
+            CoreRequest(
+                state = CoreState("deD", listOf("G", "d"), "c"),
+                previousState = CoreState("deD", listOf("G"), "c"),
+                animationDuration = 0.5,
+            ),
+        )
+
+        assertNull(response.error, response.error?.detail)
+        assertEquals(FEV(56, 210, 60), response.poly.fev())
+        assertTrue(response.animation.isEmpty())
+        assertTrue(CoreJson.encodeToString(response).isNotEmpty())
+    }
 }
 
 private const val TEST_TOLERANCE = 2e-7
@@ -102,3 +141,26 @@ private suspend fun polyhedra.model.poly.Polyhedron.greatenings() =
 
 private suspend fun polyhedra.model.poly.Polyhedron.stellations() =
     stellationCandidatesAsync(ConstellationOperation.Stellate)
+
+private fun polyhedra.model.poly.Polyhedron.resolvedFaceMetricSignatures(): Set<List<Long>> =
+    resolvedFaces.mapTo(linkedSetOf()) { geometry ->
+        buildList {
+            add(geometry.vertices.size.toLong())
+            add(geometry.cells.size.toLong())
+            add(geometry.edges.size.toLong())
+            geometry.cells.sortedBy { cell -> cell.id }.forEach { cell ->
+                add(cell.winding.toLong())
+                add(cell.boundary.size.toLong())
+                add(cell.triangles.size.toLong())
+            }
+            for (first in geometry.vertices.indices) {
+                for (second in (first + 1) until geometry.vertices.size) {
+                    add(
+                        ((geometry.vertices[first].position - geometry.vertices[second].position).norm * 1e9)
+                            .roundToLong()
+                    )
+                }
+            }
+            sort()
+        }
+    }

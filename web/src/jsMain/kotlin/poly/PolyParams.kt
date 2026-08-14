@@ -13,6 +13,7 @@ import polyhedra.web.main.*
 import polyhedra.web.params.*
 import polyhedra.web.util.Oklch
 import polyhedra.web.worker.evaluateInWasm
+import polyhedra.web.worker.CoreWorkerException
 import kotlin.js.console
 import kotlin.math.PI
 import kotlin.math.cos
@@ -207,16 +208,23 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
             onFailure = failure@{ cause ->
                 if (requestId != activeRequestId || requestedState != state) return@failure
                 cancelCoreRequest = null
-                resetTransformProgress()
-                coreError = cause.message ?: cause.toString()
-                console.error("Wasm core request failed", cause)
-                transformError = state.transformTags.firstOrNull()?.toTransformOrNull()?.let {
-                    TransformError(0, TransformFailed(it))
-                }
-                notifyUpdated(TargetValue)
-                performUpdate(null, 0.0)
+                handleCoreFailure(state, cause)
             },
         )
+    }
+
+    internal fun handleCoreFailure(state: CoreState, cause: Throwable) {
+        val stageIndex = (cause as? CoreWorkerException)?.transformIndex ?: progressStageIndex
+        resetTransformProgress()
+        coreError = cause.message ?: cause.toString()
+        console.error("Wasm core request failed", cause)
+        transformError = stageIndex?.let { index ->
+            state.transformTags.getOrNull(index)?.toTransformOrNull()?.let { transform ->
+                TransformError(index, TransformFailed(transform))
+            }
+        }
+        notifyUpdated(TargetValue)
+        performUpdate(null, 0.0)
     }
 
     fun startCore() {

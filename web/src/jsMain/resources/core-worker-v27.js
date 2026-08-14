@@ -2,9 +2,10 @@ let coreModulePromise
 
 self.onmessage = async event => {
     let request
+    let transformIndex
     try {
         request = JSON.parse(event.data)
-        coreModulePromise ??= import("./core-v26/PolyhedraExplorer-core.mjs")
+        coreModulePromise ??= import("./core-v27/PolyhedraExplorer-core.mjs")
         const core = await coreModulePromise
         let response
         if (request.kind === "stl") {
@@ -12,8 +13,14 @@ self.onmessage = async event => {
                 self.postMessage(JSON.stringify({ id: request.id, type: "progress", done }))
             })
         } else {
-            response = await core.evaluateCoreJson(request.requestJson, (transformIndex, done) => {
-                self.postMessage(JSON.stringify({ id: request.id, type: "progress", transformIndex, done }))
+            response = await core.evaluateCoreJson(request.requestJson, (activeTransformIndex, done) => {
+                transformIndex = activeTransformIndex
+                self.postMessage(JSON.stringify({
+                    id: request.id,
+                    type: "progress",
+                    transformIndex: activeTransformIndex,
+                    done,
+                }))
             })
         }
         self.postMessage(JSON.stringify({
@@ -26,6 +33,7 @@ self.onmessage = async event => {
         self.postMessage(JSON.stringify({
             id: request?.id ?? -1,
             type: "failure",
+            transformIndex,
             error,
         }))
     }

@@ -141,6 +141,31 @@ class StlApiTest {
     }
 
     @Test
+    fun exportsResolvedGreatenedDeltoidalHexecontahedronPresentations() = runTest {
+        val source = evaluateCore(CoreRequest(CoreState("deD", listOf("G", "R"), "c"))).poly
+        assertEquals(4, source.faceKinds.size)
+
+        for (hiddenKinds in listOf(emptyList(), listOf(FaceKind(0), FaceKind(2)))) {
+            val response = convertStl(
+                CoreStlRequest(
+                    presentation = CoreStlPresentation(
+                        poly = source,
+                        hiddenFaceKinds = hiddenKinds,
+                        scale = 20.0,
+                        width = 0.1,
+                        rim = 0.05,
+                        expand = 0.0,
+                    ),
+                ),
+            )
+
+            assertNull(response.error, "$hiddenKinds: ${response.error?.reason}")
+            response.toValidationPolyhedron().validateProperGeometry()
+            assertTrue(response.signedVolume6() > 0.0)
+        }
+    }
+
+    @Test
     fun exportsHigherWindingStarArrangement() = runTest {
         val source = starPrismFixture(
             n = 7,

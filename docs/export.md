@@ -32,9 +32,10 @@ partial, open, intersecting, or resource-truncated mesh.
 2. Weld only representation-scale input noise, discard degenerate or duplicate input triangles,
    and group coplanar pieces into logical surfaces.
 3. Accept an already embedded triangle boundary directly; otherwise corefine the complete triangle
-   soup and select its three-dimensional zero/nonzero-winding interface. Independently closed rim
-   extrusions retain piece identities, allowing winding tests to reject non-overlapping bounding
-   boxes and classify large pieces by accelerated ray crossings without changing Boolean semantics.
+   soup and select its three-dimensional zero/nonzero-winding interface. Independently closed face
+   and rim extrusions retain piece identities, allowing winding tests to reject non-overlapping
+   bounding boxes and classify large pieces by accelerated ray crossings without changing Boolean
+   semantics.
 4. Require one connected, outward-oriented embedded boundary and keep its final boundary
    triangulated.
 5. Quantize coordinates to eight decimal places, rebuild indexed triangles, orient positive volume,

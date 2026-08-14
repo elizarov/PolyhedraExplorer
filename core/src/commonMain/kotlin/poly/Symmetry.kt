@@ -144,28 +144,33 @@ private class SymmetryTopology(poly: Polyhedron) {
     private val edgeIndices = poly.es.withIndex().associate { (index, edge) ->
         edgeKey(edge.a.id, edge.b.id) to index
     }
-    private val incidentFaceIds = poly.es.associate { edge ->
-        edgeKey(edge.a.id, edge.b.id) to intArrayOf(edge.l.id, edge.r.id)
-    }
-    private val faceVertexIds = poly.fs.map { face -> face.fvs.mapTo(hashSetOf(), Vertex::id) }
+    private val directedEdges = poly.directedEdges.associateBy { edge -> directedEdgeKey(edge.a.id, edge.b.id) }
 
     fun edgeIndex(first: Int, second: Int): Int? = edgeIndices[edgeKey(first, second)]
 
-    fun targetFaceId(permutation: IntArray, source: Face): Int? {
-        val first = permutation[source.fvs[0].id]
-        val second = permutation[source.fvs[1].id]
-        val candidates = incidentFaceIds[edgeKey(first, second)] ?: return null
-        return candidates.firstOrNull { candidateId ->
-            val candidateVertices = faceVertexIds[candidateId]
-            candidateVertices.size == source.fvs.size &&
-                source.fvs.all { vertex -> permutation[vertex.id] in candidateVertices }
+    fun targetFaceId(permutation: IntArray, source: Face, orientation: Int): Int? {
+        var targetId = -1
+        for (sourceEdge in source.directedEdges) {
+            val mappedEdge = directedEdges[
+                directedEdgeKey(permutation[sourceEdge.a.id], permutation[sourceEdge.b.id])
+            ] ?: return null
+            val mappedFace = if (orientation > 0) mappedEdge.r else mappedEdge.l
+            if (targetId < 0) {
+                targetId = mappedFace.id
+            } else if (mappedFace.id != targetId) {
+                return null
+            }
         }
+        return targetId.takeIf { it >= 0 }
     }
 
-    fun isPreserved(permutation: IntArray, poly: Polyhedron): Boolean =
+    fun isPreserved(permutation: IntArray, poly: Polyhedron, orientation: Int): Boolean =
         poly.es.all { edge -> edgeIndex(permutation[edge.a.id], permutation[edge.b.id]) != null } &&
-            poly.fs.all { face -> targetFaceId(permutation, face) != null }
+            poly.fs.all { face -> targetFaceId(permutation, face, orientation) != null }
 }
+
+private fun directedEdgeKey(first: Int, second: Int): Long =
+    (first.toLong() shl 32) xor (second.toLong() and 0xffffffffL)
 
 private fun Polyhedron.symmetryOperation(
     source: OrthonormalFrame,
@@ -179,7 +184,7 @@ private fun Polyhedron.symmetryOperation(
     for (vertex in vs) {
         permutation[vertex.id] = vertexIndex.find(transform(vertex)) ?: return null
     }
-    if (!topology.isPreserved(permutation, this)) return null
+    if (!topology.isPreserved(permutation, this, orientation)) return null
     return GeometricSymmetryOperation(transform, permutation, orientation)
 }
 
@@ -339,7 +344,7 @@ private fun Polyhedron.symmetryOrbitCounts(operations: List<GeometricSymmetryOpe
             edgeSets.union(edgeIndex, target)
         }
         for ((faceIndex, face) in fs.withIndex()) {
-            faceSets.union(faceIndex, requireNotNull(topology.targetFaceId(permutation, face)))
+            faceSets.union(faceIndex, requireNotNull(topology.targetFaceId(permutation, face, operation.orientation)))
         }
     }
     return FEV(faceSets.count, edgeSets.count, vertexSets.count)

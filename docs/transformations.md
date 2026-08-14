@@ -224,12 +224,12 @@ construction exchanges the classical Kepler-Poinsot pairs Stellated dodecahedron
 Great dodecahedron and Great stellated dodecahedron / Great icosahedron; catalog
 recognition only names the result and resolved intersection cells are never dualized.
 
-Dual is animated through the limiting cantellation family. Face-, edge-, and
+On an embedded input, Dual is animated through the limiting cantellation family. Face-, edge-, and
 vertex-derived regions move toward the reciprocal face points until the mesh is
 visually the dual; removal traverses that limit in reverse. This supplies stable
 matching buffers even though the input and dual exchange faces and vertices.
-Classical regular-star duality is immediate because its resolved physical cell topology cannot
-pass through that cantellation family without intersections.
+Duality on any immersed input is immediate because its resolved presentation cells cannot pass
+through that cantellation family without introducing animation-only intersections.
 
 ### Snub (`s`)
 
@@ -582,6 +582,10 @@ generic order above. A missing or out-of-range result reports
 Greatening and Stellated are related but distinct. Greatening facets the polar dual and preserves
 one face per source plane. Stellated fills a complete cell-power stratum of the source plane
 arrangement; a source plane may contribute several output faces, so its face count commonly grows.
+Distinct nonzero-winding presentation cells inside one self-crossing Greatened face remain derived
+geometry and do not create additional authoritative face orbits. Applying Resolved promotes the
+embedded physical boundary and classifies its completed faces into their own proper-rotation
+orbits.
 For Dodecahedron both operations discover the same three classical geometries, but Greatened starts
 with Great dodecahedron while Stellated starts with Stellated dodecahedron. For Cuboctahedron their
 candidate sets are disjoint. Greatened therefore adds useful face-preserving extensions rather than

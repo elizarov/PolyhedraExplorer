@@ -154,7 +154,21 @@ suspend fun evaluateCore(
         symmetryOverride = current.response.symmetry,
         rimWidth = null,
     )
-    val animation = computeAnimation(previous, current, duration)
+    val animation = runCatching {
+        computeAnimation(previous, current, duration).also { steps ->
+            // Polyhedron serialization materializes resolved-face presentation lazily. Do it
+            // inside the best-effort animation boundary so a bad intermediate keyframe cannot
+            // discard the already completed transform response in the worker.
+            steps.forEach { step ->
+                step.previousPoly.resolvedFaces.forEach { face -> face.triangles.size }
+                step.targetPoly.resolvedFaces.forEach { face -> face.triangles.size }
+            }
+        }
+    }.getOrElse { cause ->
+        println("Animation skipped: ${cause.message ?: cause::class.simpleName}")
+        cause.printStackTrace()
+        emptyList()
+    }
     reportCompletion(current, reportProgress)
     return current.response.copy(animation = animation)
 }
@@ -819,6 +833,10 @@ private fun transformAnimation(
     ) return emptyList()
     if (previousTransform is Greatened || currentTransform is Greatened ||
         previousTransform is Stellated || currentTransform is Stellated
+    ) return emptyList()
+    if ((previousTransform is Dual || currentTransform is Dual) &&
+        (basePoly.cachedConstellationGeometryAnalysisOrNull() ?: basePoly.analyzeGeometry())
+            .strongestContract != PolyhedronContract.EmbeddedBoundary
     ) return emptyList()
     if (!basePoly.isConvexGeometry && basePoly.regularStarFormOrNull() != null &&
         (previousTransform is Dual || currentTransform is Dual)

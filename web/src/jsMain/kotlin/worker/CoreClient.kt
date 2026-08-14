@@ -13,7 +13,7 @@ import polyhedra.model.api.CoreResponse
 // Increment together with the worker filename, main-script query, and distribution directory
 // whenever the core contract or implementation changes, so a cached worker cannot keep running
 // an older Wasm core after an application refresh.
-internal const val CORE_WORKER_URL = "./core-worker-v26.js"
+internal const val CORE_WORKER_URL = "./core-worker-v27.js"
 private const val PROGRESS = "progress"
 private const val SUCCESS = "success"
 private const val FAILURE = "failure"
@@ -40,6 +40,11 @@ private data class ActiveRequest(
     val onSuccess: (CoreResponse) -> Unit,
     val onFailure: (Throwable) -> Unit,
 )
+
+internal class CoreWorkerException(
+    val transformIndex: Int?,
+    message: String,
+) : IllegalStateException(message)
 
 private var worker: Worker? = null
 private var activeRequest: ActiveRequest? = null
@@ -119,7 +124,9 @@ private fun onWorkerMessage(source: Worker, event: MessageEvent) {
             runCatching { active.onSuccess(response) }.onFailure(active.onFailure)
         }
 
-        FAILURE -> failWorker(IllegalStateException(message.error ?: "Wasm core request failed"))
+        FAILURE -> failWorker(
+            CoreWorkerException(message.transformIndex, message.error ?: "Wasm core request failed")
+        )
         else -> failWorker(IllegalStateException("Unknown Wasm core worker message: ${message.type}"))
     }
 }

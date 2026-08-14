@@ -63,12 +63,14 @@ internal suspend fun CoreStlPresentation.toTriangleRequest(
     physical.fs.forEachIndexed { index, face ->
         if (face !in hiddenPhysicalFaces) {
             val geometry = physical.resolvedFaces[face.id]
-            builder.addFace(face, geometry, inner = false)
-            if (hasHiddenFaces || expand > 0.0) builder.addFace(face, geometry, inner = true)
+            if ((hasHiddenFaces || expand > 0.0) && width > 0.0) {
+                builder.addClosedFace(face, geometry)
+            } else {
+                builder.addFace(face, geometry, inner = false)
+            }
         } else if (rim <= 0.0 && width > 0.0) {
             builder.addFaceBoundaryWall(face)
         }
-        if (expand > 0.0 && width > 0.0) builder.addFaceBoundaryWall(face)
         reportProgress(20 + 5 * (index + 1) / physical.fs.size)
     }
     if (rim > 0.0) for (face in source.fs.filter { candidate -> candidate.kind in hiddenKinds }) {
@@ -136,7 +138,7 @@ private class PresentationMeshBuilder(
         if (ids.toSet().size == 3) triangles += CoreStlTriangle(ids[0], ids[1], ids[2], surface, solid)
     }
 
-    fun addFace(face: Face, geometry: ResolvedFaceGeometry, inner: Boolean) {
+    fun addFace(face: Face, geometry: ResolvedFaceGeometry, inner: Boolean, solid: Int = -1) {
         val surface = nextSurface++
         for (triangle in geometry.triangles) {
             triangle(
@@ -145,8 +147,16 @@ private class PresentationMeshBuilder(
                 transformed(geometry.vertices[triangle.c].position, face, inner),
                 surface,
                 reverse = inner,
+                solid = solid,
             )
         }
+    }
+
+    fun addClosedFace(face: Face, geometry: ResolvedFaceGeometry) {
+        val solid = nextSolid++
+        addFace(face, geometry, inner = false, solid = solid)
+        addFace(face, geometry, inner = true, solid = solid)
+        addFaceBoundaryWall(face, solid)
     }
 
     private fun addRimCycle(
@@ -211,7 +221,7 @@ private class PresentationMeshBuilder(
         return MutableFace(source.id, vertices, source.kind)
     }
 
-    fun addFaceBoundaryWall(face: Face) {
+    fun addFaceBoundaryWall(face: Face, solid: Int = -1) {
         for (index in face.fvs.indices) {
             val next = (index + 1) % face.size
             val outerA = transformed(face[index], face, inner = false)
@@ -219,8 +229,8 @@ private class PresentationMeshBuilder(
             val innerA = transformed(face[index], face, inner = true)
             val innerB = transformed(face[next], face, inner = true)
             val surface = nextSurface++
-            triangle(outerA, outerB, innerA, surface)
-            triangle(innerA, outerB, innerB, surface)
+            triangle(outerA, outerB, innerA, surface, solid = solid)
+            triangle(innerA, outerB, innerB, surface, solid = solid)
         }
     }
 
