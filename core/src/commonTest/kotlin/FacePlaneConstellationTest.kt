@@ -36,6 +36,22 @@ class FacePlaneConstellationTest {
     }
 
     @Test
+    fun workerRecognizesEverySelectedDodecahedronStellationAsItsCatalogSeed() = runTest {
+        for ((result, expectedSeed) in listOf(1 to "SD", 2 to "GD", 3 to "GSD")) {
+            val tag = if (result == 1) "S" else "S~l=$result"
+            val response = evaluateCore(
+                CoreRequest(
+                    state = CoreState("D", listOf(tag), "c"),
+                    detectSeed = true,
+                ),
+            )
+
+            assertEquals(null, response.error, tag)
+            assertEquals(expectedSeed, response.recognizedSeedTag, tag)
+        }
+    }
+
+    @Test
     fun icosahedronMainLineFiltersCompoundsAndKeepsEverySupportedStratum() = runTest {
         val candidates = Seed.Icosahedron.poly
             .stellationCandidatesAsync(ConstellationOperation.Stellate)

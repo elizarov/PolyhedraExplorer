@@ -323,7 +323,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         val familySeed = state.seedTag.toFamilySeedIdOrNull() != null ||
             state.seedTag.toStarFamilySeedIdOrNull() != null
         if ((!familySeed && state.transformTags.isEmpty()) ||
-            response.validTransformTags != state.transformTags
+            !response.validTransformTags.isSameTransformChainAs(state.transformTags)
         ) return
         val recognizedSeed = Seeds.firstOrNull { it.tag == seedTag } ?: return
 
@@ -368,12 +368,14 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
 internal fun shouldDetectSeed(previous: CoreState?, current: CoreState): Boolean =
     (current.transformTags.isNotEmpty() || current.seedTag.toFamilySeedIdOrNull() != null ||
         current.seedTag.toStarFamilySeedIdOrNull() != null) &&
-        current.transformTags.all { tag ->
-            val spec = tag.parseTransformTag() ?: return@all false
-            spec.tweaks.isEmpty()
-        } &&
         (previous == null || previous.seedTag != current.seedTag ||
             previous.transformTags != current.transformTags)
+
+private fun List<String>.isSameTransformChainAs(other: List<String>): Boolean =
+    size == other.size && indices.all { index ->
+        val transform = this[index].parseTransformTag()
+        transform != null && transform == other[index].parseTransformTag()
+    }
 
 private fun CoreState.seedDetectionKey(): Pair<String, List<String>> = seedTag to transformTags
 

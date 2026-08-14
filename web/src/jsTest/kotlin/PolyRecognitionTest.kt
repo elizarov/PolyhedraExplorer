@@ -44,7 +44,7 @@ class PolyRecognitionTest {
     }
 
     @Test
-    fun detectionOnlyRunsForSeedOrTransformChainChanges() {
+    fun detectionRunsForEveryChangedTransformedGeometry() {
         val transformed = CoreState("I", listOf("t"), "c")
 
         assertEquals(true, shouldDetectSeed(null, transformed))
@@ -52,7 +52,7 @@ class PolyRecognitionTest {
         assertEquals(true, shouldDetectSeed(transformed, transformed.copy(seedTag = "D")))
         assertEquals(false, shouldDetectSeed(transformed, transformed.copy(scaleTag = "m")))
         assertEquals(false, shouldDetectSeed(transformed, transformed))
-        assertEquals(false, shouldDetectSeed(transformed, transformed.copy(transformTags = listOf("t~d=0.7"))))
+        assertEquals(true, shouldDetectSeed(transformed, transformed.copy(transformTags = listOf("t~d=0.7"))))
         assertEquals(false, shouldDetectSeed(transformed, transformed.copy(transformTags = emptyList())))
 
         val family = CoreState("P4", emptyList(), "c")
@@ -62,7 +62,12 @@ class PolyRecognitionTest {
 
         val stellateFace = CoreState("D", listOf("f[α]"), "c")
         assertEquals(true, shouldDetectSeed(null, stellateFace))
-        assertEquals(false, shouldDetectSeed(stellateFace, stellateFace.copy(transformTags = listOf("f[α]~r=0.5"))))
+        assertEquals(true, shouldDetectSeed(stellateFace, stellateFace.copy(transformTags = listOf("f[α]~r=0.5"))))
+
+        val secondStellation = CoreState("D", listOf("S~l=2"), "c")
+        assertEquals(true, shouldDetectSeed(null, secondStellation))
+        assertEquals(true, shouldDetectSeed(secondStellation, secondStellation.copy(transformTags = listOf("S~l=3"))))
+        assertEquals(false, shouldDetectSeed(secondStellation, secondStellation.copy(scaleTag = "m")))
     }
 
     @Test
@@ -70,7 +75,7 @@ class PolyRecognitionTest {
         val regularSnubCube = CoreState("C", listOf("s"), "c")
         val tweakedSnubCube = regularSnubCube.copy(transformTags = listOf("s~i=0.9"))
 
-        assertEquals(false, shouldDetectSeed(regularSnubCube, tweakedSnubCube))
+        assertEquals(true, shouldDetectSeed(regularSnubCube, tweakedSnubCube))
         assertEquals(
             true,
             shouldDetectSeed(tweakedSnubCube, regularSnubCube),
@@ -127,9 +132,34 @@ class PolyRecognitionTest {
         }
     }
 
+    @Test
+    fun higherDodecahedronStellationsAreOfferedAsTheirCatalogSeeds() {
+        val params = PolyParams("", null)
+        for ((result, seedTag) in listOf(2 to "GD", 3 to "GSD")) {
+            val transformTag = "S~l=$result"
+            val state = CoreState("D", listOf(transformTag), "c")
+            val seed = requireNotNull(seedTag.toSeedOrNull())
+            val response = CoreResponse(
+                poly = seed.poly,
+                polyName = "Stellated $result Dodecahedron",
+                symmetry = seed.poly.analyzeSymmetry(),
+                recognizedSeedTag = seedTag,
+                transformedPolys = listOf(seed.poly),
+                // Wasm serializes an integral Double with a decimal suffix; it is still the same transform.
+                validTransformTags = listOf("S~l=$result.0"),
+                availableOrbitTransforms = emptyList(),
+                warnings = listOf(null),
+            )
+
+            params.updateSuggestedSeed(state, response)
+            assertEquals(seedTag, params.suggestedSeed?.tag, transformTag)
+        }
+    }
+
     private fun awaitRecomposition(): Promise<Unit> = Promise { resolve, _ ->
         window.requestAnimationFrame {
             window.requestAnimationFrame { resolve(Unit) }
         }
     }
+
 }
