@@ -49,7 +49,8 @@ internal data class StellationCandidate(
     val stratum: Int? = null,
     private val knownGeometryAnalysis: CoreGeometryAnalysis? = null,
 ) {
-    private var presentationRims: Pair<Pair<Scale, Double>, List<ResolvedRimGeometry>>? = null
+    private data class PresentationRimKey(val scale: Scale, val rim: Double, val width: Double)
+    private var presentationRims: Pair<PresentationRimKey, List<ResolvedRimGeometry>>? = null
 
     /** Shared by transform validation, the response contract, and every later selection. */
     val geometryAnalysis: CoreGeometryAnalysis by lazy {
@@ -64,10 +65,10 @@ internal data class StellationCandidate(
         poly.availableOrbitTransforms.map(Transform::tag).sorted()
     }
 
-    fun resolvedRims(scale: Scale, width: Double): List<ResolvedRimGeometry> {
-        val key = scale to width
+    fun resolvedRims(scale: Scale, rim: Double, width: Double = 0.0): List<ResolvedRimGeometry> {
+        val key = PresentationRimKey(scale, rim, width)
         presentationRims?.takeIf { (cachedKey) -> cachedKey == key }?.let { return it.second }
-        val result = poly.scaled(scale).resolvedRims(width)
+        val result = poly.scaled(scale).resolvedRims(rim, width)
         presentationRims = key to result
         return result
     }
@@ -193,11 +194,12 @@ internal fun Polyhedron.cachedConstellationOrbitTransformTagsOrNull(): List<Stri
 
 internal fun Polyhedron.cachedConstellationResolvedRimsOrNull(
     scale: Scale,
-    width: Double,
+    rim: Double,
+    width: Double = 0.0,
 ): List<ResolvedRimGeometry>? = candidateCache.values.asSequence()
     .flatMap(List<StellationCandidate>::asSequence)
     .firstOrNull { candidate -> candidate.poly === this }
-    ?.resolvedRims(scale, width)
+    ?.resolvedRims(scale, rim, width)
 
 internal fun Polyhedron.stellationCandidates(
     operation: ConstellationOperation,

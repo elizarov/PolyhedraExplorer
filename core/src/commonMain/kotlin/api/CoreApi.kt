@@ -122,6 +122,7 @@ suspend fun evaluateCore(
         detectSeed = request.detectSeed,
         computeTweakRanges = request.calculateTweakRanges,
         rimWidth = request.rimWidth,
+        faceWidth = request.faceWidth,
     )
     val duration = request.animationDuration?.takeIf { it > 0.0 }
     val previousState = request.previousState
@@ -153,6 +154,7 @@ suspend fun evaluateCore(
         computeTweakRanges = false,
         symmetryOverride = current.response.symmetry,
         rimWidth = null,
+        faceWidth = null,
     )
     val animation = runCatching {
         computeAnimation(previous, current, duration).also { steps ->
@@ -210,6 +212,7 @@ private suspend fun evaluateState(
     computeTweakRanges: Boolean = true,
     symmetryOverride: CoreSymmetry? = null,
     rimWidth: Double? = null,
+    faceWidth: Double? = null,
 ): Evaluation {
     val seed = state.seedTag.toSeedOrNull()
         ?: error("Unknown seed tag: ${state.seedTag}")
@@ -322,7 +325,9 @@ private suspend fun evaluateState(
         error = errorIssue,
         geometryAnalysis = poly.cachedConstellationGeometryAnalysisOrNull() ?: poly.analyzeGeometry(),
         resolvedRims = rimWidth?.takeIf { it > 0.0 }?.let { width ->
-            poly.cachedConstellationResolvedRimsOrNull(scale, width) ?: displayPoly.resolvedRims(width)
+            val thickness = faceWidth?.takeIf { it > 0.0 } ?: 0.0
+            poly.cachedConstellationResolvedRimsOrNull(scale, width, thickness)
+                ?: displayPoly.resolvedRims(width, thickness)
         }.orEmpty(),
     )
     return Evaluation(state, seed, scale, validTransforms, poly, response)

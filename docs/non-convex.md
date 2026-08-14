@@ -62,6 +62,13 @@ miter. Approximating that join can move the hole outside its source face and pro
 renderer triangles. The maximum selectable width stops at the first edge collapse or concave
 reflex-corner collision, so every emitted inset remains valid.
 
+Face thickness uses a separate three-dimensional miter. Equal inward offsets of two neighboring
+face planes meet on their dihedral bisector. A hidden-face opening remains perpendicular to its
+face, so its local inset is `max(configured rim, width / tan(dihedral / 2))`; this is the minimum
+that reaches the shared inner edge without an overlap, gap, or protruding corner prism. Filled faces
+need only their outer and bisector-bounded inner surfaces. Hidden rims additionally expose the
+opening wall.
+
 For a simple non-planar face, the same uniform inset band is built in the face's stable projection,
 clipped by each triangle of the shared deterministic face tessellation, and lifted barycentrically
 back to that triangle's plane. Each resulting region is therefore a planar patch, while their union

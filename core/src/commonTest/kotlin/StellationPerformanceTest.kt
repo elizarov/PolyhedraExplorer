@@ -43,7 +43,10 @@ class StellationPerformanceTest {
         val previous = CoreState("deD", listOf("S~l=14"), "c")
         val progress = arrayListOf<CoreProgress>()
         val (response, switchDuration) = measureTimedValue {
-            evaluateCore(CoreRequest(current, previous, 0.5, detectSeed = true, rimWidth = 0.05), progress::add)
+            evaluateCore(
+                CoreRequest(current, previous, 0.5, detectSeed = true, rimWidth = 0.05, faceWidth = 0.1),
+                progress::add,
+            )
         }
 
         assertNull(response.error)
@@ -51,13 +54,13 @@ class StellationPerformanceTest {
         assertSame(candidates[14].geometryAnalysis, response.geometryAnalysis)
         assertSame(candidates[14].symmetry, response.symmetry)
         assertSame(candidates[14].availableOrbitTransformTags, response.availableOrbitTransforms.last())
-        assertSame(candidates[14].resolvedRims(Scale.Circumradius, 0.05), response.resolvedRims)
+        assertSame(candidates[14].resolvedRims(Scale.Circumradius, 0.05, 0.1), response.resolvedRims)
         assertTrue(response.animation.isEmpty(), "Changing the discrete Result must not evaluate an unused animation")
         assertTrue(switchDuration < 2.seconds, "Cached Result 15 switch took $switchDuration")
         assertEquals(100, progress.last().done)
 
         val (repeated, repeatDuration) = measureTimedValue {
-            evaluateCore(CoreRequest(current, detectSeed = true, rimWidth = 0.05))
+            evaluateCore(CoreRequest(current, detectSeed = true, rimWidth = 0.05, faceWidth = 0.1))
         }
         assertSame(response.geometryAnalysis, repeated.geometryAnalysis)
         assertSame(response.symmetry, repeated.symmetry)

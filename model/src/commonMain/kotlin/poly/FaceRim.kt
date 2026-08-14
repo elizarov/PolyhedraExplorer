@@ -1,6 +1,7 @@
 package polyhedra.model.poly
 
 import polyhedra.model.util.*
+import kotlin.math.abs
 
 class FaceRim(f: Face)  {
     val maxRim: Double
@@ -53,6 +54,29 @@ class FaceRim(f: Face)  {
     val borderNorm = List(f.size) { i ->
         val j = (i + 1) % f.size
         (f[j] cross f[i]).unit
+    }
+}
+
+/** Intersects the face's edge lines after moving each edge inward by its own distance. */
+fun Face.insetVertices(edgeInsets: List<Double>): List<Vec3> {
+    require(edgeInsets.size == size)
+    val projectedEdges = fvs.indices.map { index ->
+        val vector = fvs[(index + 1) % size] - fvs[index]
+        val projected = vector - this * (vector * this)
+        require(projected.norm > EPS) { "Face $id has a collapsed projected edge" }
+        projected.unit
+    }
+    val inward = projectedEdges.map { edge -> edge cross this }
+    return fvs.indices.map { index ->
+        val previous = (index + size - 1) % size
+        val first = inward[previous]
+        val second = inward[index]
+        val cosine = first * second
+        val denominator = 1.0 - cosine * cosine
+        require(abs(denominator) > EPS) { "Face $id has no finite inset at vertex $index" }
+        val firstWeight = (edgeInsets[previous] - cosine * edgeInsets[index]) / denominator
+        val secondWeight = (edgeInsets[index] - cosine * edgeInsets[previous]) / denominator
+        fvs[index] + first * firstWeight + second * secondWeight
     }
 }
 

@@ -10,6 +10,7 @@ import polyhedra.model.api.CoreRequest
 import polyhedra.model.api.CoreResponse
 import polyhedra.model.api.CoreState
 import polyhedra.model.poly.FaceRim
+import polyhedra.model.poly.FaceThicknessJoins
 import polyhedra.model.poly.FaceKind
 import polyhedra.model.poly.MutableFace
 import polyhedra.model.poly.MutableVertex
@@ -30,6 +31,35 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ResolvedRimTest {
+    @Test
+    fun cubeRimExpandsToTheEqualThicknessInnerEdge() {
+        val poly = Seed.Cube.poly
+        val width = 0.1
+        val configuredRim = 0.05
+        val rims = poly.resolvedRims(configuredRim, width)
+
+        for ((face, rim) in poly.fs.zip(rims)) {
+            assertEquals(width, rim.width, 1e-9)
+            val expectedInset = FaceRim(face).rimDir.mapIndexed { index, direction ->
+                face.fvs[index] + direction * width
+            }
+            assertSamePointSet(expectedInset, rim.regions.single().holes.single().vertices)
+        }
+    }
+
+    @Test
+    fun tetrahedronRimExpandsByItsAcuteDihedralFactor() {
+        val poly = Seed.Tetrahedron.poly
+        val width = 0.1
+        val configuredRim = 0.05
+        val joins = FaceThicknessJoins(poly)
+        val expected = width * joins.rimFactor(poly.es.first())
+        val rims = poly.resolvedRims(configuredRim, width)
+
+        assertTrue(expected > configuredRim)
+        assertTrue(rims.all { rim -> kotlin.math.abs(rim.width - expected) <= 1e-9 })
+    }
+
     @Test
     fun simpleConvexFaceMatchesTheExistingInsetBoundary() {
         val poly = Seed.Cube.poly
@@ -66,7 +96,7 @@ class ResolvedRimTest {
     }
 
     @Test
-    fun starPyramidSevenHalvesRimMitersTheCentralHeptagonSmoothly() {
+    fun starPyramidSevenHalvesRimTracesInsideTheCentralHeptagonSmoothly() {
         val poly = requireNotNull("SY7_2".toSeedOrNull()).poly
         val face = poly.fs.single { candidate -> candidate.fvs.size == 7 }
         val rim = face.resolvedRim(poly.resolvedFaces[face.id], 0.05)
@@ -76,9 +106,22 @@ class ResolvedRimTest {
             (central.vertices[(index + 1) % central.vertices.size] - central.vertices[index]).norm
         }
 
-        assertEquals(8, holes.size)
+        assertEquals(1, holes.size)
         assertEquals(7, central.vertices.size)
         assertTrue(edgeLengths.max() - edgeLengths.min() <= 1e-7)
+        assertTrue(rim.boundaryWalls.isNotEmpty())
+    }
+
+    @Test
+    fun starPyramidFiveHalvesKeepsOuterTipsOpenAndInsetsTheInnerPentagon() {
+        val poly = requireNotNull("SY5_2".toSeedOrNull()).poly
+        val face = poly.fs.single { candidate -> candidate.fvs.size == 5 }
+        val rim = face.resolvedRim(poly.resolvedFaces[face.id], 0.05)
+
+        val region = rim.regions.single()
+        assertEquals(1, region.holes.size)
+        assertEquals(5, region.holes.single().vertices.size)
+        assertEquals(10, rim.boundaryWalls.size)
     }
 
     @Test
@@ -179,7 +222,7 @@ class ResolvedRimTest {
     }
 
     @Test
-    fun immersedExteriorAndInternalSegmentsUseFullAndHalfWidth() {
+    fun higherWindingFaceUsesOneSidedInternalRimsAndFlatOuterCovers() {
         val face = regularStarFace(5, 2)
         val resolved = resolveFaceGeometry(face)
         val width = 0.03
@@ -189,14 +232,13 @@ class ResolvedRimTest {
         val internal = resolved.edges.filter { edge -> edge.internalToFill }
             .maxBy { edge -> (resolved.vertices[edge.b].position - resolved.vertices[edge.a].position).norm }
 
-        val exteriorSamples = sampleBothSides(resolved, exterior.a, exterior.b, width * 0.75)
-        val exteriorBeyond = sampleBothSides(resolved, exterior.a, exterior.b, width * 1.25)
-        assertEquals(1, exteriorSamples.count { point -> rim.containsProjected(point) })
-        assertEquals(0, exteriorBeyond.count { point -> rim.containsProjected(point) })
+        val exteriorSamples = sampleBothSides(resolved, exterior.a, exterior.b, width * 0.25)
+        assertEquals(0, exteriorSamples.count { point -> rim.containsProjected(point) })
+        assertTrue(rim.boundaryWalls.isNotEmpty())
 
-        val internalSamples = sampleBothSides(resolved, internal.a, internal.b, width * 0.4)
-        val internalBeyond = sampleBothSides(resolved, internal.a, internal.b, width * 0.6)
-        assertEquals(2, internalSamples.count { point -> rim.containsProjected(point) })
+        val internalSamples = sampleBothSides(resolved, internal.a, internal.b, width * 0.75)
+        val internalBeyond = sampleBothSides(resolved, internal.a, internal.b, width * 1.25)
+        assertEquals(1, internalSamples.count { point -> rim.containsProjected(point) })
         assertEquals(0, internalBeyond.count { point -> rim.containsProjected(point) })
     }
 
@@ -245,6 +287,20 @@ class ResolvedRimTest {
         assertTrue(response.resolvedRims.take(2).all { rim -> rim.regions.isNotEmpty() })
         val encoded = CoreJson.encodeToString(response)
         assertEquals(encoded, CoreJson.encodeToString(CoreJson.decodeFromString<CoreResponse>(encoded)))
+    }
+
+    @Test
+    fun coreResponseAccountsForFaceWidthWhenConstructingRims() = runTest {
+        val response = evaluateCore(
+            CoreRequest(
+                CoreState("C", emptyList(), "c"),
+                rimWidth = 0.05,
+                faceWidth = 0.1,
+            ),
+        )
+
+        assertNull(response.error)
+        assertTrue(response.resolvedRims.all { rim -> kotlin.math.abs(rim.width - 0.1) <= 1e-9 })
     }
 
     @Test

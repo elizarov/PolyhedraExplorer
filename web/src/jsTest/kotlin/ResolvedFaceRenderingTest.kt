@@ -72,32 +72,40 @@ class ResolvedFaceRenderingTest {
             context.performUpdate(null, 0.0)
 
             val rimMeshes = rims.filter { it.sourceFaceKind == FaceKind(0) }.flatMap { rim ->
-                rim.regions.map { region -> region.triangulate(poly.fs[rim.sourceFaceId]) }
+                val face = poly.fs[rim.sourceFaceId]
+                rim.regions.map { region -> face to region.triangulate(face) }
             }
             val visibleBufferSize = 5 * 4 * 2
             val visibleIndexSize = 5 * 2 * 3 * 2
-            val capBufferSize = 2 * rimMeshes.sumOf { it.vertices.size }
-            val capIndexSize = 2 * rimMeshes.sumOf { it.triangles.size }
-            val joins = FaceThicknessJoins(poly, poly.fs.mapTo(linkedSetOf()) { face -> face.id })
-            val boundarySegments = rims.filter { it.sourceFaceKind == FaceKind(0) }.sumOf { rim ->
-                val face = poly.fs[rim.sourceFaceId]
-                rim.regions.sumOf { region ->
-                    val mesh = region.triangulate(face)
-                    mesh.cycles.sumOf { cycle ->
-                        cycle.vertices.indices.count { index ->
-                            if (mesh.triangulationPatch && cycle.segmentSources[index].isEmpty()) {
-                                false
-                            } else {
-                                val next = (index + 1) % cycle.vertices.size
-                                val edge = joins.sourceEdgeOrNull(face, cycle.vertices[index], cycle.vertices[next])
-                                edge == null || joins.isExposed(edge)
-                            }
+            val capBufferSize = 2 * rimMeshes.sumOf { (_, mesh) -> mesh.vertices.size }
+            val capIndexSize = 2 * rimMeshes.sumOf { (_, mesh) -> mesh.triangles.size }
+            val joins = FaceThicknessJoins(poly)
+            val boundarySegments = rimMeshes.sumOf { (face, mesh) ->
+                mesh.cycles.sumOf { cycle ->
+                    cycle.vertices.indices.count { index ->
+                        if (mesh.triangulationPatch && cycle.segmentSources[index].isEmpty()) {
+                            false
+                        } else {
+                            val next = (index + 1) % cycle.vertices.size
+                            joins.sourceEdgeOrNull(
+                                face,
+                                cycle.vertices[index],
+                                cycle.vertices[next],
+                            ) == null
                         }
                     }
                 }
             }
-            assertEquals(visibleBufferSize + capBufferSize + 4 * boundarySegments, context.bufferSize)
-            assertEquals(visibleIndexSize + capIndexSize + 6 * boundarySegments, context.indexSize)
+            val flatBoundaryCount = rims.filter { it.sourceFaceKind == FaceKind(0) }
+                .sumOf { rim -> rim.boundaryWalls.size }
+            assertEquals(
+                visibleBufferSize + capBufferSize + 4 * (boundarySegments + flatBoundaryCount),
+                context.bufferSize,
+            )
+            assertEquals(
+                visibleIndexSize + capIndexSize + 6 * (boundarySegments + flatBoundaryCount),
+                context.indexSize,
+            )
 
             var triangleCount = 0
             context.exportTriangles(FaceExportParams(1.0, 0.1, 0.05, 0.0)) { a, b, c ->

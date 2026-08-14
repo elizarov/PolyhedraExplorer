@@ -157,9 +157,11 @@ a visible pentagram.
 The core constructs each planar immersed rim from the same arrangement and winding data as the
 face fill:
 
-- a source segment between zero and nonzero winding contributes the full rim width on the material
-  side;
-- a segment with nonzero winding on both sides contributes half the width on each side; and
+- a segment with nonzero winding on both sides contributes the full rim width on the side with the
+  greater absolute winding, so an inner pentagon is traced inward instead of receiving a strip
+  centered across its edge;
+- a source segment between zero and nonzero winding has no top-surface rim; it contributes a flat
+  thickness cover, leaving each outer star tip visually distinct from a resolved triangular face;
 - all strips are unioned in the face plane, so crossings have no duplicate surfaces or internal
   seams; and
 - where adjacent offset edges meet through short strip-cap fragments, the fragments are replaced
@@ -169,7 +171,7 @@ face fill:
 The result is tessellation-free `ResolvedRimGeometry`: deterministic outer and hole cycles,
 source-edge provenance, the applied width, and the maximum width before the rim covers the complete
 fill. WebGL triangulates those regions for caps and walls, STL includes them in its solid
-arrangement, and OpenSCAD emits their polygon paths. Simple-face inset and non-planar rim behavior
+arrangement, and OpenSCAD emits closed mitered pieces from the same cycles. Simple-face inset and non-planar rim behavior
 remain owned by [Non-convex geometry](non-convex.md); export postconditions are specified in
 [Export](export.md).
 

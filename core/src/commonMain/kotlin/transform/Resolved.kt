@@ -650,11 +650,39 @@ private class WindingClassifier(
     } else {
         listOf(WindingGroup(-1, source, useRayClassifier = false))
     }
+    private val index = WindingGroupIndex(groups)
 
-    fun hasNonzeroWinding(point: Vec3): Boolean = groups.any { group ->
-        group.contains(point, tolerance)
+    fun hasNonzeroWinding(point: Vec3): Boolean = index.contains(point, tolerance)
+
+}
+
+/** A small AABB tree keeps Boolean unions of many presentation pieces cheap to classify. */
+private class WindingGroupIndex(groups: List<WindingGroup>) {
+    private val minX = groups.minOf(WindingGroup::minX)
+    private val maxX = groups.maxOf(WindingGroup::maxX)
+    private val minY = groups.minOf(WindingGroup::minY)
+    private val maxY = groups.maxOf(WindingGroup::maxY)
+    private val minZ = groups.minOf(WindingGroup::minZ)
+    private val maxZ = groups.maxOf(WindingGroup::maxZ)
+    private val leaf = groups.takeIf { it.size <= 8 }
+    private val children: List<WindingGroupIndex> = if (leaf != null) {
+        emptyList()
+    } else {
+        val spans = listOf(maxX - minX, maxY - minY, maxZ - minZ)
+        val axis = spans.indices.maxBy(spans::get)
+        val ordered = groups.sortedBy { group -> group.center(axis) }
+        val middle = ordered.size / 2
+        listOf(WindingGroupIndex(ordered.subList(0, middle)), WindingGroupIndex(ordered.subList(middle, ordered.size)))
     }
 
+    fun contains(point: Vec3, tolerance: Double): Boolean {
+        if (point.x !in minX - tolerance..maxX + tolerance ||
+            point.y !in minY - tolerance..maxY + tolerance ||
+            point.z !in minZ - tolerance..maxZ + tolerance
+        ) return false
+        return leaf?.any { group -> group.contains(point, tolerance) }
+            ?: children.any { child -> child.contains(point, tolerance) }
+    }
 }
 
 private class WindingGroup(
@@ -662,12 +690,18 @@ private class WindingGroup(
     val triangles: List<SourceTriangle>,
     private val useRayClassifier: Boolean,
 ) {
-    private val minX = triangles.minOf(SourceTriangle::minX)
-    private val maxX = triangles.maxOf(SourceTriangle::maxX)
-    private val minY = triangles.minOf { triangle -> minOf(triangle.a.y, triangle.b.y, triangle.c.y) }
-    private val maxY = triangles.maxOf { triangle -> maxOf(triangle.a.y, triangle.b.y, triangle.c.y) }
-    private val minZ = triangles.minOf { triangle -> minOf(triangle.a.z, triangle.b.z, triangle.c.z) }
-    private val maxZ = triangles.maxOf { triangle -> maxOf(triangle.a.z, triangle.b.z, triangle.c.z) }
+    val minX = triangles.minOf(SourceTriangle::minX)
+    val maxX = triangles.maxOf(SourceTriangle::maxX)
+    val minY = triangles.minOf { triangle -> minOf(triangle.a.y, triangle.b.y, triangle.c.y) }
+    val maxY = triangles.maxOf { triangle -> maxOf(triangle.a.y, triangle.b.y, triangle.c.y) }
+    val minZ = triangles.minOf { triangle -> minOf(triangle.a.z, triangle.b.z, triangle.c.z) }
+    val maxZ = triangles.maxOf { triangle -> maxOf(triangle.a.z, triangle.b.z, triangle.c.z) }
+
+    fun center(axis: Int): Double = when (axis) {
+        0 -> (minX + maxX) / 2.0
+        1 -> (minY + maxY) / 2.0
+        else -> (minZ + maxZ) / 2.0
+    }
 
     fun boundsContain(point: Vec3, tolerance: Double): Boolean =
         point.x in minX - tolerance..maxX + tolerance &&
@@ -676,7 +710,7 @@ private class WindingGroup(
 
     fun contains(point: Vec3, tolerance: Double): Boolean {
         if (!boundsContain(point, tolerance)) return false
-        if (useRayClassifier && triangles.size >= 64) for (axis in 0..2) {
+        if (useRayClassifier) for (axis in 0..2) {
             triangles.rayWindingOrNull(point, axis, tolerance)?.let { winding -> return winding != 0 }
         }
         return triangles.hasNonzeroSolidAngleWinding(point, tolerance)

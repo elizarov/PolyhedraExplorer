@@ -7,23 +7,20 @@ import kotlinx.coroutines.promise
 import org.khronos.webgl.WebGLRenderingContext
 import org.w3c.dom.HTMLCanvasElement
 import polyhedra.core.api.convertStl
-import polyhedra.core.poly.toSeedOrNull
+import polyhedra.core.poly.resolvedRims
 import polyhedra.core.poly.Cube
 import polyhedra.core.poly.Seed
 import polyhedra.core.poly.Tetrahedron
-import polyhedra.model.api.FamilySeedId
-import polyhedra.model.api.SeedFamily
 import polyhedra.model.api.CoreStlPresentation
 import polyhedra.model.api.CoreStlRequest
 import polyhedra.model.poly.FaceKind
-import polyhedra.model.poly.outwardNormal
-import polyhedra.model.poly.size
 import polyhedra.model.util.MutableVec3
 import polyhedra.model.util.cross
 import polyhedra.model.util.minus
 import polyhedra.model.util.norm
 import polyhedra.model.util.times
 import polyhedra.web.main.toExportFileBaseName
+import polyhedra.web.glsl.get
 import polyhedra.web.poly.FaceContext
 import polyhedra.web.poly.FaceExportParams
 import polyhedra.web.poly.RenderParams
@@ -123,70 +120,96 @@ class ExportStlTest {
     }
 
     @Test
-    fun hiddenCubeUsesClippedMitersWithoutCoincidentBoundaryWalls() {
+    fun widthLargerThanConfiguredRimUsesTheBisectedInnerShell() {
+        val canvas = document.createElement("canvas") as HTMLCanvasElement
+        val gl = requireNotNull(canvas.getContext("webgl") as? WebGLRenderingContext)
         val poly = Seed.Cube.poly
-        val triangles = renderedTriangles(poly, poly.faceKinds.keys.toSet(), width = 0.1, rim = 0.1)
+        val width = 0.1
+        val rim = 0.05
+        val params = RenderParams("", null)
+        params.poly.hideFaces.updateValue(poly.faceKinds.keys.toSet())
+        params.poly.updateResolvedRims(poly.resolvedRims(rim, width))
+        val faces = FaceContext(gl, params) { poly }
+        val points = arrayListOf<Pair<Double, Double>>()
+        try {
+            faces.performUpdate(null, 0.0)
+            faces.exportTriangles(FaceExportParams(1.0, width, rim, 0.0)) { a, b, c ->
+                val triangle = listOf(a, b, c)
+                for (index in triangle.indices) {
+                    val first = triangle[index]
+                    val second = triangle[(index + 1) % triangle.size]
+                    if (first.y * second.y > 0.0 || abs(first.y - second.y) <= 1e-12) continue
+                    val fraction = -first.y / (second.y - first.y)
+                    if (fraction !in 0.0..1.0) continue
+                    points += (first.x + (second.x - first.x) * fraction) to
+                        (first.z + (second.z - first.z) * fraction)
+                }
+            }
+        } finally {
+            faces.destroy()
+        }
+
         val outer = poly.vs.maxOf { vertex -> vertex.x }
-        val squareSectionCorner = MutableVec3(outer - 0.1, outer, outer - 0.1)
-        assertTrue(
-            triangles.flatten().any { point -> (point - squareSectionCorner).norm <= 5e-7 },
-            "The cube rim must retain its square-section corner $squareSectionCorner",
+        val expected = listOf(
+            outer to outer,
+            (outer - width) to outer,
+            outer to (outer - width),
+            (outer - width) to (outer - width),
         )
-
-        val duplicateTriangles = triangles.filter { triangle -> triangleNormal(triangle).norm > 1e-10 }
-            .groupingBy(::triangleKey).eachCount().filterValues { count -> count > 1 }
-        assertTrue(duplicateTriangles.isEmpty(), "Coincident cube rim walls: $duplicateTriangles")
+        for (corner in expected) assertTrue(
+            points.any { point ->
+                abs(point.first - corner.first) <= 5e-7 &&
+                    abs(point.second - corner.second) <= 5e-7
+            },
+            "Missing bisected shell edge-section corner $corner in $points",
+        )
     }
 
     @Test
-    fun acuteTetrahedronRimMitersStayInsideEverySourcePlane() {
-        val poly = Seed.Tetrahedron.poly
-        val triangles = renderedTriangles(poly, poly.faceKinds.keys.toSet(), width = 0.1, rim = 0.08)
-        for (point in triangles.flatten()) for (face in poly.fs) {
-            val normal = face.outwardNormal
-            assertTrue(
-                normal * point <= kotlin.math.abs(face.d) + 5e-7,
-                "Tetrahedron rim point $point protrudes through face ${face.id}",
+    fun bisectedCubeAndTetrahedronRimShellsHaveConsistentSurfaceNormals() {
+        for (poly in listOf(Seed.Cube.poly, Seed.Tetrahedron.poly)) {
+            val canvas = document.createElement("canvas") as HTMLCanvasElement
+            val gl = requireNotNull(canvas.getContext("webgl") as? WebGLRenderingContext)
+            val params = RenderParams("", null)
+            params.poly.hideFaces.updateValue(poly.faceKinds.keys.toSet())
+            params.poly.updateResolvedRims(
+                poly.resolvedRims(
+                    params.view.faceRim.targetValue,
+                    params.view.faceWidth.targetValue,
+                ),
             )
-        }
-    }
-
-    @Test
-    fun triangularPrismWithoutCapsHasClosedOutwardFacingSideWalls() {
-        val poly = requireNotNull(FamilySeedId(SeedFamily.Prism, 3).tag.toSeedOrNull()).poly
-        val capKind = poly.fs.first { face -> face.size == 3 }.kind
-        val sideFaces = poly.fs.filter { face -> face.size == 4 }
-        val triangles = renderedTriangles(poly, setOf(capKind), width = 0.1, rim = 0.0)
-
-        for (point in triangles.flatten()) for (face in poly.fs) {
-            assertTrue(
-                face.outwardNormal * point <= kotlin.math.abs(face.d) + 5e-7,
-                "Open prism shell point $point protrudes through source face ${face.id}",
-            )
-        }
-        for (face in sideFaces) {
-            val normal = face.outwardNormal
-            val outerDistance = kotlin.math.abs(face.d)
-            val outerTriangles = triangles.filter { triangle ->
-                triangle.all { point -> abs(normal * point - outerDistance) <= 1e-8 }
+            val faces = FaceContext(gl, params) { poly }
+            try {
+                faces.performUpdate(null, 0.0)
+                val vertices = buildList<MutableVec3> {
+                    faces.exportVertices(FaceExportParams(1.0, 0.1, 0.05, 0.0)) { point ->
+                        add(MutableVec3(point))
+                    }
+                }
+                for (offset in 0 until faces.indexSize step 3) {
+                    val indices = List(3) { index -> faces.indexBuffer[offset + index] }
+                    val triangle = indices.map(vertices::get)
+                    val geometricNormal = triangleNormal(triangle)
+                    // A rim can intentionally collapse to the inner miter line when the minimum
+                    // effective rim equals the face width (the cube case). Float32 buffers leave
+                    // sub-pixel sliver triangles there; they have no stable geometric normal.
+                    if (geometricNormal.norm <= 1e-7) continue
+                    val unitNormal = geometricNormal * (1.0 / geometricNormal.norm)
+                    for (index in indices) {
+                        val lightNormal = MutableVec3(
+                            faces.target.lightNormalBuffer[index, 0],
+                            faces.target.lightNormalBuffer[index, 1],
+                            faces.target.lightNormalBuffer[index, 2],
+                        )
+                        assertTrue(
+                            lightNormal * unitNormal >= 1.0 - 5e-6,
+                            "$poly triangle $triangle has lighting normal $lightNormal instead of $unitNormal",
+                        )
+                    }
+                }
+            } finally {
+                faces.destroy()
             }
-            val innerTriangles = triangles.filter { triangle ->
-                triangle.all { point -> abs(normal * point - (outerDistance - 0.1)) <= 1e-8 }
-            }
-            assertTrue(outerTriangles.isNotEmpty(), "Missing outer surface for side face ${face.id}")
-            assertTrue(innerTriangles.isNotEmpty(), "Missing inner surface for side face ${face.id}")
-            assertTrue(outerTriangles.all { triangle -> triangleNormal(triangle) * normal > 0.0 })
-            assertTrue(innerTriangles.all { triangle -> triangleNormal(triangle) * normal < 0.0 })
-        }
-        val capFaces = poly.fs.filter { face -> face.size == 3 }
-        for (cap in capFaces) {
-            val normal = cap.outwardNormal
-            val distance = kotlin.math.abs(cap.d)
-            val closures = triangles.filter { triangle ->
-                triangle.all { point -> abs(normal * point - distance) <= 1e-8 }
-            }
-            assertEquals(6, closures.size, "Each missing triangular cap needs three closure quads")
-            assertTrue(closures.all { triangle -> triangleNormal(triangle) * normal > 0.0 })
         }
     }
 
@@ -211,36 +234,5 @@ class ExportStlTest {
     }
 }
 
-private fun renderedTriangles(
-    poly: polyhedra.model.poly.Polyhedron,
-    hiddenKinds: Set<FaceKind>,
-    width: Double,
-    rim: Double,
-): List<List<MutableVec3>> {
-    val canvas = document.createElement("canvas") as HTMLCanvasElement
-    val gl = requireNotNull(canvas.getContext("webgl") as? WebGLRenderingContext)
-    val params = RenderParams("", null)
-    params.poly.hideFaces.updateValue(hiddenKinds)
-    params.view.faceWidth.updateValue(width)
-    params.view.faceRim.updateValue(rim)
-    val faces = FaceContext(gl, params) { poly }
-    return try {
-        faces.performUpdate(null, 0.0)
-        buildList {
-            faces.exportTriangles(FaceExportParams(1.0, width, rim, 0.0)) { a, b, c ->
-                add(listOf(MutableVec3(a), MutableVec3(b), MutableVec3(c)))
-            }
-        }
-    } finally {
-        faces.destroy()
-    }
-}
-
 private fun triangleNormal(triangle: List<MutableVec3>) =
     (triangle[1] - triangle[0]) cross (triangle[2] - triangle[0])
-
-private fun triangleKey(triangle: List<MutableVec3>): String = triangle.map { point ->
-    listOf(point.x, point.y, point.z).joinToString(",") { coordinate ->
-        kotlin.math.round(coordinate * 1e9).toLong().toString()
-    }
-}.sorted().joinToString("|")

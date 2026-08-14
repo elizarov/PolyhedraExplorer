@@ -5,7 +5,7 @@ self.onmessage = async event => {
     let transformIndex
     try {
         request = JSON.parse(event.data)
-        coreModulePromise ??= import("./core-v27/PolyhedraExplorer-core.mjs")
+        coreModulePromise ??= import("./core-v28/PolyhedraExplorer-core.mjs")
         const core = await coreModulePromise
         let response
         if (request.kind === "stl") {

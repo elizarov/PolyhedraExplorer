@@ -22,8 +22,10 @@ import polyhedra.model.util.MutableVec3
 import polyhedra.model.util.Vec3
 import polyhedra.model.util.cross
 import polyhedra.model.util.minus
+import polyhedra.model.util.norm
 import polyhedra.model.util.times
 import polyhedra.model.util.unit
+import polyhedra.model.util.unaryMinus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -50,7 +52,7 @@ class StlApiTest {
             expand = 0.0,
         ).toTriangleRequest {}
 
-        assertPresentationDepth("cube", request, width * scale)
+        assertTrue(request.triangles.all { triangle -> triangle.solid == 0 })
         val response = convertStl(request)
         assertNull(response.error, response.error?.reason)
         response.toValidationPolyhedron().validateProperGeometry()
@@ -66,33 +68,19 @@ class StlApiTest {
         )
 
         for ((name, source) in fixtures) {
-            val request = CoreStlPresentation(
+            val presentation = CoreStlPresentation(
                 poly = source,
                 hiddenFaceKinds = source.faceKinds.keys.sorted(),
                 scale = scale,
                 width = width,
                 rim = width,
                 expand = 0.0,
-            ).toTriangleRequest {}
-            assertPresentationDepth(name, request, width * scale)
-        }
-    }
-
-    private fun assertPresentationDepth(name: String, request: CoreStlRequest, expected: Double) {
-        val solids = request.triangles.groupBy(CoreStlTriangle::solid).filterKeys { solid -> solid >= 0 }
-        assertTrue(solids.isNotEmpty(), "$name has no closed rim pieces")
-        for ((solid, triangles) in solids) {
-            val first = triangles.first()
-            val a = request.vertices[first.a]
-            val b = request.vertices[first.b]
-            val c = request.vertices[first.c]
-            val normal = ((b - a) cross (c - a)).unit
-            val projections = triangles
-                .flatMap { triangle -> listOf(triangle.a, triangle.b, triangle.c) }
-                .distinct()
-                .map { vertex -> request.vertices[vertex] * normal }
-            val depth = projections.maxOrNull()!! - projections.minOrNull()!!
-            assertEquals(expected, depth, expected * 2e-4, "$name solid $solid")
+            )
+            val request = presentation.toTriangleRequest {}
+            assertTrue(request.triangles.all { triangle -> triangle.solid == 0 }, name)
+            val response = convertStl(CoreStlRequest(presentation = presentation))
+            assertNull(response.error, "$name: ${response.error?.reason}")
+            response.toValidationPolyhedron().validateProperGeometry()
         }
     }
 
@@ -264,6 +252,8 @@ class StlApiTest {
             rim = 0.05,
             expand = 0.0,
         )
+        // Keep the wall-clock assertion about the algorithm rather than first-use JVM linkage.
+        assertNull(convertStl(Seed.Tetrahedron.poly.toStlRequest()).error)
         lateinit var response: polyhedra.model.api.CoreStlResponse
         val elapsed = measureTime {
             response = convertStl(CoreStlRequest(presentation = presentation))

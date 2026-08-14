@@ -28,6 +28,8 @@ class FaceContext(
     val hasExpand by { params.view.expandFaces.value > 0.0 }
     val hasRim by { params.view.faceRim.value > 0.0 }
     val hasWidth by { params.view.faceWidth.value > 0.0 }
+    val faceRim by { params.view.faceRim.value }
+    val faceWidth by { params.view.faceWidth.value }
     val printPreview by { params.printPreview.enabled.value }
     val printLightness by { params.printPreview.lightness.value }
     val printChroma by { params.printPreview.chroma.value }
@@ -100,6 +102,8 @@ class FaceContext(
             val includeExpand = exportParams?.let { it.expand > 0.0 } ?: hasExpand
             val includeRim = exportParams?.let { it.rim > 0.0 } ?: hasRim
             val includeWidth = exportParams?.let { it.width > 0.0 } ?: hasWidth
+            val presentationRim = exportParams?.rim ?: faceRim
+            val presentationWidth = exportParams?.width ?: faceWidth
             val hasHiddenFaces = hiddenFaces.isNotEmpty()
 
             var bufferSize = 0
@@ -129,8 +133,21 @@ class FaceContext(
             ): Boolean {
                 if (mesh.triangulationPatch && cycle.segmentSources[index].isEmpty()) return false
                 val next = (index + 1) % cycle.vertices.size
-                val sourceEdge = sourceEdgeOrNull(face, cycle.vertices[index], cycle.vertices[next])
-                return sourceEdge == null || thicknessJoins.isExposed(sourceEdge)
+                return sourceEdgeOrNull(face, cycle.vertices[index], cycle.vertices[next]) == null
+            }
+
+            val fallbackRimVertices = poly.fs.associate { face ->
+                val effectiveWidths = thicknessJoins.effectiveRimWidths(
+                    face,
+                    presentationRim,
+                    presentationWidth,
+                )
+                face.id to runCatching { face.insetVertices(effectiveWidths) }.getOrElse {
+                    val fallback = min(presentationRim, poly.faceRim(face).maxRim)
+                    face.fvs.mapIndexed { index, vertex ->
+                        vertex + poly.faceRim(face).rimDir[index] * fallback
+                    }
+                }
             }
 
             for (f in poly.fs) {
@@ -141,11 +158,6 @@ class FaceContext(
                     if (hasHiddenFaces || includeExpand) {
                         bufferSize += resolved.vertices.size
                         indexSize += resolved.triangles.size * 3
-                    }
-                    if (!includeExpand && includeWidth) {
-                        val exposedEdges = f.directedEdges.count(thicknessJoins::isExposed)
-                        bufferSize += 4 * exposedEdges
-                        indexSize += 6 * exposedEdges
                     }
                 } else {
                     val rimMeshes = rimMeshesByFace[f.id]
@@ -162,6 +174,9 @@ class FaceContext(
                             }
                             bufferSize += 4 * boundarySegmentCount
                             indexSize += 6 * boundarySegmentCount
+                            val flatBoundaryCount = resolvedRimByFace[f.id]?.boundaryWalls?.size ?: 0
+                            bufferSize += 4 * flatBoundaryCount
+                            indexSize += 6 * flatBoundaryCount
                         }
                     } else {
                         if (includeRim) {
@@ -256,20 +271,24 @@ class FaceContext(
                 }
             }
 
-            fun makeRim(f: Face, fr: FaceRim, faceColor: Color, inner: Boolean) {
+            fun makeRim(f: Face, rimVertices: List<Vec3>, faceColor: Color, inner: Boolean) {
                 val n = f.size
                 var ofs = bufOfs
                 val lNorm = if (inner) -f else f
                 val innerFlag = if (inner) 1 else 0
                 for (i in 0 until n) {
                     for (rim in 0..1) {
-                        positionBuffer[ofs] = f[i]
+                        val position = if (rim == 0) f[i] else rimVertices[i]
+                        positionBuffer[ofs] = position
                         lightNormalBuffer[ofs] = lNorm
                         expandDirBuffer[ofs] = f
-                        thicknessDirBuffer[ofs] = if (includeExpand || rim != 0) f.outwardNormal else
+                        thicknessDirBuffer[ofs] = if (includeExpand || rim != 0) {
+                            f.outwardNormal
+                        } else {
                             thicknessJoins.vertexDirection(f, f[i])
-                        rimDirBuffer[ofs] = if (rim == 0) Vec3.ZERO else fr.rimDir[i]
-                        rimMaxBuffer[ofs] = if (rim == 0) 0.0 else fr.maxRim
+                        }
+                        rimDirBuffer[ofs] = Vec3.ZERO
+                        rimMaxBuffer[ofs] = 0.0
                         colorBuffer[ofs] = faceColor
                         innerBuffer?.set(ofs, innerFlag)
                         faceModeBuffer?.set(ofs, if (f.kind == selectedFace) FACE_SELECTED else FACE_NORMAL)
@@ -280,18 +299,24 @@ class FaceContext(
                 bufOfs = ofs
             }
 
-            fun makeBorder(f: Face, fr: FaceRim, faceColor: Color, noRim: Boolean) {
+            fun makeBorder(f: Face, rimVertices: List<Vec3>, faceColor: Color, noRim: Boolean) {
                 val n = f.size
                 var ofs = bufOfs
                 for (i in 0 until n) {
-                    val lNorm = if (noRim) -fr.borderNorm[i] else fr.borderNorm[i]
+                    val positions = if (noRim) f.fvs else rimVertices
+                    val edge = positions[(i + 1) % n] - positions[i]
+                    val lNorm = if (noRim) {
+                        (edge cross -f.outwardNormal).unit
+                    } else {
+                        (-f.outwardNormal cross edge).unit
+                    }
                     for (innerFlag in 0..1) {
-                        positionBuffer[ofs] = f[i]
+                        positionBuffer[ofs] = positions[i]
                         lightNormalBuffer[ofs] = lNorm
                         expandDirBuffer[ofs] = f
                         thicknessDirBuffer[ofs] = f.outwardNormal
-                        rimDirBuffer[ofs] = if (noRim) Vec3.ZERO else fr.rimDir[i]
-                        rimMaxBuffer[ofs] = if (noRim) 0.0 else fr.maxRim
+                        rimDirBuffer[ofs] = Vec3.ZERO
+                        rimMaxBuffer[ofs] = 0.0
                         colorBuffer[ofs] = faceColor
                         innerBuffer?.set(ofs, innerFlag)
                         faceModeBuffer?.set(ofs, if (f.kind == selectedFace) FACE_SELECTED else FACE_NORMAL)
@@ -353,7 +378,7 @@ class FaceContext(
                 faceColor: Color,
             ) {
                 for (mesh in meshes) for (cycle in mesh.cycles) {
-                    val patchThicknessDirection = if (mesh.normal * mesh.vertices.first() >= 0.0) {
+                    val thicknessDirection = if (mesh.normal * mesh.vertices.first() >= 0.0) {
                         mesh.normal
                     } else {
                         -mesh.normal
@@ -363,17 +388,12 @@ class FaceContext(
                         val base = bufOfs
                         val a = cycle.vertices[index]
                         val b = cycle.vertices[(index + 1) % cycle.vertices.size]
-                        val sideNormal = (b cross a).unit
-                        val sourceEdge = sourceEdgeOrNull(f, a, b)
+                        val sideNormal = (-thicknessDirection cross (b - a)).unit
                         for (position in listOf(a, b)) for (innerFlag in 0..1) {
                             positionBuffer[bufOfs] = position
                             lightNormalBuffer[bufOfs] = sideNormal
                             expandDirBuffer[bufOfs] = f
-                            thicknessDirBuffer[bufOfs] = if (sourceEdge == null) {
-                                patchThicknessDirection
-                            } else {
-                                thicknessJoins.direction(f, position)
-                            }
+                            thicknessDirBuffer[bufOfs] = thicknessDirection
                             rimDirBuffer[bufOfs] = Vec3.ZERO
                             rimMaxBuffer[bufOfs] = 0.0
                             colorBuffer[bufOfs] = faceColor
@@ -388,15 +408,26 @@ class FaceContext(
                 }
             }
 
-            fun makeExposedFaceBorders(f: Face, faceColor: Color) {
-                for (edge in f.directedEdges.filter(thicknessJoins::isExposed)) {
+            fun makeResolvedRimFlatBoundaries(
+                f: Face,
+                walls: List<ResolvedRimWall>,
+                faceColor: Color,
+            ) {
+                for (wall in walls) {
+                    val sourceSegment = wall.sourceEdges.firstOrNull()?.sourceSegmentIndex ?: continue
+                    val midpoint = (wall.a + wall.b) * 0.5
+                    val wallDirection = thicknessJoins.direction(f, midpoint, sourceSegment)
+                    val sideNormal = ((wall.b - wall.a) cross wallDirection).unit
                     val base = bufOfs
-                    val sideNormal = ((edge.b - edge.a) cross -thicknessJoins.edgeDirection(edge)).unit
-                    for (position in listOf(edge.a, edge.b)) for (innerFlag in 0..1) {
+                    for (position in listOf(wall.a, wall.b)) for (innerFlag in 0..1) {
                         positionBuffer[bufOfs] = position
                         lightNormalBuffer[bufOfs] = sideNormal
                         expandDirBuffer[bufOfs] = f
-                        thicknessDirBuffer[bufOfs] = thicknessJoins.direction(f, position)
+                        thicknessDirBuffer[bufOfs] = thicknessJoins.direction(
+                            f,
+                            position,
+                            sourceSegment,
+                        )
                         rimDirBuffer[bufOfs] = Vec3.ZERO
                         rimMaxBuffer[bufOfs] = 0.0
                         colorBuffer[bufOfs] = faceColor
@@ -405,8 +436,8 @@ class FaceContext(
                         bufOfs++
                     }
                     val surfaceId = nextSurfaceId++
-                    indexBuffer?.indexTriangle(base, base + 2, base + 1, false, surfaceId)
-                    indexBuffer?.indexTriangle(base + 1, base + 2, base + 3, false, surfaceId)
+                    indexBuffer?.indexTriangle(base, base + 1, base + 2, false, surfaceId)
+                    indexBuffer?.indexTriangle(base + 1, base + 3, base + 2, false, surfaceId)
                 }
             }
 
@@ -419,25 +450,31 @@ class FaceContext(
                     if (hasHiddenFaces || includeExpand) {
                         makeFace(f, resolved, faceColor, true)
                     }
-                    if (!includeExpand && includeWidth) makeExposedFaceBorders(f, faceColor)
                 } else {
                     val rimMeshes = rimMeshesByFace[f.id]
                     if (rimMeshes != null && includeRim) {
                         makeResolvedRim(f, rimMeshes, faceColor, false)
                         makeResolvedRim(f, rimMeshes, faceColor, true)
-                        if (includeWidth) makeResolvedRimBorders(f, rimMeshes, faceColor)
+                        if (includeWidth) {
+                            makeResolvedRimBorders(f, rimMeshes, faceColor)
+                            makeResolvedRimFlatBoundaries(
+                                f,
+                                resolvedRimByFace.getValue(f.id).boundaryWalls,
+                                faceColor,
+                            )
+                        }
                     } else {
                         if (includeRim) {
-                            makeRim(f, poly.faceRim(f), faceColor, false)
-                            makeRim(f, poly.faceRim(f), faceColor, true)
+                            makeRim(f, fallbackRimVertices.getValue(f.id), faceColor, false)
+                            makeRim(f, fallbackRimVertices.getValue(f.id), faceColor, true)
                         }
                         if (includeWidth && includeRim) {
-                            makeBorder(f, poly.faceRim(f), faceColor, false)
+                            makeBorder(f, fallbackRimVertices.getValue(f.id), faceColor, false)
                         }
                     }
                 }
                 if (includeExpand && includeWidth) {
-                    makeBorder(f, poly.faceRim(f), faceColor, true)
+                    makeBorder(f, f.fvs, faceColor, true)
                 }
             }
             positionBuffer.bindBufferData(gl)

@@ -2,12 +2,15 @@ package polyhedra.core.poly
 
 import polyhedra.model.poly.Face
 import polyhedra.model.poly.FaceRim
+import polyhedra.model.poly.FaceThicknessJoins
 import polyhedra.model.poly.Polyhedron
 import polyhedra.model.poly.ResolvedFaceGeometry
 import polyhedra.model.poly.ResolvedRimCycle
 import polyhedra.model.poly.ResolvedRimGeometry
 import polyhedra.model.poly.ResolvedRimRegion
+import polyhedra.model.poly.ResolvedRimWall
 import polyhedra.model.poly.SourceEdgeOccurrence
+import polyhedra.model.poly.size
 import polyhedra.model.util.EPS
 import polyhedra.model.util.Vec3
 import polyhedra.model.util.cross
@@ -17,8 +20,10 @@ import polyhedra.model.util.plus
 import polyhedra.model.util.times
 import polyhedra.model.util.unit
 import kotlin.math.abs
+import kotlin.math.atan2
 import kotlin.math.floor
 import kotlin.math.min
+import kotlin.math.PI
 
 private data class RimPoint(val x: Double, val y: Double) {
     operator fun plus(other: RimPoint) = RimPoint(x + other.x, y + other.y)
@@ -64,6 +69,7 @@ private data class RimTriangle(
 private data class RimStrip(
     val polygon: List<RimPoint>,
     val sources: Set<SourceEdgeOccurrence>,
+    val width: Double,
 )
 
 private data class RimSegment(
@@ -79,9 +85,21 @@ private data class RimNode(
 private data class RimEdge(val a: Int, val b: Int)
 private fun rimEdge(a: Int, b: Int) = if (a < b) RimEdge(a, b) else RimEdge(b, a)
 
+private data class RimCellUse(
+    val cellId: Int,
+    val winding: Int,
+    val a: Int,
+    val b: Int,
+)
+
 /** Computes tessellation-free rim regions for every face at one presentation width. */
-fun Polyhedron.resolvedRims(width: Double): List<ResolvedRimGeometry> {
+fun Polyhedron.resolvedRims(width: Double): List<ResolvedRimGeometry> = resolvedRims(width, 0.0)
+
+/** Computes rims widened where necessary to meet the equal-thickness inner shell. */
+fun Polyhedron.resolvedRims(width: Double, faceWidth: Double): List<ResolvedRimGeometry> {
     require(width.isFinite() && width >= 0.0) { "Rim width must be finite and non-negative" }
+    require(faceWidth.isFinite() && faceWidth >= 0.0) { "Face width must be finite and non-negative" }
+    val joins = FaceThicknessJoins(this)
     val immersedMaximumByKind = mutableMapOf<polyhedra.model.poly.FaceKind, Double>()
     return fs.map { face ->
         val resolved = resolvedFaces[face.id]
@@ -90,7 +108,8 @@ fun Polyhedron.resolvedRims(width: Double): List<ResolvedRimGeometry> {
         } else {
             FaceRim(face).maxRim
         }
-        face.resolvedRim(resolved, width, maximumWidth)
+        val edgeWidths = joins.effectiveRimWidths(face, width, faceWidth)
+        face.resolvedRim(resolved, edgeWidths, maximumWidth)
     }
 }
 
@@ -104,6 +123,39 @@ fun Polyhedron.resolvedRimsForExport(width: Double): List<ResolvedRimGeometry> {
         } else {
             face.resolvedRim(resolved, width)
         }
+    }
+}
+
+/** Legacy overlapping-prism fallback used only after exact STL shell resolution fails. */
+fun Polyhedron.resolvedRimsForStableExport(width: Double): List<ResolvedRimGeometry> {
+    require(width.isFinite() && width >= 0.0) { "Rim width must be finite and non-negative" }
+    return fs.map { face ->
+        val resolved = resolvedFaces[face.id]
+        if (resolved.sourceBoundarySelfIntersects) {
+            // Presentation parameters have already been constrained by the display geometry. STL
+            // only needs this one requested width, so repeating the expensive slider-limit search
+            // here would add no geometric information.
+            face.resolvedRimAtWidth(resolved, width, legacyTwoSided = true)
+        } else {
+            val maximumWidth = FaceRim(face).maxRim
+            val clamped = min(width, maximumWidth)
+            face.resolvedRim(resolved, clamped, maximumWidth)
+        }
+    }
+}
+
+fun Polyhedron.resolvedRimsForExport(width: Double, faceWidth: Double): List<ResolvedRimGeometry> {
+    require(width.isFinite() && width >= 0.0) { "Rim width must be finite and non-negative" }
+    require(faceWidth.isFinite() && faceWidth >= 0.0) { "Face width must be finite and non-negative" }
+    val joins = FaceThicknessJoins(this)
+    return fs.map { face ->
+        val resolved = resolvedFaces[face.id]
+        val maximumWidth = if (resolved.sourceBoundarySelfIntersects) {
+            face.immersedRimMaximum(resolved)
+        } else {
+            FaceRim(face).maxRim
+        }
+        face.resolvedRim(resolved, joins.effectiveRimWidths(face, width, faceWidth), maximumWidth)
     }
 }
 
@@ -133,50 +185,121 @@ private fun Face.resolvedRim(
     return resolvedRimAtWidth(resolved, width).copy(maximumWidth = maximumWidth)
 }
 
+private fun Face.resolvedRim(
+    resolved: ResolvedFaceGeometry,
+    requestedEdgeWidths: List<Double>,
+    maximumWidth: Double,
+): ResolvedRimGeometry {
+    require(requestedEdgeWidths.size == size)
+    require(requestedEdgeWidths.all { width -> width.isFinite() && width >= 0.0 })
+    val minimum = requestedEdgeWidths.minOrNull() ?: 0.0
+    val maximum = requestedEdgeWidths.maxOrNull() ?: 0.0
+    if (maximum - minimum <= maxOf(maximum, 1.0) * 1e-12) {
+        return resolvedRim(resolved, maximum, maximumWidth)
+    }
+    if (maximum <= 0.0) return ResolvedRimGeometry(id, kind, 0.0, emptyList(), maximumWidth)
+    return if (isPlanar || resolved.sourceBoundarySelfIntersects) {
+        resolvedRimAtWidths(resolved, requestedEdgeWidths, maximumWidth)
+    } else {
+        // Folded faces are already split into independently planar patches. A conservative common
+        // width keeps their shared clipping topology stable while still satisfying every edge.
+        nonPlanarRim(resolved, maximum, maximumWidth)
+    }
+}
+
 private fun Face.resolvedRimAtWidth(
     resolved: ResolvedFaceGeometry,
     width: Double,
+    coverageOnly: Boolean = false,
+    legacyTwoSided: Boolean = false,
+): ResolvedRimGeometry = resolvedRimAtWidths(
+    resolved,
+    List(size) { width },
+    width,
+    coverageOnly,
+    legacyTwoSided,
+)
+
+private fun Face.resolvedRimAtWidths(
+    resolved: ResolvedFaceGeometry,
+    edgeWidths: List<Double>,
+    maximumWidth: Double,
+    coverageOnly: Boolean = false,
+    legacyTwoSided: Boolean = false,
 ): ResolvedRimGeometry {
+    require(edgeWidths.size == size)
+    val width = edgeWidths.maxOrNull() ?: 0.0
     val plane = rimPlane(resolved)
     val points = resolved.vertices.map { vertex -> plane.project(vertex.position) }
     val cellBoundaries = resolved.cells.map { cell -> cell.boundary.map(points::get) }
-    val cellUses = HashMap<RimEdge, MutableList<Pair<Int, Int>>>()
+    val cellUses = HashMap<RimEdge, MutableList<RimCellUse>>()
     for (cell in resolved.cells) {
         val boundaryArea = cell.boundary.map(points::get).signedArea()
         for (index in cell.boundary.indices) {
             val first = cell.boundary[index]
             val second = cell.boundary[(index + 1) % cell.boundary.size]
             val (a, b) = if (boundaryArea >= 0.0) first to second else second to first
-            cellUses.getOrPut(rimEdge(a, b), ::arrayListOf) += a to b
+            cellUses.getOrPut(rimEdge(a, b), ::arrayListOf) += RimCellUse(
+                cell.id,
+                cell.winding,
+                a,
+                b,
+            )
         }
+    }
+
+    val boundaryWalls = if (coverageOnly || legacyTwoSided) emptyList() else resolved.edges.mapNotNull { edge ->
+        if (edge.internalToFill || edge.provenance.sourceEdgeIds.isEmpty()) return@mapNotNull null
+        val uses = cellUses[rimEdge(edge.a, edge.b)].orEmpty()
+        if (uses.isEmpty()) return@mapNotNull null
+        val directed = uses.first()
+        ResolvedRimWall(
+            polyhedra.model.util.MutableVec3(resolved.vertices[directed.a].position),
+            polyhedra.model.util.MutableVec3(resolved.vertices[directed.b].position),
+            edge.provenance.sourceEdgeIds.distinct().sorted().map { sourceSegmentIndex ->
+                SourceEdgeOccurrence(id, sourceSegmentIndex)
+            },
+        )
     }
 
     val strips = resolved.edges.flatMap { edge ->
         if (edge.provenance.sourceEdgeIds.isEmpty()) return@flatMap emptyList()
+        // In the presentation geometry of a higher-winding face, a source segment buried between
+        // two filled cells carries one full-width strip on its greater-winding side. A zero/nonzero
+        // boundary segment has no top rim and is represented by [boundaryWalls] instead. The
+        // coverage-only path retains the historical full/half strip union solely to determine the
+        // finite slider limit; the legacy path is reserved for STL's closed-piece Boolean fallback.
+        if (!coverageOnly && !legacyTwoSided && !edge.internalToFill) return@flatMap emptyList()
         val uses = cellUses[rimEdge(edge.a, edge.b)].orEmpty()
         if (uses.isEmpty()) return@flatMap emptyList()
         val sourceIds = edge.provenance.sourceEdgeIds
         sourceIds.map { sourceSegmentIndex ->
+            val stripWidth = edgeWidths[sourceSegmentIndex]
             val occurrence = SourceEdgeOccurrence(id, sourceSegmentIndex)
-            val directed = uses.first()
-            val a = points[directed.first]
-            val b = points[directed.second]
+            val directed = if (edge.internalToFill && !coverageOnly && !legacyTwoSided) {
+                uses.maxWith(compareBy<RimCellUse>({ kotlin.math.abs(it.winding) }, { it.winding }, { -it.cellId }))
+            } else {
+                uses.first()
+            }
+            val a = points[directed.a]
+            val b = points[directed.b]
             val direction = b - a
             val length = direction.norm
             require(length > plane.tolerance) { "Resolved face $id has a collapsed rim segment" }
             val inward = (direction * (1.0 / length)).left
-            val polygon = if (edge.internalToFill) {
-                val offset = inward * (width / 2.0)
+            val polygon = if (edge.internalToFill && (coverageOnly || legacyTwoSided)) {
+                val offset = inward * (stripWidth / 2.0)
                 listOf(a - offset, b - offset, b + offset, a + offset)
             } else {
-                val offset = inward * width
+                val offset = inward * stripWidth
                 listOf(a, b, b + offset, a + offset)
             }
-            RimStrip(polygon, setOf(occurrence))
+            RimStrip(polygon, setOf(occurrence), stripWidth)
         }
     }
 
-    // Source vertices are joins, while arrangement crossings are ordinary strip intersections.
+    // Source vertices are joins, while arrangement crossings are ordinary strip intersections or
+    // the flat ends of a buried source-edge strip.
     val joins = fvs.indices.mapNotNull { sourceVertexIndex ->
         val vertex = plane.project(fvs[sourceVertexIndex])
         val incomingSource = (sourceVertexIndex + fvs.lastIndex) % fvs.size
@@ -187,19 +310,30 @@ private fun Face.resolvedRimAtWidth(
             }
         }
         if (touching.size < 2) return@mapNotNull null
+        val joinWidth = touching.maxOf(RimStrip::width)
         val candidates = touching.flatMap { strip ->
-            strip.polygon.filter { point -> (point - vertex).norm <= width * 4.0 + plane.tolerance }
+            strip.polygon.filter { point -> (point - vertex).norm <= joinWidth * 4.0 + plane.tolerance }
         } + vertex
         val hull = candidates.convexHull(plane.tolerance)
         hull.takeIf { it.size >= 3 }?.let { polygon ->
             RimStrip(
                 polygon,
                 setOf(SourceEdgeOccurrence(id, incomingSource), SourceEdgeOccurrence(id, outgoingSource)),
+                joinWidth,
             )
         }
     }
     val allStrips = strips + joins
-    if (allStrips.isEmpty()) return ResolvedRimGeometry(id, kind, width, emptyList())
+    if (allStrips.isEmpty()) {
+        return ResolvedRimGeometry(
+            id,
+            kind,
+            width,
+            emptyList(),
+            maximumWidth,
+            boundaryWalls,
+        )
+    }
 
     val inputSegments = buildList {
         for (boundary in cellBoundaries) boundary.addSegmentsTo(this, emptySet())
@@ -235,7 +369,7 @@ private fun Face.resolvedRimAtWidth(
             edgeSources,
         )
     }
-    return ResolvedRimGeometry(id, kind, width, regions)
+    return ResolvedRimGeometry(id, kind, width, regions, maximumWidth, boundaryWalls)
 }
 
 private fun Face.simpleRim(width: Double, maximumWidth: Double): ResolvedRimGeometry {
@@ -369,7 +503,7 @@ private fun Face.immersedRimMaximum(resolved: ResolvedFaceGeometry): Double {
     )
     val areaTolerance = maxOf(plane.tolerance * scale * 64.0, fillArea * 1e-9)
     fun covered(width: Double): Boolean {
-        val area = resolvedRimAtWidth(resolved, width).regions.sumOf { region ->
+        val area = resolvedRimAtWidth(resolved, width, coverageOnly = true).regions.sumOf { region ->
             val outer = region.outer.vertices.map(plane::project).signedArea()
             val holes = region.holes.sumOf { cycle ->
                 abs(cycle.vertices.map(plane::project).signedArea())
@@ -553,7 +687,7 @@ private fun List<RimSegment>.toCycles(tolerance: Double, rimWidth: Double): List
     val incoming = directed.keys.groupBy({ it.second }, { it.first })
     require(
         outgoing.keys == incoming.keys &&
-            outgoing.values.all { it.size == 1 } && incoming.values.all { it.size == 1 },
+            outgoing.all { (node, targets) -> targets.size == incoming.getValue(node).size },
     ) {
         val sources = outgoing.keys - incoming.keys
         val sinks = incoming.keys - outgoing.keys
@@ -561,6 +695,23 @@ private fun List<RimSegment>.toCycles(tolerance: Double, rimWidth: Double): List
             "(sources=${sources.map { nodes[it].point }}, sinks=${sinks.map { nodes[it].point }})"
     }
     val remaining = directed.keys.toMutableSet()
+    val successor = directed.keys.associateWith { edge ->
+        val incomingDirection = nodes[edge.second].point - nodes[edge.first].point
+        val candidates = outgoing.getValue(edge.second)
+        edge.second to candidates.minWith(
+            compareBy<Int> { target ->
+                val outgoingDirection = nodes[target].point - nodes[edge.second].point
+                val angle = atan2(
+                    incomingDirection cross outgoingDirection,
+                    incomingDirection dot outgoingDirection,
+                )
+                if (angle >= 0.0) angle else angle + 2.0 * PI
+            }.thenBy { target -> target },
+        )
+    }
+    require(successor.values.toSet().size == successor.size) {
+        "Resolved rim boundary branches cannot be paired into oriented cycles"
+    }
     val cycles = ArrayList<RimCycle2>()
     while (remaining.isNotEmpty()) {
         val start = remaining.minWith(compareBy<Pair<Int, Int>>({ it.first }, { it.second }))
@@ -571,7 +722,7 @@ private fun List<RimSegment>.toCycles(tolerance: Double, rimWidth: Double): List
             require(remaining.remove(edge)) { "Resolved rim cycle does not close" }
             points += nodes[edge.first].point
             sources += directed.getValue(edge)
-            edge = edge.second to outgoing.getValue(edge.second).single()
+            edge = successor.getValue(edge)
         } while (edge != start)
         simplifyCycle(points, sources, tolerance)
         miterShortJoins(points, sources, rimWidth, tolerance)

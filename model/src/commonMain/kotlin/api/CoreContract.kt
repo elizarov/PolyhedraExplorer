@@ -21,6 +21,8 @@ data class CoreRequest(
     val calculateTweakRanges: Boolean = true,
     /** Presentation-space rim width; omitted when no polygonal rims are requested. */
     val rimWidth: Double? = null,
+    /** Presentation-space perpendicular face thickness used to widen sharp-edge rims. */
+    val faceWidth: Double? = null,
 )
 
 data class CoreProgress(

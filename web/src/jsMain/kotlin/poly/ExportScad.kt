@@ -115,6 +115,7 @@ fun Polyhedron.exportSolidToScad(
                 "OpenSCAD piece-union export requires a positive face width"
             }
             val rimByFace = resolvedRims.associateBy(ResolvedRimGeometry::sourceFaceId)
+            val thicknessJoins = FaceThicknessJoins(this@exportSolidToScad)
             if (exportParams.rim > 0.0) {
                 val missingRims = fs.filter { face -> face.kind in presentationHiddenKinds && face.id !in rimByFace }
                 require(missingRims.isEmpty()) {
@@ -129,18 +130,19 @@ fun Polyhedron.exportSolidToScad(
                     val resolved = resolvedFaces[face.id]
                     if (face.isPlanar) {
                         for (cell in resolved.cells) {
-                            appendExtrudedRegion(
+                            appendPresentationRegion(
                                 label = "face ${face.id}, cell ${cell.id}",
                                 outer = cell.boundary.map { index -> resolved.vertices[index].position },
                                 holes = emptyList(),
                                 face = face,
                                 exportParams = exportParams,
+                                thicknessJoins = thicknessJoins,
                             )
                             emittedPieces++
                         }
                     } else {
                         for ((index, triangle) in resolved.triangles.withIndex()) {
-                            appendExtrudedRegion(
+                            appendPresentationRegion(
                                 label = "non-planar face ${face.id}, triangle $index",
                                 outer = listOf(
                                     resolved.vertices[triangle.a].position,
@@ -150,6 +152,8 @@ fun Polyhedron.exportSolidToScad(
                                 holes = emptyList(),
                                 face = triangleFace(face, resolved, triangle),
                                 exportParams = exportParams,
+                                sourceFace = face,
+                                thicknessJoins = thicknessJoins,
                             )
                             emittedPieces++
                         }
@@ -159,13 +163,15 @@ fun Polyhedron.exportSolidToScad(
                         val regionFace = if (region.triangulationPatch) {
                             planarPatchFace(face, region.outer.vertices)
                         } else face
-                        appendExtrudedRegion(
+                        appendPresentationRegion(
                             label = "hidden face ${face.id}, rim $index",
                             outer = region.outer.vertices,
                             holes = region.holes.map(ResolvedRimCycle::vertices),
                             face = regionFace,
                             expansionDirection = face,
                             exportParams = exportParams,
+                            sourceFace = face,
+                            thicknessJoins = thicknessJoins,
                         )
                         emittedPieces++
                     }
@@ -175,6 +181,102 @@ fun Polyhedron.exportSolidToScad(
             appendLine("}")
         }
     }
+}
+
+private fun StringBuilder.appendPresentationRegion(
+    label: String,
+    outer: List<Vec3>,
+    holes: List<List<Vec3>>,
+    face: Face,
+    expansionDirection: Vec3 = face,
+    exportParams: FaceExportParams,
+    sourceFace: Face = face,
+    thicknessJoins: FaceThicknessJoins,
+) {
+    if (exportParams.expand > 0.0) {
+        appendExtrudedRegion(label, outer, holes, face, expansionDirection, exportParams)
+    } else {
+        appendMiteredRegion(
+            label,
+            outer,
+            holes,
+            face,
+            expansionDirection,
+            exportParams,
+            sourceFace,
+            thicknessJoins,
+        )
+    }
+}
+
+/** Emits one closed piece whose underside meets neighboring equal-offset face planes. */
+private fun StringBuilder.appendMiteredRegion(
+    label: String,
+    outer: List<Vec3>,
+    holes: List<List<Vec3>>,
+    face: Face,
+    expansionDirection: Vec3,
+    exportParams: FaceExportParams,
+    sourceFace: Face,
+    thicknessJoins: FaceThicknessJoins,
+) {
+    if (outer.size < 3) return
+    val outward = if (face.d >= 0.0) face.unit else -face.unit
+    val mesh = triangulatePlanarRegion(outer, holes, outward)
+    val expanded = mesh.vertices.map { point -> point + expansionDirection * exportParams.expand }
+    val top = expanded.map { point -> point * exportParams.scale }
+    val bottom = expanded.mapIndexed { index, point ->
+        val sourcePoint = mesh.vertices[index]
+        val direction = if (thicknessJoins.sourceEdgeOrNull(sourceFace, sourcePoint) != null) {
+            thicknessJoins.direction(sourceFace, sourcePoint)
+        } else {
+            outward
+        }
+        (point - direction * exportParams.width) * exportParams.scale
+    }
+    val points = top + bottom
+    val faces = arrayListOf<List<Int>>()
+    for (triangle in mesh.triangles) {
+        val a = mesh.vertices[triangle.a]
+        val b = mesh.vertices[triangle.b]
+        val c = mesh.vertices[triangle.c]
+        val topFace = if (((b - a) cross (c - a)) * outward > 0.0) {
+            listOf(triangle.c, triangle.b, triangle.a)
+        } else {
+            listOf(triangle.a, triangle.b, triangle.c)
+        }
+        faces += topFace
+        faces += topFace.asReversed().map { index -> index + mesh.vertices.size }
+    }
+    var cycleOffset = 0
+    for (cycle in listOf(outer) + holes) {
+        for (index in cycle.indices) {
+            val next = (index + 1) % cycle.size
+            val a = cycleOffset + index
+            val b = cycleOffset + next
+            faces += listOf(a, b, b + mesh.vertices.size, a + mesh.vertices.size)
+        }
+        cycleOffset += cycle.size
+    }
+
+    appendLine("  // $label")
+    appendLine("  polyhedron(")
+    appendLine("    points = [")
+    points.forEachIndexed { index, point ->
+        append("      ${point.toPreciseString()}")
+        if (index != points.lastIndex) append(',')
+        appendLine()
+    }
+    appendLine("    ],")
+    appendLine("    faces = [")
+    faces.forEachIndexed { index, polygon ->
+        append("      [${polygon.joinToString()}]")
+        if (index != faces.lastIndex) append(',')
+        appendLine()
+    }
+    appendLine("    ],")
+    appendLine("    convexity = 20")
+    appendLine("  );")
 }
 
 private fun StringBuilder.appendClosedPolyhedron(poly: Polyhedron, scale: Double) {

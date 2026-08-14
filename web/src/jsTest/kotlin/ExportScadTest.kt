@@ -100,9 +100,8 @@ class ExportScadTest {
         )
 
         assertContains(scad, "union() {")
-        assertTrue("polyhedron(" !in scad)
-        assertTrue(scad.lineSequence().count { "linear_extrude" in it } >= source.fs.size)
-        assertContains(scad, "polygon(")
+        assertTrue(scad.lineSequence().count { "polyhedron(" in it } >= source.fs.size)
+        assertTrue("linear_extrude" !in scad)
     }
 
     @Test
@@ -129,7 +128,7 @@ class ExportScadTest {
             StarFamilySeedId(SeedFamily.Prism, 5, 2).tag.toSeedOrNull(),
         ).poly
         val hidden = setOf(FaceKind(0))
-        val rims = source.resolvedRims(exportParams.rim)
+        val rims = source.resolvedRims(exportParams.rim, exportParams.width)
         val scad = source.exportSolidToScad(
             "star_prism",
             "hidden pentagram caps",
@@ -140,9 +139,8 @@ class ExportScadTest {
         )
 
         assertEquals(2, scad.lineSequence().count { "hidden face" in it && "rim" in it })
-        assertContains(scad, "paths = [")
-        assertTrue(scad.lineSequence().count { "linear_extrude" in it } >= 7)
-        assertTrue("polyhedron(" !in scad)
+        assertTrue(scad.lineSequence().count { "polyhedron(" in it } >= 7)
+        assertTrue("linear_extrude" !in scad)
     }
 
     @Test
@@ -154,17 +152,11 @@ class ExportScadTest {
             "hidden faces",
             exportParams,
             hiddenFaceKinds = hidden,
-            resolvedRims = source.resolvedRims(exportParams.rim),
+            resolvedRims = source.resolvedRims(exportParams.rim, exportParams.width),
             embeddedBoundary = true,
         )
-        val expectedHeight = exportParams.width * exportParams.scale
-        val extrusions = scad.lineSequence().filter { line -> "linear_extrude" in line }.toList()
-
-        assertEquals(source.fs.size, extrusions.size)
-        extrusions.forEach { line ->
-            assertContains(line, "height = $expectedHeight")
-            assertTrue("scale =" !in line)
-        }
+        assertEquals(source.fs.size, scad.lineSequence().count { line -> "polyhedron(" in line })
+        assertTrue("linear_extrude" !in scad)
     }
 
     @Test
@@ -176,16 +168,11 @@ class ExportScadTest {
             "different vertex joins",
             exportParams,
             hiddenFaceKinds = hidden,
-            resolvedRims = source.resolvedRims(exportParams.rim),
+            resolvedRims = source.resolvedRims(exportParams.rim, exportParams.width),
             embeddedBoundary = true,
         )
-        val extrusions = scad.lineSequence().filter { line -> "linear_extrude" in line }.toList()
-
-        assertEquals(source.fs.size, extrusions.size)
-        extrusions.forEach { line ->
-            assertContains(line, "height = ${exportParams.width * exportParams.scale}")
-            assertTrue("scale =" !in line)
-        }
+        assertEquals(source.fs.size, scad.lineSequence().count { line -> "polyhedron(" in line })
+        assertTrue("linear_extrude" !in scad)
     }
 
     @Test
@@ -206,9 +193,9 @@ class ExportScadTest {
         )
 
         assertContains(scad, "union() {")
-        assertTrue("polyhedron(" !in scad)
+        assertTrue(scad.lineSequence().any { line -> "polyhedron(" in line })
         assertTrue(scad.lineSequence().any { line -> "hidden face" in line && "rim" in line })
-        assertTrue(scad.lineSequence().count { line -> "linear_extrude" in line } > source.fs.size)
+        assertTrue("linear_extrude" !in scad)
     }
 
     private fun cube(): Polyhedron {

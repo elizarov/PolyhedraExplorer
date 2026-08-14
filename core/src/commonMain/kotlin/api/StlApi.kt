@@ -52,8 +52,12 @@ suspend fun convertStl(
         }
     }
     val presentation = request.presentation ?: return convertStlInternal(request, reportProgress, started)
+    val needsStablePresentation = presentation.poly.resolvedFaces.any { geometry ->
+        geometry.sourceBoundarySelfIntersects
+    }
     val triangleRequest = try {
         presentation.toTriangleRequest(
+            stableJoinsFallback = needsStablePresentation,
             reportProgress = { progress ->
                 checkTime(CoreStlStage.Input)
                 reportProgress(progress)
@@ -77,11 +81,11 @@ suspend fun convertStl(
         reportProgress = { progress -> reportProgress(25 + progress * 75 / 100) },
         started = started,
     )
-    if (primary.error?.kind != CoreStlErrorKind.Topology) return primary
+    if (primary.error?.kind != CoreStlErrorKind.Topology || needsStablePresentation) return primary
 
-    // Some high-winding presentations create numerically coincident joins even after their
-    // per-face depth is constructed exactly. Retry those rare cases with one topology-stable
-    // radial shell referenced to the closest face plane; it is never thinner than requested.
+    // A rare exact mitered presentation can still create numerically coincident joins. Retry it
+    // with one topology-stable radial shell referenced to the closest face plane; the fallback is
+    // never thinner than requested. Higher-winding inputs selected their closed-piece path above.
     val fallbackRequest = try {
         presentation.toTriangleRequest(
             reportProgress = { progress ->
@@ -374,12 +378,7 @@ private suspend fun convertStlInternal(
         require(volume6.isFinite() && volume6 > radius * radius * radius * 1e-12) {
             "STL final mesh has non-positive volume"
         }
-        polyhedron {
-            vertices.forEach { point -> vertex(point, VertexKind(0)) }
-            triangles.forEachIndexed { index, triangle ->
-                face(listOf(triangle.a, triangle.c, triangle.b), FaceKind(index))
-            }
-        }.validateProperGeometry()
+        validateQuantizedStl(vertices, triangles)
         checkTime()
         reportProgress(100)
         CoreStlResponse(vertices, triangles)
@@ -397,6 +396,57 @@ private suspend fun convertStlInternal(
                 },
             ),
         )
+    }
+}
+
+/**
+ * Validates everything quantization can invalidate without repeating the arrangement's quadratic
+ * embedded-surface intersection pass. Final rounding is much finer than the arrangement weld
+ * tolerance, so a new transverse intersection cannot be introduced here; collapsed topology,
+ * orientation, connectivity, and finite coordinates still receive exact checks.
+ */
+private fun validateQuantizedStl(
+    vertices: List<Vec3>,
+    triangles: List<CoreStlTriangle>,
+) {
+    require(vertices.all(Vec3::isFinite)) { "STL final mesh contains a non-finite vertex" }
+    data class Edge(val a: Int, val b: Int)
+    fun edge(a: Int, b: Int) = if (a < b) Edge(a, b) else Edge(b, a)
+
+    val uses = linkedMapOf<Edge, MutableList<Pair<Int, Boolean>>>()
+    triangles.forEachIndexed { triangleIndex, triangle ->
+        val ids = listOf(triangle.a, triangle.b, triangle.c)
+        require(ids.all { id -> id in vertices.indices } && ids.toSet().size == 3) {
+            "STL final triangle $triangleIndex has invalid vertices $ids"
+        }
+        for (index in ids.indices) {
+            val a = ids[index]
+            val b = ids[(index + 1) % ids.size]
+            uses.getOrPut(edge(a, b), ::arrayListOf) += triangleIndex to (a < b)
+        }
+    }
+    uses.entries.firstOrNull { (_, incident) ->
+        incident.size != 2 || incident[0].second == incident[1].second
+    }?.let { (edge, incident) ->
+        error("STL final edge $edge has invalid oriented incidence $incident")
+    }
+    val neighbors = List(triangles.size) { linkedSetOf<Int>() }
+    for (incident in uses.values) {
+        val a = incident[0].first
+        val b = incident[1].first
+        neighbors[a] += b
+        neighbors[b] += a
+    }
+    val reached = linkedSetOf(0)
+    val pending = ArrayDeque<Int>()
+    pending += 0
+    while (pending.isNotEmpty()) {
+        for (neighbor in neighbors[pending.removeFirst()]) {
+            if (reached.add(neighbor)) pending += neighbor
+        }
+    }
+    require(reached.size == triangles.size) {
+        "STL final mesh has disconnected triangle components"
     }
 }
 

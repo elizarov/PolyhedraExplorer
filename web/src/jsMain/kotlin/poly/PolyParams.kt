@@ -26,7 +26,7 @@ class RenderParams(tag: String, val animationParams: ViewAnimationParams?) : Par
     val printPreview = using(PrintPreviewParams("p"))
 
     init {
-        poly.connectRimWidth(view.faceRim)
+        poly.connectRimDimensions(view.faceRim, view.faceWidth)
     }
 }
 
@@ -145,6 +145,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
     }
     private var requestedState: CoreState? = null
     private var requestedRimWidth: Double? = null
+    private var requestedFaceWidth: Double? = null
     private var appliedState: CoreState? = null
     private var suggestedSeedKey: Pair<String, List<String>>? = null
 
@@ -165,7 +166,12 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         if (!coreStarted) return
         val state = currentState()
         val rimWidth = rimWidthProvider().takeIf { it > 0.0 }
-        if (state == requestedState && rimWidth == requestedRimWidth) return
+        val faceWidth = faceWidthProvider().takeIf { rimWidth != null && it > 0.0 }
+        if (
+            state == requestedState &&
+            rimWidth == requestedRimWidth &&
+            faceWidth == requestedFaceWidth
+        ) return
 
         val stateKey = state.seedDetectionKey()
         if (suggestedSeedKey != null && suggestedSeedKey != stateKey) {
@@ -175,6 +181,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
 
         requestedState = state
         requestedRimWidth = rimWidth
+        requestedFaceWidth = faceWidth
         coreError = null
         resetTransformProgress()
         transformProgress = 0
@@ -192,6 +199,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
                 animationDuration = duration,
                 detectSeed = detectSeed,
                 rimWidth = rimWidth,
+                faceWidth = faceWidth,
             ),
             reportProgress = progress@{ progress ->
                 if (requestId != activeRequestId) return@progress
@@ -318,12 +326,17 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
     }
 
     private var rimWidthProvider: () -> Double = { 0.0 }
+    private var faceWidthProvider: () -> Double = { 0.0 }
     private var rimWidthDependency: Param.Dependency? = null
+    private var faceWidthDependency: Param.Dependency? = null
 
-    internal fun connectRimWidth(param: DoubleParam) {
+    internal fun connectRimDimensions(rimParam: DoubleParam, widthParam: DoubleParam) {
         rimWidthDependency?.destroy()
-        rimWidthProvider = { param.targetValue }
-        rimWidthDependency = param.onNotifyUpdated(Param.TargetValue, ::computeDerivedTargetValues)
+        faceWidthDependency?.destroy()
+        rimWidthProvider = { rimParam.targetValue }
+        faceWidthProvider = { widthParam.targetValue }
+        rimWidthDependency = rimParam.onNotifyUpdated(Param.TargetValue, ::computeDerivedTargetValues)
+        faceWidthDependency = widthParam.onNotifyUpdated(Param.TargetValue, ::computeDerivedTargetValues)
     }
 
     internal fun updateSuggestedSeed(state: CoreState, response: CoreResponse) {
