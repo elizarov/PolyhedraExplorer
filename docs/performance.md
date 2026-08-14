@@ -39,7 +39,16 @@ immersion and resolved physical boundary. The candidate search reuses one plane 
 orbit, expands it through geometric symmetries, uses spatial indices for tolerant point merging,
 and constructs physical stratum boundaries only when they are needed. Greatened and Stellated
 enumeration both publish monotonic intermediate worker progress; cached result sets complete
-immediately.
+without repeating candidate discovery. Each cached result also retains its geometry-contract
+analysis, full point-group and F/E/V orbit classification, orbit-action availability, and its most
+recent presentation-rim geometry. Returning to a large result therefore avoids repeated
+classification and derives Stellate-face availability with one full-Kis
+construction instead of one construction per face orbit. Switching between two Stellated Results
+does not evaluate the previous result because this discrete setting has no animation keyframes.
+The face-orbit classifier maps a transformed face through one of its boundary edges instead of
+allocating and sorting a vertex list for every symmetry operation. The JVM regression covers
+switching to Result 15 (`F = 2820`) from a warm candidate set and requires
+the complete core response in under 2 seconds.
 
 Run the current comparison with:
 

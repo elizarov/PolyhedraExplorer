@@ -1,6 +1,7 @@
 package polyhedra.core.transform
 
 import polyhedra.core.poly.geometricSymmetryOperations
+import polyhedra.core.poly.analyzeGeometry
 import polyhedra.core.poly.polyhedron
 import polyhedra.core.poly.scaled
 import polyhedra.core.poly.validateProperGeometry
@@ -91,26 +92,26 @@ internal suspend fun Polyhedron.buildGenericGreateningCandidates(
             val candidate = alignGreateningToSourcePlanes(faceted.directDual(), planeTolerance)
                 ?: return@runCatching null
             candidate.validateRenderableImmersion()
-            candidate.resolved(candidateProgress).validateProperGeometry()
-            candidate
+            val geometryAnalysis = candidate.analyzeGeometry()
+            candidate.resolved(candidateProgress, geometryAnalysis).validateProperGeometry()
+            StellationCandidate(candidate, knownGeometryAnalysis = geometryAnalysis)
         }.getOrNull()
         candidateProgress?.reportProgress(100)
         candidate
     }.distinctBy { candidate ->
-        candidate.coordinateSignature(tolerance) to candidate.edgeSignature(tolerance)
+        candidate.poly.coordinateSignature(tolerance) to candidate.poly.edgeSignature(tolerance)
     }
 
     val result = candidates
-        .sortedWith(compareBy<Polyhedron>(
-            { candidate -> candidate.facePatternMismatchCount(this) },
-            { candidate -> candidate.totalFaceArityDelta(this) },
-            { candidate -> candidate.totalFaceWindingDelta(this) },
-            Polyhedron::meanFaceCircuitRadius,
-            { candidate -> candidate.fs.size },
-            { candidate -> candidate.es.size },
-            { candidate -> candidate.vs.size },
+        .sortedWith(compareBy<StellationCandidate>(
+            { candidate -> candidate.poly.facePatternMismatchCount(this) },
+            { candidate -> candidate.poly.totalFaceArityDelta(this) },
+            { candidate -> candidate.poly.totalFaceWindingDelta(this) },
+            { candidate -> candidate.poly.meanFaceCircuitRadius() },
+            { candidate -> candidate.poly.fs.size },
+            { candidate -> candidate.poly.es.size },
+            { candidate -> candidate.poly.vs.size },
         ))
-        .map(::StellationCandidate)
     progress?.reportProgress(100)
     return result
 }

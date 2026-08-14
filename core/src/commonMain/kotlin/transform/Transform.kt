@@ -46,7 +46,7 @@ sealed class Transform : Tagged {
         get() = TransformSupport()
 
     fun applicability(poly: Polyhedron): TransformApplicability {
-        val inputAnalysis = poly.analyzeGeometry()
+        val inputAnalysis = poly.cachedConstellationGeometryAnalysisOrNull() ?: poly.analyzeGeometry()
         val outputContract = when (support.outputPolicy) {
             TransformOutputPolicy.Preserve -> inputAnalysis.strongestContract
             TransformOutputPolicy.RenderableImmersion -> PolyhedronContract.RenderableImmersion

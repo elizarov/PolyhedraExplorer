@@ -130,6 +130,13 @@ suspend fun evaluateCore(
         return current.response
     }
 
+    // Greatened and Stellated Result changes are discrete and have no animation keyframes. Avoid
+    // rebuilding the previous large candidate merely to discover that the animation is empty.
+    if (request.state.hasNonAnimatedStarResultChangeFrom(previousState)) {
+        reportCompletion(current, reportProgress)
+        return current.response
+    }
+
     // A seed change cannot be animated, so evaluating the old transform chain would only repeat
     // potentially expensive operations such as canonicalization before returning no animation.
     if (previousState.seedTag != request.state.seedTag) {
@@ -155,6 +162,22 @@ suspend fun evaluateCore(
 private fun reportCompletion(evaluation: Evaluation, reportProgress: (CoreProgress) -> Unit) {
     if (evaluation.response.errorIndex != null) return
     reportProgress(CoreProgress(evaluation.validTransforms.lastIndex.coerceAtLeast(0), 100))
+}
+
+private fun CoreState.hasNonAnimatedStarResultChangeFrom(previous: CoreState): Boolean {
+    if (seedTag != previous.seedTag || scaleTag != previous.scaleTag || transformTags.size != previous.transformTags.size) {
+        return false
+    }
+    val changed = transformTags.indices.filter { index -> transformTags[index] != previous.transformTags[index] }
+    if (changed.size != 1 || changed.single() != transformTags.lastIndex) return false
+    val currentSpec = transformTags.last().parseTransformTag() ?: return false
+    val previousSpec = previous.transformTags.last().parseTransformTag() ?: return false
+    if (currentSpec.id != previousSpec.id) return false
+    if (currentSpec.id.operation != TransformOperation.Greatened &&
+        currentSpec.id.operation != TransformOperation.Stellated
+    ) return false
+    return currentSpec.tweaks - TransformTweak.StellationResult ==
+        previousSpec.tweaks - TransformTweak.StellationResult
 }
 
 private data class Evaluation(
@@ -220,7 +243,7 @@ private suspend fun evaluateState(
             transformTweakRanges += transform.safeTweakRanges(poly, pendingRectification, scale, rangeProgress)
         }
         val applicationProgress = if (reportsCandidateProgress) {
-            { done: Int -> reportTransformProgress(95 + done * 5 / 100) }
+            { done: Int -> reportTransformProgress(95 + done * 3 / 100) }
         } else {
             reportTransformProgress
         }
@@ -255,14 +278,18 @@ private suspend fun evaluateState(
         transformedPolys += poly
         validTransforms += transform
         warnings += warning
-        availableOrbitTransforms += poly.availableOrbitTransforms.map(Transform::tag).sorted()
+        availableOrbitTransforms += poly.cachedConstellationOrbitTransformTagsOrNull()
+            ?: poly.availableOrbitTransforms.map(Transform::tag).sorted()
+        if (reportsCandidateProgress) reportTransformProgress(99)
     }
 
     val displayPoly = poly.scaled(scale)
     val response = CoreResponse(
         poly = displayPoly,
         polyName = polyName,
-        symmetry = symmetryOverride ?: poly.analyzeSymmetry(),
+        symmetry = symmetryOverride
+            ?: poly.cachedConstellationSymmetryOrNull()
+            ?: poly.analyzeSymmetry(),
         recognizedSeedTag = if (
             detectSeed && errorIndex == null &&
             (validTransforms.isNotEmpty() || seed.type == SeedType.Families ||
@@ -279,8 +306,10 @@ private suspend fun evaluateState(
         transformTweakRanges = transformTweakRanges,
         errorIndex = errorIndex,
         error = errorIssue,
-        geometryAnalysis = poly.analyzeGeometry(),
-        resolvedRims = rimWidth?.takeIf { it > 0.0 }?.let(displayPoly::resolvedRims).orEmpty(),
+        geometryAnalysis = poly.cachedConstellationGeometryAnalysisOrNull() ?: poly.analyzeGeometry(),
+        resolvedRims = rimWidth?.takeIf { it > 0.0 }?.let { width ->
+            poly.cachedConstellationResolvedRimsOrNull(scale, width) ?: displayPoly.resolvedRims(width)
+        }.orEmpty(),
     )
     return Evaluation(state, seed, scale, validTransforms, poly, response)
 }
@@ -400,7 +429,9 @@ private suspend fun applyTransform(
     outputScale: Scale? = null,
 ): TransformApplication {
     var poly = inputPoly
-    val logicalInputContract = inputPoly.analyzeGeometry().strongestContract
+    val logicalInputContract = (
+        inputPoly.cachedConstellationGeometryAnalysisOrNull() ?: inputPoly.analyzeGeometry()
+    ).strongestContract
     var pendingRectification = inputPendingRectification
     var isIdentity = false
     var outputContract = PolyhedronContract.EmbeddedBoundary

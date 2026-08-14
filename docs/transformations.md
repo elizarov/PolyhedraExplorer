@@ -635,6 +635,12 @@ phases on the Stellated pill. Plane diagrams are computed once per face orbit an
 polyhedron's geometric symmetries. Spatial point indices merge arrangement intersections without
 quadratic scans, and physical stratum boundaries are constructed only when reconstruction or
 geometric matching needs them. Cached discovery completes immediately.
+The bounded candidate cache owns each result's geometry-contract analysis, full point-group and
+F/E/V orbit classification, complete set of core-derived orbit-targeted action tags, and most
+recent presentation-rim geometry. A Result change reuses those records and skips evaluation
+of the previous Result because no animation can be produced. Stellate-face eligibility is derived
+for every face orbit from one shared full-Kis construction rather than rebuilding selective Kis
+once per orbit.
 
 Stellated is immediate for the same reason as Greatened: no connected, non-degenerate,
 topology-compatible interpolation has the required endpoint topology.

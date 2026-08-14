@@ -152,8 +152,7 @@ val Polyhedron.availableOrbitTransforms: Set<Transform>
         if (faceKinds.size > 1) {
             faceKinds.keys.map(::KisFace).filterTo(this) { transform -> transform.isApplicable(this@availableOrbitTransforms) }
         }
-        faceKinds.keys.map(::StellateFace)
-            .filterTo(this) { transform -> transform.isApplicable(this@availableOrbitTransforms) }
+        stellatableFaceKinds().mapTo(this, ::StellateFace)
         if (vertexKinds.size > 1) {
             vertexKinds.keys.mapTo(this, ::TruncateVertex)
             vertexKinds.keys.mapTo(this, ::RectifyVertex)
@@ -173,6 +172,35 @@ internal data class KisFacesResult(
     val apexKinds: Map<FaceKind, VertexKind>,
 )
 
+private fun Polyhedron.fullKisWithApexKinds(): KisFacesResult {
+    val fullKis = runCatching { dual().truncated().dual() }.getOrElse { directFailure ->
+        val analysis = cachedConstellationGeometryAnalysisOrNull() ?: analyzeGeometry()
+        if (analysis.strongestContract != PolyhedronContract.EmbeddedBoundary) throw directFailure
+        canonical().dual().truncated().dual()
+    }
+    val apexKinds = fs.groupBy(Face::kind).mapValues { (_, faces) ->
+        faces.map { face -> fullKis.vs[vs.size + face.id].kind }.distinct().single()
+    }
+    return KisFacesResult(fullKis, apexKinds)
+}
+
+/**
+ * Determines every usable Stellate-face target from one full-Kis construction. A selected Kis
+ * apex is adjacent only to its source face's boundary, so it satisfies the Radial preconditions
+ * exactly when its kind is not also assigned to a retained input vertex.
+ */
+internal fun Polyhedron.stellatableFaceKinds(): Set<FaceKind> {
+    val simpleKinds = faceKinds.keys.filterTo(linkedSetOf()) { kind ->
+        fs.filter { face -> face.kind == kind }.all { face ->
+            face.isPlanar && !resolvedFaces[face.id].sourceBoundarySelfIntersects
+        }
+    }
+    if (simpleKinds.isEmpty()) return emptySet()
+    val fullKis = runCatching { fullKisWithApexKinds() }.getOrNull() ?: return emptySet()
+    val retainedKinds = vs.indices.mapTo(hashSetOf()) { vertexId -> fullKis.poly.vs[vertexId].kind }
+    return simpleKinds.filterTo(linkedSetOf()) { kind -> fullKis.apexKinds.getValue(kind) !in retainedKinds }
+}
+
 internal fun Polyhedron.kisFacesWithApexKinds(
     kinds: Set<FaceKind>,
     height: Double = 1.0,
@@ -181,15 +209,10 @@ internal fun Polyhedron.kisFacesWithApexKinds(
     require(fs.filter { face -> face.kind in kinds }.all { face ->
         face.isPlanar && !resolvedFaces[face.id].sourceBoundarySelfIntersects
     }) { "Kis requires every target source face to be simple and planar" }
-    val fullKis = runCatching { dual().truncated().dual() }.getOrElse { directFailure ->
-        if (analyzeGeometry().strongestContract != PolyhedronContract.EmbeddedBoundary) throw directFailure
-        canonical().dual().truncated().dual()
-    }
+    val fullKisResult = fullKisWithApexKinds()
+    val fullKis = fullKisResult.poly
     if (height == 1.0 && kinds.size == faceKinds.size && kinds.containsAll(faceKinds.keys)) {
-        val apexKinds = fs.groupBy(Face::kind).mapValues { (_, faces) ->
-            faces.map { face -> fullKis.vs[vs.size + face.id].kind }.distinct().single()
-        }
-        return KisFacesResult(fullKis, apexKinds)
+        return fullKisResult
     }
     require(fullKis.vs.size == vs.size + fs.size) {
         "Continuous or orbit-targeted Kis requires a topological dual; it is not available for " +

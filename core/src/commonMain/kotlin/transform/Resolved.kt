@@ -8,6 +8,7 @@ import polyhedra.core.poly.validateProperGeometry
 import polyhedra.core.util.OperationProgressContext
 import polyhedra.core.util.runSynchronously
 import polyhedra.model.api.MAX_POLYHEDRON_EDGES
+import polyhedra.model.api.CoreGeometryAnalysis
 import polyhedra.model.api.PolyhedronContract
 import polyhedra.model.api.CoreIssueCode
 import polyhedra.model.api.ResolvedElementProvenance
@@ -59,7 +60,25 @@ fun Polyhedron.resolved(): Polyhedron = runSynchronously { resolved(null) }
  * authoritative first phase; safe polygon merging is deliberately a separate topology phase.
  */
 suspend fun Polyhedron.resolved(progress: OperationProgressContext?): Polyhedron =
-    resolvedSurface(progress, validateSource = true, retainProvenance = true, maximumEdges = MAX_POLYHEDRON_EDGES)
+    resolvedSurface(
+        progress,
+        validateSource = true,
+        knownSourceAnalysis = null,
+        retainProvenance = true,
+        maximumEdges = MAX_POLYHEDRON_EDGES,
+    )
+
+/** Reuses a classification already computed by a candidate-construction pipeline. */
+internal suspend fun Polyhedron.resolved(
+    progress: OperationProgressContext?,
+    knownSourceAnalysis: CoreGeometryAnalysis,
+): Polyhedron = resolvedSurface(
+    progress,
+    validateSource = true,
+    knownSourceAnalysis = knownSourceAnalysis,
+    retainProvenance = true,
+    maximumEdges = MAX_POLYHEDRON_EDGES,
+)
 
 internal data class TriangleSoupTriangle(
     val a: Vec3,
@@ -98,11 +117,12 @@ internal suspend fun resolvedTriangleSoup(
 private suspend fun Polyhedron.resolvedSurface(
     progress: OperationProgressContext?,
     validateSource: Boolean,
+    knownSourceAnalysis: CoreGeometryAnalysis?,
     retainProvenance: Boolean,
     maximumEdges: Int,
 ): Polyhedron {
     if (validateSource) {
-        val analysis = analyzeGeometry()
+        val analysis = knownSourceAnalysis ?: analyzeGeometry()
         if (analysis.strongestContract == PolyhedronContract.EmbeddedBoundary) return this
     }
 

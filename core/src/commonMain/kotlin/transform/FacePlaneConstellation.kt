@@ -1,8 +1,11 @@
 package polyhedra.core.transform
 
 import polyhedra.core.poly.GeometricSymmetryOperation
+import polyhedra.core.poly.analyzeGeometry
+import polyhedra.core.poly.analyzeSymmetry
 import polyhedra.core.poly.geometricSymmetryOperations
 import polyhedra.core.poly.polyhedron
+import polyhedra.core.poly.resolvedRims
 import polyhedra.core.poly.scaled
 import polyhedra.core.poly.signedVolume
 import polyhedra.core.poly.validateRenderableImmersion
@@ -11,11 +14,15 @@ import polyhedra.core.util.OperationProgressContext
 import polyhedra.core.util.reportProgress
 import polyhedra.core.util.runSynchronously
 import polyhedra.core.util.subrange
+import polyhedra.model.api.CoreGeometryAnalysis
+import polyhedra.model.api.CoreSymmetry
+import polyhedra.model.api.PolyhedronContract
 import polyhedra.model.poly.FEV
 import polyhedra.model.poly.Edge
 import polyhedra.model.poly.Face
 import polyhedra.model.poly.FaceKind
 import polyhedra.model.poly.Polyhedron
+import polyhedra.model.poly.ResolvedRimGeometry
 import polyhedra.model.poly.Scale
 import polyhedra.model.poly.VertexKind
 import polyhedra.model.poly.fev
@@ -40,7 +47,31 @@ internal data class StellationCandidate(
     val poly: Polyhedron,
     val fev: FEV = poly.fev(),
     val stratum: Int? = null,
-)
+    private val knownGeometryAnalysis: CoreGeometryAnalysis? = null,
+) {
+    private var presentationRims: Pair<Pair<Scale, Double>, List<ResolvedRimGeometry>>? = null
+
+    /** Shared by transform validation, the response contract, and every later selection. */
+    val geometryAnalysis: CoreGeometryAnalysis by lazy {
+        knownGeometryAnalysis ?: poly.analyzeGeometry()
+    }
+
+    /** Geometric point-group and F/E/V orbit classification retained across Result switches. */
+    val symmetry: CoreSymmetry by lazy { poly.analyzeSymmetry() }
+
+    /** Core-owned orbit actions are derived once and retained with the cached candidate geometry. */
+    val availableOrbitTransformTags: List<String> by lazy {
+        poly.availableOrbitTransforms.map(Transform::tag).sorted()
+    }
+
+    fun resolvedRims(scale: Scale, width: Double): List<ResolvedRimGeometry> {
+        val key = scale to width
+        presentationRims?.takeIf { (cachedKey) -> cachedKey == key }?.let { return it.second }
+        val result = poly.scaled(scale).resolvedRims(width)
+        presentationRims = key to result
+        return result
+    }
+}
 
 private class CompoundStellationException(componentCount: Int) : IllegalArgumentException(
     "Main-line candidate is a compound with $componentCount disconnected surface components",
@@ -111,11 +142,21 @@ private data class DiagramFacet(
         }
 }
 private data class PlaneDiagram(val plane: ConstellationPlane, val facets: List<DiagramFacet>)
-private data class MainLineSource(val immersed: Polyhedron, val physical: Polyhedron)
+private data class MainLineSource(
+    val immersed: Polyhedron,
+    val physical: Polyhedron,
+    val geometryAnalysis: CoreGeometryAnalysis,
+)
+private data class MainLineStratum(
+    val power: Int,
+    val mainLine: MainLineSource?,
+    val physical: Polyhedron,
+)
 
 private const val CONSTELLATION_EPS = 2e-7
 private const val MAX_CONSTELLATION_RADIUS = 1e6
 private const val CANDIDATE_CACHE_SIZE = 16
+private val EMBEDDED_GEOMETRY_ANALYSIS = CoreGeometryAnalysis(PolyhedronContract.EmbeddedBoundary)
 
 private data class NormalizedFaceSignature(
     val kind: Int,
@@ -131,6 +172,32 @@ private val candidateCache = LinkedHashMap<CandidateCacheKey, List<StellationCan
 internal fun clearStellationCandidateCache() {
     candidateCache.clear()
 }
+
+internal fun Polyhedron.cachedConstellationGeometryAnalysisOrNull(): CoreGeometryAnalysis? =
+    candidateCache.values.asSequence()
+        .flatMap(List<StellationCandidate>::asSequence)
+        .firstOrNull { candidate -> candidate.poly === this }
+        ?.geometryAnalysis
+
+internal fun Polyhedron.cachedConstellationSymmetryOrNull(): CoreSymmetry? =
+    candidateCache.values.asSequence()
+        .flatMap(List<StellationCandidate>::asSequence)
+        .firstOrNull { candidate -> candidate.poly === this }
+        ?.symmetry
+
+internal fun Polyhedron.cachedConstellationOrbitTransformTagsOrNull(): List<String>? =
+    candidateCache.values.asSequence()
+        .flatMap(List<StellationCandidate>::asSequence)
+        .firstOrNull { candidate -> candidate.poly === this }
+        ?.availableOrbitTransformTags
+
+internal fun Polyhedron.cachedConstellationResolvedRimsOrNull(
+    scale: Scale,
+    width: Double,
+): List<ResolvedRimGeometry>? = candidateCache.values.asSequence()
+    .flatMap(List<StellationCandidate>::asSequence)
+    .firstOrNull { candidate -> candidate.poly === this }
+    ?.resolvedRims(scale, width)
 
 internal fun Polyhedron.stellationCandidates(
     operation: ConstellationOperation,
@@ -225,8 +292,7 @@ private suspend fun Polyhedron.buildArrangementCircuitStellations(
         } else {
             runCatching { buildCandidate(planes, circuits, tolerance) }
                 .getOrNull()
-                ?.takeUnless { result -> result.sameGeometryAs(this, tolerance) }
-                ?.let(::StellationCandidate)
+                ?.takeUnless { candidate -> candidate.poly.sameGeometryAs(this, tolerance) }
         }
         candidateProgress?.reportProgress(keyIndex + 1, sortedKeys.size)
         candidate
@@ -269,7 +335,9 @@ private suspend fun Polyhedron.buildMainLineStellations(
             42 + 8 * index / circuitCandidates.size.coerceAtLeast(1),
             42 + 8 * (index + 1) / circuitCandidates.size.coerceAtLeast(1),
         )
-        runCatching { candidate.poly.resolved(candidateProgress) }.getOrNull()?.let { resolved -> candidate to resolved }
+        runCatching { candidate.poly.resolved(candidateProgress, candidate.geometryAnalysis) }
+            .getOrNull()
+            ?.let { resolved -> candidate to resolved }
     }
     val strata = commonPowers.mapIndexedNotNull { powerIndex, power ->
         val start = 50 + 48 * powerIndex / commonPowers.size.coerceAtLeast(1)
@@ -285,19 +353,30 @@ private suspend fun Polyhedron.buildMainLineStellations(
             buildMainLinePhysicalBoundary(diagrams, power, tolerance)
         }.getOrNull() ?: return@mapIndexedNotNull null
         progress?.reportProgress(end)
-        Triple(power, mainLine?.immersed, physical)
+        MainLineStratum(power, mainLine, physical)
     }
     val sourcePower = resolvedSource?.let { source ->
-        strata.lastOrNull { (_, _, physical) -> source.matchesPhysicalBoundary(physical, tolerance) }?.first
+        strata.lastOrNull { stratum -> source.matchesPhysicalBoundary(stratum.physical, tolerance) }?.power
     } ?: 0
-    val result = strata.mapNotNull { (power, immersed, physical) ->
-        if (power <= sourcePower) return@mapNotNull null
+    val result = strata.mapNotNull { stratum ->
+        if (stratum.power <= sourcePower) return@mapNotNull null
         val matchedCircuit = resolvedCircuits.firstOrNull { (_, resolved) ->
-            resolved.matchesPhysicalBoundary(physical, tolerance)
+            resolved.matchesPhysicalBoundary(stratum.physical, tolerance)
         }?.first
-        val candidate: Polyhedron = matchedCircuit?.poly ?: immersed ?: physical
-        candidate.takeUnless { result -> result.sameGeometryAs(this, tolerance) }
-            ?.let { result -> StellationCandidate(result, stratum = power) }
+        val candidate = when {
+            matchedCircuit != null -> matchedCircuit.copy(stratum = stratum.power)
+            stratum.mainLine != null -> StellationCandidate(
+                stratum.mainLine.immersed,
+                stratum = stratum.power,
+                knownGeometryAnalysis = stratum.mainLine.geometryAnalysis,
+            )
+            else -> StellationCandidate(
+                stratum.physical,
+                stratum = stratum.power,
+                knownGeometryAnalysis = EMBEDDED_GEOMETRY_ANALYSIS,
+            )
+        }
+        candidate.takeUnless { result -> result.poly.sameGeometryAs(this, tolerance) }
     }.distinctBy { candidate ->
         candidate.poly.coordinateSignature(tolerance) to candidate.poly.edgeSignature(tolerance)
     }
@@ -501,10 +580,11 @@ private suspend fun buildMainLineCandidate(
     progress?.reportProgress(35)
     result.validateRenderableImmersion()
     progress?.reportProgress(45)
-    val physical = result.resolved(progress?.subrange(45, 92))
+    val geometryAnalysis = result.analyzeGeometry()
+    val physical = result.resolved(progress?.subrange(45, 92), geometryAnalysis)
     physical.validateProperGeometry()
     progress?.reportProgress(100)
-    return MainLineSource(result, physical)
+    return MainLineSource(result, physical, geometryAnalysis)
 }
 
 internal fun Polyhedron.surfaceComponentCount(): Int {
@@ -682,7 +762,7 @@ private suspend fun buildCandidate(
     planes: List<ConstellationPlane>,
     circuits: List<FaceCircuit>,
     tolerance: Double,
-): Polyhedron {
+): StellationCandidate {
     val positionIndex = TolerantPointIndex(tolerance * 8.0)
     val positions = positionIndex.points
     val faceIndices = circuits.map { circuit -> circuit.points.map(positionIndex::index) }
@@ -708,8 +788,9 @@ private suspend fun buildCandidate(
     val components = result.surfaceComponentCount()
     if (components != 1) throw CompoundStellationException(components)
     result.validateRenderableImmersion()
-    result.resolved(null).validateProperGeometry()
-    return result
+    val geometryAnalysis = result.analyzeGeometry()
+    result.resolved(null, geometryAnalysis).validateProperGeometry()
+    return StellationCandidate(result, knownGeometryAnalysis = geometryAnalysis)
 }
 
 internal fun Polyhedron.sameGeometryAs(other: Polyhedron, tolerance: Double): Boolean =

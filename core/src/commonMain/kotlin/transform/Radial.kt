@@ -75,11 +75,7 @@ fun Polyhedron.canMoveRadially(kind: VertexKind): Boolean {
     }
 }
 
-fun Polyhedron.canStellateFaces(kind: FaceKind): Boolean = runCatching {
-    val result = kisFacesWithApexKinds(setOf(kind))
-    val apexKind = result.apexKinds.getValue(kind)
-    result.poly.canMoveRadially(apexKind)
-}.getOrDefault(false)
+fun Polyhedron.canStellateFaces(kind: FaceKind): Boolean = kind in stellatableFaceKinds()
 
 fun Polyhedron.radialVertices(
     kind: VertexKind,

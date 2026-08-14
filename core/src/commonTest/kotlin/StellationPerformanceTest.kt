@@ -13,9 +13,12 @@ import polyhedra.core.transform.resolved
 import polyhedra.model.api.CoreProgress
 import polyhedra.model.api.CoreRequest
 import polyhedra.model.api.CoreState
+import polyhedra.model.poly.Scale
+import polyhedra.model.poly.fev
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.measureTimedValue
@@ -33,8 +36,33 @@ class StellationPerformanceTest {
         assertTrue(duration < 3.seconds, "Deltoidal hexecontahedron stellation took $duration")
         candidates.forEach { candidate ->
             candidate.poly.validateRenderableImmersion()
-            candidate.poly.resolved().validateProperGeometry()
+            candidate.poly.resolved(null, candidate.geometryAnalysis).validateProperGeometry()
         }
+
+        val current = CoreState("deD", listOf("S~l=15"), "c")
+        val previous = CoreState("deD", listOf("S~l=14"), "c")
+        val progress = arrayListOf<CoreProgress>()
+        val (response, switchDuration) = measureTimedValue {
+            evaluateCore(CoreRequest(current, previous, 0.5, detectSeed = true, rimWidth = 0.05), progress::add)
+        }
+
+        assertNull(response.error)
+        assertEquals(candidates[14].fev, response.poly.fev())
+        assertSame(candidates[14].geometryAnalysis, response.geometryAnalysis)
+        assertSame(candidates[14].symmetry, response.symmetry)
+        assertSame(candidates[14].availableOrbitTransformTags, response.availableOrbitTransforms.last())
+        assertSame(candidates[14].resolvedRims(Scale.Circumradius, 0.05), response.resolvedRims)
+        assertTrue(response.animation.isEmpty(), "Changing the discrete Result must not evaluate an unused animation")
+        assertTrue(switchDuration < 2.seconds, "Cached Result 15 switch took $switchDuration")
+        assertEquals(100, progress.last().done)
+
+        val (repeated, repeatDuration) = measureTimedValue {
+            evaluateCore(CoreRequest(current, detectSeed = true, rimWidth = 0.05))
+        }
+        assertSame(response.geometryAnalysis, repeated.geometryAnalysis)
+        assertSame(response.symmetry, repeated.symmetry)
+        assertSame(response.resolvedRims, repeated.resolvedRims)
+        assertTrue(repeatDuration < 1.seconds, "Repeated Result 15 response took $repeatDuration")
     }
 
     @Test

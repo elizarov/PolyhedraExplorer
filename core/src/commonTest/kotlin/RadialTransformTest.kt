@@ -12,6 +12,7 @@ import polyhedra.core.transform.radialVertices
 import polyhedra.core.transform.resolved
 import polyhedra.core.transform.stellateFaceCoplanarRadii
 import polyhedra.core.transform.stellateFaces
+import polyhedra.core.transform.stellatableFaceKinds
 import polyhedra.model.api.CoreRequest
 import polyhedra.model.api.CoreState
 import polyhedra.model.api.TransformTweak
@@ -32,6 +33,24 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class RadialTransformTest {
+    @Test
+    fun onePassStellateFaceAvailabilityMatchesSelectiveConstruction() {
+        for (source in listOf(
+            Seed.Cube.poly,
+            Seed.TruncatedCube.poly,
+            Seed.TriakisTetrahedron.poly,
+            Seed.DisdyakisDodecahedron.poly,
+        )) {
+            val expected = source.faceKinds.keys.filterTo(linkedSetOf()) { kind ->
+                runCatching {
+                    val kis = source.kisFacesWithApexKinds(setOf(kind))
+                    kis.poly.canMoveRadially(kis.apexKinds.getValue(kind))
+                }.getOrDefault(false)
+            }
+            assertEquals(expected, source.stellatableFaceKinds())
+        }
+    }
+
     @Test
     fun radialEligibilityRequiresAnIndependentTriangularVertexOrbit() {
         val tetrahedron = Seed.Tetrahedron.poly
