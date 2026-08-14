@@ -196,19 +196,40 @@ private suspend fun evaluateState(
     availableOrbitTransforms += poly.availableOrbitTransforms.map(Transform::tag).sorted()
     for ((index, transform) in transforms.withIndex()) {
         var warning: CoreIssue? = null
+        var lastReportedDone = -1
         val reportTransformProgress: (Int) -> Unit = { done ->
-            reportProgress(CoreProgress(index, done.coerceIn(0, 100)))
+            val clamped = done.coerceIn(0, 100)
+            if (clamped > lastReportedDone) {
+                lastReportedDone = clamped
+                reportProgress(CoreProgress(index, clamped))
+            }
         }
         reportTransformProgress(0)
+        val reportsCandidateProgress = computeTweakRanges && (
+            transform.spec.id.operation == TransformOperation.Greatened ||
+                transform.spec.id.operation == TransformOperation.Stellated
+            )
         if (computeTweakRanges) {
-            transformTweakRanges += transform.safeTweakRanges(poly, pendingRectification, scale)
+            val rangeProgress = if (reportsCandidateProgress) {
+                OperationProgressContext { done ->
+                    reportTransformProgress(if (done <= 0) 0 else 1 + done.coerceAtMost(100) * 94 / 100)
+                }
+            } else {
+                null
+            }
+            transformTweakRanges += transform.safeTweakRanges(poly, pendingRectification, scale, rangeProgress)
+        }
+        val applicationProgress = if (reportsCandidateProgress) {
+            { done: Int -> reportTransformProgress(95 + done * 5 / 100) }
+        } else {
+            reportTransformProgress
         }
         when (
             val application = applyTransform(
                 transform,
                 poly,
                 pendingRectification,
-                reportTransformProgress,
+                applicationProgress,
                 outputScale = scale,
             )
         ) {
@@ -268,6 +289,7 @@ private suspend fun LogicalTransform.safeTweakRanges(
     inputPoly: Polyhedron,
     inputPendingRectification: PendingRectification?,
     outputScale: Scale,
+    progress: OperationProgressContext? = null,
 ): List<CoreTransformTweakRange> {
     when (spec.id.operation) {
         TransformOperation.Greatened,
@@ -277,7 +299,7 @@ private suspend fun LogicalTransform.safeTweakRanges(
             } else {
                 ConstellationOperation.Stellate
             }
-            val candidates = inputPoly.stellationCandidatesAsync(operation)
+            val candidates = inputPoly.stellationCandidatesAsync(operation, progress)
             if (candidates.isEmpty()) return emptyList()
             return listOf(
                 CoreTransformTweakRange(

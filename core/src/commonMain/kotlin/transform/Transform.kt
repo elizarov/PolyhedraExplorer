@@ -296,8 +296,8 @@ private data class TweakedTransform(
 
     @Transient
     override val asyncTransform: AsyncTransform? = when (base) {
-        is Greatened -> { poly, _ -> poly.greatenedAsync(integerResult()) }
-        is Stellated -> { poly, _ -> poly.stellatedAsync(integerResult()) }
+        is Greatened -> { poly, progress -> poly.greatenedAsync(integerResult(), progress) }
+        is Stellated -> { poly, progress -> poly.stellatedAsync(integerResult(), progress) }
         else -> null
     }
 

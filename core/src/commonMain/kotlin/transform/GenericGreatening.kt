@@ -5,6 +5,9 @@ import polyhedra.core.poly.polyhedron
 import polyhedra.core.poly.scaled
 import polyhedra.core.poly.validateProperGeometry
 import polyhedra.core.poly.validateRenderableImmersion
+import polyhedra.core.util.OperationProgressContext
+import polyhedra.core.util.reportProgress
+import polyhedra.core.util.subrange
 import polyhedra.model.api.MAX_POLYHEDRON_EDGES
 import polyhedra.model.poly.Face
 import polyhedra.model.poly.FaceKind
@@ -58,38 +61,46 @@ private data class FacetingFaceOrbit(
  */
 internal suspend fun Polyhedron.buildGenericGreateningCandidates(
     tolerance: Double,
+    progress: OperationProgressContext?,
 ): List<StellationCandidate> {
     val dual = runCatching { directDual() }.getOrNull() ?: return emptyList()
     if (dual.vs.size < 4) return emptyList()
     val symmetries = runCatching { dual.geometricSymmetryOperations() }.getOrNull() ?: return emptyList()
+    progress?.reportProgress(5)
     val vertexRepresentatives = dual.vertexOrbitRepresentatives(symmetries.all.map { it.vertexPermutation })
     val estimatedTriples = vertexRepresentatives.size.toLong() *
         (dual.vs.size - 1L) * (dual.vs.size - 2L) / 2L
     if (estimatedTriples > MAX_FACETING_TRIPLES) return emptyList()
 
     val planeTolerance = maxOf(tolerance / circumradius.coerceAtLeast(1.0), 2e-7)
-    val planes = dual.facetingPlanes(vertexRepresentatives, planeTolerance)
+    val planes = dual.facetingPlanes(vertexRepresentatives, planeTolerance, progress?.subrange(5, 10))
     if (planes.isEmpty()) return emptyList()
-    val orbits = dual.facetingFaceOrbits(planes, symmetries.all, planeTolerance)
+    val orbits = dual.facetingFaceOrbits(planes, symmetries.all, planeTolerance, progress?.subrange(10, 17))
         .pruneUnmatchableOrbits()
         .take(MAX_FACETING_ORBITS)
     if (orbits.isEmpty()) return emptyList()
 
-    val facetedDuals = dual.assembleFacetings(orbits)
-    val candidates = facetedDuals.mapNotNull { faceted ->
-        runCatching {
+    val facetedDuals = dual.assembleFacetings(orbits, progress?.subrange(17, 25))
+    val candidates = facetedDuals.mapIndexedNotNull { index, faceted ->
+        val candidateProgress = progress?.subrange(
+            25 + 73 * index / facetedDuals.size.coerceAtLeast(1),
+            25 + 73 * (index + 1) / facetedDuals.size.coerceAtLeast(1),
+        )
+        val candidate = runCatching {
             faceted.validateRenderableImmersion()
             val candidate = alignGreateningToSourcePlanes(faceted.directDual(), planeTolerance)
                 ?: return@runCatching null
             candidate.validateRenderableImmersion()
-            candidate.resolved(null).validateProperGeometry()
+            candidate.resolved(candidateProgress).validateProperGeometry()
             candidate
         }.getOrNull()
+        candidateProgress?.reportProgress(100)
+        candidate
     }.distinctBy { candidate ->
         candidate.coordinateSignature(tolerance) to candidate.edgeSignature(tolerance)
     }
 
-    return candidates
+    val result = candidates
         .sortedWith(compareBy<Polyhedron>(
             { candidate -> candidate.facePatternMismatchCount(this) },
             { candidate -> candidate.totalFaceArityDelta(this) },
@@ -100,6 +111,8 @@ internal suspend fun Polyhedron.buildGenericGreateningCandidates(
             { candidate -> candidate.vs.size },
         ))
         .map(::StellationCandidate)
+    progress?.reportProgress(100)
+    return result
 }
 
 private fun Polyhedron.facePatternMismatchCount(source: Polyhedron): Int =
@@ -128,11 +141,12 @@ private fun Polyhedron.vertexOrbitRepresentatives(permutations: List<IntArray>):
 private fun Polyhedron.facetingPlanes(
     representatives: List<Int>,
     tolerance: Double,
+    progress: OperationProgressContext?,
 ): List<FacetingPlane> {
     val tripleKeys = hashSetOf<Long>()
     val planes = linkedMapOf<FacetingPlaneKey, Pair<Vec3, Double>>()
     val count = vs.size
-    for (representative in representatives) {
+    for ((representativeIndex, representative) in representatives.withIndex()) {
         for (second in vs.indices) {
             if (second == representative) continue
             for (third in second + 1 until count) {
@@ -160,6 +174,7 @@ private fun Polyhedron.facetingPlanes(
                 planes.getOrPut(key) { normal to distance }
             }
         }
+        progress?.reportProgress(representativeIndex + 1, representatives.size)
     }
     return planes.values.mapNotNull { (normal, distance) ->
         val vertexIds = vs.indices.filter { vertexId ->
@@ -173,38 +188,41 @@ private fun Polyhedron.facetingFaceOrbits(
     planes: List<FacetingPlane>,
     symmetries: List<polyhedra.core.poly.GeometricSymmetryOperation>,
     tolerance: Double,
+    progress: OperationProgressContext?,
 ): List<FacetingFaceOrbit> {
     val result = linkedMapOf<String, FacetingFaceOrbit>()
     val visitedPlaneOrbits = hashSetOf<String>()
-    for (plane in planes) {
+    for ((planeIndex, plane) in planes.withIndex()) {
         val planeOrbitKey = symmetries.minOf { operation ->
             plane.vertexIds.map { vertexId -> operation.vertexPermutation[vertexId] }
                 .sorted()
                 .joinToString(",")
         }
-        if (!visitedPlaneOrbits.add(planeOrbitKey)) continue
-        for (circuit in plane.circuits(this, tolerance)) {
-            val faces = symmetries.map { operation ->
-                val mapped = circuit.map { vertexId -> operation.vertexPermutation[vertexId] }
-                FacetingFace(canonicalCycle(if (operation.orientation > 0) mapped else mapped.asReversed()))
-            }.distinctBy(FacetingFace::key).sortedBy(FacetingFace::key)
-            val edgeUses = linkedMapOf<Long, Int>()
-            val vertexIds = linkedSetOf<Int>()
-            for (face in faces) {
-                vertexIds += face.vertexIds
-                for (index in face.vertexIds.indices) {
-                    val edge = edgeKey(
-                        face.vertexIds[index],
-                        face.vertexIds[(index + 1) % face.vertexIds.size],
-                        vs.size,
-                    )
-                    edgeUses[edge] = edgeUses.getOrElse(edge) { 0 } + 1
+        if (visitedPlaneOrbits.add(planeOrbitKey)) {
+            for (circuit in plane.circuits(this, tolerance)) {
+                val faces = symmetries.map { operation ->
+                    val mapped = circuit.map { vertexId -> operation.vertexPermutation[vertexId] }
+                    FacetingFace(canonicalCycle(if (operation.orientation > 0) mapped else mapped.asReversed()))
+                }.distinctBy(FacetingFace::key).sortedBy(FacetingFace::key)
+                val edgeUses = linkedMapOf<Long, Int>()
+                val vertexIds = linkedSetOf<Int>()
+                for (face in faces) {
+                    vertexIds += face.vertexIds
+                    for (index in face.vertexIds.indices) {
+                        val edge = edgeKey(
+                            face.vertexIds[index],
+                            face.vertexIds[(index + 1) % face.vertexIds.size],
+                            vs.size,
+                        )
+                        edgeUses[edge] = edgeUses.getOrElse(edge) { 0 } + 1
+                    }
                 }
+                if (edgeUses.values.any { uses -> uses > 2 }) continue
+                val key = faces.joinToString("|") { face -> face.key }
+                result.getOrPut(key) { FacetingFaceOrbit(faces, edgeUses, vertexIds, key) }
             }
-            if (edgeUses.values.any { uses -> uses > 2 }) continue
-            val key = faces.joinToString("|") { face -> face.key }
-            result.getOrPut(key) { FacetingFaceOrbit(faces, edgeUses, vertexIds, key) }
         }
+        progress?.reportProgress(planeIndex + 1, planes.size)
     }
     return result.values.sortedWith(compareBy(
         { orbit -> orbit.faces.size },
@@ -278,7 +296,10 @@ private fun convexHull(
     return (lower.dropLast(1) + upper.dropLast(1)).map(ProjectedVertex::id)
 }
 
-private fun Polyhedron.assembleFacetings(orbits: List<FacetingFaceOrbit>): List<Polyhedron> {
+private fun Polyhedron.assembleFacetings(
+    orbits: List<FacetingFaceOrbit>,
+    progress: OperationProgressContext?,
+): List<Polyhedron> {
     val result = arrayListOf<Polyhedron>()
     val resultKeys = hashSetOf<String>()
     val visitedSelections = hashSetOf<String>()
@@ -289,6 +310,7 @@ private fun Polyhedron.assembleFacetings(orbits: List<FacetingFaceOrbit>): List<
         }
     }
     var searchNodes = 0
+    var lastReportedProgress = -1
 
     fun build(chosen: List<Int>) {
         val key = chosen.sorted().joinToString(",")
@@ -315,6 +337,11 @@ private fun Polyhedron.assembleFacetings(orbits: List<FacetingFaceOrbit>): List<
         usedVertices: BooleanArray,
     ) {
         if (++searchNodes > MAX_FACETING_SEARCH_NODES) return
+        val done = searchNodes * 100 / MAX_FACETING_SEARCH_NODES
+        if (done > lastReportedProgress) {
+            lastReportedProgress = done
+            progress?.reportProgress(done)
+        }
         val selectionKey = chosen.sorted().joinToString(",")
         if (!visitedSelections.add(selectionKey)) return
         val openEdges = edgeUses.filterValues { uses -> uses == 1 }.keys
@@ -361,6 +388,7 @@ private fun Polyhedron.assembleFacetings(orbits: List<FacetingFaceOrbit>): List<
             usedVertices,
         )
     }
+    progress?.reportProgress(100)
     return result
 }
 

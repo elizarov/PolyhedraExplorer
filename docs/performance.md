@@ -31,6 +31,16 @@ Canonicalization's symmetry quotient reduces this benchmark from 36 edge points 
 
 These figures measure computation kernels only. Wasm download/instantiation, JSON transfer, Compose work, and WebGL rendering are outside the timed region.
 
+## Interactive star-result enumeration
+
+Uncached Stellated enumeration for Deltoidal hexecontahedron is a JVM regression workload. It must
+produce all 27 supported results in under 3 seconds and independently validate every resulting
+immersion and resolved physical boundary. The candidate search reuses one plane diagram per face
+orbit, expands it through geometric symmetries, uses spatial indices for tolerant point merging,
+and constructs physical stratum boundaries only when they are needed. Greatened and Stellated
+enumeration both publish monotonic intermediate worker progress; cached result sets complete
+immediately.
+
 Run the current comparison with:
 
 ```shell

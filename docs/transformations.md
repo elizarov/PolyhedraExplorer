@@ -565,7 +565,6 @@ is unchanged, while its face boundary, `E`, and `V` may change. Generic ordering
 changes to the source faces' side counts and winding steps, then total cyclic changes and circuit
 radius. This geometry-only ordering makes the classical result the default without naming it in
 the algorithm. It produces the classical identities:
-This produces the classical identities:
 
 | Input | Output |
 | --- | --- |
@@ -591,6 +590,8 @@ being an alias for Stellated.
 Result 1 is omitted from serialization. Later results use `G~l=n`, display `n` as an HTML subscript
 on the Greatened pill, and use `_n` in generated export filenames. The popup's compact left/right
 controls select the previous or next greatening and keep the Result slider synchronized.
+Uncached Result discovery reports its faceting-plane, symmetry-orbit, exact-cover, and candidate
+validation phases on the Greatened pill. Cached discovery completes immediately.
 
 Greatened is immediate because its changed immersed topology has no stable collapsed correspondence
 to the input surface.
@@ -628,6 +629,12 @@ omitted from serialization, while later results use `S~l=n`. A non-first result 
 subscript on the Stellated transform pill and as `_n` in generated export filenames. The slider's
 compact tap controls share the popup's bottom action row with Reset, select the previous or next
 available result, and keep the slider position synchronized.
+
+Uncached Result discovery reports its plane-diagram, arrangement-circuit, and successive-stratum
+phases on the Stellated pill. Plane diagrams are computed once per face orbit and expanded by the
+polyhedron's geometric symmetries. Spatial point indices merge arrangement intersections without
+quadratic scans, and physical stratum boundaries are constructed only when reconstruction or
+geometric matching needs them. Cached discovery completes immediately.
 
 Stellated is immediate for the same reason as Greatened: no connected, non-degenerate,
 topology-compatible interpolation has the required endpoint topology.

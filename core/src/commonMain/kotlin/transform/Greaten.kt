@@ -2,9 +2,10 @@ package polyhedra.core.transform
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import polyhedra.core.util.OperationProgressContext
+import polyhedra.model.api.CoreIssueCode
 import polyhedra.model.api.TransformId
 import polyhedra.model.api.TransformOperation
-import polyhedra.model.api.CoreIssueCode
 import polyhedra.model.poly.Polyhedron
 
 /** Symmetric greatening: facet the polar dual, then reciprocate the selected closed result. */
@@ -23,7 +24,7 @@ class Greatened : Transform() {
     override fun transform(poly: Polyhedron): Polyhedron = poly.greatened()
 
     @Transient
-    override val asyncTransform: AsyncTransform = { poly, _ -> poly.greatenedAsync() }
+    override val asyncTransform: AsyncTransform = { poly, progress -> poly.greatenedAsync(progress = progress) }
 }
 
 /** Main-line stellation: add a complete next stratum of the source face-plane arrangement. */
@@ -42,7 +43,7 @@ class Stellated : Transform() {
     override fun transform(poly: Polyhedron): Polyhedron = poly.stellated()
 
     @Transient
-    override val asyncTransform: AsyncTransform = { poly, _ -> poly.stellatedAsync() }
+    override val asyncTransform: AsyncTransform = { poly, progress -> poly.stellatedAsync(progress = progress) }
 }
 
 fun Polyhedron.greatened(result: Int = 1): Polyhedron =
@@ -51,11 +52,15 @@ fun Polyhedron.greatened(result: Int = 1): Polyhedron =
 fun Polyhedron.stellated(result: Int = 1): Polyhedron =
     stellationCandidates(ConstellationOperation.Stellate).selected("Stellation", result)
 
-internal suspend fun Polyhedron.greatenedAsync(result: Int = 1): Polyhedron =
-    stellationCandidatesAsync(ConstellationOperation.Greaten).selected("Greatening", result)
+internal suspend fun Polyhedron.greatenedAsync(
+    result: Int = 1,
+    progress: OperationProgressContext? = null,
+): Polyhedron = stellationCandidatesAsync(ConstellationOperation.Greaten, progress).selected("Greatening", result)
 
-internal suspend fun Polyhedron.stellatedAsync(result: Int = 1): Polyhedron =
-    stellationCandidatesAsync(ConstellationOperation.Stellate).selected("Stellation", result)
+internal suspend fun Polyhedron.stellatedAsync(
+    result: Int = 1,
+    progress: OperationProgressContext? = null,
+): Polyhedron = stellationCandidatesAsync(ConstellationOperation.Stellate, progress).selected("Stellation", result)
 
 private fun List<StellationCandidate>.selected(operation: String, result: Int): Polyhedron {
     if (result < 1) throw TransformApplicabilityException(
