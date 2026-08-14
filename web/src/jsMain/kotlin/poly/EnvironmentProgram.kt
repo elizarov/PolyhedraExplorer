@@ -116,9 +116,7 @@ class TableShadowProgram(gl: GL) : ViewBaseProgram(gl) {
         val pos by aPosition * uTargetFraction + aPrevPosition * uPrevFraction
         val rimDirection by aRimDir * min(uFaceRim, aRimMax) * uTargetFraction +
             aPrevRimDir * min(uFaceRim, aPrevRimMax) * uPrevFraction
-        val thicknessDirection by normalize(
-            aThicknessDir * uTargetFraction + aPrevThicknessDir * uPrevFraction
-        )
+        val thicknessDirection by aThicknessDir * uTargetFraction + aPrevThicknessDir * uPrevFraction
         pos + rimDirection - thicknessDirection * aInner * uFaceWidth
     }
 

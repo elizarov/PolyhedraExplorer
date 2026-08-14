@@ -70,7 +70,7 @@ class FaceProgram(gl: GL) : ViewBaseProgram(gl) {
     val fInterpolatedPosition by function(GLType.vec3) {
         val pos by aPosition * uTargetFraction + aPrevPosition * uPrevFraction
         val rd by aRimDir * min(uFaceRim, aRimMax) * uTargetFraction + aPrevRimDir * min(uFaceRim, aPrevRimMax) * uPrevFraction
-        val thicknessDir by normalize(aThicknessDir * uTargetFraction + aPrevThicknessDir * uPrevFraction)
+        val thicknessDir by aThicknessDir * uTargetFraction + aPrevThicknessDir * uPrevFraction
         pos + rd - thicknessDir * aInner * uFaceWidth
     }
 

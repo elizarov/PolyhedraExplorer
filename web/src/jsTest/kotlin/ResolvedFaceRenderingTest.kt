@@ -12,6 +12,7 @@ import polyhedra.core.api.evaluateCore
 import polyhedra.model.api.CoreRequest
 import polyhedra.model.api.CoreState
 import polyhedra.model.poly.FaceKind
+import polyhedra.model.poly.FaceThicknessJoins
 import polyhedra.model.poly.Polyhedron
 import polyhedra.model.util.Vec3
 import polyhedra.web.poly.FaceContext
@@ -77,9 +78,26 @@ class ResolvedFaceRenderingTest {
             val visibleIndexSize = 5 * 2 * 3 * 2
             val capBufferSize = 2 * rimMeshes.sumOf { it.vertices.size }
             val capIndexSize = 2 * rimMeshes.sumOf { it.triangles.size }
-            val boundarySize = rimMeshes.sumOf { mesh -> mesh.cycles.sumOf { it.vertices.size } }
-            assertEquals(visibleBufferSize + capBufferSize + 2 * boundarySize, context.bufferSize)
-            assertEquals(visibleIndexSize + capIndexSize + 6 * boundarySize, context.indexSize)
+            val joins = FaceThicknessJoins(poly, poly.fs.mapTo(linkedSetOf()) { face -> face.id })
+            val boundarySegments = rims.filter { it.sourceFaceKind == FaceKind(0) }.sumOf { rim ->
+                val face = poly.fs[rim.sourceFaceId]
+                rim.regions.sumOf { region ->
+                    val mesh = region.triangulate(face)
+                    mesh.cycles.sumOf { cycle ->
+                        cycle.vertices.indices.count { index ->
+                            if (mesh.triangulationPatch && cycle.segmentSources[index].isEmpty()) {
+                                false
+                            } else {
+                                val next = (index + 1) % cycle.vertices.size
+                                val edge = joins.sourceEdgeOrNull(face, cycle.vertices[index], cycle.vertices[next])
+                                edge == null || joins.isExposed(edge)
+                            }
+                        }
+                    }
+                }
+            }
+            assertEquals(visibleBufferSize + capBufferSize + 4 * boundarySegments, context.bufferSize)
+            assertEquals(visibleIndexSize + capIndexSize + 6 * boundarySegments, context.indexSize)
 
             var triangleCount = 0
             context.exportTriangles(FaceExportParams(1.0, 0.1, 0.05, 0.0)) { a, b, c ->
