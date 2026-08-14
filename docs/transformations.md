@@ -548,14 +548,23 @@ immediate to avoid passing through the invalid opposite-twist intermediate.
 ## Star transformations
 
 Greatened, Stellated, and Resolved are primitive transforms grouped in the final Star popup section.
-The first two share a geometry-derived face-plane constellation engine.
+The first two derive candidates from the input geometry but use distinct constructions described
+below.
 
 ### Greatened (`G`)
 
-Greatening extends all authoritative source-face planes and selects the first larger closed
-two-manifold whose faces retain each input face's side count, winding step, and face-kind word.
-Candidate vertices are computed from triple plane intersections, grouped into symmetric circuits,
-then independently validated as renderable immersions. Catalog recognition runs only afterward.
+Greatening is implemented as generic symmetric faceting of the polar dual. Source faces become
+dual vertices; candidate planes through those vertices supply convex and regular-star circuits.
+The full geometric point group expands each circuit into a face orbit, and an exact-cover search
+combines orbit sets that use every dual vertex and every edge exactly twice. Each connected valid
+faceting is reciprocated and aligned back to the source planes. There is no catalog-specific
+construction or fallback; catalog recognition runs only on the completed result.
+
+Every result therefore keeps exactly one authoritative face on every source face plane, so `F`
+is unchanged, while its face boundary, `E`, and `V` may change. Generic ordering first minimizes
+changes to the source faces' side counts and winding steps, then total cyclic changes and circuit
+radius. This geometry-only ordering makes the classical result the default without naming it in
+the algorithm. It produces the classical identities:
 This produces the classical identities:
 
 | Input | Output |
@@ -564,11 +573,24 @@ This produces the classical identities:
 | Icosahedron | Great icosahedron |
 | Stellated dodecahedron | Great stellated dodecahedron |
 
-The operation also applies to non-catalog plane constellations when the same geometric criteria
-produce a finite connected surface. Candidate data is cached by a circumradius-normalized plane,
-boundary, and kind signature. If several strict extensions survive, the Result setting selects
-them in increasing circuit-radius order. A missing or out-of-range result reports
+The same construction applies to non-catalog and mixed-face inputs; for example, Cuboctahedron has
+three valid Greatened results even though its triangular and square face planes cannot share one
+uniform regular circuit. Candidate data is cached by a circumradius-normalized plane, boundary,
+and kind signature. If several strict extensions survive, the Result setting selects them in the
+generic order above. A missing or out-of-range result reports
 `TransformNotApplicable` rather than substituting a catalog mesh.
+
+Greatening and Stellated are related but distinct. Greatening facets the polar dual and preserves
+one face per source plane. Stellated fills a complete cell-power stratum of the source plane
+arrangement; a source plane may contribute several output faces, so its face count commonly grows.
+For Dodecahedron both operations discover the same three classical geometries, but Greatened starts
+with Great dodecahedron while Stellated starts with Stellated dodecahedron. For Cuboctahedron their
+candidate sets are disjoint. Greatened therefore adds useful face-preserving extensions rather than
+being an alias for Stellated.
+
+Result 1 is omitted from serialization. Later results use `G~l=n`, display `n` as an HTML subscript
+on the Greatened pill, and use `_n` in generated export filenames. The popup's compact left/right
+controls select the previous or next greatening and keep the Result slider synchronized.
 
 Greatened is immediate because its changed immersed topology has no stable collapsed correspondence
 to the input surface.

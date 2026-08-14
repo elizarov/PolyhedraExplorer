@@ -86,7 +86,10 @@ private fun TransformSpec.toLogicalTransformOrNull(): LogicalTransform? {
     }
     return toTransformOrNull()?.let { transform ->
         val resultNumber = tweaks[TransformTweak.StellationResult]
-            ?.takeIf { id.operation == TransformOperation.Stellated && it > 1.0 }
+            ?.takeIf {
+                (id.operation == TransformOperation.Greatened || id.operation == TransformOperation.Stellated) &&
+                    it > 1.0
+            }
             ?.toInt()
         LogicalTransform(
             this,

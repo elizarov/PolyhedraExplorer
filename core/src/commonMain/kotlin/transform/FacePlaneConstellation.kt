@@ -48,7 +48,6 @@ private data class ConstellationPlane(
     val u: Vec3,
     val v: Vec3,
     val sourceRadius: Double,
-    val sourceStep: Int,
 ) : Plane {
     override val x: Double get() = normal.x
     override val y: Double get() = normal.y
@@ -128,14 +127,13 @@ private suspend fun Polyhedron.buildStellationCandidates(
         (first + 1 until planes.size).none { second -> planes[first].coincidesWith(planes[second], tolerance) }
     }) { "Face-plane constellation contains coincident source planes" }
 
-    if (operation == ConstellationOperation.Stellate) return buildMainLineStellations(planes, tolerance)
-    return buildCircuitCandidates(planes, tolerance, operation)
+    if (operation == ConstellationOperation.Greaten) return buildGenericGreateningCandidates(tolerance)
+    return buildMainLineStellations(planes, tolerance)
 }
 
-private suspend fun Polyhedron.buildCircuitCandidates(
+private suspend fun Polyhedron.buildArrangementCircuitStellations(
     planes: List<ConstellationPlane>,
     tolerance: Double,
-    operation: ConstellationOperation?,
 ): List<StellationCandidate> {
     val scale = circumradius.coerceAtLeast(1.0)
     val pointsByPlane = List(planes.size) { arrayListOf<Vec3>() }
@@ -164,10 +162,7 @@ private suspend fun Polyhedron.buildCircuitCandidates(
         .sortedWith(compareBy<CandidateKey>({ it.ring.radiusBin }, { it.step }, { it.ring.size }))
         .mapNotNull { candidateKey ->
             val circuits = circuitsByPlane.map { planeCircuits -> planeCircuits.getValue(candidateKey) }
-            if (operation == ConstellationOperation.Greaten && !qualifiesGreatening(planes, circuits, tolerance)) {
-                return@mapNotNull null
-            }
-            if (operation == null && planes.indices.any { index ->
+            if (planes.indices.any { index ->
                 circuits[index].radius <= planes[index].sourceRadius + tolerance
             }) return@mapNotNull null
             runCatching { buildCandidate(planes, circuits, tolerance) }
@@ -215,7 +210,7 @@ private suspend fun Polyhedron.buildMainLineStellations(
     val sourcePower = resolvedSource?.let { source ->
         physicalByPower.lastOrNull { (_, physical) -> source.matchesPhysicalBoundary(physical, tolerance) }?.first
     } ?: 0
-    val circuitCandidates = buildCircuitCandidates(planes, tolerance, operation = null)
+    val circuitCandidates = buildArrangementCircuitStellations(planes, tolerance)
     val resolvedCircuits = circuitCandidates.mapNotNull { candidate ->
         runCatching { candidate.poly.resolved(null) }.getOrNull()?.let { resolved -> candidate to resolved }
     }
@@ -386,7 +381,7 @@ private suspend fun buildMainLineCandidate(
     return result
 }
 
-private fun Polyhedron.surfaceComponentCount(): Int {
+internal fun Polyhedron.surfaceComponentCount(): Int {
     val visited = hashSetOf<Face>()
     var components = 0
     for (first in fs) {
@@ -526,17 +521,8 @@ private fun Face.toConstellationPlane(tolerance: Double): ConstellationPlane {
     val axis = if (abs(normal.x) < 0.8) Vec3(1.0, 0.0, 0.0) else Vec3(0.0, 1.0, 0.0)
     val u = (axis cross normal).unit
     val v = (normal cross u).unit
-    val angular = fvs.sortedBy { point -> atan2((point - center) * v, (point - center) * u) }
-    val sourceStep = angular.indices.firstOrNull { angular[it].id == fvs[1].id }
-        ?.let { secondIndex ->
-            val firstIndex = angular.indexOfFirst { it.id == fvs[0].id }
-            val raw = (secondIndex - firstIndex + angular.size) % angular.size
-            minOf(raw, angular.size - raw)
-        }
-        ?.coerceAtLeast(1)
-        ?: 1
     val sourceRadius = fvs.sumOf { point -> (point - center).norm } / fvs.size
-    return ConstellationPlane(this, normal, distance, center, u, v, sourceRadius, sourceStep)
+    return ConstellationPlane(this, normal, distance, center, u, v, sourceRadius)
 }
 
 private fun ConstellationPlane.circuits(
@@ -572,18 +558,6 @@ private fun ConstellationPlane.circuits(
         }
     }
     return result
-}
-
-private fun qualifiesGreatening(
-    planes: List<ConstellationPlane>,
-    circuits: List<FaceCircuit>,
-    tolerance: Double,
-): Boolean = planes.indices.all { index ->
-        val plane = planes[index]
-        val circuit = circuits[index]
-        circuit.points.size == plane.face.fvs.size &&
-            circuit.step == plane.sourceStep &&
-            circuit.radius > plane.sourceRadius + tolerance
 }
 
 private suspend fun buildCandidate(
@@ -625,10 +599,12 @@ private suspend fun buildCandidate(
     return result
 }
 
-private fun Polyhedron.sameGeometryAs(other: Polyhedron, tolerance: Double): Boolean =
-    fev() == other.fev() && coordinateSignature(tolerance) == other.coordinateSignature(tolerance)
+internal fun Polyhedron.sameGeometryAs(other: Polyhedron, tolerance: Double): Boolean =
+    fev() == other.fev() &&
+        coordinateSignature(tolerance) == other.coordinateSignature(tolerance) &&
+        edgeSignature(tolerance) == other.edgeSignature(tolerance)
 
-private fun Polyhedron.coordinateSignature(tolerance: Double): List<Triple<Long, Long, Long>> = vs.map { point ->
+internal fun Polyhedron.coordinateSignature(tolerance: Double): List<Triple<Long, Long, Long>> = vs.map { point ->
     Triple(
         (point.x / tolerance).roundToLong(),
         (point.y / tolerance).roundToLong(),
@@ -636,7 +612,7 @@ private fun Polyhedron.coordinateSignature(tolerance: Double): List<Triple<Long,
     )
 }.sortedWith(compareBy({ it.first }, { it.second }, { it.third }))
 
-private fun Polyhedron.edgeSignature(tolerance: Double): List<Pair<Triple<Long, Long, Long>, Triple<Long, Long, Long>>> {
+internal fun Polyhedron.edgeSignature(tolerance: Double): List<Pair<Triple<Long, Long, Long>, Triple<Long, Long, Long>>> {
     val points = vs.map { point ->
         Triple(
             (point.x / tolerance).roundToLong(),
@@ -680,7 +656,7 @@ private fun Polyhedron.normalizedConstellationSignature(): List<NormalizedFaceSi
     }
 }
 
-private fun Polyhedron.meanFaceCircuitRadius(): Double = fs.sumOf { face ->
+internal fun Polyhedron.meanFaceCircuitRadius(): Double = fs.sumOf { face ->
     val center = face.unit * face.d
     face.fvs.sumOf { point -> (point - center).norm } / face.fvs.size
 } / fs.size

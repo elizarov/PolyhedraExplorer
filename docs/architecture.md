@@ -54,7 +54,8 @@ The Wasm core owns:
 - primitive transform and macro-expansion evaluation, including composition-aware `aa` cantellation and `at` bevel fusion;
 - truncate, rectify, cantellate, dual, bevel, snub, propeller, whirl, quinto, chamfer, canonicalization (the UI's `Canonical` transform), Greaten, Stellate, drop, and orbit-targeted Kis/Stellate/Truncate/Rectify/Radial geometry kernels;
 - regular Kepler-Poinsot face arrangements and their nonzero-winding embedded physical-boundary resolution;
-- normalized face-plane constellation construction for Greatened and Stellated, including symmetric circuit candidates, bounded plane-arrangement diagrams, main-line cell-power strata, compound filtering, bounded LRU reuse, and discrete Result metadata;
+- generic Greatened construction by full-point-group face-orbit enumeration and exact-cover faceting of the polar dual, followed by reciprocal reconstruction and geometry-only result ordering;
+- normalized face-plane-arrangement construction for Stellated, including symmetric circuit candidates, bounded diagrams, main-line cell-power strata, compound filtering, bounded LRU reuse, and discrete Result metadata shared with Greatened;
 - tessellation-free hidden-face rim regions, including immersed-edge strip unions, bounded source-vertex joins, width limits, and source-edge provenance;
 - size guards, applicability checks, warnings, and progress;
 - fixed and parameterized-family seed geometry, scale normalization, and topology/drop analysis;

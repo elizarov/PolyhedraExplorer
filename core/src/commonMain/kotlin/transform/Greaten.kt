@@ -7,7 +7,7 @@ import polyhedra.model.api.TransformOperation
 import polyhedra.model.api.CoreIssueCode
 import polyhedra.model.poly.Polyhedron
 
-/** Conway greatening: retain the regular face type while moving to its great realization. */
+/** Symmetric greatening: facet the polar dual, then reciprocate the selected closed result. */
 @Serializable
 class Greatened : Transform() {
     @Transient

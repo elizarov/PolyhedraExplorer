@@ -513,7 +513,10 @@ internal fun ControlPane(
 @Composable
 private fun TransformPillLabel(transform: Transform) {
     Text(transform.toString())
-    if (transform.operation == TransformOperation.Stellated) {
+    if (
+        transform.operation == TransformOperation.Greatened ||
+        transform.operation == TransformOperation.Stellated
+    ) {
         transform.tweaks[TransformTweak.StellationResult]
             ?.roundToInt()
             ?.takeIf { result -> result > 1 }
@@ -607,11 +610,16 @@ private fun TransformSettingsPopup(
                 val rangeAvailable = safeRanges == null || safeRange != null && minTick <= maxTick
                 val currentTick = (currentValue / setting.step).roundToInt()
                     .coerceIn(minTick, maxTick.coerceAtLeast(minTick))
+                val operationName = if (transform.operation == TransformOperation.Greatened) {
+                    "greatening"
+                } else {
+                    "stellation"
+                }
                 SliderStepControls(
                     canStepBackward = rangeAvailable && currentTick > minTick,
                     canStepForward = rangeAvailable && currentTick < maxTick,
-                    previousLabel = "Previous stellation",
-                    nextLabel = "Next stellation",
+                    previousLabel = "Previous $operationName",
+                    nextLabel = "Next $operationName",
                 ) { delta -> onChange(setting, (currentTick + delta) * setting.step) }
             }
             Button(attrs = {

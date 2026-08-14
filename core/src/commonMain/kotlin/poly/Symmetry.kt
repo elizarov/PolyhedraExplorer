@@ -32,33 +32,9 @@ private const val MAX_ROTATION_ORDER = 100
 
 /** Finds the full geometric rotation orbits, rotation axes, and mirror planes of this mesh. */
 fun Polyhedron.analyzeSymmetry(): CoreSymmetry {
-    val radius = circumradius.coerceAtLeast(1.0)
-    val tolerance = radius * SYMMETRY_TOLERANCE
-    val vertexIndex = VertexSpatialIndex(vs, tolerance)
-    val topology = SymmetryTopology(this)
-    val sourceEdge = directedEdges.firstOrNull { edgeFrame(it, tolerance) != null }
-        ?: error("Cannot derive a symmetry frame from $this")
-    val sourceFrame = requireNotNull(edgeFrame(sourceEdge, tolerance))
-
-    val proper = ArrayList<SymmetryOperation>()
-    var improperSeed: OrthogonalTransform? = null
-    for (targetEdge in directedEdges) {
-        val targetFrame = edgeFrame(targetEdge, tolerance) ?: continue
-        if (sourceEdge.hasMatchingGeometry(targetEdge, tolerance, reverseSides = false)) {
-            symmetryOperation(sourceFrame, targetFrame, orientation = 1, vertexIndex, topology)
-                ?.let(proper::add)
-        }
-        if (improperSeed == null && sourceEdge.hasMatchingGeometry(targetEdge, tolerance, reverseSides = true)) {
-            improperSeed = symmetryOperation(
-                sourceFrame,
-                targetFrame,
-                orientation = -1,
-                vertexIndex,
-                topology,
-            )?.transform
-        }
-    }
-    check(proper.isNotEmpty()) { "Every polyhedron must have the identity symmetry" }
+    val operations = geometricSymmetryOperations()
+    val proper = operations.proper
+    val reversingTransforms = operations.reversing.map(GeometricSymmetryOperation::transform)
 
     val rotationGroup = classifyRotationGroup(proper.map { it.transform })
     val axisDirections = proper.asSequence()
@@ -66,9 +42,6 @@ fun Polyhedron.analyzeSymmetry(): CoreSymmetry {
         .distinctDirections()
         .map(Vec3::toMutableDirection)
         .toList()
-    val reversingTransforms = improperSeed?.let { reversing ->
-        proper.map { operation -> operation.transform * reversing }
-    }.orEmpty()
     val planeNormals = reversingTransforms.asSequence()
         .mapNotNull(OrthogonalTransform::reflectionPlaneNormalOrNull)
         .distinctDirections()
@@ -82,7 +55,62 @@ fun Polyhedron.analyzeSymmetry(): CoreSymmetry {
     )
 }
 
-private data class OrthonormalFrame(
+internal data class GeometricSymmetryOperation(
+    val transform: OrthogonalTransform,
+    val vertexPermutation: IntArray,
+    val orientation: Int,
+)
+
+internal data class GeometricSymmetryOperations(
+    val proper: List<GeometricSymmetryOperation>,
+    val reversing: List<GeometricSymmetryOperation>,
+) {
+    val all: List<GeometricSymmetryOperation> get() = proper + reversing
+}
+
+internal fun Polyhedron.geometricSymmetryOperations(): GeometricSymmetryOperations {
+    val radius = circumradius.coerceAtLeast(1.0)
+    val tolerance = radius * SYMMETRY_TOLERANCE
+    val vertexIndex = VertexSpatialIndex(vs, tolerance)
+    val topology = SymmetryTopology(this)
+    val sourceEdge = directedEdges.firstOrNull { edgeFrame(it, tolerance) != null }
+        ?: error("Cannot derive a symmetry frame from $this")
+    val sourceFrame = requireNotNull(edgeFrame(sourceEdge, tolerance))
+
+    val proper = ArrayList<GeometricSymmetryOperation>()
+    var improperSeed: GeometricSymmetryOperation? = null
+    for (targetEdge in directedEdges) {
+        val targetFrame = edgeFrame(targetEdge, tolerance) ?: continue
+        if (sourceEdge.hasMatchingGeometry(targetEdge, tolerance, reverseSides = false)) {
+            symmetryOperation(sourceFrame, targetFrame, orientation = 1, vertexIndex, topology)
+                ?.let(proper::add)
+        }
+        if (improperSeed == null && sourceEdge.hasMatchingGeometry(targetEdge, tolerance, reverseSides = true)) {
+            improperSeed = symmetryOperation(
+                sourceFrame,
+                targetFrame,
+                orientation = -1,
+                vertexIndex,
+                topology,
+            )
+        }
+    }
+    check(proper.isNotEmpty()) { "Every polyhedron must have the identity symmetry" }
+    val reversing = improperSeed?.let { seed ->
+        proper.map { operation ->
+            GeometricSymmetryOperation(
+                transform = operation.transform * seed.transform,
+                vertexPermutation = IntArray(vs.size) { vertexId ->
+                    operation.vertexPermutation[seed.vertexPermutation[vertexId]]
+                },
+                orientation = -1,
+            )
+        }
+    }.orEmpty()
+    return GeometricSymmetryOperations(proper, reversing)
+}
+
+internal data class OrthonormalFrame(
     val radial: Vec3,
     val tangent: Vec3,
     val bitangent: Vec3,
@@ -111,11 +139,6 @@ private fun Edge.hasMatchingGeometry(target: Edge, tolerance: Double, reverseSid
 
 private fun Double.near(other: Double, tolerance: Double): Boolean = abs(this - other) <= tolerance
 
-private data class SymmetryOperation(
-    val transform: OrthogonalTransform,
-    val vertexPermutation: IntArray,
-)
-
 private class SymmetryTopology(poly: Polyhedron) {
     private val edges = poly.es.mapTo(HashSet()) { edge -> edgeKey(edge.a.id, edge.b.id) }
     private val faces = poly.fs.mapTo(HashSet()) { face -> face.fvs.map(Vertex::id).sorted() }
@@ -131,17 +154,17 @@ private fun Polyhedron.symmetryOperation(
     orientation: Int,
     vertexIndex: VertexSpatialIndex,
     topology: SymmetryTopology,
-): SymmetryOperation? {
+): GeometricSymmetryOperation? {
     val transform = OrthogonalTransform(source, target, orientation)
     val permutation = IntArray(vs.size)
     for (vertex in vs) {
         permutation[vertex.id] = vertexIndex.find(transform(vertex)) ?: return null
     }
     if (!topology.isPreserved(permutation, this)) return null
-    return SymmetryOperation(transform, permutation)
+    return GeometricSymmetryOperation(transform, permutation, orientation)
 }
 
-private class OrthogonalTransform(
+internal class OrthogonalTransform(
     val xx: Double, val xy: Double, val xz: Double,
     val yx: Double, val yy: Double, val yz: Double,
     val zx: Double, val zy: Double, val zz: Double,
@@ -284,7 +307,7 @@ private fun OrthogonalTransform.rotationOrder(): Int {
     error("Cannot determine rotation order for angle $angle")
 }
 
-private fun Polyhedron.symmetryOrbitCounts(operations: List<SymmetryOperation>): FEV {
+private fun Polyhedron.symmetryOrbitCounts(operations: List<GeometricSymmetryOperation>): FEV {
     val vertexSets = DisjointSets(vs.size)
     val edgeSets = DisjointSets(es.size)
     val faceSets = DisjointSets(fs.size)

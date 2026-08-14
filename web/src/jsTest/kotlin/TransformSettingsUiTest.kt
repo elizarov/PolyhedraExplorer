@@ -280,6 +280,45 @@ class TransformSettingsUiTest {
     }
 
     @Test
+    fun laterGreateningUsesSubscriptAndGreateningStepLabels(): Promise<Unit> {
+        val params = PolyParams("", null)
+        params.transforms.updateValue(listOf(Transform.Greatened))
+        params.updateTransformTweakRanges(
+            listOf(
+                listOf(
+                    CoreTransformTweakRange(
+                        TransformTweak.StellationResult,
+                        min = 1.0,
+                        max = 3.0,
+                        options = (1..3).map { result ->
+                            CoreTransformTweakOption(result, FEV(12, result * 30, result * 12))
+                        },
+                    ),
+                ),
+            ),
+        )
+        composition = renderComposable(host) {
+            ControlPane(params, Popup.TransformSettings(0), togglePopup = {})
+        }
+
+        assertNull(host.querySelector("button.txt sub"))
+        assertEquals(
+            "Previous greatening",
+            host.querySelector(".slider-step-previous")?.getAttribute("aria-label"),
+        )
+        assertEquals(
+            "Next greatening",
+            host.querySelector(".slider-step-next")?.getAttribute("aria-label"),
+        )
+        (host.querySelector(".slider-step-next") as HTMLButtonElement).click()
+
+        return awaitRecomposition().then {
+            assertEquals("G~l=2", params.transforms.value.single().tag)
+            assertEquals("2", host.querySelector("button.txt sub")?.textContent)
+        }
+    }
+
+    @Test
     fun stellationGearEnumeratesAllSupportedIcosahedronMainLineResults() {
         val params = PolyParams("", null)
         params.transforms.updateValue(listOf(Transform.Stellated))
