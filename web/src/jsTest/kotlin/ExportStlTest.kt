@@ -17,6 +17,7 @@ import polyhedra.web.poly.FaceContext
 import polyhedra.web.poly.FaceExportParams
 import polyhedra.web.poly.RenderParams
 import polyhedra.web.poly.toAsciiStl
+import kotlin.math.abs
 import kotlin.js.Promise
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -64,6 +65,49 @@ class ExportStlTest {
             assertTrue(request.triangles.isEmpty())
         } finally {
             faces.destroy()
+        }
+    }
+
+    @Test
+    fun hiddenCubeWithEqualRimAndWidthRendersSquareEdgeCrossSections() {
+        val canvas = document.createElement("canvas") as HTMLCanvasElement
+        val gl = requireNotNull(canvas.getContext("webgl") as? WebGLRenderingContext)
+        val poly = Seed.Cube.poly
+        val params = RenderParams("", null)
+        params.poly.hideFaces.updateValue(poly.faceKinds.keys.toSet())
+        val faces = FaceContext(gl, params) { poly }
+        val width = 0.1
+        val points = arrayListOf<Pair<Double, Double>>()
+        try {
+            faces.performUpdate(null, 0.0)
+            faces.exportTriangles(FaceExportParams(1.0, width, width, 0.0)) { a, b, c ->
+                val triangle = listOf(a, b, c)
+                for (index in triangle.indices) {
+                    val first = triangle[index]
+                    val second = triangle[(index + 1) % triangle.size]
+                    if (first.y * second.y > 0.0 || abs(first.y - second.y) <= 1e-12) continue
+                    val fraction = -first.y / (second.y - first.y)
+                    if (fraction !in 0.0..1.0) continue
+                    points += (first.x + (second.x - first.x) * fraction) to
+                        (first.z + (second.z - first.z) * fraction)
+                }
+            }
+        } finally {
+            faces.destroy()
+        }
+
+        val outer = poly.vs.maxOf { vertex -> vertex.x }
+        val expected = listOf(
+            outer to outer,
+            (outer - width) to outer,
+            outer to (outer - width),
+            (outer - width) to (outer - width),
+        )
+        for (corner in expected) {
+            assertTrue(
+                points.any { point -> abs(point.first - corner.first) <= 5e-7 && abs(point.second - corner.second) <= 5e-7 },
+                "Missing square edge-section corner $corner in $points",
+            )
         }
     }
 

@@ -115,9 +115,6 @@ fun Polyhedron.exportSolidToScad(
                 "OpenSCAD piece-union export requires a positive face width"
             }
             val rimByFace = resolvedRims.associateBy(ResolvedRimGeometry::sourceFaceId)
-            // One global scale makes every incident face map a source vertex p to the same
-            // inner vertex innerScale * p, even when the joins at the edge's endpoints differ.
-            val innerScale = (1.0 - exportParams.width / circumradius).coerceAtLeast(0.0)
             if (exportParams.rim > 0.0) {
                 val missingRims = fs.filter { face -> face.kind in presentationHiddenKinds && face.id !in rimByFace }
                 require(missingRims.isEmpty()) {
@@ -138,7 +135,6 @@ fun Polyhedron.exportSolidToScad(
                                 holes = emptyList(),
                                 face = face,
                                 exportParams = exportParams,
-                                innerScale = innerScale,
                             )
                             emittedPieces++
                         }
@@ -154,7 +150,6 @@ fun Polyhedron.exportSolidToScad(
                                 holes = emptyList(),
                                 face = triangleFace(face, resolved, triangle),
                                 exportParams = exportParams,
-                                innerScale = innerScale,
                             )
                             emittedPieces++
                         }
@@ -171,7 +166,6 @@ fun Polyhedron.exportSolidToScad(
                             face = regionFace,
                             expansionDirection = face,
                             exportParams = exportParams,
-                            innerScale = innerScale,
                         )
                         emittedPieces++
                     }
@@ -232,7 +226,6 @@ private fun StringBuilder.appendExtrudedRegion(
     face: Face,
     expansionDirection: Vec3 = face,
     exportParams: FaceExportParams,
-    innerScale: Double,
 ) {
     if (outer.size < 3) return
     val normal = face.unit
@@ -240,13 +233,11 @@ private fun StringBuilder.appendExtrudedRegion(
     val axis = if (abs(normal.x) < 0.8) Vec3(1.0, 0.0, 0.0) else Vec3(0.0, 1.0, 0.0)
     val u = (axis cross normal).unit
     val v = (normal cross u).unit
-    // Choosing the closest point on the face plane as the local 2-D origin makes OpenSCAD's
-    // in-plane scale plus this face-specific depth exactly equal to global radial scaling.
     val origin = normal * face.d
     val translatedOrigin = (origin + expansionDirection * exportParams.expand) * exportParams.scale
     val depthDirection = if (face.d >= 0.0) -normal else normal
-    val extrusionHeight = abs(face.d) * (1.0 - innerScale) * exportParams.scale
-    require(extrusionHeight > 0.0) { "OpenSCAD region $label has no positive radial thickness" }
+    val extrusionHeight = exportParams.width * exportParams.scale
+    require(extrusionHeight > 0.0) { "OpenSCAD region $label has no positive thickness" }
     val cycles = listOf(outer) + holes
     val points = cycles.flatten()
     val paths = arrayListOf<List<Int>>()
@@ -262,7 +253,7 @@ private fun StringBuilder.appendExtrudedRegion(
     appendLine("    [${u.y}, ${v.y}, ${depthDirection.y}, ${translatedOrigin.y}],")
     appendLine("    [${u.z}, ${v.z}, ${depthDirection.z}, ${translatedOrigin.z}],")
     appendLine("    [0, 0, 0, 1]")
-    appendLine("  ]) linear_extrude(height = $extrusionHeight, scale = $innerScale, convexity = 20)")
+    appendLine("  ]) linear_extrude(height = $extrusionHeight, convexity = 20)")
     appendLine("    polygon(")
     appendLine("      points = [")
     points.forEachIndexed { index, point ->

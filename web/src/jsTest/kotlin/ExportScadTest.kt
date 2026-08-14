@@ -146,7 +146,7 @@ class ExportScadTest {
     }
 
     @Test
-    fun hiddenTetrahedronRimsTaperTowardTheirSharedInnerVertices() {
+    fun hiddenTetrahedronRimsUseTheConfiguredPerpendicularDepth() {
         val source = requireNotNull("T".toSeedOrNull()).poly
         val hidden = source.fs.mapTo(linkedSetOf(), Face::kind)
         val scad = source.exportSolidToScad(
@@ -157,19 +157,18 @@ class ExportScadTest {
             resolvedRims = source.resolvedRims(exportParams.rim),
             embeddedBoundary = true,
         )
-        val expectedInnerScale = 1.0 - exportParams.width / source.circumradius
-        val expectedHeight = source.fs.first().d * (1.0 - expectedInnerScale) * exportParams.scale
+        val expectedHeight = exportParams.width * exportParams.scale
         val extrusions = scad.lineSequence().filter { line -> "linear_extrude" in line }.toList()
 
         assertEquals(source.fs.size, extrusions.size)
         extrusions.forEach { line ->
             assertContains(line, "height = $expectedHeight")
-            assertContains(line, "scale = $expectedInnerScale")
+            assertTrue("scale =" !in line)
         }
     }
 
     @Test
-    fun radialTaperSharesInnerEndpointsWhenTheTwoEndJoinsDiffer() {
+    fun perpendicularDepthDoesNotDependOnFacePlaneDistance() {
         val source = asymmetricTetrahedron()
         val hidden = source.fs.mapTo(linkedSetOf(), Face::kind)
         val scad = source.exportSolidToScad(
@@ -180,32 +179,12 @@ class ExportScadTest {
             resolvedRims = source.resolvedRims(exportParams.rim),
             embeddedBoundary = true,
         )
-        val innerScale = 1.0 - exportParams.width / source.circumradius
         val extrusions = scad.lineSequence().filter { line -> "linear_extrude" in line }.toList()
 
         assertEquals(source.fs.size, extrusions.size)
-        source.fs.zip(extrusions).forEach { (face, line) ->
-            assertContains(line, "height = ${face.d * (1.0 - innerScale) * exportParams.scale}")
-            assertContains(line, "scale = $innerScale")
-        }
-        for (vertex in source.vs) {
-            val incident = source.fs.filter { face -> vertex in face.fvs }
-            assertTrue(incident.size >= 3)
-            val innerEndpoints = incident.map { face ->
-                val normal = face.unit
-                val axis = if (kotlin.math.abs(normal.x) < 0.8) {
-                    Vec3(1.0, 0.0, 0.0)
-                } else {
-                    Vec3(0.0, 1.0, 0.0)
-                }
-                val u = (axis cross normal).unit
-                val v = (normal cross u).unit
-                val origin = normal * face.d
-                val relative = vertex - origin
-                origin + u * (relative * u * innerScale) + v * (relative * v * innerScale) -
-                    normal * (face.d * (1.0 - innerScale))
-            }
-            assertTrue(innerEndpoints.all { point -> (point - vertex * innerScale).norm <= 1e-9 })
+        extrusions.forEach { line ->
+            assertContains(line, "height = ${exportParams.width * exportParams.scale}")
+            assertTrue("scale =" !in line)
         }
     }
 

@@ -129,10 +129,12 @@ class EnvironmentContext(private val gl: GL, params: RenderParams) : Param.Conte
             uPrevFraction by (animation?.prevFraction ?: 0.0)
             aPosition by faces.target.positionBuffer
             aExpandDir by faces.target.expandDirBuffer
+            aThicknessDir by faces.target.thicknessDirBuffer
             aRimDir by faces.target.rimDirBuffer
             aRimMax by faces.target.rimMaxBuffer
             aPrevPosition by previousOrTarget.positionBuffer
             aPrevExpandDir by previousOrTarget.expandDirBuffer
+            aPrevThicknessDir by previousOrTarget.thicknessDirBuffer
             aPrevRimDir by previousOrTarget.rimDirBuffer
             aPrevRimMax by previousOrTarget.rimMaxBuffer
             aInner by faces.innerBuffer

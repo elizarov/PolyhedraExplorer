@@ -102,10 +102,12 @@ class TableShadowProgram(gl: GL) : ViewBaseProgram(gl) {
 
     val aPosition by attribute(GLType.vec3)
     val aExpandDir by attribute(GLType.vec3)
+    val aThicknessDir by attribute(GLType.vec3)
     val aRimDir by attribute(GLType.vec3)
     val aRimMax by attribute(GLType.float)
     val aPrevPosition by attribute(GLType.vec3)
     val aPrevExpandDir by attribute(GLType.vec3)
+    val aPrevThicknessDir by attribute(GLType.vec3)
     val aPrevRimDir by attribute(GLType.vec3)
     val aPrevRimMax by attribute(GLType.float)
     val aInner by attribute(GLType.float, GLPrecision.lowp)
@@ -114,10 +116,10 @@ class TableShadowProgram(gl: GL) : ViewBaseProgram(gl) {
         val pos by aPosition * uTargetFraction + aPrevPosition * uPrevFraction
         val rimDirection by aRimDir * min(uFaceRim, aRimMax) * uTargetFraction +
             aPrevRimDir * min(uFaceRim, aPrevRimMax) * uPrevFraction
-        val insetLength by aInner * uFaceWidth
-        val positionLength by length(pos)
-        val inset by pos * insetLength / positionLength
-        pos - inset + rimDirection * (positionLength - insetLength) / positionLength
+        val thicknessDirection by normalize(
+            aThicknessDir * uTargetFraction + aPrevThicknessDir * uPrevFraction
+        )
+        pos + rimDirection - thicknessDirection * aInner * uFaceWidth
     }
 
     private val fInterpolatedExpandDir by function(GLType.vec3) {

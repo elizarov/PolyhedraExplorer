@@ -29,9 +29,12 @@ import polyhedra.model.util.plus
 import polyhedra.model.util.rotated
 import polyhedra.model.util.rotationBetweenQuat
 import polyhedra.model.util.times
+import polyhedra.model.util.unaryMinus
+import kotlin.math.abs
 
 /** Builds presentation solids from authoritative polygonal geometry before STL arrangement. */
 internal suspend fun CoreStlPresentation.toTriangleRequest(
+    stableJoinsFallback: Boolean = false,
     reportProgress: (Int) -> Unit,
 ): CoreStlRequest {
     require(scale.isFinite() && scale > 0.0) { "STL scale must be finite and positive" }
@@ -57,7 +60,17 @@ internal suspend fun CoreStlPresentation.toTriangleRequest(
         emptyMap()
     }
     val rotation = physical.rotationWithLargestFaceDown()
-    val builder = PresentationMeshBuilder(this, rotation, physical.circumradius)
+    val shellReferenceDistance = physical.fs.map { face -> abs(face.d) }
+        .filter { distance -> distance > 1e-12 }
+        .minOrNull() ?: physical.circumradius
+    val requiresRadialJoins = source.nonPlanarFaceKinds.isNotEmpty() ||
+        source.resolvedFaces.any { geometry -> geometry.sourceBoundarySelfIntersects }
+    val joinMode = when {
+        stableJoinsFallback -> StlJoinMode.GlobalRadial
+        requiresRadialJoins -> StlJoinMode.FaceRadial
+        else -> StlJoinMode.NearlyNormal
+    }
+    val builder = PresentationMeshBuilder(this, rotation, shellReferenceDistance, joinMode)
     val hasHiddenFaces = hiddenPhysicalFaces.isNotEmpty()
 
     physical.fs.forEachIndexed { index, face ->
@@ -101,21 +114,47 @@ private fun Polyhedron.rotationWithLargestFaceDown(): Quat {
     return rotationBetweenQuat(face, Vec3(0.0, 0.0, -1.0))
 }
 
+private enum class StlJoinMode { NearlyNormal, FaceRadial, GlobalRadial }
+
 private class PresentationMeshBuilder(
     private val settings: CoreStlPresentation,
     private val rotation: Quat,
-    circumradius: Double,
+    shellReferenceDistance: Double,
+    private val joinMode: StlJoinMode,
 ) {
     private val vertices = arrayListOf<MutableVec3>()
     private val vertexIds = linkedMapOf<Triple<Double, Double, Double>, Int>()
     private val triangles = arrayListOf<CoreStlTriangle>()
     private var nextSurface = 0
     private var nextSolid = 0
-    private val innerScale = (1.0 - settings.width / circumradius).coerceAtLeast(0.0)
 
-    private fun transformed(point: Vec3, expansionDirection: Vec3, inner: Boolean): Vec3 {
-        val inset = if (inner) point * innerScale else point
-        return ((inset + expansionDirection * settings.expand) * settings.scale).rotated(rotation)
+    private val innerScale = (1.0 - settings.width / shellReferenceDistance).coerceAtLeast(0.0)
+
+    private fun Face.originOutwardNormal(): Vec3 = if (d >= 0.0) this else -this
+    private fun transformed(
+        point: Vec3,
+        expansionDirection: Vec3,
+        thicknessDirection: Vec3,
+        inner: Boolean,
+    ): Vec3 {
+        val insetPoint = if (!inner) {
+            point
+        } else if (joinMode == StlJoinMode.GlobalRadial) {
+            point * innerScale
+        } else {
+            val planeDistance = abs(thicknessDirection * point)
+            val radialScale = (1.0 - settings.width / planeDistance).coerceAtLeast(0.0)
+            val radialOffset = point * radialScale
+            if (joinMode == StlJoinMode.FaceRadial) {
+                radialOffset
+            } else {
+                val normalOffset = point - thicknessDirection * settings.width
+                // This half-percent radial component disambiguates neighboring Boolean pieces;
+                // both endpoints have exactly the requested perpendicular depth.
+                normalOffset * 0.995 + radialOffset * 0.005
+            }
+        }
+        return ((insetPoint + expansionDirection * settings.expand) * settings.scale).rotated(rotation)
     }
 
     private fun vertex(point: Vec3): Int {
@@ -142,9 +181,9 @@ private class PresentationMeshBuilder(
         val surface = nextSurface++
         for (triangle in geometry.triangles) {
             triangle(
-                transformed(geometry.vertices[triangle.a].position, face, inner),
-                transformed(geometry.vertices[triangle.b].position, face, inner),
-                transformed(geometry.vertices[triangle.c].position, face, inner),
+                transformed(geometry.vertices[triangle.a].position, face, face.originOutwardNormal(), inner),
+                transformed(geometry.vertices[triangle.b].position, face, face.originOutwardNormal(), inner),
+                transformed(geometry.vertices[triangle.c].position, face, face.originOutwardNormal(), inner),
                 surface,
                 reverse = inner,
                 solid = solid,
@@ -172,9 +211,9 @@ private class PresentationMeshBuilder(
         val counterClockwise = !hole
         for (part in triangulatePlanarPolygon(points, face, counterClockwise)) {
             triangle(
-                transformed(points[part.a], expansionDirection, inner),
-                transformed(points[part.b], expansionDirection, inner),
-                transformed(points[part.c], expansionDirection, inner),
+                transformed(points[part.a], expansionDirection, face.originOutwardNormal(), inner),
+                transformed(points[part.b], expansionDirection, face.originOutwardNormal(), inner),
+                transformed(points[part.c], expansionDirection, face.originOutwardNormal(), inner),
                 surface,
                 reverse = inner xor hole,
                 solid = solid,
@@ -182,13 +221,18 @@ private class PresentationMeshBuilder(
         }
     }
 
-    private fun addRimWall(cycle: ResolvedRimCycle, expansionDirection: Vec3, solid: Int) {
+    private fun addRimWall(
+        cycle: ResolvedRimCycle,
+        expansionDirection: Vec3,
+        thicknessDirection: Vec3,
+        solid: Int,
+    ) {
         for (index in cycle.vertices.indices) {
             val next = (index + 1) % cycle.vertices.size
-            val outerA = transformed(cycle.vertices[index], expansionDirection, inner = false)
-            val outerB = transformed(cycle.vertices[next], expansionDirection, inner = false)
-            val innerA = transformed(cycle.vertices[index], expansionDirection, inner = true)
-            val innerB = transformed(cycle.vertices[next], expansionDirection, inner = true)
+            val outerA = transformed(cycle.vertices[index], expansionDirection, thicknessDirection, inner = false)
+            val outerB = transformed(cycle.vertices[next], expansionDirection, thicknessDirection, inner = false)
+            val innerA = transformed(cycle.vertices[index], expansionDirection, thicknessDirection, inner = true)
+            val innerB = transformed(cycle.vertices[next], expansionDirection, thicknessDirection, inner = true)
             val surface = nextSurface++
             triangle(outerA, innerA, outerB, surface, solid = solid)
             triangle(innerA, innerB, outerB, surface, solid = solid)
@@ -207,8 +251,9 @@ private class PresentationMeshBuilder(
             addRimCycle(hole, regionFace, face, inner = true, hole = true, solid = solid)
         }
         if (settings.width > 0.0) {
-            addRimWall(region.outer, face, solid)
-            region.holes.forEach { hole -> addRimWall(hole, face, solid) }
+            val thicknessDirection = regionFace.originOutwardNormal()
+            addRimWall(region.outer, face, thicknessDirection, solid)
+            region.holes.forEach { hole -> addRimWall(hole, face, thicknessDirection, solid) }
         }
     }
 
@@ -224,10 +269,11 @@ private class PresentationMeshBuilder(
     fun addFaceBoundaryWall(face: Face, solid: Int = -1) {
         for (index in face.fvs.indices) {
             val next = (index + 1) % face.size
-            val outerA = transformed(face[index], face, inner = false)
-            val outerB = transformed(face[next], face, inner = false)
-            val innerA = transformed(face[index], face, inner = true)
-            val innerB = transformed(face[next], face, inner = true)
+            val thicknessDirection = face.originOutwardNormal()
+            val outerA = transformed(face[index], face, thicknessDirection, inner = false)
+            val outerB = transformed(face[next], face, thicknessDirection, inner = false)
+            val innerA = transformed(face[index], face, thicknessDirection, inner = true)
+            val innerB = transformed(face[next], face, thicknessDirection, inner = true)
             val surface = nextSurface++
             triangle(outerA, outerB, innerA, surface, solid = solid)
             triangle(innerA, outerB, innerB, surface, solid = solid)

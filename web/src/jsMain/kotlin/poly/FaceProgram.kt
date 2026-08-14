@@ -23,6 +23,7 @@ class FaceProgram(gl: GL) : ViewBaseProgram(gl) {
     val aPosition by attribute(GLType.vec3)
     val aLightNormal by attribute(GLType.vec3)
     val aExpandDir by attribute(GLType.vec3)
+    val aThicknessDir by attribute(GLType.vec3)
     val aRimDir by attribute(GLType.vec3)
     val aRimMax by attribute(GLType.float)
     val aColor by attribute(GLType.vec3, GLPrecision.lowp)
@@ -30,6 +31,7 @@ class FaceProgram(gl: GL) : ViewBaseProgram(gl) {
     val aPrevPosition by attribute(GLType.vec3)
     val aPrevLightNormal by attribute(GLType.vec3)
     val aPrevExpandDir by attribute(GLType.vec3)
+    val aPrevThicknessDir by attribute(GLType.vec3)
     val aPrevRimDir by attribute(GLType.vec3)
     val aPrevRimMax by attribute(GLType.float)
     val aPrevColor by attribute(GLType.vec3, GLPrecision.lowp)
@@ -68,10 +70,8 @@ class FaceProgram(gl: GL) : ViewBaseProgram(gl) {
     val fInterpolatedPosition by function(GLType.vec3) {
         val pos by aPosition * uTargetFraction + aPrevPosition * uPrevFraction
         val rd by aRimDir * min(uFaceRim, aRimMax) * uTargetFraction + aPrevRimDir * min(uFaceRim, aPrevRimMax) * uPrevFraction
-        val diLen by aInner * uFaceWidth
-        val posLen by length(pos)
-        val di by pos * diLen / posLen
-        pos - di + rd * (posLen - diLen) / posLen
+        val thicknessDir by normalize(aThicknessDir * uTargetFraction + aPrevThicknessDir * uPrevFraction)
+        pos + rd - thicknessDir * aInner * uFaceWidth
     }
 
     val fInterpolatedLightNormal by function(GLType.vec3) {

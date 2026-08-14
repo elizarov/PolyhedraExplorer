@@ -27,8 +27,11 @@ partial, open, intersecting, or resource-truncated mesh.
 ### Conversion pipeline
 
 1. Build the requested thickened presentation from visible face regions, hidden-face rims, width,
-   expansion, and scale. A topology-preserving radial inner shell keeps derived intersection points
-   on the same logical face construction.
+   expansion, and scale. Width is measured perpendicular to each face or non-planar rim patch,
+   independently of its distance from the origin. Ordinary planar pieces use an almost-normal
+   offset with a half-percent radial join component; immersed and folded pieces use the equivalent
+   face-plane radial offset. Both constructions preserve the requested perpendicular depth while
+   keeping independently closed Boolean pieces in general position.
 2. Weld only representation-scale input noise, discard degenerate or duplicate input triangles,
    and group coplanar pieces into logical surfaces.
 3. Accept an already embedded triangle boundary directly; otherwise corefine the complete triangle
@@ -41,6 +44,10 @@ partial, open, intersecting, or resource-truncated mesh.
 5. Quantize coordinates to eight decimal places, rebuild indexed triangles, orient positive volume,
    and validate again after quantization.
 6. Serialize ASCII STL only after the independent final-mesh checks succeed.
+
+If a high-winding presentation still produces numerically coincident joins, conversion retries
+with one topology-stable radial shell referenced to the closest face plane. That conservative
+fallback can make farther face orbits thicker, but never thinner, than the configured width.
 
 The final mesh requires finite non-degenerate triangles, two oppositely directed uses of every
 edge, one connected component, outward positive volume, no duplicate triangles, and no residual
@@ -84,13 +91,11 @@ Two output forms are used:
   expansion is emitted as one `polyhedron`. Planar resolved cells remain polygon cycles; simple
   non-planar faces use their deterministic triangles.
 - **Piece union.** An immersed presentation, hidden face orbit, or nonzero expansion is emitted as
-  one explicit `union()` of individually closed face or rim extrusions. Each extrusion tapers by
-  the presentation's shared radial inner scale: its front boundary uses the displayed surface and
-  its back boundary uses the same vertices scaled toward the origin. Adjacent pieces therefore
-  share their complete inner edges and vertex endpoints instead of extending perpendicular blocks
-  through one another. Planar regions preserve outer and hole paths, including pentagram rims;
-  visible non-planar regions are emitted as closed triangle pieces, while hidden non-planar rims
-  preserve each clipped patch's polygon and holes in that patch's triangle plane.
+  one explicit `union()` of individually closed face or rim extrusions. Every piece has constant
+  configured depth along its face or patch normal and does not taper toward the origin. Planar
+  regions preserve outer and hole paths, including pentagram rims; visible non-planar regions are
+  emitted as closed triangle pieces, while hidden non-planar rims preserve each clipped patch's
+  polygon and holes in that patch's triangle plane.
 
 Every piece-union member has front and back caps and side walls. The application does not pre-union
 pieces from different faces and does not ask OpenSCAD to repair open sheets. OpenSCAD's geometry
@@ -101,7 +106,7 @@ engine removes internal walls and produces the final solid when the script is re
 Focused core tests cover presentation construction, arrangement, quantization, final STL
 validation, every resource guard, deterministic output, and the no-partial-download rule. Structural
 OpenSCAD tests distinguish closed-polyhedron and piece-union output, verify polygon paths and closed
-pieces, and require hidden tetrahedron rims to share the same radial inner scale and endpoints.
+pieces, and require constant configured perpendicular depth for regular and asymmetric fixtures.
 Shared regressions include immersed catalog solids, concave and non-planar faces,
 expanded pieces, hidden rims, Prism 5/2 with hidden caps, all-rim Antiprism 5/2 and Antiprism 7/3,
 the acute triangular rims of resolved Bipyramid 7/2, and Pyramid 7/2 with either only its immersed
@@ -109,6 +114,10 @@ base or every face orbit hidden. Folded-rim regressions include Truncated stella
 its second truncation; lower-level coverage also uses an asymmetric synthetic non-planar
 quadrilateral so the construction is not tied to a catalog transform. The Antiprism 7/3 JVM
 regression also guards a complete conversion time below one second.
+
+Rendering coverage includes the dimensionally unambiguous cube case: equal rim and width settings
+produce square edge cross-sections. Core presentation tests independently verify configured depth
+for a cube, tetrahedron, and immersed star rim, and validate the resulting cube STL solid.
 
 The opt-in deterministic STL stress campaign and its current corpus results are documented with the
 command that runs it in [Development](development.md).

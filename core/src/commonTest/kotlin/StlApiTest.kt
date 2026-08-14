@@ -3,6 +3,7 @@ package polyhedra.core
 import kotlinx.coroutines.test.runTest
 import polyhedra.core.api.convertStl
 import polyhedra.core.api.evaluateCore
+import polyhedra.core.api.toTriangleRequest
 import polyhedra.core.poly.*
 import polyhedra.core.transform.resolved
 import polyhedra.model.api.CoreRequest
@@ -22,6 +23,7 @@ import polyhedra.model.util.Vec3
 import polyhedra.model.util.cross
 import polyhedra.model.util.minus
 import polyhedra.model.util.times
+import polyhedra.model.util.unit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -34,6 +36,66 @@ import kotlin.time.measureTime
 import kotlin.time.Duration.Companion.seconds
 
 class StlApiTest {
+    @Test
+    fun hiddenCubeWithEqualRimAndWidthExportsValidatedSolidAtConfiguredDepth() = runTest {
+        val source = Seed.Cube.poly
+        val width = 0.1
+        val scale = 10.0
+        val request = CoreStlPresentation(
+            poly = source,
+            hiddenFaceKinds = source.faceKinds.keys.sorted(),
+            scale = scale,
+            width = width,
+            rim = width,
+            expand = 0.0,
+        ).toTriangleRequest {}
+
+        assertPresentationDepth("cube", request, width * scale)
+        val response = convertStl(request)
+        assertNull(response.error, response.error?.reason)
+        response.toValidationPolyhedron().validateProperGeometry()
+    }
+
+    @Test
+    fun presentationWidthIsPerpendicularDepthForRegularAndStarRims() = runTest {
+        val width = 0.1
+        val scale = 10.0
+        val fixtures = listOf(
+            "tetrahedron" to Seed.Tetrahedron.poly,
+            "star prism 5/2" to requireNotNull("SP5_2".toSeedOrNull()).poly,
+        )
+
+        for ((name, source) in fixtures) {
+            val request = CoreStlPresentation(
+                poly = source,
+                hiddenFaceKinds = source.faceKinds.keys.sorted(),
+                scale = scale,
+                width = width,
+                rim = width,
+                expand = 0.0,
+            ).toTriangleRequest {}
+            assertPresentationDepth(name, request, width * scale)
+        }
+    }
+
+    private fun assertPresentationDepth(name: String, request: CoreStlRequest, expected: Double) {
+        val solids = request.triangles.groupBy(CoreStlTriangle::solid).filterKeys { solid -> solid >= 0 }
+        assertTrue(solids.isNotEmpty(), "$name has no closed rim pieces")
+        for ((solid, triangles) in solids) {
+            val first = triangles.first()
+            val a = request.vertices[first.a]
+            val b = request.vertices[first.b]
+            val c = request.vertices[first.c]
+            val normal = ((b - a) cross (c - a)).unit
+            val projections = triangles
+                .flatMap { triangle -> listOf(triangle.a, triangle.b, triangle.c) }
+                .distinct()
+                .map { vertex -> request.vertices[vertex] * normal }
+            val depth = projections.maxOrNull()!! - projections.minOrNull()!!
+            assertEquals(expected, depth, expected * 2e-4, "$name solid $solid")
+        }
+    }
+
     @Test
     fun convertsAClosedIndexedMeshToAValidatedPositiveVolumeSolid() = runTest {
         val progress = arrayListOf<Int>()

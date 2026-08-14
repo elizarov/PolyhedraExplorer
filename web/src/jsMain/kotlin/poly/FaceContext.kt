@@ -16,6 +16,9 @@ import polyhedra.web.util.*
 import kotlin.math.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
+private val Face.originOutwardNormal: Vec3
+    get() = if (d >= 0.0) this else -this
+
 class FaceContext(
     val gl: GL,
     params: RenderParams,
@@ -80,6 +83,7 @@ class FaceContext(
         val positionBuffer = createBuffer(gl, GLType.vec3)
         val lightNormalBuffer = createBuffer(gl, GLType.vec3)
         val expandDirBuffer = createBuffer(gl, GLType.vec3)
+        val thicknessDirBuffer = createBuffer(gl, GLType.vec3)
         val rimDirBuffer = createBuffer(gl, GLType.vec3)
         val rimMaxBuffer = createBuffer(gl, GLType.float)
         val colorBuffer = createBuffer(gl, GLType.vec3)
@@ -166,6 +170,7 @@ class FaceContext(
             positionBuffer.ensureCapacity(bufferSize)
             lightNormalBuffer.ensureCapacity(bufferSize)
             expandDirBuffer.ensureCapacity(bufferSize)
+            thicknessDirBuffer.ensureCapacity(bufferSize)
             rimDirBuffer.ensureCapacity(bufferSize)
             rimMaxBuffer.ensureCapacity(bufferSize)
             colorBuffer.ensureCapacity(bufferSize)
@@ -199,11 +204,13 @@ class FaceContext(
                 val n = resolved.vertices.size
                 var ofs = bufOfs
                 val lNorm: Vec3 = if (inner) -f else f
+                val thicknessDirection = f.originOutwardNormal
                 val innerFlag = if (inner) 1 else 0
                 for (i in 0 until n) {
                     positionBuffer[ofs] = resolved.vertices[i].position
                     lightNormalBuffer[ofs] = lNorm
                     expandDirBuffer[ofs] = f
+                    thicknessDirBuffer[ofs] = thicknessDirection
                     rimDirBuffer[ofs] = Vec3.ZERO
                     rimMaxBuffer[ofs] = 0.0
                     colorBuffer[ofs] = faceColor
@@ -240,12 +247,14 @@ class FaceContext(
                 val n = f.size
                 var ofs = bufOfs
                 val lNorm = if (inner) -f else f
+                val thicknessDirection = f.originOutwardNormal
                 val innerFlag = if (inner) 1 else 0
                 for (i in 0 until n) {
                     for (rim in 0..1) {
                         positionBuffer[ofs] = f[i]
                         lightNormalBuffer[ofs] = lNorm
                         expandDirBuffer[ofs] = f
+                        thicknessDirBuffer[ofs] = thicknessDirection
                         rimDirBuffer[ofs] = if (rim == 0) Vec3.ZERO else fr.rimDir[i]
                         rimMaxBuffer[ofs] = if (rim == 0) 0.0 else fr.maxRim
                         colorBuffer[ofs] = faceColor
@@ -261,12 +270,14 @@ class FaceContext(
             fun makeBorder(f: Face, fr: FaceRim, faceColor: Color, noRim: Boolean) {
                 val n = f.size
                 var ofs = bufOfs
+                val thicknessDirection = f.originOutwardNormal
                 for (i in 0 until n) {
                     val lNorm = if (noRim) -fr.borderNorm[i] else fr.borderNorm[i]
                     for (innerFlag in 0..1) {
                         positionBuffer[ofs] = f[i]
                         lightNormalBuffer[ofs] = lNorm
                         expandDirBuffer[ofs] = f
+                        thicknessDirBuffer[ofs] = thicknessDirection
                         rimDirBuffer[ofs] = if (noRim) Vec3.ZERO else fr.rimDir[i]
                         rimMaxBuffer[ofs] = if (noRim) 0.0 else fr.maxRim
                         colorBuffer[ofs] = faceColor
@@ -288,12 +299,18 @@ class FaceContext(
                 val innerFlag = if (inner) 1 else 0
                 for (mesh in meshes) {
                     val lNorm = if (inner) -mesh.normal else mesh.normal
+                    val thicknessDirection = if (mesh.normal * mesh.vertices.first() >= 0.0) {
+                        mesh.normal
+                    } else {
+                        -mesh.normal
+                    }
                     val base = bufOfs
                     val surfaceId = nextSurfaceId++
                     for (position in mesh.vertices) {
                         positionBuffer[bufOfs] = position
                         lightNormalBuffer[bufOfs] = lNorm
                         expandDirBuffer[bufOfs] = f
+                        thicknessDirBuffer[bufOfs] = thicknessDirection
                         rimDirBuffer[bufOfs] = Vec3.ZERO
                         rimMaxBuffer[bufOfs] = 0.0
                         colorBuffer[bufOfs] = faceColor
@@ -318,6 +335,11 @@ class FaceContext(
                 faceColor: Color,
             ) {
                 for (mesh in meshes) for (cycle in mesh.cycles) {
+                    val thicknessDirection = if (mesh.normal * mesh.vertices.first() >= 0.0) {
+                        mesh.normal
+                    } else {
+                        -mesh.normal
+                    }
                     if (!mesh.triangulationPatch) {
                         val base = bufOfs
                         for (index in cycle.vertices.indices) {
@@ -328,6 +350,7 @@ class FaceContext(
                                 positionBuffer[bufOfs] = position
                                 lightNormalBuffer[bufOfs] = sideNormal
                                 expandDirBuffer[bufOfs] = f
+                                thicknessDirBuffer[bufOfs] = thicknessDirection
                                 rimDirBuffer[bufOfs] = Vec3.ZERO
                                 rimMaxBuffer[bufOfs] = 0.0
                                 colorBuffer[bufOfs] = faceColor
@@ -356,6 +379,7 @@ class FaceContext(
                                 positionBuffer[bufOfs] = position
                                 lightNormalBuffer[bufOfs] = sideNormal
                                 expandDirBuffer[bufOfs] = f
+                                thicknessDirBuffer[bufOfs] = thicknessDirection
                                 rimDirBuffer[bufOfs] = Vec3.ZERO
                                 rimMaxBuffer[bufOfs] = 0.0
                                 colorBuffer[bufOfs] = faceColor
@@ -404,6 +428,7 @@ class FaceContext(
             positionBuffer.bindBufferData(gl)
             lightNormalBuffer.bindBufferData(gl)
             expandDirBuffer.bindBufferData(gl)
+            thicknessDirBuffer.bindBufferData(gl)
             rimDirBuffer.bindBufferData(gl)
             rimMaxBuffer.bindBufferData(gl)
             colorBuffer.bindBufferData(gl)
@@ -419,16 +444,10 @@ class FaceContext(
 
     private fun FaceExportParams.setIndex(v: MutableVec3, i: Int) = with(target) {
         val ri = min(target.rimMaxBuffer.data[i].toDouble(), rim)
-        val diLen = innerBuffer[i] * width
-        val posLen = norm(
-            positionBuffer[i, 0],
-            positionBuffer[i, 1],
-            positionBuffer[i, 2]
-        )
         fun coord(j: Int) = scale * (
             positionBuffer[i, j] -
-            positionBuffer[i, j] * diLen / posLen +
-            rimDirBuffer[i, j] * ri * (posLen - diLen) / posLen +
+            thicknessDirBuffer[i, j] * innerBuffer[i] * width +
+            rimDirBuffer[i, j] * ri +
             expandDirBuffer[i, j] * expand
         )
         v.x = coord(0)
@@ -505,12 +524,14 @@ fun FaceContext.draw(view: ViewContext, lighting: LightingContext, cullMode: Int
         aPosition by target.positionBuffer
         aLightNormal by target.lightNormalBuffer
         aExpandDir by target.expandDirBuffer
+        aThicknessDir by target.thicknessDirBuffer
         aRimDir by target.rimDirBuffer
         aRimMax by target.rimMaxBuffer
         aColor by target.colorBuffer
         aPrevPosition by prevOrTarget.positionBuffer
         aPrevLightNormal by prevOrTarget.lightNormalBuffer
         aPrevExpandDir by prevOrTarget.expandDirBuffer
+        aPrevThicknessDir by prevOrTarget.thicknessDirBuffer
         aPrevRimDir by prevOrTarget.rimDirBuffer
         aPrevRimMax by prevOrTarget.rimMaxBuffer
         aPrevColor by prevOrTarget.colorBuffer

@@ -53,10 +53,12 @@ suspend fun convertStl(
     }
     val presentation = request.presentation ?: return convertStlInternal(request, reportProgress, started)
     val triangleRequest = try {
-        presentation.toTriangleRequest { progress ->
-            checkTime(CoreStlStage.Input)
-            reportProgress(progress)
-        }.also { checkTime(CoreStlStage.Input) }
+        presentation.toTriangleRequest(
+            reportProgress = { progress ->
+                checkTime(CoreStlStage.Input)
+                reportProgress(progress)
+            },
+        ).also { checkTime(CoreStlStage.Input) }
     } catch (failure: Throwable) {
         return CoreStlResponse(
             error = CoreStlError(
@@ -70,8 +72,29 @@ suspend fun convertStl(
             ),
         )
     }
-    return convertStlInternal(
+    val primary = convertStlInternal(
         triangleRequest,
+        reportProgress = { progress -> reportProgress(25 + progress * 75 / 100) },
+        started = started,
+    )
+    if (primary.error?.kind != CoreStlErrorKind.Topology) return primary
+
+    // Some high-winding presentations create numerically coincident joins even after their
+    // per-face depth is constructed exactly. Retry those rare cases with one topology-stable
+    // radial shell referenced to the closest face plane; it is never thinner than requested.
+    val fallbackRequest = try {
+        presentation.toTriangleRequest(
+            reportProgress = { progress ->
+                checkTime(CoreStlStage.Input)
+                reportProgress(progress)
+            },
+            stableJoinsFallback = true,
+        )
+    } catch (_: Throwable) {
+        return primary
+    }
+    return convertStlInternal(
+        fallbackRequest,
         reportProgress = { progress -> reportProgress(25 + progress * 75 / 100) },
         started = started,
     )
