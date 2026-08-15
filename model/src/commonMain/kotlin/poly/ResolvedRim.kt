@@ -33,14 +33,6 @@ data class ResolvedRimRegion(
     val triangulationPatch: Boolean = false,
 )
 
-/** A zero-width source-boundary cover used by a higher-winding hidden face. */
-@Serializable
-data class ResolvedRimWall(
-    val a: MutableVec3,
-    val b: MutableVec3,
-    val sourceEdges: List<SourceEdgeOccurrence>,
-)
-
 /** Polygonal hidden-face rim geometry. Triangulation deliberately belongs to each consumer. */
 @Serializable
 data class ResolvedRimGeometry(
@@ -51,6 +43,4 @@ data class ResolvedRimGeometry(
     val regions: List<ResolvedRimRegion>,
     /** Largest selectable width before the rim completely covers the source-face fill. */
     val maximumWidth: Double = width,
-    /** Flat source-boundary covers that have thickness but no top-surface rim. */
-    val boundaryWalls: List<ResolvedRimWall> = emptyList(),
 )

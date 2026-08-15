@@ -96,14 +96,12 @@ class ResolvedFaceRenderingTest {
                     }
                 }
             }
-            val flatBoundaryCount = rims.filter { it.sourceFaceKind == FaceKind(0) }
-                .sumOf { rim -> rim.boundaryWalls.size }
             assertEquals(
-                visibleBufferSize + capBufferSize + 4 * (boundarySegments + flatBoundaryCount),
+                visibleBufferSize + capBufferSize + 4 * boundarySegments,
                 context.bufferSize,
             )
             assertEquals(
-                visibleIndexSize + capIndexSize + 6 * (boundarySegments + flatBoundaryCount),
+                visibleIndexSize + capIndexSize + 6 * boundarySegments,
                 context.indexSize,
             )
 

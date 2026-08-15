@@ -154,23 +154,22 @@ Hiding an immersed face preserves a rim along its original source boundary rathe
 it with the outer silhouette of its filled cells. Hiding the cap orbit of Prism 5/2 therefore leaves
 a visible pentagram.
 
-The core constructs each planar immersed rim from the same arrangement and winding data as the
-face fill:
+The core constructs one uninterrupted sheet along every authoritative source edge. The complete
+sheet lies on the winding-interior side of the directed edge and keeps the same side and width before,
+through, and after every arrangement crossing. A pentagram therefore has rim material along both
+the central pentagon and all five outer triangular arms; a crossing never becomes an endpoint or a
+reason to suppress part of an edge.
 
-- a segment with nonzero winding on both sides contributes the full rim width on the side with the
-  greater absolute winding, so an inner pentagon is traced inward instead of receiving a strip
-  centered across its edge;
-- a source segment between zero and nonzero winding has no top-surface rim; it contributes a flat
-  thickness cover, leaving each outer star tip visually distinct from a resolved triangular face;
-- all strips are unioned in the face plane, so crossings have no duplicate surfaces or internal
-  seams; and
-- where adjacent offset edges meet through short strip-cap fragments, the fragments are replaced
-  by their exact local miter. This keeps internal star-polygon openings smooth without extending
-  an acute miter beyond four rim widths or changing genuine short features.
+Adjacent sheets share the exact intersection of their offset lines only at their authoritative
+source vertex. All sheets are then unioned in the face plane, so overlapping crossings have no duplicate top surfaces or
+internal seams. The union boundary may be split at crossings as a derived triangulation detail, but
+the source sheets themselves are never split or clipped by resolved winding cells. The maximum-width
+calculation intersects the same sheets with the nonzero-winding fill only to detect complete coverage;
+that measurement does not alter presentation geometry.
 
 The result is tessellation-free `ResolvedRimGeometry`: deterministic outer and hole cycles,
 source-edge provenance, the applied width, and the maximum width before the rim covers the complete
-fill. WebGL triangulates those regions for caps and walls, STL includes them in its solid
+fill. WebGL triangulates those regions for caps and walls, STL includes equivalent closed pieces in its solid
 arrangement, and OpenSCAD emits closed mitered pieces from the same cycles. Simple-face inset and non-planar rim behavior
 remain owned by [Non-convex geometry](non-convex.md); export postconditions are specified in
 [Export](export.md).

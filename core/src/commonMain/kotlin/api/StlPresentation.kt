@@ -15,7 +15,6 @@ import polyhedra.model.poly.MutableVertex
 import polyhedra.model.poly.Polyhedron
 import polyhedra.model.poly.ResolvedFaceGeometry
 import polyhedra.model.poly.ResolvedRimCycle
-import polyhedra.model.poly.ResolvedRimWall
 import polyhedra.model.poly.VertexKind
 import polyhedra.model.poly.area
 import polyhedra.model.poly.essence
@@ -96,7 +95,6 @@ internal suspend fun CoreStlPresentation.toTriangleRequest(
         if (rim > 0.0) for (face in source.fs.filter { candidate -> candidate.kind in hiddenKinds }) {
             val geometry = rimBySourceFace[face.id] ?: continue
             for (region in geometry.regions) builder.addMiteredRimRegion(region, face, joins)
-            for (wall in geometry.boundaryWalls) builder.addMiteredBoundaryWall(wall, face, joins)
         }
         return builder.request()
     }
@@ -374,31 +372,6 @@ private class PresentationMeshBuilder(
                 solid = solid,
             )
         }
-    }
-
-    fun addMiteredBoundaryWall(
-        wall: ResolvedRimWall,
-        face: Face,
-        joins: FaceThicknessJoins,
-    ) {
-        val sourceSegment = wall.sourceEdges.firstOrNull()?.sourceSegmentIndex ?: return
-        val outerA = transformed(wall.a, face, face.originOutwardNormal(), inner = false)
-        val outerB = transformed(wall.b, face, face.originOutwardNormal(), inner = false)
-        val innerA = transformed(
-            wall.a,
-            face,
-            joins.direction(face, wall.a, sourceSegment),
-            inner = true,
-        )
-        val innerB = transformed(
-            wall.b,
-            face,
-            joins.direction(face, wall.b, sourceSegment),
-            inner = true,
-        )
-        val surface = nextSurface++
-        triangle(outerA, innerA, outerB, surface, solid = MITERED_SHELL_SOLID)
-        triangle(innerA, innerB, outerB, surface, solid = MITERED_SHELL_SOLID)
     }
 
     private fun polyhedra.model.poly.ResolvedRimRegion.patchFace(source: Face): Face {

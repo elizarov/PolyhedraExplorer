@@ -174,9 +174,6 @@ class FaceContext(
                             }
                             bufferSize += 4 * boundarySegmentCount
                             indexSize += 6 * boundarySegmentCount
-                            val flatBoundaryCount = resolvedRimByFace[f.id]?.boundaryWalls?.size ?: 0
-                            bufferSize += 4 * flatBoundaryCount
-                            indexSize += 6 * flatBoundaryCount
                         }
                     } else {
                         if (includeRim) {
@@ -408,39 +405,6 @@ class FaceContext(
                 }
             }
 
-            fun makeResolvedRimFlatBoundaries(
-                f: Face,
-                walls: List<ResolvedRimWall>,
-                faceColor: Color,
-            ) {
-                for (wall in walls) {
-                    val sourceSegment = wall.sourceEdges.firstOrNull()?.sourceSegmentIndex ?: continue
-                    val midpoint = (wall.a + wall.b) * 0.5
-                    val wallDirection = thicknessJoins.direction(f, midpoint, sourceSegment)
-                    val sideNormal = ((wall.b - wall.a) cross wallDirection).unit
-                    val base = bufOfs
-                    for (position in listOf(wall.a, wall.b)) for (innerFlag in 0..1) {
-                        positionBuffer[bufOfs] = position
-                        lightNormalBuffer[bufOfs] = sideNormal
-                        expandDirBuffer[bufOfs] = f
-                        thicknessDirBuffer[bufOfs] = thicknessJoins.direction(
-                            f,
-                            position,
-                            sourceSegment,
-                        )
-                        rimDirBuffer[bufOfs] = Vec3.ZERO
-                        rimMaxBuffer[bufOfs] = 0.0
-                        colorBuffer[bufOfs] = faceColor
-                        innerBuffer?.set(bufOfs, innerFlag)
-                        faceModeBuffer?.set(bufOfs, if (f.kind == selectedFace) FACE_SELECTED else FACE_NORMAL)
-                        bufOfs++
-                    }
-                    val surfaceId = nextSurfaceId++
-                    indexBuffer?.indexTriangle(base, base + 1, base + 2, false, surfaceId)
-                    indexBuffer?.indexTriangle(base + 1, base + 3, base + 2, false, surfaceId)
-                }
-            }
-
             for (f in poly.fs) {
                 val faceColor = printColor ?: PolyStyle.faceColor(f)
                 val resolved = poly.resolvedFaces[f.id]
@@ -457,11 +421,6 @@ class FaceContext(
                         makeResolvedRim(f, rimMeshes, faceColor, true)
                         if (includeWidth) {
                             makeResolvedRimBorders(f, rimMeshes, faceColor)
-                            makeResolvedRimFlatBoundaries(
-                                f,
-                                resolvedRimByFace.getValue(f.id).boundaryWalls,
-                                faceColor,
-                            )
                         }
                     } else {
                         if (includeRim) {

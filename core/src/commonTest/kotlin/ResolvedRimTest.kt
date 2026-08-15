@@ -96,7 +96,7 @@ class ResolvedRimTest {
     }
 
     @Test
-    fun starPyramidSevenHalvesRimTracesInsideTheCentralHeptagonSmoothly() {
+    fun starPyramidSevenHalvesKeepsEveryStarEdgeSheetContinuous() {
         val poly = requireNotNull("SY7_2".toSeedOrNull()).poly
         val face = poly.fs.single { candidate -> candidate.fvs.size == 7 }
         val rim = face.resolvedRim(poly.resolvedFaces[face.id], 0.05)
@@ -106,22 +106,21 @@ class ResolvedRimTest {
             (central.vertices[(index + 1) % central.vertices.size] - central.vertices[index]).norm
         }
 
-        assertEquals(1, holes.size)
+        assertEquals(8, holes.size)
+        assertEquals(7, holes.count { hole -> hole.vertices.size == 3 })
         assertEquals(7, central.vertices.size)
         assertTrue(edgeLengths.max() - edgeLengths.min() <= 1e-7)
-        assertTrue(rim.boundaryWalls.isNotEmpty())
+        assertContinuousSourceEdgeSheets(face, rim, 0.05)
     }
 
     @Test
-    fun starPyramidFiveHalvesKeepsOuterTipsOpenAndInsetsTheInnerPentagon() {
+    fun starPyramidFiveHalvesKeepsEveryStarEdgeSheetContinuous() {
         val poly = requireNotNull("SY5_2".toSeedOrNull()).poly
         val face = poly.fs.single { candidate -> candidate.fvs.size == 5 }
         val rim = face.resolvedRim(poly.resolvedFaces[face.id], 0.05)
 
-        val region = rim.regions.single()
-        assertEquals(1, region.holes.size)
-        assertEquals(5, region.holes.single().vertices.size)
-        assertEquals(10, rim.boundaryWalls.size)
+        assertTrue(rim.regions.isNotEmpty())
+        assertContinuousSourceEdgeSheets(face, rim, 0.05)
     }
 
     @Test
@@ -133,7 +132,15 @@ class ResolvedRimTest {
         assertTrue(rim.maximumWidth.isFinite() && rim.maximumWidth > 0.0)
         assertEquals(rim.maximumWidth, rim.width)
         assertTrue(rim.regions.isNotEmpty())
-        assertTrue(rim.regions.all { region -> region.holes.isEmpty() })
+        val resolved = poly.resolvedFaces[face.id]
+        for (cell in resolved.cells) for (triangle in cell.triangles) {
+            val center = (
+                resolved.vertices[triangle.a].position +
+                    resolved.vertices[triangle.b].position +
+                    resolved.vertices[triangle.c].position
+                ) * (1.0 / 3.0)
+            assertTrue(rim.containsProjected(center), "Maximum rim does not cover filled cell ${cell.id}")
+        }
     }
 
     @Test
@@ -222,24 +229,19 @@ class ResolvedRimTest {
     }
 
     @Test
-    fun higherWindingFaceUsesOneSidedInternalRimsAndFlatOuterCovers() {
+    fun higherWindingFaceUsesOneContinuousOneSidedSheetPerSourceEdge() {
         val face = regularStarFace(5, 2)
         val resolved = resolveFaceGeometry(face)
         val width = 0.03
         val rim = face.resolvedRim(resolved, width)
-        val exterior = resolved.edges.filterNot { edge -> edge.internalToFill }
-            .maxBy { edge -> (resolved.vertices[edge.b].position - resolved.vertices[edge.a].position).norm }
-        val internal = resolved.edges.filter { edge -> edge.internalToFill }
-            .maxBy { edge -> (resolved.vertices[edge.b].position - resolved.vertices[edge.a].position).norm }
+        assertContinuousSourceEdgeSheets(face, rim, width)
 
-        val exteriorSamples = sampleBothSides(resolved, exterior.a, exterior.b, width * 0.25)
-        assertEquals(0, exteriorSamples.count { point -> rim.containsProjected(point) })
-        assertTrue(rim.boundaryWalls.isNotEmpty())
-
-        val internalSamples = sampleBothSides(resolved, internal.a, internal.b, width * 0.75)
-        val internalBeyond = sampleBothSides(resolved, internal.a, internal.b, width * 1.25)
-        assertEquals(1, internalSamples.count { point -> rim.containsProjected(point) })
-        assertEquals(0, internalBeyond.count { point -> rim.containsProjected(point) })
+        val a = face.fvs[0]
+        val b = face.fvs[1]
+        val midpointNearTip = a + (b - a) * 0.1
+        val inward = ((b - a) cross face.unit).unit
+        assertTrue(rim.containsProjected(midpointNearTip + inward * (width * 0.5)))
+        assertTrue(!rim.containsProjected(midpointNearTip - inward * (width * 0.5)))
     }
 
     @Test
@@ -332,6 +334,25 @@ class ResolvedRimTest {
         assertTrue(expected.all { point -> actual.any { candidate -> (candidate - point).norm <= scale * 1e-7 } })
     }
 
+    private fun assertContinuousSourceEdgeSheets(
+        face: polyhedra.model.poly.Face,
+        rim: ResolvedRimGeometry,
+        width: Double,
+    ) {
+        for (index in face.fvs.indices) {
+            val a = face.fvs[index]
+            val b = face.fvs[(index + 1) % face.fvs.size]
+            val inward = ((b - a) cross face.unit).unit
+            for (parameter in listOf(0.1, 0.25, 0.5, 0.75, 0.9)) {
+                val point = a + (b - a) * parameter + inward * (width * 0.5)
+                assertTrue(
+                    rim.containsProjected(point),
+                    "Source edge $index has no continuous rim at t=$parameter",
+                )
+            }
+        }
+    }
+
     private fun face(vararg points: Vec3): MutableFace {
         val vertices = points.mapIndexed { index, point ->
             MutableVertex(index, point, VertexKind(0))
@@ -345,20 +366,6 @@ class ResolvedRimTest {
             Vec3(kotlin.math.cos(angle), kotlin.math.sin(angle), 0.0)
         }
         return face(*List(n) { index -> ring[(index * q) % n] }.toTypedArray())
-    }
-
-    private fun sampleBothSides(
-        resolved: polyhedra.model.poly.ResolvedFaceGeometry,
-        aIndex: Int,
-        bIndex: Int,
-        distance: Double,
-    ): List<Vec3> {
-        val a = resolved.vertices[aIndex].position
-        val b = resolved.vertices[bIndex].position
-        val midpoint = (a + b) * 0.5
-        val direction = b - a
-        val normal = Vec3(-direction.y, direction.x, 0.0) * (distance / direction.norm)
-        return listOf(midpoint + normal, midpoint - normal)
     }
 
     private fun ResolvedRimGeometry.containsProjected(point: Vec3): Boolean = regions.any { region ->
