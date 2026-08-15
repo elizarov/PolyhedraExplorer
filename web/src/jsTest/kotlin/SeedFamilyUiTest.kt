@@ -130,6 +130,9 @@ class SeedFamilyUiTest {
         assertEquals("Star polygon density", slider.getAttribute("aria-label"))
         assertEquals("2", slider.value)
         assertEquals("3", slider.max)
+        val valueInput = host.querySelector(".seed-setting-value") as HTMLInputElement
+        assertEquals("2", valueInput.value)
+        assertEquals("Star polygon density value", valueInput.getAttribute("aria-label"))
         val previous = host.querySelector(".slider-step-previous") as HTMLButtonElement
         val next = host.querySelector(".slider-step-next") as HTMLButtonElement
         assertTrue(previous.parentElement?.parentElement?.classList?.contains("transform-settings-actions") == true)

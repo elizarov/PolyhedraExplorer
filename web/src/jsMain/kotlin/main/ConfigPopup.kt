@@ -1,9 +1,6 @@
 package polyhedra.web.main
 
 import androidx.compose.runtime.Composable
-import org.jetbrains.compose.web.dom.Span
-import org.jetbrains.compose.web.dom.Text
-import polyhedra.model.util.fmt
 import polyhedra.web.components.observe
 import polyhedra.web.components.PCheckbox
 import polyhedra.web.components.PDropdown
@@ -16,57 +13,73 @@ fun ConfigPopup(params: RootParams) {
     val animateUpdates = params.animationParams.animateValueUpdates.value
     val rotate = params.animationParams.animatedRotation.value
     val scale = params.export.size.targetValue / 2
-    val faceWidth = params.render.view.faceWidth.targetValue
-    val faceRim = params.render.view.faceRim.targetValue
 
     GroupHeader("View")
     TableBody {
         ControlRow("Base scale") { PDropdown(params.render.poly.baseScale) }
-        ControlRow("View scale") { PSlider(params.render.view.scale) }
-        ControlRow("Expand") { PSlider(params.render.view.expandFaces) }
+        ControlRow("View scale") { PSlider(params.render.view.scale, ariaLabel = "View scale") }
+        ControlRow("Expand") { PSlider(params.render.view.expandFaces, ariaLabel = "Expand") }
         ControlRow("Display") { PDropdown(params.render.view.display) }
         ControlRow("Environment") { PDropdown(params.render.view.environment) }
     }
 
     GroupHeader("Faces")
     TableBody {
-        ControlRow("Transparent") { PSlider(params.render.view.transparentFaces, !hasFaces) }
+        ControlRow("Transparent") {
+            PSlider(params.render.view.transparentFaces, !hasFaces, ariaLabel = "Transparency")
+        }
         ControlRow("Width") {
-            PSlider(params.render.view.faceWidth, !hasFaces, showValue = false)
-            Span { Text("${(scale * faceWidth).fmt(1)} (mm)") }
+            PSlider(
+                params.render.view.faceWidth,
+                !hasFaces,
+                valueScale = scale,
+                valuePrecision = 3,
+                unit = "(mm)",
+                snapInputToStep = false,
+                ariaLabel = "Face width in millimeters",
+            )
         }
         ControlRow("Rim") {
-            PSlider(params.render.view.faceRim, !hasFaces, showValue = false)
-            Span { Text("${(scale * faceRim).fmt(1)} (mm)") }
+            PSlider(
+                params.render.view.faceRim,
+                !hasFaces,
+                valueScale = scale,
+                valuePrecision = 3,
+                unit = "(mm)",
+                snapInputToStep = false,
+                ariaLabel = "Face rim in millimeters",
+            )
         }
     }
 
     GroupHeader("Symmetry")
     TableBody {
-        ControlRow("Plane size") { PSlider(params.render.view.symmetryPlaneSize) }
-        ControlRow("Axis size") { PSlider(params.render.view.symmetryAxisSize) }
+        ControlRow("Plane size") { PSlider(params.render.view.symmetryPlaneSize, ariaLabel = "Plane size") }
+        ControlRow("Axis size") { PSlider(params.render.view.symmetryAxisSize, ariaLabel = "Axis size") }
     }
 
     GroupHeader("Animation")
     TableBody {
         ControlRow2("Rotation", { PCheckbox(params.animationParams.animatedRotation) }) {
-            PSlider(params.animationParams.rotationSpeed, !rotate)
+            PSlider(params.animationParams.rotationSpeed, !rotate, ariaLabel = "Rotation speed")
         }
-        ControlRow2("Angle", {}) { PSlider(params.animationParams.rotationAngle, !rotate) }
+        ControlRow2("Angle", {}) {
+            PSlider(params.animationParams.rotationAngle, !rotate, ariaLabel = "Rotation angle")
+        }
         ControlRow2("Updates", { PCheckbox(params.animationParams.animateValueUpdates) }) {
-            PSlider(params.animationParams.animationDuration, !animateUpdates)
+            PSlider(params.animationParams.animationDuration, !animateUpdates, ariaLabel = "Update duration")
         }
     }
 
     GroupHeader("Lighting")
     TableBody {
-        ControlRow("Key light") { PSlider(params.render.lighting.keyLight, !hasFaces) }
-        ControlRow("Fill light") { PSlider(params.render.lighting.fillLight, !hasFaces) }
+        ControlRow("Key light") { PSlider(params.render.lighting.keyLight, !hasFaces, ariaLabel = "Key light") }
+        ControlRow("Fill light") { PSlider(params.render.lighting.fillLight, !hasFaces, ariaLabel = "Fill light") }
     }
 
     GroupHeader("Material")
     TableBody {
-        ControlRow("Roughness") { PSlider(params.render.lighting.roughness, !hasFaces) }
-        ControlRow("IOR") { PSlider(params.render.lighting.ior, !hasFaces) }
+        ControlRow("Roughness") { PSlider(params.render.lighting.roughness, !hasFaces, ariaLabel = "Roughness") }
+        ControlRow("IOR") { PSlider(params.render.lighting.ior, !hasFaces, ariaLabel = "Index of refraction") }
     }
 }

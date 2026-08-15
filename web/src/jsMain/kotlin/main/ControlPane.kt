@@ -19,6 +19,7 @@ import polyhedra.model.api.TransformPrefixReplacement
 import polyhedra.model.api.findTransformPrefixReplacement
 import polyhedra.model.util.updatedAt
 import polyhedra.web.catalog.*
+import polyhedra.web.components.NumericValueInput
 import polyhedra.web.components.SliderStepControls
 import polyhedra.web.components.observe
 import polyhedra.web.params.Param
@@ -560,17 +561,43 @@ private fun TransformSettingsPopup(
                             }
                         }
                     })
-                    Span(attrs = { classes("transform-setting-value") }) {
-                        if (setting.tweak == TransformTweak.StellationResult) {
-                            val current = currentValue.roundToInt()
-                            val count = maximum.roundToInt()
-                            val fev = safeRange?.options?.singleOrNull { option -> option.value == current }?.fev
+                    if (setting.tweak == TransformTweak.StellationResult) {
+                        val current = currentValue.roundToInt()
+                        val count = maximum.roundToInt()
+                        val fev = safeRange?.options?.singleOrNull { option -> option.value == current }?.fev
+                        NumericValueInput(
+                            value = currentValue,
+                            min = minTick * setting.step,
+                            max = maxTick.coerceAtLeast(minTick) * setting.step,
+                            step = setting.step,
+                            ariaLabel = "${setting.label} value",
+                            disabled = !rangeAvailable,
+                            precision = 0,
+                            extraClasses = arrayOf("transform-setting-value"),
+                        ) { newValue ->
+                            onChange(setting, newValue)
+                            newValue
+                        }
+                        Span(attrs = { classes("transform-setting-detail") }) {
                             Text(buildString {
-                                append("$current of $count")
+                                append("of $count")
                                 if (fev != null) append(" · F ${fev.f}, E ${fev.e}, V ${fev.v}")
                             })
-                        } else {
-                            Text("${(currentValue * 100).roundToInt()}%")
+                        }
+                    } else {
+                        NumericValueInput(
+                            value = currentValue * 100.0,
+                            min = minTick * setting.step * 100.0,
+                            max = maxTick.coerceAtLeast(minTick) * setting.step * 100.0,
+                            step = setting.step * 100.0,
+                            ariaLabel = "${setting.label} percentage",
+                            disabled = !rangeAvailable,
+                            precision = 0,
+                            unit = "%",
+                            extraClasses = arrayOf("transform-setting-value"),
+                        ) { percentage ->
+                            onChange(setting, percentage / 100.0)
+                            percentage
                         }
                     }
                 }
@@ -657,8 +684,18 @@ private fun SeedSettingsPopup(
                         event.value?.toDouble()?.roundToInt()?.let(onChangeQ)
                     }
                 })
-                Span(attrs = { classes("transform-setting-value", "seed-setting-value") }) {
-                    Text(id.q.toString())
+                NumericValueInput(
+                    value = id.q.toDouble(),
+                    min = 2.0,
+                    max = validDensities.last().toDouble(),
+                    step = 1.0,
+                    ariaLabel = "Star polygon density value",
+                    precision = 0,
+                    extraClasses = arrayOf("transform-setting-value", "seed-setting-value"),
+                ) { requested ->
+                    val density = nearestValidStarFamilyQ(id, requested.roundToInt()) ?: id.q
+                    onChangeQ(density)
+                    density.toDouble()
                 }
             }
         }

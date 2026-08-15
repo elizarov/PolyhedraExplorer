@@ -6,7 +6,6 @@ import org.jetbrains.compose.web.dom.Button
 import org.jetbrains.compose.web.dom.Div
 import org.jetbrains.compose.web.dom.Span
 import org.jetbrains.compose.web.dom.Text
-import polyhedra.model.util.fmt
 import polyhedra.model.api.PolyhedronContract
 import polyhedra.web.components.observe
 import polyhedra.web.components.PCheckbox
@@ -44,16 +43,35 @@ fun ExportPopup(params: RootParams, faces: FaceContext?, onPickColor: () -> Unit
     GroupHeader("Export size")
     TableBody {
         ControlRow("Width") {
-            PSlider(params.render.view.faceWidth, !hasFaces, showValue = false)
-            Span { Text("${(scale * faceWidth).fmt(1)} (mm)") }
+            PSlider(
+                params.render.view.faceWidth,
+                !hasFaces,
+                valueScale = scale,
+                valuePrecision = 3,
+                unit = "(mm)",
+                snapInputToStep = false,
+                ariaLabel = "Face width in millimeters",
+            )
         }
         ControlRow("Rim") {
-            PSlider(params.render.view.faceRim, !hasFaces, showValue = false)
-            Span { Text("${(scale * faceRim).fmt(1)} (mm)") }
+            PSlider(
+                params.render.view.faceRim,
+                !hasFaces,
+                valueScale = scale,
+                valuePrecision = 3,
+                unit = "(mm)",
+                snapInputToStep = false,
+                ariaLabel = "Face rim in millimeters",
+            )
         }
         ControlRow("Overall size") {
-            PSlider(params.export.size, !hasFaces)
-            Span(attrs = { classes("suffix") }) { Text("(mm)") }
+            PSlider(
+                params.export.size,
+                !hasFaces,
+                valuePrecision = 1,
+                unit = "(mm)",
+                ariaLabel = "Overall size in millimeters",
+            )
         }
     }
 

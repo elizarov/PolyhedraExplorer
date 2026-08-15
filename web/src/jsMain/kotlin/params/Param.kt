@@ -393,7 +393,8 @@ class DoubleParam(
     val min: Double,
     val max: Double,
     val step: Double,
-    valueAnimationParams: ValueAnimationParams? = null
+    valueAnimationParams: ValueAnimationParams? = null,
+    private val serializationPrecision: Int = 4,
 ) : AnimatedValueParam<Double, DoubleParam>(tag, value, valueAnimationParams) {
     override var targetValue: Double = value
         protected set
@@ -404,11 +405,16 @@ class DoubleParam(
         super.updateValue(r.coerceIn(min, max), updateType)
     }
 
+    /** Updates a typed value without forcing it onto the coarser slider tick grid. */
+    fun updateUnsnappedValue(value: Double, updateType: UpdateType? = null) {
+        super.updateValue(value.coerceIn(min, max), updateType)
+    }
+
     override fun createValueUpdateAnimation(duration: Double, oldValue: Double): DoubleUpdateAnimation =
         DoubleUpdateAnimation(this, duration, oldValue)
 
     override fun valueToString(): String =
-        value.fmt
+        value.fmt(serializationPrecision)
 
     override fun parseValue(value: String): Double? =
         value.toDoubleOrNull()

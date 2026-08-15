@@ -708,6 +708,26 @@ label {
     margin-left: 1ch;
 }
 
+.slider-value-input {
+    box-sizing: border-box;
+    width: 6.5ch;
+    min-width: 6.5ch;
+    padding: 0.05em 0.35ch;
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+tr.control > td > input.slider-value-input {
+    margin-right: 0;
+}
+
+.slider-unit {
+    display: inline-block;
+    margin-left: 0.4ch;
+    white-space: nowrap;
+}
+
 div.control {
     height: 1.5em;
     margin-top: 0.3em;
@@ -790,10 +810,11 @@ aside.transform-settings input[type="range"] {
 }
 
 aside.transform-settings .transform-setting-value {
-    display: inline-block;
-    min-width: 4ch;
     margin-left: 0.5ch;
-    text-align: right;
+}
+
+aside.transform-settings .transform-setting-detail {
+    margin-left: 0.5ch;
 }
 
 aside.transform-settings tr.control > td {

@@ -68,7 +68,15 @@ class TransformSettingsUiTest {
 
         return awaitRecomposition().then {
             assertEquals("70", (host.querySelector(".transform-setting-slider") as HTMLInputElement).value)
-            assertTrue(host.querySelector(".transform-setting-value")?.textContent == "70%")
+            val valueInput = host.querySelector(".transform-setting-value") as HTMLInputElement
+            assertEquals("70", valueInput.value)
+            assertEquals("%", host.querySelector(".slider-unit")?.textContent)
+            valueInput.value = "43"
+            valueInput.dispatchEvent(Event("change"))
+            assertEquals("t~d=0.43", params.transforms.value.single().tag)
+            awaitRecomposition()
+        }.then {
+            assertEquals("43", (host.querySelector(".transform-setting-slider") as HTMLInputElement).value)
             val updatedReset = host.querySelector(".transform-settings-reset") as HTMLButtonElement
             assertTrue(!updatedReset.disabled)
             updatedReset.click()
@@ -252,7 +260,8 @@ class TransformSettingsUiTest {
         val slider = host.querySelector(".transform-setting-slider") as HTMLInputElement
         assertEquals("1", slider.min)
         assertEquals("3", slider.max)
-        assertEquals("1 of 3 · F 12, E 30, V 12", host.querySelector(".transform-setting-value")?.textContent)
+        assertEquals("1", (host.querySelector(".transform-setting-value") as HTMLInputElement).value)
+        assertEquals("of 3 · F 12, E 30, V 12", host.querySelector(".transform-setting-detail")?.textContent)
 
         assertNull(host.querySelector("button.txt sub"))
         val previous = host.querySelector(".slider-step-previous") as HTMLButtonElement

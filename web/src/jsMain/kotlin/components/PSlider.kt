@@ -9,14 +9,20 @@ import org.jetbrains.compose.web.attributes.InputType
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.attributes.value
 import org.jetbrains.compose.web.dom.Input
-import org.jetbrains.compose.web.dom.Span
-import org.jetbrains.compose.web.dom.Text
-import polyhedra.model.util.fmt
 import polyhedra.web.params.DoubleParam
 import kotlin.math.roundToInt
 
 @Composable
-fun PSlider(param: DoubleParam, disabled: Boolean = false, showValue: Boolean = true) {
+fun PSlider(
+    param: DoubleParam,
+    disabled: Boolean = false,
+    valueScale: Double = 1.0,
+    valuePrecision: Int = 6,
+    unit: String? = null,
+    snapInputToStep: Boolean = true,
+    ariaLabel: String = "Slider value",
+) {
+    require(valueScale > 0.0 && valueScale.isFinite())
     param.observe()
     fun Double.intString() = roundToInt().toString()
     val targetValue = param.targetValue
@@ -30,5 +36,22 @@ fun PSlider(param: DoubleParam, disabled: Boolean = false, showValue: Boolean = 
             event.value?.let { param.updateValue(it.toDouble() * param.step) }
         }
     })
-    if (showValue) Span { Text(targetValue.fmt) }
+    NumericValueInput(
+        value = targetValue * valueScale,
+        min = param.min * valueScale,
+        max = param.max * valueScale,
+        step = param.step * valueScale,
+        ariaLabel = ariaLabel,
+        disabled = disabled,
+        precision = valuePrecision,
+        unit = unit,
+        snapToStep = snapInputToStep,
+    ) { displayedValue ->
+        if (snapInputToStep) {
+            param.updateValue(displayedValue / valueScale)
+        } else {
+            param.updateUnsnappedValue(displayedValue / valueScale)
+        }
+        param.targetValue * valueScale
+    }
 }

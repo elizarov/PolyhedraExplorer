@@ -126,9 +126,9 @@ fun PrintColorPopup(preview: PrintPreviewParams, onBack: () -> Unit) {
 
     Div(attrs = { classes("print-color-components") }) {
         TableBody {
-            ControlRow("Hue") { PSlider(preview.hue) }
-            ControlRow("Chroma") { PSlider(preview.chroma) }
-            ControlRow("Lightness") { PSlider(preview.lightness) }
+            ControlRow("Hue") { PSlider(preview.hue, ariaLabel = "Hue") }
+            ControlRow("Chroma") { PSlider(preview.chroma, ariaLabel = "Chroma") }
+            ControlRow("Lightness") { PSlider(preview.lightness, ariaLabel = "Lightness") }
         }
     }
 }
