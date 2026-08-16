@@ -40,7 +40,7 @@ flowchart LR
     V --> E["STL / OpenSCAD export"]
 ```
 
-`CoreClient.kt` is the browser-to-core invocation boundary. It owns a dedicated Web Worker, sends a serialized `CoreRequest`, receives progress messages, and decodes `CoreResponse`. The small versioned `core-worker-v<n>.js` shim dynamically imports the generated Wasm module and relays JSON messages; it contains no manipulation logic. The worker filename and complete `core-v<n>/` directory advance together whenever the serialized core contract changes, preventing a cached core from returning an incompatible response to a newer JS client. Canonicalization and every other core operation therefore execute as WasmGC off the browser's main thread. Starting a newer request terminates an in-progress worker so stale expensive work cannot block the next result.
+`CoreClient.kt` is the browser-to-core invocation boundary. It owns a dedicated Web Worker, sends a serialized `CoreRequest`, receives progress messages, and decodes `CoreResponse`. The small `core-worker.js` shim dynamically imports the generated Wasm module and relays JSON messages; it contains no manipulation logic. The build derives one fingerprint from the application version and browser-runtime inputs, applies it to the main script, stylesheet, and worker URLs, and puts the complete Wasm output in `core-<fingerprint>/`. A runtime change therefore gets new asset URLs automatically, preventing a cached core from returning an incompatible response to a newer JS client. Canonicalization and every other core operation execute as WasmGC off the browser's main thread. Starting a newer request terminates an in-progress worker so stale expensive work cannot block the next result.
 
 Propeller, Whirl, and Quinto first build their exact local Conway incidence structure, apply a small orbit-preserving radial perturbation to avoid a degenerate circle-packing start, and then use the same progress-capable canonical solver to return a convex realization. Their final geometry is cached by input polyhedron and chirality. Progress identifies the active logical transform index and reports a stage-local percentage; multiple primitive operations inside one macro are mapped into a monotonic `0…100` range for that macro pill.
 
@@ -124,9 +124,9 @@ Prefix-replacement detection is a separate, synchronous notation operation in th
 build/dist/browser/<mode>/
 ├── index.html
 ├── PolyhedraExplorer.js
-├── core-worker-v<n>.js
+├── core-worker.js
 ├── css/
-└── core-v<n>/
+└── core-<fingerprint>/
     ├── PolyhedraExplorer-core.mjs
     ├── PolyhedraExplorer-core.wasm
     └── generated Kotlin/Wasm support modules

@@ -69,13 +69,15 @@ private class EarClipRegion(
         lateinit var next: Node
     }
 
+    private var filteredOut = false
+
     fun triangulate(): List<Int> {
         val outerEnd = holeStarts.firstOrNull() ?: points.size
         var outer = linkedList(0, outerEnd, clockwise = true) ?: return emptyList()
         if (outer.next === outer.previous) return emptyList()
         if (holeStarts.isNotEmpty()) outer = eliminateHoles(outer)
         val triangles = arrayListOf<Int>()
-        earcutLinked(outer, triangles, 0)
+        earcutLinked(outer, triangles)
         return triangles
     }
 
@@ -122,10 +124,12 @@ private class EarClipRegion(
             if (point !== point.next &&
                 (equals(point, point.next) || area(point.previous, point, point.next) == 0.0)
             ) {
-                if (point === end) end = point.previous
                 remove(point)
                 point = point.previous
+                end = point
+                filteredOut = true
                 again = true
+                if (point === point.next) break
             } else {
                 point = point.next
             }
@@ -133,9 +137,10 @@ private class EarClipRegion(
         return end
     }
 
-    private fun earcutLinked(start: Node, triangles: MutableList<Int>, pass: Int) {
+    private fun earcutLinked(start: Node, triangles: MutableList<Int>) {
         var ear = start
         var stop = start
+        var cured = false
         while (ear.previous !== ear.next) {
             val previous = ear.previous
             val next = ear.next
@@ -144,17 +149,25 @@ private class EarClipRegion(
                 triangles += ear.index
                 triangles += next.index
                 remove(ear)
-                ear = next.next
-                stop = next.next
+                ear = next
+                stop = next
                 continue
             }
             ear = next
             if (ear === stop) {
-                when (pass) {
-                    0 -> earcutLinked(filterPoints(ear), triangles, 1)
-                    1 -> earcutLinked(cureLocalIntersections(filterPoints(ear), triangles), triangles, 2)
-                    else -> splitEarcut(ear, triangles)
+                filteredOut = false
+                ear = filterPoints(ear)
+                if (filteredOut) {
+                    stop = ear
+                    continue
                 }
+                if (!cured) {
+                    ear = cureLocalIntersections(ear, triangles)
+                    stop = ear
+                    cured = true
+                    continue
+                }
+                splitEarcut(ear, triangles)
                 return
             }
         }
@@ -183,6 +196,7 @@ private class EarClipRegion(
     private fun cureLocalIntersections(start: Node, triangles: MutableList<Int>): Node {
         var first = start
         var point = start
+        var cured = false
         do {
             val a = point.previous
             val b = point.next.next
@@ -196,10 +210,11 @@ private class EarClipRegion(
                 remove(point.next)
                 point = b
                 first = b
+                cured = true
             }
             point = point.next
         } while (point !== first)
-        return filterPoints(point)
+        return if (cured) filterPoints(point) else point
     }
 
     private fun splitEarcut(start: Node, triangles: MutableList<Int>) {
@@ -211,8 +226,8 @@ private class EarClipRegion(
                     var other = splitPolygon(a, b)
                     a = filterPoints(a, a.next)
                     other = filterPoints(other, other.next)
-                    earcutLinked(a, triangles, 0)
-                    earcutLinked(other, triangles, 0)
+                    earcutLinked(a, triangles)
+                    earcutLinked(other, triangles)
                     return
                 }
                 b = b.next
@@ -226,7 +241,9 @@ private class EarClipRegion(
         val holes = holeStarts.mapIndexedNotNull { holeIndex, start ->
             val end = holeStarts.getOrNull(holeIndex + 1) ?: points.size
             linkedList(start, end, clockwise = false)?.let(::leftmost)
-        }.sortedWith(compareBy<Node>({ it.x }, { it.y }))
+        }.sortedWith(compareBy<Node>({ it.x }, { it.y }).thenBy { hole ->
+            (hole.next.y - hole.y) / (hole.next.x - hole.x)
+        })
         var outer = outerStart
         for (hole in holes) {
             val bridge = findHoleBridge(hole, outer) ?: continue
@@ -234,7 +251,7 @@ private class EarClipRegion(
             filterPoints(reverse, reverse.next)
             outer = filterPoints(bridge, bridge.next)
         }
-        return outer
+        return filterPoints(outer)
     }
 
     private fun findHoleBridge(hole: Node, outer: Node): Node? {
@@ -243,7 +260,9 @@ private class EarClipRegion(
         val hy = hole.y
         var qx = Double.NEGATIVE_INFINITY
         var bridge: Node? = null
+        if (equals(hole, point)) return point
         do {
+            if (equals(hole, point.next)) return point.next
             if (hy <= point.y && hy >= point.next.y && point.next.y != point.y) {
                 val x = point.x + (hy - point.y) * (point.next.x - point.x) /
                     (point.next.y - point.y)
@@ -274,7 +293,8 @@ private class EarClipRegion(
                 )
             ) {
                 val current = abs(hy - point.y) / (hx - point.x)
-                if (locallyInside(point, hole) &&
+                val touchesHorizontalEdge = point.y == hy && point.next.y == hy && point.next.x > hx
+                if ((locallyInside(point, hole) || touchesHorizontalEdge) &&
                     (current < tangent ||
                         current == tangent &&
                         (point.x > candidate.x ||

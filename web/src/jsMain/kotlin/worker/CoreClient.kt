@@ -9,11 +9,9 @@ import polyhedra.model.api.CoreJson
 import polyhedra.model.api.CoreProgress
 import polyhedra.model.api.CoreRequest
 import polyhedra.model.api.CoreResponse
+import polyhedra.web.main.BROWSER_CACHE_VERSION
 
-// Increment together with the worker filename, main-script query, and distribution directory
-// whenever the core contract or implementation changes, so a cached worker cannot keep running
-// an older Wasm core after an application refresh.
-internal const val CORE_WORKER_URL = "./core-worker-v29.js"
+internal const val CORE_WORKER_URL = "./core-worker.js?v=$BROWSER_CACHE_VERSION"
 private const val PROGRESS = "progress"
 private const val SUCCESS = "success"
 private const val FAILURE = "failure"

@@ -6,6 +6,9 @@ package polyhedra.web.poly
 
 import kotlinx.browser.*
 import org.w3c.dom.*
+import org.w3c.dom.url.URL
+import org.w3c.files.Blob
+import org.w3c.files.BlobPropertyBag
 import polyhedra.model.poly.*
 import polyhedra.model.util.*
 import kotlin.math.abs
@@ -69,15 +72,18 @@ private fun StringBuilder.appendSeparator(i: Int, size: Int) {
 
 fun download(filename: String, content: String) {
     val body = document.body!!
+    val url = URL.createObjectURL(
+        Blob(arrayOf(content), BlobPropertyBag(type = "text/plain;charset=utf-8")),
+    )
     val node = (document.createElement("a") as HTMLAnchorElement).apply {
         setAttribute("style", "download")
         setAttribute("download", filename)
-        setAttribute("href", "data:text/plain;charset=utf-8,${encodeURIComponent(content)}")
+        setAttribute("href", url)
     }
     body.appendChild(node)
     node.click()
     body.removeChild(node)
-
+    window.setTimeout({ URL.revokeObjectURL(url) }, 60_000)
 }
 
 private data class ScadFace(
@@ -85,8 +91,6 @@ private data class ScadFace(
     val kind: FaceKind,
     val sourceFaceId: Int,
 )
-
-external fun encodeURIComponent(content: String): String
 
 /**
  * Emits a directly renderable OpenSCAD solid while retaining polygonal face and rim regions.

@@ -216,6 +216,30 @@ class StlApiTest {
     }
 
     @Test
+    fun exportsFifthGreateningOfTruncatedIcosahedronWithBothFaceOrbitsHidden() = runTest {
+        val evaluation = evaluateCore(CoreRequest(CoreState("tI", listOf("G~l=5"), "c")))
+        assertNull(evaluation.error, evaluation.error?.detail)
+        val source = evaluation.poly
+        val presentation = CoreStlPresentation(
+            poly = source,
+            hiddenFaceKinds = listOf(FaceKind(0), FaceKind(1)),
+            scale = 20.0,
+            width = 0.1,
+            rim = 0.027,
+            expand = 0.0,
+        )
+        lateinit var response: polyhedra.model.api.CoreStlResponse
+        val elapsed = measureTime {
+            response = convertStl(CoreStlRequest(presentation = presentation))
+        }
+
+        assertNull(response.error, response.error?.reason)
+        response.toValidationPolyhedron().validateMeshGeometry()
+        assertTrue(response.signedVolume6() > 0.0)
+        assertTrue(elapsed < 30.seconds, "Hidden-rim STL export took $elapsed")
+    }
+
+    @Test
     fun exportsHigherWindingStarArrangement() = runTest {
         val source = starPrismFixture(
             n = 7,

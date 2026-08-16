@@ -31,6 +31,7 @@ fun ExportPopup(params: RootParams, faces: FaceContext?, onPickColor: () -> Unit
     var stlBusy by remember { mutableStateOf(false) }
     var stlProgress by remember { mutableStateOf(0) }
     var stlError by remember { mutableStateOf<String?>(null) }
+    var scadError by remember { mutableStateOf<String?>(null) }
     val stlJob = remember { arrayOfNulls<() -> Unit>(1) }
 
     DisposableEffect(Unit) {
@@ -132,8 +133,8 @@ fun ExportPopup(params: RootParams, faces: FaceContext?, onPickColor: () -> Unit
             onClick {
                 val name = polyName.toExportFileBaseName()
                 val exportParams = FaceExportParams(scale, faceWidth, faceRim, expandFaces)
-                download(
-                    "$name.scad",
+                scadError = null
+                runCatching {
                     poly.exportSolidToScad(
                         name = name,
                         description = params.toString(),
@@ -142,10 +143,17 @@ fun ExportPopup(params: RootParams, faces: FaceContext?, onPickColor: () -> Unit
                         resolvedRims = params.render.poly.resolvedRims,
                         embeddedBoundary = params.render.poly.geometryAnalysis?.strongestContract ==
                             PolyhedronContract.EmbeddedBoundary,
-                    ),
-                )
+                    )
+                }.onSuccess { scad ->
+                    download("$name.scad", scad)
+                }.onFailure { cause ->
+                    scadError = "OpenSCAD export failed: ${cause.message}. No file was created."
+                }
             }
         }) { Text("Export to SCAD") }
+        scadError?.let { message ->
+            Div(attrs = { classes("save-error") }) { Text(message) }
+        }
     }
 }
 
