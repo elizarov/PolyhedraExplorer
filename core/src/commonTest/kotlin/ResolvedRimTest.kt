@@ -53,8 +53,7 @@ class ResolvedRimTest {
         val poly = Seed.Tetrahedron.poly
         val width = 0.1
         val configuredRim = 0.05
-        val allFaces = poly.fs.mapTo(linkedSetOf()) { candidate -> candidate.id }
-        val joins = FaceThicknessJoins(poly, allFaces, allFaces, configuredRim)
+        val joins = FaceThicknessJoins(poly)
         val expected = width * joins.rimFactor(poly.es.first())
         val rims = poly.resolvedRims(configuredRim, width)
 
@@ -247,7 +246,7 @@ class ResolvedRimTest {
     }
 
     @Test
-    fun asymmetricAcuteStarPyramidBoundsCollapsedMitersWithoutChangingItsTopRim() {
+    fun asymmetricAcuteStarPyramidKeepsItsImmersedTopRimIndependentOfThickness() {
         val poly = polyhedron {
             repeat(5) { index ->
                 val angle = 2.0 * kotlin.math.PI * index / 5.0
@@ -259,18 +258,12 @@ class ResolvedRimTest {
                 face(listOf(index, apex.id, (index + 2) % 5), FaceKind(1))
             }
         }
-        val face = poly.fs.first { candidate -> candidate.kind == FaceKind(1) }
+        val face = poly.fs.first { candidate -> candidate.kind == FaceKind(0) }
         val configuredRim = 0.05
         val faceWidth = 0.1
         val joins = FaceThicknessJoins(poly)
 
-        assertTrue(face.fvs.any { vertex ->
-            joins.vertexDirection(face, vertex, faceWidth).norm <
-                joins.vertexDirection(face, vertex).norm - 1e-9
-        })
-        face.fvs.forEach { vertex ->
-            assertPointInsideFace(face, vertex - joins.vertexDirection(face, vertex, faceWidth) * faceWidth)
-        }
+        assertTrue(face.fvs.all { vertex -> joins.vertexDirection(face, vertex).norm.isFinite() })
         val rim = poly.resolvedRims(configuredRim, faceWidth)[face.id]
         assertEquals(configuredRim, rim.width, 1e-9)
         assertTrue(rim.regions.all { region -> region.touchesSourceBoundary(face) })
@@ -299,21 +292,13 @@ class ResolvedRimTest {
 
         assertNull(response.error)
         val betaFaces = response.poly.fs.filter { face -> face.kind == FaceKind(1) }
-        val materialFaces = response.poly.fs.mapTo(linkedSetOf()) { face -> face.id }
-        val joins = FaceThicknessJoins(
-            response.poly,
-            materialFaces,
-            betaFaces.mapTo(linkedSetOf()) { face -> face.id },
-            rimWidth = 0.05,
-        )
+        val joins = FaceThicknessJoins(response.poly)
         assertEquals(19, betaFaces.size)
         val tolerance = response.poly.circumradius * 1e-8
         for (face in betaFaces) {
             val rim = response.resolvedRims[face.id]
-            assertEquals(0.05, rim.width, tolerance)
-            face.fvs.forEach { vertex ->
-                assertPointInsideFace(face, vertex - joins.vertexDirection(face, vertex, 0.1) * 0.1)
-            }
+            assertTrue(rim.width >= 0.05 - tolerance)
+            face.fvs.forEach { vertex -> assertTrue(joins.vertexDirection(face, vertex).norm.isFinite()) }
             for (point in rim.regions.flatMap { region ->
                 region.outer.vertices + region.holes.flatMap { hole -> hole.vertices }
             }) {

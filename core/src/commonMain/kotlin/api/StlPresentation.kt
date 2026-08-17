@@ -19,7 +19,6 @@ import polyhedra.model.poly.VertexKind
 import polyhedra.model.poly.area
 import polyhedra.model.poly.essence
 import polyhedra.model.poly.get
-import polyhedra.model.poly.keepsConfiguredRimWidth
 import polyhedra.model.poly.size
 import polyhedra.model.poly.triangulatePlanarPolygon
 import polyhedra.model.poly.triangulatePlanarRegion
@@ -81,9 +80,6 @@ internal suspend fun CoreStlPresentation.toTriangleRequest(
     val thicknessJoins = FaceThicknessJoins(
         source,
         materialFaceIds,
-        candidateRimFaceIds.takeIf { source.keepsConfiguredRimWidth }.orEmpty(),
-        rim,
-        rimBySourceFace,
     )
     val rotation = physical.rotationWithLargestFaceDown()
     val shellReferenceDistance = physical.fs.map { face -> abs(face.d) }
@@ -253,7 +249,7 @@ private class PresentationMeshBuilder(
     fun addMiteredFace(face: Face, geometry: ResolvedFaceGeometry, joins: FaceThicknessJoins) {
         addFace(face, geometry, inner = false, solid = MITERED_SHELL_SOLID)
         addFace(face, geometry, inner = true, solid = MITERED_SHELL_SOLID) { point ->
-            joins.direction(face, point, settings.width)
+            joins.direction(face, point)
         }
     }
 
@@ -291,17 +287,19 @@ private class PresentationMeshBuilder(
     private fun addRimWall(
         cycle: ResolvedRimCycle,
         expansionDirection: Vec3,
-        thicknessDirection: Vec3,
+        thicknessDirection: (Vec3) -> Vec3,
         solid: Int,
         includeSegment: (Int) -> Boolean = { true },
     ) {
         for (index in cycle.vertices.indices) {
             if (!includeSegment(index)) continue
             val next = (index + 1) % cycle.vertices.size
-            val outerA = transformed(cycle.vertices[index], expansionDirection, thicknessDirection, inner = false)
-            val outerB = transformed(cycle.vertices[next], expansionDirection, thicknessDirection, inner = false)
-            val innerA = transformed(cycle.vertices[index], expansionDirection, thicknessDirection, inner = true)
-            val innerB = transformed(cycle.vertices[next], expansionDirection, thicknessDirection, inner = true)
+            val directionA = thicknessDirection(cycle.vertices[index])
+            val directionB = thicknessDirection(cycle.vertices[next])
+            val outerA = transformed(cycle.vertices[index], expansionDirection, directionA, inner = false)
+            val outerB = transformed(cycle.vertices[next], expansionDirection, directionB, inner = false)
+            val innerA = transformed(cycle.vertices[index], expansionDirection, directionA, inner = true)
+            val innerB = transformed(cycle.vertices[next], expansionDirection, directionB, inner = true)
             val surface = nextSurface++
             triangle(outerA, innerA, outerB, surface, solid = solid)
             triangle(innerA, innerB, outerB, surface, solid = solid)
@@ -321,8 +319,8 @@ private class PresentationMeshBuilder(
         }
         if (settings.width > 0.0) {
             val thicknessDirection = regionFace.originOutwardNormal()
-            addRimWall(region.outer, face, thicknessDirection, solid)
-            region.holes.forEach { hole -> addRimWall(hole, face, thicknessDirection, solid) }
+            addRimWall(region.outer, face, { thicknessDirection }, solid)
+            region.holes.forEach { hole -> addRimWall(hole, face, { thicknessDirection }, solid) }
         }
     }
 
@@ -335,7 +333,7 @@ private class PresentationMeshBuilder(
         val patchNormal = regionFace.originOutwardNormal()
         val innerDirection: (Vec3) -> Vec3 = { point ->
             if (joins.sourceEdgeOrNull(face, point) != null) {
-                joins.direction(face, point, settings.width)
+                joins.direction(face, point)
             } else {
                 patchNormal
             }
@@ -352,7 +350,12 @@ private class PresentationMeshBuilder(
         )
         val cycles = listOf(region.outer) + region.holes
         for (cycle in cycles) {
-            addRimWall(cycle, face, patchNormal, solid) { index ->
+            addRimWall(
+                cycle,
+                face,
+                { patchNormal },
+                solid,
+            ) { index ->
                 if (region.triangulationPatch && cycle.segmentSources[index].isEmpty()) {
                     false
                 } else {

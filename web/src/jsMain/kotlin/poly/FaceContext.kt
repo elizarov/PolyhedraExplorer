@@ -128,20 +128,38 @@ class FaceContext(
             val thicknessJoins = FaceThicknessJoins(
                 poly,
                 materialFaceIds,
-                candidateRimFaceIds.takeIf { poly.keepsConfiguredRimWidth }.orEmpty(),
-                presentationRim,
+            )
+            val hasImmersedFaces = poly.resolvedFaces.any(ResolvedFaceGeometry::sourceBoundarySelfIntersects)
+            val immersedBottomCorners = poly.immersedBottomCorners(
+                presentationWidth,
+                thicknessJoins,
                 resolvedRimByFace,
             )
-            val immersedRimScale = if (includeWidth && !includeExpand) {
-                safeImmersedRimScale(
-                    poly,
-                    resolvedRimByFace,
-                    rimMeshesByFace,
-                    thicknessJoins,
-                    presentationWidth,
-                )
+            val simpleFaceIds = poly.resolvedFaces
+                .filterNot(ResolvedFaceGeometry::sourceBoundarySelfIntersects)
+                .mapTo(linkedSetOf(), ResolvedFaceGeometry::sourceFaceId)
+            val immersedRimGeometryByFace = if (includeWidth && !includeExpand) {
+                candidateRimFaceIds.mapNotNull { faceId ->
+                    val face = poly.fs[faceId]
+                    val rim = resolvedRimByFace[faceId]
+                    if (
+                        !hasImmersedFaces || !face.isPlanar ||
+                        rim == null || rim.regions.isEmpty()
+                    ) {
+                        null
+                    } else {
+                        faceId to face.immersedRimGeometry(
+                            rim.width,
+                            presentationWidth,
+                            thicknessJoins,
+                            poly.resolvedFaces[faceId].sourceBoundarySelfIntersects,
+                            simpleFaceIds,
+                            immersedBottomCorners,
+                        )
+                    }
+                }.toMap()
             } else {
-                1.0
+                emptyMap()
             }
 
             fun sourceEdgeOrNull(face: Face, a: Vec3, b: Vec3): Edge? =
@@ -187,16 +205,21 @@ class FaceContext(
                     if (rimMeshes != null && includeRim) {
                         val rimVertexCount = rimMeshes.sumOf { mesh -> mesh.vertices.size }
                         val rimIndexCount = rimMeshes.sumOf { mesh -> mesh.triangles.size }
-                        bufferSize += 2 * rimVertexCount
-                        indexSize += 2 * rimIndexCount
+                        val immersedGeometry = immersedRimGeometryByFace[f.id]
+                        bufferSize += rimVertexCount +
+                            (immersedGeometry?.surfaces?.sumOf { surface -> surface.vertices.size } ?: rimVertexCount)
+                        indexSize += rimIndexCount +
+                            (immersedGeometry?.surfaces?.sumOf { surface -> surface.triangles.size } ?: rimIndexCount)
                         if (includeWidth) {
-                            val boundarySegmentCount = rimMeshes.sumOf { mesh ->
-                                mesh.cycles.sumOf { cycle ->
-                                    cycle.vertices.indices.count { index -> includeRimBorder(f, mesh, cycle, index) }
+                            if (immersedGeometry == null) {
+                                val boundarySegmentCount = rimMeshes.sumOf { mesh ->
+                                    mesh.cycles.sumOf { cycle ->
+                                        cycle.vertices.indices.count { index -> includeRimBorder(f, mesh, cycle, index) }
+                                    }
                                 }
+                                bufferSize += 4 * boundarySegmentCount
+                                indexSize += 6 * boundarySegmentCount
                             }
-                            bufferSize += 4 * boundarySegmentCount
-                            indexSize += 6 * boundarySegmentCount
                         }
                     } else {
                         if (includeRim) {
@@ -258,8 +281,8 @@ class FaceContext(
                     lightNormalBuffer[ofs] = lNorm
                     expandDirBuffer[ofs] = f
                     val thicknessDirection = if (includeExpand) f.outwardNormal else
-                        thicknessJoins.direction(f, position, presentationWidth)
-                    thicknessDirBuffer[ofs] = thicknessDirection * immersedRimScale
+                        thicknessJoins.direction(f, position)
+                    thicknessDirBuffer[ofs] = thicknessDirection
                     rimDirBuffer[ofs] = Vec3.ZERO
                     rimMaxBuffer[ofs] = 0.0
                     colorBuffer[ofs] = faceColor
@@ -306,9 +329,9 @@ class FaceContext(
                         val thicknessDirection = if (includeExpand || rim != 0) {
                             f.outwardNormal
                         } else {
-                            thicknessJoins.vertexDirection(f, f[i], presentationWidth)
+                            thicknessJoins.vertexDirection(f, f[i])
                         }
-                        thicknessDirBuffer[ofs] = thicknessDirection * immersedRimScale
+                        thicknessDirBuffer[ofs] = thicknessDirection
                         rimDirBuffer[ofs] = Vec3.ZERO
                         rimMaxBuffer[ofs] = 0.0
                         colorBuffer[ofs] = faceColor
@@ -336,7 +359,7 @@ class FaceContext(
                         positionBuffer[ofs] = positions[i]
                         lightNormalBuffer[ofs] = lNorm
                         expandDirBuffer[ofs] = f
-                        thicknessDirBuffer[ofs] = f.outwardNormal * immersedRimScale
+                        thicknessDirBuffer[ofs] = f.outwardNormal
                         rimDirBuffer[ofs] = Vec3.ZERO
                         rimMaxBuffer[ofs] = 0.0
                         colorBuffer[ofs] = faceColor
@@ -372,11 +395,11 @@ class FaceContext(
                         val thicknessDirection = if (includeExpand) {
                             patchThicknessDirection
                         } else if (thicknessJoins.sourceEdgeOrNull(f, position) != null) {
-                            thicknessJoins.direction(f, position, presentationWidth)
+                            thicknessJoins.direction(f, position)
                         } else {
                             patchThicknessDirection
                         }
-                        thicknessDirBuffer[bufOfs] = thicknessDirection * immersedRimScale
+                        thicknessDirBuffer[bufOfs] = thicknessDirection
                         rimDirBuffer[bufOfs] = Vec3.ZERO
                         rimMaxBuffer[bufOfs] = 0.0
                         colorBuffer[bufOfs] = faceColor
@@ -401,7 +424,7 @@ class FaceContext(
                 faceColor: Color,
             ) {
                 for (mesh in meshes) for (cycle in mesh.cycles) {
-                    val thicknessDirection = if (mesh.normal * mesh.vertices.first() >= 0.0) {
+                    val preferredThicknessDirection = if (mesh.normal * mesh.vertices.first() >= 0.0) {
                         mesh.normal
                     } else {
                         -mesh.normal
@@ -411,13 +434,12 @@ class FaceContext(
                         val base = bufOfs
                         val a = cycle.vertices[index]
                         val b = cycle.vertices[(index + 1) % cycle.vertices.size]
-                        val sideNormal = (-thicknessDirection cross (b - a)).unit
-                        val presentationThicknessDirection = thicknessDirection * immersedRimScale
+                        val sideNormal = (-preferredThicknessDirection cross (b - a)).unit
                         for (position in listOf(a, b)) for (innerFlag in 0..1) {
                             positionBuffer[bufOfs] = position
                             lightNormalBuffer[bufOfs] = sideNormal
                             expandDirBuffer[bufOfs] = f
-                            thicknessDirBuffer[bufOfs] = presentationThicknessDirection
+                            thicknessDirBuffer[bufOfs] = preferredThicknessDirection
                             rimDirBuffer[bufOfs] = Vec3.ZERO
                             rimMaxBuffer[bufOfs] = 0.0
                             colorBuffer[bufOfs] = faceColor
@@ -428,6 +450,38 @@ class FaceContext(
                         val surfaceId = nextSurfaceId++
                         indexBuffer?.indexTriangle(base, base + 1, base + 2, false, surfaceId)
                         indexBuffer?.indexTriangle(base + 1, base + 3, base + 2, false, surfaceId)
+                    }
+                }
+            }
+
+            fun makeImmersedRimGeometry(
+                f: Face,
+                geometry: ImmersedRimGeometry,
+                faceColor: Color,
+            ) {
+                for (surface in geometry.surfaces) {
+                    val base = bufOfs
+                    for (vertex in surface.vertices) {
+                        positionBuffer[bufOfs] = vertex.position
+                        lightNormalBuffer[bufOfs] = surface.normal
+                        expandDirBuffer[bufOfs] = f
+                        thicknessDirBuffer[bufOfs] = vertex.direction
+                        rimDirBuffer[bufOfs] = Vec3.ZERO
+                        rimMaxBuffer[bufOfs] = 0.0
+                        colorBuffer[bufOfs] = faceColor
+                        innerBuffer?.set(bufOfs, if (vertex.inner) 1 else 0)
+                        faceModeBuffer?.set(bufOfs, if (f.kind == selectedFace) FACE_SELECTED else FACE_NORMAL)
+                        bufOfs++
+                    }
+                    val surfaceId = nextSurfaceId++
+                    for (triangle in surface.triangles.indices step 3) {
+                        indexBuffer?.indexTriangle(
+                            base + surface.triangles[triangle],
+                            base + surface.triangles[triangle + 1],
+                            base + surface.triangles[triangle + 2],
+                            false,
+                            surfaceId,
+                        )
                     }
                 }
             }
@@ -445,8 +499,13 @@ class FaceContext(
                     val rimMeshes = rimMeshesByFace[f.id]
                     if (rimMeshes != null && includeRim) {
                         makeResolvedRim(f, rimMeshes, faceColor, false)
-                        makeResolvedRim(f, rimMeshes, faceColor, true)
-                        if (includeWidth) makeResolvedRimBorders(f, rimMeshes, faceColor)
+                        val immersedGeometry = immersedRimGeometryByFace[f.id]
+                        if (immersedGeometry == null) {
+                            makeResolvedRim(f, rimMeshes, faceColor, true)
+                            if (includeWidth) makeResolvedRimBorders(f, rimMeshes, faceColor)
+                        } else {
+                            makeImmersedRimGeometry(f, immersedGeometry, faceColor)
+                        }
                     } else {
                         if (includeRim) {
                             makeRim(f, fallbackRimVertices.getValue(f.id), faceColor, false)
@@ -531,73 +590,219 @@ class FaceContext(
     }
 }
 
-internal fun safeImmersedRimScale(
-    poly: Polyhedron,
-    rimsByFace: Map<Int, ResolvedRimGeometry>,
-    meshesByFace: Map<Int, List<TriangulatedRimRegion>>,
+internal data class ImmersedRimVertex(
+    val position: Vec3,
+    val direction: Vec3,
+    val inner: Boolean,
+) {
+    fun rendered(width: Double): Vec3 = if (inner) position - direction * width else position
+}
+
+internal data class ImmersedRimSurface(
+    val vertices: List<ImmersedRimVertex>,
+    val triangles: List<Int>,
+    val normal: Vec3,
+)
+
+internal data class ImmersedRimGeometry(
+    val undersides: List<ImmersedRimSurface>,
+    val transitionWalls: List<ImmersedRimSurface>,
+    val openingWalls: List<ImmersedRimSurface>,
+) {
+    val surfaces: List<ImmersedRimSurface> get() = undersides + transitionWalls + openingWalls
+}
+
+internal data class ImmersedBottomCorners(
+    val full: Map<Int, Vec3>,
+    val rimLimited: Map<Int, Vec3>,
+)
+
+/**
+ * Safe bottom corners for an immersed source topology. At a reflex source vertex, extending either
+ * edge's offset independently reaches outside the other edge's winding-interior sector. The full
+ * and rim-limited variants trim that corner for the immersed sheet and its ordinary neighbors;
+ * their difference is closed explicitly along the shared edge.
+ */
+internal fun Polyhedron.immersedBottomCorners(
+    faceWidth: Double,
     joins: FaceThicknessJoins,
-    width: Double,
-): Double {
-    val immersedFaceIds = meshesByFace.keys.filter { faceId ->
-        poly.resolvedFaces[faceId].sourceBoundarySelfIntersects
+    rimsByFace: Map<Int, ResolvedRimGeometry>,
+): ImmersedBottomCorners {
+    val fullCandidates = hashMapOf<Int, MutableList<Vec3>>()
+    val limitedCandidates = hashMapOf<Int, MutableList<Vec3>>()
+    for (face in fs.filter { candidate ->
+        candidate.isPlanar && resolvedFaces[candidate.id].sourceBoundarySelfIntersects
+    }) {
+        val rim = rimsByFace[face.id] ?: continue
+        val fullWidths = joins.requiredRimWidths(face, faceWidth).map { required ->
+            min(required, rim.maximumWidth)
+        }
+        val limitedWidths = fullWidths.map { required -> min(required, rim.width) }
+        val full = face.insetVertices(fullWidths)
+        val limited = face.insetVertices(limitedWidths)
+        for (index in face.fvs.indices) {
+            val vertex = face.fvs[index]
+            val vertexId = vertex.id
+            val fullTangentialDistance = (full[index] - vertex).norm
+            val limitedFraction = if (fullTangentialDistance <= EPS) {
+                1.0
+            } else {
+                ((limited[index] - vertex).norm / fullTangentialDistance).coerceIn(0.0, 1.0)
+            }
+            fullCandidates.getOrPut(vertexId, ::arrayListOf) +=
+                full[index] - face.outwardNormal * faceWidth
+            limitedCandidates.getOrPut(vertexId, ::arrayListOf) +=
+                limited[index] - face.outwardNormal * (faceWidth * limitedFraction)
+        }
     }
-    if (immersedFaceIds.isEmpty() || width <= 0.0) return 1.0
-
-    data class ProjectedMesh(
-        val rim: ResolvedRimGeometry,
-        val normal: Vec3,
-        val vertices: List<Vec3>,
-        val displacements: List<Vec3>,
-        val triangles: List<Int>,
+    for (vertex in vs) {
+        if (vertex.id in limitedCandidates) continue
+        val incidentFaces = fs.filter { face -> vertex in face.fvs }
+        val referenceFace = incidentFaces.firstOrNull() ?: continue
+        val direction = joins.vertexDirection(referenceFace, vertex)
+        val displacement = direction * faceWidth
+        val limitedFraction = incidentFaces.minOf { face ->
+            val normal = face.outwardNormal
+            val tangentialDistance = (displacement - normal * (normal * displacement)).norm
+            val rim = rimsByFace[face.id]?.width ?: 0.0
+            if (tangentialDistance <= EPS) 1.0 else min(1.0, rim / tangentialDistance)
+        }
+        fullCandidates.getOrPut(vertex.id, ::arrayListOf) += vertex - displacement
+        limitedCandidates.getOrPut(vertex.id, ::arrayListOf) +=
+            vertex - displacement * limitedFraction
+    }
+    fun closest(candidates: Map<Int, List<Vec3>>): Map<Int, Vec3> =
+        candidates.mapValues { (vertexId, points) ->
+            val vertex = vs[vertexId]
+            points.minBy { point -> (point - vertex).norm }
+        }
+    return ImmersedBottomCorners(
+        full = closest(fullCandidates),
+        rimLimited = closest(limitedCandidates),
     )
+}
 
-    val projectedMeshes = immersedFaceIds.flatMap { faceId ->
-        val face = poly.fs[faceId]
-        val normal = face.outwardNormal
-        meshesByFace.getValue(faceId).map { mesh ->
-            ProjectedMesh(
-                rimsByFace.getValue(faceId),
-                normal,
-                mesh.vertices,
-                mesh.vertices.map { position ->
-                    val direction = if (joins.sourceEdgeOrNull(face, position) != null) {
-                        joins.direction(face, position, width)
-                    } else {
-                        normal
-                    }
-                    val tangent = direction - normal * (normal * direction)
-                    tangent * -width
-                },
-                mesh.triangles,
+/**
+ * Builds the underside as the original uninterrupted source-edge sheets instead of deforming the
+ * triangulation of their planar union. Reflex source edges terminate at safe face-local corners;
+ * transition sheets connect the full and rim-limited outlines. No union triangle can bridge
+ * between unrelated star openings.
+ */
+internal fun Face.immersedRimGeometry(
+    rimWidth: Double,
+    faceWidth: Double,
+    joins: FaceThicknessJoins,
+    sourceBoundarySelfIntersects: Boolean,
+    simpleFaceIds: Set<Int>,
+    bottomCorners: ImmersedBottomCorners,
+): ImmersedRimGeometry {
+    val topInner = insetVertices(List(size) { rimWidth })
+    val selectedCorners = if (sourceBoundarySelfIntersects) bottomCorners.full else bottomCorners.rimLimited
+    val bottomOuter = fvs.map { vertex ->
+        selectedCorners[vertex.id]
+            ?: vertex - joins.vertexDirection(this, vertex) * faceWidth
+    }
+    val bottomInner = insetPoints(bottomOuter, rimWidth)
+    val innerNormal = -outwardNormal
+
+    fun orientedSurfaces(
+        vertices: List<ImmersedRimVertex>,
+        preferredNormal: Vec3,
+    ): List<ImmersedRimSurface> {
+        require(vertices.size == 4)
+        val candidates = listOf(
+            listOf(0, 1, 2, 0, 2, 3),
+            listOf(0, 1, 3, 1, 2, 3),
+        )
+        val rendered = vertices.map { vertex -> vertex.rendered(faceWidth) }
+        val triangles = candidates.maxBy { candidate ->
+            candidate.chunked(3).minOf { (a, b, c) ->
+                abs(((rendered[b] - rendered[a]) cross (rendered[c] - rendered[a])) * preferredNormal)
+            }
+        }
+        val areaTolerance = maxOf(faceWidth, rimWidth, 1.0) * 1e-12
+        return triangles.chunked(3).mapNotNull { (a, b, c) ->
+            var oriented = listOf(a, b, c)
+            var normal = (rendered[b] - rendered[a]) cross (rendered[c] - rendered[a])
+            if (normal.norm <= areaTolerance) return@mapNotNull null
+            if (normal * preferredNormal < 0.0) {
+                oriented = listOf(a, c, b)
+                normal = -normal
+            }
+            ImmersedRimSurface(
+                oriented.map(vertices::get),
+                listOf(0, 1, 2),
+                normal.unit,
             )
         }
     }
 
-    fun isSafe(scale: Double): Boolean = projectedMeshes.all { mesh ->
-        val projectedInner = mesh.vertices.indices.map { index ->
-            mesh.vertices[index] + mesh.displacements[index] * scale
-        }
-        mesh.triangles.chunked(3).all { triangle ->
-            val points = triangle.map(projectedInner::get)
-            val samples = points + listOf(
-                (points[0] + points[1]) * 0.5,
-                (points[1] + points[2]) * 0.5,
-                (points[2] + points[0]) * 0.5,
-                (points[0] + points[1] + points[2]) * (1.0 / 3.0),
+    val undersides = fvs.indices.flatMap { index ->
+        val next = (index + 1) % size
+        val vertices = listOf(
+            ImmersedRimVertex(bottomOuter[index], Vec3.ZERO, inner = true),
+            ImmersedRimVertex(bottomOuter[next], Vec3.ZERO, inner = true),
+            ImmersedRimVertex(bottomInner[next], Vec3.ZERO, inner = true),
+            ImmersedRimVertex(bottomInner[index], Vec3.ZERO, inner = true),
+        )
+        orientedSurfaces(vertices, innerNormal)
+    }
+    val transitionWalls = if (!sourceBoundarySelfIntersects) {
+        emptyList()
+    } else {
+        fvs.indices.flatMap { index ->
+            val edge = joins.sourceEdge(this, index)
+            if (edge.l.id !in simpleFaceIds) return@flatMap emptyList()
+            val next = (index + 1) % size
+            val fullA = bottomCorners.full.getValue(fvs[index].id)
+            val fullB = bottomCorners.full.getValue(fvs[next].id)
+            val limitedA = bottomCorners.rimLimited.getValue(fvs[index].id)
+            val limitedB = bottomCorners.rimLimited.getValue(fvs[next].id)
+            val vertices = listOf(
+                ImmersedRimVertex(fullA, Vec3.ZERO, inner = true),
+                ImmersedRimVertex(fullB, Vec3.ZERO, inner = true),
+                ImmersedRimVertex(limitedB, Vec3.ZERO, inner = true),
+                ImmersedRimVertex(limitedA, Vec3.ZERO, inner = true),
             )
-            samples.all { point -> mesh.rim.containsProjected(point, mesh.normal, 1e-8) }
+            val preferred = (fullB - fullA) cross (limitedA - fullA)
+            orientedSurfaces(vertices, preferred)
         }
     }
-
-    if (isSafe(1.0)) return 1.0
-    if (!isSafe(0.0)) return 0.0
-    var low = 0.0
-    var high = 1.0
-    repeat(32) {
-        val middle = (low + high) / 2.0
-        if (isSafe(middle)) low = middle else high = middle
+    val openingWalls = fvs.indices.flatMap { index ->
+        val next = (index + 1) % size
+        val vertices = listOf(
+            ImmersedRimVertex(topInner[index], outwardNormal, inner = false),
+            ImmersedRimVertex(bottomInner[index], Vec3.ZERO, inner = true),
+            ImmersedRimVertex(topInner[next], outwardNormal, inner = false),
+            ImmersedRimVertex(bottomInner[next], Vec3.ZERO, inner = true),
+        )
+        val inward = (fvs[next] - fvs[index]) cross outwardNormal
+        orientedSurfaces(vertices, inward)
     }
-    return low
+    return ImmersedRimGeometry(undersides, transitionWalls, openingWalls)
+}
+
+/** Uniform inset of an already clipped bottom outline, retaining any out-of-plane variation. */
+private fun Face.insetPoints(points: List<Vec3>, width: Double): List<Vec3> {
+    require(points.size == size)
+    val edgeDirections = points.indices.map { index ->
+        val edge = points[(index + 1) % points.size] - points[index]
+        val projected = edge - this * (edge * this)
+        require(projected.norm > EPS)
+        projected.unit
+    }
+    val inward = edgeDirections.map { edge -> edge cross this }
+    return points.indices.map { index ->
+        val previous = (index + points.lastIndex) % points.size
+        val first = inward[previous]
+        val second = inward[index]
+        val cosine = first * second
+        val denominator = 1.0 - cosine * cosine
+        require(abs(denominator) > EPS)
+        val firstWeight = width * (1.0 - cosine) / denominator
+        val secondWeight = width * (1.0 - cosine) / denominator
+        points[index] + first * firstWeight + second * secondWeight
+    }
 }
 
 data class FaceExportParams(

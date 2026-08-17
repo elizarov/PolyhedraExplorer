@@ -21,6 +21,32 @@ For each source face the core returns `ResolvedRimGeometry`:
 
 The result is polygonal and tessellation-free. Each consumer triangulates it for its own format.
 
+## Hard geometry contracts
+
+The presentation with hidden faces must not protrude into the unbounded exterior of the complete
+resolved polyhedron with every face present. For cases whose exterior is described directly by the
+nonzero generalized-winding solid, the reusable presentation-containment test builds the actual
+WebGL triangles, tests vertices and edge/centroid samples, probes both sides of every transverse
+surface intersection, and reports the first offending triangle and point.
+
+That external test is necessary but cannot validate internal immersed sheets: a legitimate source
+sheet can pass through a zero-winding three-dimensional cell that is nevertheless enclosed by the
+outer presentation. The construction therefore also has independent local contracts:
+
+- thickness direction is derived only from incident source faces, never from resolved-solid point
+  classification or from which face orbits happen to be visible;
+- incident bottom outlines either share an edge or are joined by one explicit transition wall;
+- every occurrence of a given bottom-corner role uses the same locally constructed point;
+- every emitted top, underside, transition-wall, and opening-wall triangle is finite,
+  non-degenerate, and consistently oriented with its own surface normal;
+- hiding or showing another face cannot move an existing source-edge or source-vertex join.
+
+Tests exercise both contracts over convex, stellated, and star-family examples. Rim smaller than
+thickness, rim equal to thickness, rim larger than thickness, and narrow-rim/large-thickness cases
+are separate settings in the test matrix. High-winding pyramids are included in local closure tests
+even where a global nonzero-winding containment classifier cannot distinguish an internal sheet
+from the exterior.
+
 ## Face fill and rim regions
 
 Every face first has a two-dimensional arrangement in its face plane. The arrangement splits all
@@ -75,55 +101,73 @@ the clipping topology between patches.
 
 The inner surface of a material face is offset by `Width` along a direction `d` whose projection on
 every incident outward unit normal is one. Thus `p_inner = p_outer - Width · d` has exactly the
-configured perpendicular depth in every incident face.
+configured perpendicular depth in every incident face. This exact construction applies to ordinary
+embedded edge and vertex fans. An immersed acute corner can require an unbounded or visually
+destructive tangential miter; the tapered construction below preserves its source topology without
+pretending that it is a single convex half-space corner.
 
 Along an edge with normals `n1` and `n2`, the minimum-norm solution is
 
 `d = (n1 + n2) / (1 + n1 · n2)`.
 
 This is the intersection of the two equally offset face planes and lies on their dihedral bisector.
-At each ordinary face corner, the solver uses that face and the material faces across its incoming
-and outgoing source edges. It chooses a finite three-normal solution; duplicate normals are
-removed. One or two independent normals reduce to the normal or edge formula. If an adjacent face
-has no material, that side contributes no constraint.
+At a source vertex, all incident material-face normals participate. The solver finds the
+minimum-length local displacement satisfying `n · d >= 1` for every incident normal by enumerating
+the active one-, two-, and three-plane constraints. This gives the exact common corner for an
+ordinary convex fan and a candidate inward point for an overdetermined fan. If the half-space
+system has no common point, a regularized least-squares point is used. Duplicate normals are
+removed. If an adjacent face has no material, it contributes no constraint.
 
-Acute immersed configurations can make the unconstrained solution travel beyond the material
-available in an incident face. The complete join vector is then scaled uniformly until it first
-reaches either:
+Neither edge nor vertex directions query resolved face cells or the resolved three-dimensional
+solid. This is essential for immersed polyhedra: internal source sheets use the same local joins as
+externally visible sheets and do not change direction when another face orbit is hidden.
 
-- the inner edge of a configured rim band; or
-- the first boundary of a resolved filled face along the tangential displacement; or
-- the first boundary of the actual resolved rim region.
+An immersed face cannot reuse the triangulation of the planar union for its underside. A union
+triangle can join portions owned by different overlapping source-edge sheets; moving its
+source-edge vertices to a shared miter can then fold that triangle across an opening. Scaling the
+join separately in each incident face is also invalid: it gives the two faces different bottom
+edges and makes an ordinary side face protrude from the seam.
 
-Both faces of an edge receive the same scaled three-dimensional join point. The rim-region test is
-needed at an immersed crossing: a displacement can remain inside the nonzero-winding face fill but
-leave the particular one-sided rim sheet.
+WebGL therefore keeps two representations with distinct jobs. The visible top uses the resolved
+planar union. The underside uses one uninterrupted sheet per authoritative source edge and two
+locally derived bottom-corner outlines:
 
-A self-intersecting hidden face keeps the same connected resolved-rim triangulation on its top and
-underside. A source edge uses its exact shared bisector direction; an opening boundary uses the face
-normal. Moving those vertices by the full requested depth can fold an underside triangle across a
-hole because the planar union no longer records which overlapping source sheet owns a crossing.
-The renderer therefore finds the largest common depth factor for which every underside triangle
-stays inside the actual resolved rim. The containment check covers triangle vertices, edge
-midpoints, and centroids, and a binary search finds the factor.
+1. The **full outline** intersects the two width-offset edge lines in the self-intersecting source
+   face. Its tangential inset is capped by that face's arrangement-derived maximum.
+2. The **rim-limited outline** caps that tangential inset by `Rim`. Its perpendicular displacement
+   is scaled by the same fraction, so the corner lies between the original vertex and the full
+   miter instead of combining a shallow tangential inset with the full depth outside the solid.
+3. A self-intersecting source sheet uses the full outline. An ordinary neighboring face uses the
+   rim-limited outline. One explicit transition sheet closes the difference along their shared
+   edge.
+4. The inner boundary of each bottom rim is a uniform `Rim` inset of its actual bottom outline,
+   rather than an unrelated inset of the original top face.
 
-The factor multiplies every thickness direction in the presentation, not only the failing face or
-individual vertices. Adjacent faces therefore retain identical shared joins, opening walls reach
-the same underside, and the surface remains connected. Ordinary geometry uses factor one. Only an
-immersed rim whose requested depth would invert its resolved surface is made uniformly shallower;
-its visible top rim keeps the configured in-face width.
+At an immersed vertex not belonging to a self-intersecting face, such as the apex of a star
+pyramid, the all-face join is limited by the largest tangential excursion over its incident faces.
+The complete displacement is scaled by the same rim-derived fraction, so all incident sheets reuse
+one watertight corner without pulling the apex through the model.
 
-For an embedded planar surface, the visible rim is widened when necessary to let a perpendicular
+Opening walls connect the configured top inset to the independently constructed bottom inset and
+may therefore be sloped or twisted. Every selected triangle is emitted as its own surface with its
+own normal; no planar-quad normal is assumed. Degenerate triangles are omitted and the diagonal
+with the stronger valid area is selected. Overlapping source sheets represent the same material and
+are resolved by the depth buffer; no union triangle can bridge unrelated openings.
+
+For an ordinary embedded surface, the visible rim is widened when necessary to let a perpendicular
 opening wall reach the shared inner bisector. The required in-face distance is the tangential part
-of `Width · d`. Immersed and folded surfaces retain the configured top-rim width; only their
-underside join is bounded. This prevents an acute dihedral from making the visible strip arbitrarily
-wide.
+of `Width · d`. If the polyhedron contains an immersed face, every visible top rim instead retains
+the configured width. This keeps an ordinary triangular neighbor visually identical to the same
+triangle in a non-star pyramid even when the immersed dihedral becomes extremely acute. The
+full and rim-limited bottom outlines, their transition sheet, and sloped opening walls absorb the
+depth transition without changing that visible band.
 
 ## Consumer geometry
 
-- **WebGL** triangulates the returned outer and hole cycles. It emits the top and shared inner
-  surfaces plus walls around actual opening cycles. A source edge shared with another material face
-  has no separate wall. Immersed-rim thickness uses the common safe-depth factor described above.
+- **WebGL** triangulates the returned outer and hole cycles. Embedded presentations emit the top and
+  shared inner surfaces plus walls around actual opening cycles. An immersed hidden face uses the
+  continuous source-sheet underside, tapered bottom corners, and explicit full-to-limited
+  transition sheets described above.
 - **STL** constructs the complete thick presentation, corefines all triangle intersections, and
   selects the zero/nonzero-winding solid boundary. High-winding arrangements remain an indexed
   triangle boundary through quantization; they are not converted back into source-style polygon
@@ -145,9 +189,11 @@ pieces use their own perpendicular extrusion and are unioned downstream.
 | Collapsed projected edge or 180-degree planar corner | No unique finite inset exists, so the simple-face maximum rim is zero. |
 | Concave corner collision | The maximum rim stops before the first invalid inset, even when that precedes an edge collapse. |
 | Source-edge crossing | The continuous one-sided sheets overlap and are resolved as a planar union; they are not clipped into independent edge fragments. |
-| Very acute dihedral | The common underside join stops at the first available-material boundary instead of inverting or floating outside the face. |
+| Very acute embedded dihedral | The full outline is arrangement-limited; the neighboring outline tapers tangential inset and depth together, and an explicit transition wall closes them. |
+| Simple face adjacent to an immersed face | Its visible and bottom bands retain the configured rim; a local transition wall absorbs the acute depth difference. |
 | Missing material on one adjacent face | The remaining face normal supplies the offset direction on that side. |
-| More than three non-concurrent offset planes at one immersed vertex | The least-residual shared direction is bounded by every incident filled/rim region; if the resulting immersed underside would fold, the whole presentation uses one common safe depth factor. |
+| More than three non-concurrent offset planes at one immersed vertex | The all-face join supplies a candidate direction; excessive tangential travel scales the complete displacement toward the source vertex, and all incident sheets reuse the result. |
+| Internal immersed structure | Source-face orientation and incident topology choose the side; resolved-solid containment never chooses or reverses it. |
 | Non-planar face | Projection is used only for clipping; triangle-wise barycentric lifting restores the actual folded surface. |
 | Multiple coplanar or transverse STL pieces | The three-dimensional arrangement splits intersections and removes internal fragments by solid winding. |
 | High-winding point junction | STL keeps the edge-closed arrangement triangles directly instead of forcing them through the stricter source-polyhedron vertex-fan model. |
