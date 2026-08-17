@@ -28,6 +28,7 @@ class FaceThicknessJoins(
     private val materialFaceIds: Set<Int> = poly.fs.mapTo(linkedSetOf(), Face::id),
     private val rimFaceIds: Set<Int> = emptySet(),
     private val rimWidth: Double = 0.0,
+    private val resolvedRims: Map<Int, ResolvedRimGeometry> = emptyMap(),
 ) {
     init {
         require(rimFaceIds.all(materialFaceIds::contains))
@@ -131,6 +132,7 @@ class FaceThicknessJoins(
         val normal = outwardNormal
         val normalComponent = normal * direction
         val tangent = direction - normal * normalComponent
+        val resolvedRim = resolvedRims[id].takeIf { isPlanar }
         val rimScale = if (id in rimFaceIds && tangent.norm * width > rimWidth) {
             rimWidth / (tangent.norm * width)
         } else {
@@ -140,11 +142,19 @@ class FaceThicknessJoins(
         val delta = tangent * -width
         if (delta.norm <= tolerance) return 1.0
         val geometry = poly.resolvedFaces[id]
-        val events = geometry.edges.asSequence()
-            .filter { edge -> !edge.internalToFill }
-            .mapNotNull { edge ->
-                val a = geometry.vertices[edge.a].position
-                val b = geometry.vertices[edge.b].position
+        val boundaries = sequence {
+            geometry.edges.asSequence().filter { edge -> !edge.internalToFill }.forEach { edge ->
+                yield(geometry.vertices[edge.a].position to geometry.vertices[edge.b].position)
+            }
+            resolvedRim?.regions?.forEach { region ->
+                (listOf(region.outer) + region.holes).forEach { cycle ->
+                    cycle.vertices.indices.forEach { index ->
+                        yield(cycle.vertices[index] to cycle.vertices[(index + 1) % cycle.vertices.size])
+                    }
+                }
+            }
+        }
+        val events = boundaries.mapNotNull { (a, b) ->
                 val segment = b - a
                 val denominator = (delta cross segment) * normal
                 if (abs(denominator) <= tolerance * delta.norm * segment.norm) return@mapNotNull null
@@ -162,7 +172,10 @@ class FaceThicknessJoins(
         for (end in events + 1.0) {
             if (end - start > 1e-10) {
                 val sample = point + delta * ((start + end) * 0.5)
-                if (!geometry.contains(sample, normal, tolerance)) return minOf(start, rimScale)
+                if (
+                    !geometry.contains(sample, normal, tolerance) ||
+                    resolvedRim?.containsProjected(sample, normal, tolerance) == false
+                ) return minOf(start, rimScale)
             }
             start = end
         }
@@ -204,7 +217,7 @@ val Face.outwardNormal: Vec3
 
 private fun directedEdgeKey(edge: Edge) = edge.r.id to edge.a.id
 
-/** Minimum-norm displacement whose projection onto every supplied unit normal is one. */
+/** Unit-offset displacement; overdetermined inputs use the three-plane solution with least residual. */
 private fun solve(normals: List<Vec3>): Vec3 {
     val distinct = normals.distinctBy { normal ->
         listOf(

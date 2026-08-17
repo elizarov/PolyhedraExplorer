@@ -130,7 +130,19 @@ class FaceContext(
                 materialFaceIds,
                 candidateRimFaceIds.takeIf { poly.keepsConfiguredRimWidth }.orEmpty(),
                 presentationRim,
+                resolvedRimByFace,
             )
+            val immersedRimScale = if (includeWidth && !includeExpand) {
+                safeImmersedRimScale(
+                    poly,
+                    resolvedRimByFace,
+                    rimMeshesByFace,
+                    thicknessJoins,
+                    presentationWidth,
+                )
+            } else {
+                1.0
+            }
 
             fun sourceEdgeOrNull(face: Face, a: Vec3, b: Vec3): Edge? =
                 thicknessJoins.sourceEdgeOrNull(face, a, b)
@@ -143,6 +155,7 @@ class FaceContext(
             ): Boolean {
                 if (mesh.triangulationPatch && cycle.segmentSources[index].isEmpty()) return false
                 val next = (index + 1) % cycle.vertices.size
+                if ((cycle.vertices[next] - cycle.vertices[index]).norm <= 1e-12) return false
                 return sourceEdgeOrNull(face, cycle.vertices[index], cycle.vertices[next]) == null
             }
 
@@ -244,8 +257,9 @@ class FaceContext(
                     positionBuffer[ofs] = position
                     lightNormalBuffer[ofs] = lNorm
                     expandDirBuffer[ofs] = f
-                    thicknessDirBuffer[ofs] = if (includeExpand) f.outwardNormal else
+                    val thicknessDirection = if (includeExpand) f.outwardNormal else
                         thicknessJoins.direction(f, position, presentationWidth)
+                    thicknessDirBuffer[ofs] = thicknessDirection * immersedRimScale
                     rimDirBuffer[ofs] = Vec3.ZERO
                     rimMaxBuffer[ofs] = 0.0
                     colorBuffer[ofs] = faceColor
@@ -289,11 +303,12 @@ class FaceContext(
                         positionBuffer[ofs] = position
                         lightNormalBuffer[ofs] = lNorm
                         expandDirBuffer[ofs] = f
-                        thicknessDirBuffer[ofs] = if (includeExpand || rim != 0) {
+                        val thicknessDirection = if (includeExpand || rim != 0) {
                             f.outwardNormal
                         } else {
                             thicknessJoins.vertexDirection(f, f[i], presentationWidth)
                         }
+                        thicknessDirBuffer[ofs] = thicknessDirection * immersedRimScale
                         rimDirBuffer[ofs] = Vec3.ZERO
                         rimMaxBuffer[ofs] = 0.0
                         colorBuffer[ofs] = faceColor
@@ -321,7 +336,7 @@ class FaceContext(
                         positionBuffer[ofs] = positions[i]
                         lightNormalBuffer[ofs] = lNorm
                         expandDirBuffer[ofs] = f
-                        thicknessDirBuffer[ofs] = f.outwardNormal
+                        thicknessDirBuffer[ofs] = f.outwardNormal * immersedRimScale
                         rimDirBuffer[ofs] = Vec3.ZERO
                         rimMaxBuffer[ofs] = 0.0
                         colorBuffer[ofs] = faceColor
@@ -354,13 +369,14 @@ class FaceContext(
                         positionBuffer[bufOfs] = position
                         lightNormalBuffer[bufOfs] = lNorm
                         expandDirBuffer[bufOfs] = f
-                        thicknessDirBuffer[bufOfs] = if (includeExpand) {
+                        val thicknessDirection = if (includeExpand) {
                             patchThicknessDirection
                         } else if (thicknessJoins.sourceEdgeOrNull(f, position) != null) {
                             thicknessJoins.direction(f, position, presentationWidth)
                         } else {
                             patchThicknessDirection
                         }
+                        thicknessDirBuffer[bufOfs] = thicknessDirection * immersedRimScale
                         rimDirBuffer[bufOfs] = Vec3.ZERO
                         rimMaxBuffer[bufOfs] = 0.0
                         colorBuffer[bufOfs] = faceColor
@@ -396,11 +412,12 @@ class FaceContext(
                         val a = cycle.vertices[index]
                         val b = cycle.vertices[(index + 1) % cycle.vertices.size]
                         val sideNormal = (-thicknessDirection cross (b - a)).unit
+                        val presentationThicknessDirection = thicknessDirection * immersedRimScale
                         for (position in listOf(a, b)) for (innerFlag in 0..1) {
                             positionBuffer[bufOfs] = position
                             lightNormalBuffer[bufOfs] = sideNormal
                             expandDirBuffer[bufOfs] = f
-                            thicknessDirBuffer[bufOfs] = thicknessDirection
+                            thicknessDirBuffer[bufOfs] = presentationThicknessDirection
                             rimDirBuffer[bufOfs] = Vec3.ZERO
                             rimMaxBuffer[bufOfs] = 0.0
                             colorBuffer[bufOfs] = faceColor
@@ -429,9 +446,7 @@ class FaceContext(
                     if (rimMeshes != null && includeRim) {
                         makeResolvedRim(f, rimMeshes, faceColor, false)
                         makeResolvedRim(f, rimMeshes, faceColor, true)
-                        if (includeWidth) {
-                            makeResolvedRimBorders(f, rimMeshes, faceColor)
-                        }
+                        if (includeWidth) makeResolvedRimBorders(f, rimMeshes, faceColor)
                     } else {
                         if (includeRim) {
                             makeRim(f, fallbackRimVertices.getValue(f.id), faceColor, false)
@@ -514,6 +529,75 @@ class FaceContext(
             ),
         )
     }
+}
+
+internal fun safeImmersedRimScale(
+    poly: Polyhedron,
+    rimsByFace: Map<Int, ResolvedRimGeometry>,
+    meshesByFace: Map<Int, List<TriangulatedRimRegion>>,
+    joins: FaceThicknessJoins,
+    width: Double,
+): Double {
+    val immersedFaceIds = meshesByFace.keys.filter { faceId ->
+        poly.resolvedFaces[faceId].sourceBoundarySelfIntersects
+    }
+    if (immersedFaceIds.isEmpty() || width <= 0.0) return 1.0
+
+    data class ProjectedMesh(
+        val rim: ResolvedRimGeometry,
+        val normal: Vec3,
+        val vertices: List<Vec3>,
+        val displacements: List<Vec3>,
+        val triangles: List<Int>,
+    )
+
+    val projectedMeshes = immersedFaceIds.flatMap { faceId ->
+        val face = poly.fs[faceId]
+        val normal = face.outwardNormal
+        meshesByFace.getValue(faceId).map { mesh ->
+            ProjectedMesh(
+                rimsByFace.getValue(faceId),
+                normal,
+                mesh.vertices,
+                mesh.vertices.map { position ->
+                    val direction = if (joins.sourceEdgeOrNull(face, position) != null) {
+                        joins.direction(face, position, width)
+                    } else {
+                        normal
+                    }
+                    val tangent = direction - normal * (normal * direction)
+                    tangent * -width
+                },
+                mesh.triangles,
+            )
+        }
+    }
+
+    fun isSafe(scale: Double): Boolean = projectedMeshes.all { mesh ->
+        val projectedInner = mesh.vertices.indices.map { index ->
+            mesh.vertices[index] + mesh.displacements[index] * scale
+        }
+        mesh.triangles.chunked(3).all { triangle ->
+            val points = triangle.map(projectedInner::get)
+            val samples = points + listOf(
+                (points[0] + points[1]) * 0.5,
+                (points[1] + points[2]) * 0.5,
+                (points[2] + points[0]) * 0.5,
+                (points[0] + points[1] + points[2]) * (1.0 / 3.0),
+            )
+            samples.all { point -> mesh.rim.containsProjected(point, mesh.normal, 1e-8) }
+        }
+    }
+
+    if (isSafe(1.0)) return 1.0
+    if (!isSafe(0.0)) return 0.0
+    var low = 0.0
+    var high = 1.0
+    repeat(32) {
+        val middle = (low + high) / 2.0
+        if (isSafe(middle)) low = middle else high = middle
+    }
+    return low
 }
 
 data class FaceExportParams(

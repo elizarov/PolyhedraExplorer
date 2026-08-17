@@ -344,6 +344,21 @@ class StlApiTest {
     }
 
     @Test
+    fun exportsMinimizedHighWindingPyramidTenThirdsWithHiddenRims() = runTest {
+        assertHighWindingStarPyramidExports("SY10_3")
+    }
+
+    @Test
+    fun exportsReportedPyramidFifteenSeventhsWithHiddenRims() = runTest {
+        assertHighWindingStarPyramidExports("SY15_7")
+    }
+
+    @Test
+    fun exportsPyramidNineteenNinthsWithHiddenRims() = runTest {
+        assertHighWindingStarPyramidExports("SY19_9")
+    }
+
+    @Test
     fun exportsTruncatedStellatedOctahedronFoldedFacesAsRims() = runTest {
         assertFoldedRimExport(listOf("S", "t"), expectedNonPlanarFaces = 6)
     }
@@ -423,6 +438,27 @@ class StlApiTest {
 private suspend fun assertAllHiddenRimExport(seedTag: String) {
     val source = requireNotNull(seedTag.toSeedOrNull()).poly
     assertHiddenRimExport(source, source.fs.map { face -> face.kind }.distinct())
+}
+
+private suspend fun assertHighWindingStarPyramidExports(seedTag: String) {
+    val source = requireNotNull(seedTag.toSeedOrNull()).poly
+    val kinds = source.faceKinds.keys.sorted()
+    for (hidden in listOf(listOf(kinds[0]), listOf(kinds[1]), kinds)) {
+        val response = convertStl(
+            CoreStlRequest(
+                presentation = CoreStlPresentation(
+                    poly = source,
+                    hiddenFaceKinds = hidden,
+                    scale = 20.0,
+                    width = 0.1,
+                    rim = 0.05,
+                    expand = 0.0,
+                ),
+            ),
+        )
+        assertNull(response.error, "$seedTag $hidden: ${response.error?.reason}")
+        assertTrue(response.signedVolume6() > 0.0, "$seedTag $hidden")
+    }
 }
 
 private suspend fun assertHiddenRimExport(source: Polyhedron, hiddenFaceKinds: List<FaceKind>) {

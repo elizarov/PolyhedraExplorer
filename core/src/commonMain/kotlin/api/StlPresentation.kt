@@ -56,12 +56,6 @@ internal suspend fun CoreStlPresentation.toTriangleRequest(
     } else {
         emptySet()
     }
-    val thicknessJoins = FaceThicknessJoins(
-        source,
-        materialFaceIds,
-        candidateRimFaceIds.takeIf { source.keepsConfiguredRimWidth }.orEmpty(),
-        rim,
-    )
     val useClosedSourcePieces = hiddenKinds.isNotEmpty() && width > 0.0 && expand == 0.0
     val useMiteredShell = !stableJoinsFallback && useClosedSourcePieces
     val allSourceFacesHidden = source.fs.all { face -> face.kind in hiddenKinds }
@@ -84,6 +78,13 @@ internal suspend fun CoreStlPresentation.toTriangleRequest(
     } else {
         emptyMap()
     }
+    val thicknessJoins = FaceThicknessJoins(
+        source,
+        materialFaceIds,
+        candidateRimFaceIds.takeIf { source.keepsConfiguredRimWidth }.orEmpty(),
+        rim,
+        rimBySourceFace,
+    )
     val rotation = physical.rotationWithLargestFaceDown()
     val shellReferenceDistance = physical.fs.map { face -> abs(face.d) }
         .filter { distance -> distance > 1e-12 }

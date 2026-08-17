@@ -160,24 +160,10 @@ through, and after every arrangement crossing. A pentagram therefore has rim mat
 the central pentagon and all five outer triangular arms; a crossing never becomes an endpoint or a
 reason to suppress part of an edge.
 
-Adjacent sheets share the exact intersection of their offset lines only at their authoritative
-source vertex. All sheets are then unioned in the face plane, so overlapping crossings have no duplicate top surfaces or
-internal seams. The union boundary may be split at crossings as a derived triangulation detail, but
-the source sheets themselves are never split or clipped by resolved winding cells. The maximum-width
-calculation intersects the same sheets with the nonzero-winding fill only to detect complete coverage;
-that measurement does not alter presentation geometry.
-
-The result is tessellation-free `ResolvedRimGeometry`: deterministic outer and hole cycles,
-source-edge provenance, the applied width, and the maximum width before the rim covers the complete
-fill. Adjacent face offsets share the same angle-bisector edge and corner joins for embedded and
-immersed surfaces alike. Immersed rims retain the configured top width; a steep dihedral never
-widens the visible strip. If an acute miter reaches the inner boundary of that rim, or the first
-boundary of a filled incident face, before the configured depth, the shared join stops at that local
-offset-surface collapse instead of continuing through the material into an inverted, detached sheet.
-The underside tapers to the bounded join while the top rim is unchanged. Every incident face uses
-the same join point, so corners remain connected and ordinary immersed triangles retain the same
-construction as their embedded counterparts. Simple-face inset and non-planar rim behavior remain owned by
-[Non-convex geometry](non-convex.md); export postconditions are specified in [Export](export.md).
+Adjacent sheets meet at source vertices and are unioned in the face plane. Arrangement crossings
+may split only the derived union boundary, never the authoritative sheet. The complete construction,
+including maximum-width measurement, acute shared thickness joins, and non-planar patches, is owned
+by [Rim geometry](rim_geometry.md). Export postconditions are owned by [Export](export.md).
 
 ## Invariants
 

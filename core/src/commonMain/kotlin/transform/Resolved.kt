@@ -88,30 +88,35 @@ internal data class TriangleSoupTriangle(
     val solidId: Int = -1,
 )
 
+internal data class TriangleSoupBoundary(
+    val positions: List<Vec3>,
+    /** Counter-clockwise triangles viewed from outside the retained solid. */
+    val triangles: List<List<Int>>,
+)
+
 /** Resolves presentation triangles without requiring an abstract manifold before arrangement. */
 internal suspend fun resolvedTriangleSoup(
     triangles: List<TriangleSoupTriangle>,
     progress: OperationProgressContext?,
     maximumEdges: Int,
     toleranceFloor: Double = 0.0,
-    mergeFaces: Boolean = true,
-): Polyhedron {
+): TriangleSoupBoundary {
     val points = triangles.flatMap { triangle -> listOf(triangle.a, triangle.b, triangle.c) }
     val radius = points.maxOfOrNull(Vec3::norm) ?: 0.0
     val source = triangles.map { triangle ->
         SourceTriangle(triangle.sourceFaceId, triangle.a, triangle.b, triangle.c, solidId = triangle.solidId)
     }
-    return resolveSurface(
+    val boundary = resolveBoundary(
         source,
         radius,
         progress,
         maximumEdges,
-        provenanceSource = null,
-        mergeFaces = mergeFaces,
+        mergeFaces = false,
         allowCoplanarOverlap = true,
         toleranceFloor = toleranceFloor,
-        validateResult = false,
     )
+    require(boundary.faceVertexIds.all { face -> face.size == 3 })
+    return TriangleSoupBoundary(boundary.positions, boundary.faceVertexIds)
 }
 
 private suspend fun Polyhedron.resolvedSurface(
@@ -150,6 +155,39 @@ private suspend fun resolveSurface(
     toleranceFloor: Double,
     validateResult: Boolean,
 ): Polyhedron {
+    val boundary = resolveBoundary(
+        source,
+        radius,
+        progress,
+        maximumEdges,
+        mergeFaces,
+        allowCoplanarOverlap,
+        toleranceFloor,
+    )
+    val tolerance = maxOf(EPS * radius * 32.0, 1e-12 * radius, toleranceFloor)
+    val topologyProvenance = provenanceSource?.let { boundary.sourceProvenance(it, tolerance) }
+    val result = polyhedron(mergeIndistinguishableKinds = true) {
+        boundary.positions.forEachIndexed { index, position -> vertex(position, VertexKind(index)) }
+        // Working fragments are counter-clockwise from outside; Polyhedron stores clockwise faces.
+        boundary.faceVertexIds.forEachIndexed { index, polygon ->
+            face(polygon.asReversed(), FaceKind(index))
+        }
+        resolvedTopologyProvenance(topologyProvenance)
+    }
+    if (validateResult) result.validateProperGeometry()
+    progress?.reportProgress(100)
+    return result
+}
+
+private suspend fun resolveBoundary(
+    source: List<SourceTriangle>,
+    radius: Double,
+    progress: OperationProgressContext?,
+    maximumEdges: Int,
+    mergeFaces: Boolean,
+    allowCoplanarOverlap: Boolean,
+    toleranceFloor: Double,
+): PolygonBoundary {
     require(radius.isFinite() && radius > 0.0) { "Resolved requires a finite nonzero circumradius" }
     val tolerance = maxOf(EPS * radius * 32.0, 1e-12 * radius, toleranceFloor)
     require(source.isNotEmpty()) { "Resolved requires presentation triangles" }
@@ -259,18 +297,7 @@ private suspend fun resolveSurface(
         )
     }
     progress?.reportProgress(90)
-    val topologyProvenance = provenanceSource?.let { boundary.sourceProvenance(it, tolerance) }
-    val result = polyhedron(mergeIndistinguishableKinds = true) {
-        boundary.positions.forEachIndexed { index, position -> vertex(position, VertexKind(index)) }
-        // Working fragments are counter-clockwise from outside; Polyhedron stores clockwise faces.
-        boundary.faceVertexIds.forEachIndexed { index, polygon ->
-            face(polygon.asReversed(), FaceKind(index))
-        }
-        resolvedTopologyProvenance(topologyProvenance)
-    }
-    if (validateResult) result.validateProperGeometry()
-    progress?.reportProgress(100)
-    return result
+    return boundary
 }
 
 private data class SourceTriangle(

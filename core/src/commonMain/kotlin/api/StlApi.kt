@@ -39,6 +39,7 @@ private data class Bounds(
 private data class PointKey(val x: Double, val y: Double, val z: Double)
 private data class InputTriangle(val points: List<Vec3>, val surface: Int, val solid: Int)
 private data class WeldBucket(val x: Long, val y: Long, val z: Long)
+private data class IndexedBoundary(val positions: List<Vec3>, val triangles: List<List<Int>>)
 
 suspend fun convertStl(
     request: CoreStlRequest,
@@ -141,9 +142,10 @@ private suspend fun convertStlInternal(
         val radius = request.vertices.maxOfOrNull(Vec3::norm) ?: 0.0
         require(radius.isFinite() && radius > 0.0) { "STL input has no finite nonzero extent" }
         val coordinateFactor = 10.0.pow(STL_COORDINATE_PRECISION)
-        // WebGL presentation buffers are float32. Weld only their sub-pixel representation noise;
-        // final STL coordinates retain six decimal places independently of this input repair.
-        val weldTolerance = maxOf(25e-6, radius * 5e-7)
+        // Presentation geometry comes from the double-precision core. Use the same scale-relative
+        // tolerance as the arrangement instead of collapsing short high-winding features as if
+        // this were a float32 WebGL buffer.
+        val weldTolerance = maxOf(EPS * radius * 32.0, 1e-12 * radius)
         val welded = arrayListOf<Vec3>()
         val weldBuckets = hashMapOf<WeldBucket, MutableList<Int>>()
         fun weldBucket(point: Vec3) = WeldBucket(
@@ -291,21 +293,23 @@ private suspend fun convertStlInternal(
                     face(faceVertices, FaceKind(index))
                 }
             }.also { candidate -> candidate.validateProperGeometry() }
+                .let { candidate ->
+                    IndexedBoundary(
+                        candidate.vs,
+                        candidate.fs.map { face -> face.fvs.map { vertex -> vertex.id } },
+                    )
+                }
         }.getOrNull()
         val resolved = directBoundary ?: resolvedTriangleSoup(
-                triangleSoup,
-                OperationProgressContext { done ->
-                    checkTime()
-                    reportProgress(5 + done * 80 / 100)
-                },
-                maximumEdges = Int.MAX_VALUE,
-                toleranceFloor = weldTolerance,
-                // Independent closed presentation pieces produce many coplanar arrangement
-                // fragments, so merge them before final tessellation. A global soup can carry
-                // coincident logical surfaces whose polygon merge is intentionally deferred.
-                mergeFaces = triangleSoup.all { triangle -> triangle.solidId >= 0 },
-            )
-        val arrangementTriangles = resolved.fs.sumOf { face -> face.triangles.size }
+            triangleSoup,
+            OperationProgressContext { done ->
+                checkTime()
+                reportProgress(5 + done * 80 / 100)
+            },
+            maximumEdges = Int.MAX_VALUE,
+            toleranceFloor = weldTolerance,
+        ).let { boundary -> IndexedBoundary(boundary.positions, boundary.triangles) }
+        val arrangementTriangles = resolved.triangles.size
         checkLimit(
             stage,
             "generated arrangement fragments",
@@ -318,7 +322,7 @@ private suspend fun convertStlInternal(
         reportProgress(86)
 
         stage = CoreStlStage.Quantization
-        val floor = resolved.vs.minOf(Vec3::z)
+        val floor = resolved.positions.minOf(Vec3::z)
         val vertices = arrayListOf<MutableVec3>()
         val vertexIds = linkedMapOf<Triple<Double, Double, Double>, Int>()
         fun vertex(point: Vec3): Int {
@@ -329,17 +333,12 @@ private suspend fun convertStlInternal(
                 vertices.lastIndex
             }
         }
-        val triangles = resolved.fs.flatMap { face ->
-            val geometry = resolved.resolvedFaces[face.id]
-            geometry.triangles.map { triangle ->
-                val ids = listOf(triangle.a, triangle.b, triangle.c).map { index ->
-                    vertex(geometry.vertices[index].position)
-                }
-                require(ids.toSet().size == 3) {
-                    "STL quantization merged vertices of resolved face ${face.id} triangle $triangle"
-                }
-                CoreStlTriangle(ids[0], ids[1], ids[2])
+        val triangles = resolved.triangles.mapIndexed { triangleIndex, triangle ->
+            val ids = triangle.map { index -> vertex(resolved.positions[index]) }
+            require(ids.toSet().size == 3) {
+                "STL quantization merged vertices of resolved triangle $triangleIndex"
             }
+            CoreStlTriangle(ids[0], ids[1], ids[2])
         }.toMutableList()
         require(triangles.isNotEmpty()) { "STL quantization removed every triangle" }
         checkLimit(
@@ -418,6 +417,12 @@ private fun validateQuantizedStl(
         val ids = listOf(triangle.a, triangle.b, triangle.c)
         require(ids.all { id -> id in vertices.indices } && ids.toSet().size == 3) {
             "STL final triangle $triangleIndex has invalid vertices $ids"
+        }
+        val a = vertices[ids[0]]
+        val b = vertices[ids[1]]
+        val c = vertices[ids[2]]
+        require(((b - a) cross (c - a)).norm > 0.0) {
+            "STL final triangle $triangleIndex is degenerate"
         }
         for (index in ids.indices) {
             val a = ids[index]

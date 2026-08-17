@@ -8,17 +8,22 @@ import org.khronos.webgl.WebGLRenderingContext
 import org.w3c.dom.HTMLCanvasElement
 import polyhedra.core.poly.polyhedron
 import polyhedra.core.poly.resolvedRims
+import polyhedra.core.poly.toSeedOrNull
 import polyhedra.core.api.evaluateCore
 import polyhedra.model.api.CoreRequest
 import polyhedra.model.api.CoreState
 import polyhedra.model.poly.FaceKind
 import polyhedra.model.poly.FaceThicknessJoins
 import polyhedra.model.poly.Polyhedron
+import polyhedra.model.poly.outwardNormal
+import polyhedra.model.poly.size
 import polyhedra.model.util.Vec3
 import polyhedra.web.poly.FaceContext
 import polyhedra.web.poly.RenderParams
 import polyhedra.web.poly.FaceExportParams
+import polyhedra.web.poly.safeImmersedRimScale
 import polyhedra.web.poly.triangulate
+import polyhedra.web.params.Param
 import polyhedra.model.util.cross
 import polyhedra.model.util.minus
 import polyhedra.model.util.norm
@@ -39,6 +44,97 @@ class ResolvedFaceRenderingTest {
     @AfterTest
     fun tearDown() {
         scope.cancel()
+    }
+
+    @Test
+    fun hiddenStellatedDodecahedronBoundsItsWholeInnerRimWithOneCoherentScale() {
+        val poly = requireNotNull("SD".toSeedOrNull()).poly
+        val rimWidth = 0.015
+        val faceWidth = 0.129
+        val params = RenderParams("", null)
+        params.poly.hideFaces.updateValue(setOf(FaceKind(0)))
+        params.view.faceRim.updateUnsnappedValue(rimWidth, Param.TargetValue)
+        params.view.faceWidth.updateUnsnappedValue(faceWidth, Param.TargetValue)
+        val rims = poly.resolvedRims(rimWidth, faceWidth)
+        params.poly.updateResolvedRims(rims)
+        val canvas = document.createElement("canvas") as HTMLCanvasElement
+        val gl = requireNotNull(canvas.getContext("webgl") as? WebGLRenderingContext)
+        val context = FaceContext(gl, params) { poly }
+        try {
+            context.performUpdate(null, 0.0)
+
+            val rimMeshes = rims.flatMap { rim ->
+                val face = poly.fs[rim.sourceFaceId]
+                rim.regions.map { region -> face to region.triangulate(face) }
+            }
+            val boundarySegments = rimBoundarySegments(poly, rimMeshes)
+            val capBufferSize = 2 * rimMeshes.sumOf { (_, mesh) -> mesh.vertices.size }
+            val fullIndexSize = 2 * rimMeshes.sumOf { (_, mesh) -> mesh.triangles.size } +
+                6 * boundarySegments
+            assertEquals(
+                capBufferSize + 4 * boundarySegments,
+                context.bufferSize,
+            )
+            assertEquals(fullIndexSize, context.indexSize)
+
+            val rimsByFace = rims.associateBy { rim -> rim.sourceFaceId }
+            val meshesByFace = rims.associate { rim ->
+                val face = poly.fs[rim.sourceFaceId]
+                rim.sourceFaceId to rim.regions.map { region -> region.triangulate(face) }
+            }
+            val allFaces = poly.fs.mapTo(linkedSetOf()) { face -> face.id }
+            val joins = FaceThicknessJoins(poly, allFaces, allFaces, rimWidth, rimsByFace)
+            val safeScale = safeImmersedRimScale(
+                poly,
+                rimsByFace,
+                meshesByFace,
+                joins,
+                faceWidth,
+            )
+            assertTrue(safeScale > 0.0 && safeScale < 1.0, "The regression must constrain the depth")
+
+            val vertices = arrayListOf<Vec3>()
+            context.exportVertices(FaceExportParams(1.0, faceWidth, rimWidth, 0.0)) { vertex ->
+                vertices += Vec3(vertex.x, vertex.y, vertex.z)
+            }
+            var offset = 0
+            for (rim in rims) {
+                val face = poly.fs[rim.sourceFaceId]
+                val meshes = rim.regions.map { region -> region.triangulate(face) }
+                val count = meshes.sumOf { mesh -> mesh.vertices.size }
+                val top = vertices.subList(offset, offset + count)
+                val inner = vertices.subList(offset + count, offset + 2 * count)
+                val expectedTop = meshes.flatMap { mesh -> mesh.vertices }
+                expectedTop.indices.forEach { index ->
+                    val direction = if (joins.sourceEdgeOrNull(face, expectedTop[index]) != null) {
+                        joins.direction(face, expectedTop[index], faceWidth)
+                    } else {
+                        face.outwardNormal
+                    }
+                    assertTrue(
+                        (top[index] - expectedTop[index]).norm <= 1e-6,
+                        "Immersed face ${face.id} moves its top rim at vertex $index: " +
+                            "${top[index]} instead of ${expectedTop[index]}",
+                    )
+                    assertTrue(
+                        (inner[index] - (expectedTop[index] - direction * (faceWidth * safeScale))).norm <= 1e-6,
+                        "Immersed face ${face.id} deforms its inner rim at vertex $index: " +
+                            "${inner[index]} instead of " +
+                            "${expectedTop[index] - direction * (faceWidth * safeScale)}",
+                    )
+                }
+                offset += 2 * count + 4 * rimBoundarySegments(poly, meshes.map { mesh -> face to mesh })
+            }
+            assertEquals(vertices.size, offset)
+
+            var triangleCount = 0
+            context.exportTriangles(FaceExportParams(1.0, faceWidth, rimWidth, 0.0)) { _, _, _ ->
+                triangleCount++
+            }
+            assertEquals(context.indexSize / 3, triangleCount)
+        } finally {
+            context.destroy()
+        }
     }
 
     @Test
@@ -78,30 +174,14 @@ class ResolvedFaceRenderingTest {
             val visibleBufferSize = 5 * 4 * 2
             val visibleIndexSize = 5 * 2 * 3 * 2
             val capBufferSize = 2 * rimMeshes.sumOf { (_, mesh) -> mesh.vertices.size }
-            val capIndexSize = 2 * rimMeshes.sumOf { (_, mesh) -> mesh.triangles.size }
-            val joins = FaceThicknessJoins(poly)
-            val boundarySegments = rimMeshes.sumOf { (face, mesh) ->
-                mesh.cycles.sumOf { cycle ->
-                    cycle.vertices.indices.count { index ->
-                        if (mesh.triangulationPatch && cycle.segmentSources[index].isEmpty()) {
-                            false
-                        } else {
-                            val next = (index + 1) % cycle.vertices.size
-                            joins.sourceEdgeOrNull(
-                                face,
-                                cycle.vertices[index],
-                                cycle.vertices[next],
-                            ) == null
-                        }
-                    }
-                }
-            }
+            val fullCapIndexSize = 2 * rimMeshes.sumOf { (_, mesh) -> mesh.triangles.size }
+            val boundarySegments = rimBoundarySegments(poly, rimMeshes)
             assertEquals(
                 visibleBufferSize + capBufferSize + 4 * boundarySegments,
                 context.bufferSize,
             )
             assertEquals(
-                visibleIndexSize + capIndexSize + 6 * boundarySegments,
+                visibleIndexSize + fullCapIndexSize + 6 * boundarySegments,
                 context.indexSize,
             )
 
@@ -113,6 +193,30 @@ class ResolvedFaceRenderingTest {
             assertEquals(context.indexSize / 3, triangleCount)
         } finally {
             context.destroy()
+        }
+    }
+
+    private fun rimBoundarySegments(
+        poly: Polyhedron,
+        rimMeshes: List<Pair<polyhedra.model.poly.Face, polyhedra.web.poly.TriangulatedRimRegion>>,
+    ): Int {
+        val joins = FaceThicknessJoins(poly)
+        return rimMeshes.sumOf { (face, mesh) ->
+            mesh.cycles.sumOf { cycle ->
+                cycle.vertices.indices.count { index ->
+                    if (mesh.triangulationPatch && cycle.segmentSources[index].isEmpty()) {
+                        false
+                    } else {
+                        val next = (index + 1) % cycle.vertices.size
+                        (cycle.vertices[next] - cycle.vertices[index]).norm > 1e-12 &&
+                            joins.sourceEdgeOrNull(
+                                face,
+                                cycle.vertices[index],
+                                cycle.vertices[next],
+                            ) == null
+                    }
+                }
+            }
         }
     }
 

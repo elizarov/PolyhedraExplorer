@@ -4,6 +4,7 @@ import polyhedra.core.poly.Seed
 import polyhedra.core.poly.Tetrahedron
 import polyhedra.core.poly.Cube
 import polyhedra.core.poly.Octahedron
+import polyhedra.core.poly.resolvedRims
 import polyhedra.core.poly.Dodecahedron
 import polyhedra.core.poly.Icosahedron
 import polyhedra.core.poly.toSeedOrNull
@@ -11,6 +12,7 @@ import polyhedra.model.poly.FaceThicknessJoins
 import polyhedra.model.poly.Face
 import polyhedra.model.poly.outwardNormal
 import polyhedra.model.poly.keepsConfiguredRimWidth
+import polyhedra.model.poly.containsProjected
 import polyhedra.model.poly.size
 import polyhedra.model.util.cross
 import polyhedra.model.util.minus
@@ -25,6 +27,62 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class FaceThicknessJoinsTest {
+    @Test
+    fun stellatedDodecahedronBoundsEveryMiterJoinToItsResolvedRim() {
+        val poly = requireNotNull("SD".toSeedOrNull()).poly
+        val rimWidth = 0.015
+        val faceWidth = 0.129
+        val materialFaces = poly.fs.mapTo(linkedSetOf()) { face -> face.id }
+        val rims = poly.resolvedRims(rimWidth, faceWidth).associateBy { rim -> rim.sourceFaceId }
+        val joins = FaceThicknessJoins(
+            poly,
+            materialFaces,
+            materialFaces,
+            rimWidth,
+            rims,
+        )
+
+        for (face in poly.fs) {
+            val rim = rims.getValue(face.id)
+            val boundaryPoints = rim.regions.flatMap { region ->
+                (listOf(region.outer) + region.holes).flatMap { cycle -> cycle.vertices }
+            }.distinct()
+            for (point in boundaryPoints.filter { candidate -> joins.sourceEdgeOrNull(face, candidate) != null }) {
+                val direction = joins.direction(face, point, faceWidth)
+                val tangent = direction - face.outwardNormal * (face.outwardNormal * direction)
+                val innerPoint = point - direction * faceWidth
+                assertTrue(
+                    rim.containsProjected(point - tangent * faceWidth, face.outwardNormal, 1e-8),
+                    "Face ${face.id} source-edge underside leaves its visible rim at $point: " +
+                        "direction=$direction projected=${point - tangent * faceWidth}",
+                )
+                assertTrue(
+                    innerPoint.norm <= point.norm + 1e-9,
+                    "Face ${face.id} source-edge underside moves outward at $point: inner=$innerPoint",
+                )
+            }
+        }
+
+        for (vertex in poly.vs) {
+            val incidentFaces = poly.fs.filter { face -> vertex in face.fvs }
+            assertTrue(incidentFaces.size > 3, "Expected a high-valence pentagram vertex")
+            val corners = incidentFaces.map { face ->
+                val direction = joins.vertexDirection(face, vertex, faceWidth)
+                assertTrue(direction.norm > 1e-8, "Vertex ${vertex.id} collapses its inner rim corner")
+                val tangent = direction - face.outwardNormal * (face.outwardNormal * direction)
+                val projectedCorner = vertex - tangent * faceWidth
+                assertTrue(
+                    rims.getValue(face.id).containsProjected(projectedCorner, face.outwardNormal, 1e-8),
+                    "Face ${face.id} inner corner leaves its visible rim",
+                )
+                vertex - direction * faceWidth
+            }
+            assertTrue(corners.drop(1).all { corner ->
+                (corner - corners.first()).norm <= 1e-9
+            }, "Vertex ${vertex.id} has ${corners.size} different inner rim corners")
+        }
+    }
+
     @Test
     fun starPyramidFiveHalvesUsesTheSameExactTriangleMitersAsARegularPyramid() {
         val width = 0.1

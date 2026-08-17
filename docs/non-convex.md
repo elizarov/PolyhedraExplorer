@@ -56,33 +56,12 @@ replace the shared tessellation with a triangle fan or independently choose diag
 
 ## Simple hidden-face rims
 
-The core supplies hidden-face rims as polygonal regions rather than final consumer triangles. For a
-simple planar face, adjacent boundary lines are offset in the face plane and meet at their exact
-miter. Approximating that join can move the hole outside its source face and produce overlapping
-renderer triangles. The maximum selectable width stops at the first edge collapse or concave
-reflex-corner collision, so every emitted inset remains valid.
-
-Face thickness uses a separate three-dimensional miter. Equal inward offsets of two neighboring
-face planes meet on their dihedral bisector. A hidden-face opening remains perpendicular to its
-face, so its local inset is `max(configured rim, width / tan(dihedral / 2))`; this is the minimum
-that reaches the shared inner edge without an overlap, gap, or protruding corner prism. Filled faces
-need only their outer and bisector-bounded inner surfaces. Hidden rims additionally expose the
-opening wall.
-
-For a simple non-planar face, the same uniform inset band is built in the face's stable projection,
-clipped by each triangle of the shared deterministic face tessellation, and lifted barycentrically
-back to that triangle's plane. Each resulting region is therefore a planar patch, while their union
-retains the source face's folds. Patch cuts introduced only by face tessellation carry no source-edge
-provenance and do not become visible rim walls; source-boundary and inset segments do. This avoids
-both a cap cutting across the folds and visible seams between adjacent patches.
-
-Each `ResolvedRimGeometry` contains deterministic outer and hole cycles, source-edge provenance,
-the applied width, and its maximum. A region also identifies when it is one clipped non-planar
-triangle patch so consumers use its local plane. WebGL triangulates the regions for visible caps
-and physical boundary walls; STL and OpenSCAD consume the same polygonal shape according to
-[Export](export.md). Immersed-face strip
-union and pentagram-rim semantics are specified separately in
-[Self-intersecting polyhedra](self-intersections.md#hidden-immersed-faces).
+The core supplies hidden-face rims as polygonal regions rather than consumer-specific triangles.
+Simple planar insets stop before edge collapse or a concave reflex-corner collision. A simple
+non-planar rim is clipped to the shared deterministic face triangles and lifted back to their
+piecewise-planar surface, so triangulation seams do not become opening walls. The complete inset,
+thickness, shared-join, immersed-strip, scale, and edge-case contract is owned by
+[Rim geometry](rim_geometry.md).
 
 ## Transform applicability
 

@@ -2,7 +2,8 @@
 
 This document owns the geometry contract for STL and OpenSCAD output. UI controls and print preview
 are summarized in [Features](features.md); immersed surface semantics and hidden star rims are
-defined in [Self-intersecting polyhedra](self-intersections.md).
+defined in [Self-intersecting polyhedra](self-intersections.md), and their physical construction is
+defined in [Rim geometry](rim_geometry.md).
 
 ## Presentation input
 
@@ -31,15 +32,16 @@ partial, open, intersecting, or resource-truncated mesh.
    perpendicular Width and neighboring planes meet on their dihedral bisector. Hidden openings are
    widened only where required for a perpendicular wall to reach that shared inner edge. Expanded,
    folded, and immersed fallback pieces remain independently closed inputs to the Boolean stage.
-2. Weld only representation-scale input noise, discard degenerate or duplicate input triangles,
+2. Weld only double-precision, scale-relative input noise, discard degenerate or duplicate input triangles,
    and group coplanar pieces into logical surfaces.
 3. Accept an already embedded triangle boundary directly; otherwise corefine the complete triangle
    soup and select its three-dimensional zero/nonzero-winding interface. Independently closed face
    and rim extrusions retain piece identities, allowing winding tests to reject non-overlapping
    bounding boxes and classify large pieces by accelerated ray crossings without changing Boolean
    semantics.
-4. Require one connected, outward-oriented embedded boundary and keep its final boundary
-   triangulated.
+4. Require one connected, outward-oriented edge-closed boundary and keep the corefined arrangement
+   triangulated. The STL path does not reconstruct source-style polygon faces or require one source
+   vertex fan at a high-winding point junction.
 5. Quantize coordinates to eight decimal places, rebuild indexed triangles, orient positive volume,
    and recheck exact edge incidence, orientation, connectivity, and finite coordinates. The
    arrangement has already performed the surface-intersection validation, and final rounding is
@@ -52,9 +54,9 @@ plane. That conservative fallback can make farther face orbits thicker, but neve
 configured width.
 
 The final mesh requires finite non-degenerate triangles, two oppositely directed uses of every
-edge, one connected component, outward positive volume, no duplicate triangles, and no residual
-surface intersections. These are postconditions of STL conversion, not properties inferred from
-the input `Polyhedron`.
+edge, one connected component, outward positive volume, and no duplicate triangles. The
+arrangement has already selected the solid boundary before quantization. These are postconditions
+of STL conversion, not properties inferred from the input `Polyhedron`.
 
 An explicit Resolved transform is unnecessary. Export performs its own presentation-aware solid
 conversion and preserves hidden immersed rims before resolving the complete three-dimensional
@@ -112,7 +114,8 @@ and cover regular, asymmetric, immersed, and folded fixtures.
 Shared regressions include immersed catalog solids, concave and non-planar faces,
 expanded pieces, hidden rims, Prism 5/2 with hidden caps, all-rim Antiprism 5/2 and Antiprism 7/3,
 the acute triangular rims of resolved Bipyramid 7/2, and Pyramid 7/2 with either only its immersed
-base or every face orbit hidden. Folded-rim regressions include Truncated stellated octahedron and
+base or every face orbit hidden. High-winding pyramid coverage includes the minimized Pyramid 10/3
+case and every hidden-orbit combination of Pyramid 15/7 and Pyramid 19/9. Folded-rim regressions include Truncated stellated octahedron and
 its second truncation; lower-level coverage also uses an asymmetric synthetic non-planar
 quadrilateral so the construction is not tied to a catalog transform. The Antiprism 7/3 JVM
 regression also guards a complete conversion time below one second.

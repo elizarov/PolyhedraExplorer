@@ -133,6 +133,7 @@ fun Polyhedron.exportSolidToScad(
                 materialFaceIds,
                 candidateRimFaceIds.takeIf { this@exportSolidToScad.keepsConfiguredRimWidth }.orEmpty(),
                 exportParams.rim,
+                rimByFace,
             )
             if (exportParams.rim > 0.0) {
                 val missingRims = fs.filter { face -> face.kind in presentationHiddenKinds && face.id !in rimByFace }
