@@ -19,6 +19,7 @@ import polyhedra.model.poly.VertexKind
 import polyhedra.model.poly.area
 import polyhedra.model.poly.essence
 import polyhedra.model.poly.get
+import polyhedra.model.poly.keepsConfiguredRimWidth
 import polyhedra.model.poly.size
 import polyhedra.model.poly.triangulatePlanarPolygon
 import polyhedra.model.poly.triangulatePlanarRegion
@@ -47,9 +48,22 @@ internal suspend fun CoreStlPresentation.toTriangleRequest(
 
     val source = poly
     val hiddenKinds = (hiddenFaceKinds + source.nonPlanarFaceKinds).toSet()
-    val thicknessJoins = FaceThicknessJoins(source)
+    val materialFaceIds = source.fs.filterTo(linkedSetOf()) { face ->
+        face.kind !in hiddenKinds || rim > 0.0
+    }.mapTo(linkedSetOf(), Face::id)
+    val candidateRimFaceIds = if (rim > 0.0) {
+        source.fs.filterTo(linkedSetOf()) { face -> face.kind in hiddenKinds }.mapTo(linkedSetOf(), Face::id)
+    } else {
+        emptySet()
+    }
+    val thicknessJoins = FaceThicknessJoins(
+        source,
+        materialFaceIds,
+        candidateRimFaceIds.takeIf { source.keepsConfiguredRimWidth }.orEmpty(),
+        rim,
+    )
     val useClosedSourcePieces = hiddenKinds.isNotEmpty() && width > 0.0 && expand == 0.0
-    val useMiteredShell = !stableJoinsFallback && useClosedSourcePieces && thicknessJoins.usesExactMiterJoins
+    val useMiteredShell = !stableJoinsFallback && useClosedSourcePieces
     val allSourceFacesHidden = source.fs.all { face -> face.kind in hiddenKinds }
     val physical = if (useClosedSourcePieces || allSourceFacesHidden) {
         reportProgress(20)
@@ -238,7 +252,7 @@ private class PresentationMeshBuilder(
     fun addMiteredFace(face: Face, geometry: ResolvedFaceGeometry, joins: FaceThicknessJoins) {
         addFace(face, geometry, inner = false, solid = MITERED_SHELL_SOLID)
         addFace(face, geometry, inner = true, solid = MITERED_SHELL_SOLID) { point ->
-            joins.direction(face, point)
+            joins.direction(face, point, settings.width)
         }
     }
 
@@ -319,7 +333,11 @@ private class PresentationMeshBuilder(
         val regionFace = if (region.triangulationPatch) region.patchFace(face) else face
         val patchNormal = regionFace.originOutwardNormal()
         val innerDirection: (Vec3) -> Vec3 = { point ->
-            if (joins.sourceEdgeOrNull(face, point) != null) joins.direction(face, point) else patchNormal
+            if (joins.sourceEdgeOrNull(face, point) != null) {
+                joins.direction(face, point, settings.width)
+            } else {
+                patchNormal
+            }
         }
         val solid = MITERED_SHELL_SOLID
         addMiteredRimSurface(region, regionFace, face, inner = false, solid = solid) { patchNormal }

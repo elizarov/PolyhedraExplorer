@@ -120,7 +120,17 @@ class FaceContext(
             val materialFaceIds = poly.fs.filterTo(linkedSetOf()) { face ->
                 faceShown(face) || includeRim
             }.mapTo(linkedSetOf(), Face::id)
-            val thicknessJoins = FaceThicknessJoins(poly, materialFaceIds)
+            val candidateRimFaceIds = if (includeRim) {
+                poly.fs.filterTo(linkedSetOf()) { face -> !faceShown(face) }.mapTo(linkedSetOf(), Face::id)
+            } else {
+                emptySet()
+            }
+            val thicknessJoins = FaceThicknessJoins(
+                poly,
+                materialFaceIds,
+                candidateRimFaceIds.takeIf { poly.keepsConfiguredRimWidth }.orEmpty(),
+                presentationRim,
+            )
 
             fun sourceEdgeOrNull(face: Face, a: Vec3, b: Vec3): Edge? =
                 thicknessJoins.sourceEdgeOrNull(face, a, b)
@@ -132,7 +142,6 @@ class FaceContext(
                 index: Int,
             ): Boolean {
                 if (mesh.triangulationPatch && cycle.segmentSources[index].isEmpty()) return false
-                if (!thicknessJoins.usesExactMiterJoins) return true
                 val next = (index + 1) % cycle.vertices.size
                 return sourceEdgeOrNull(face, cycle.vertices[index], cycle.vertices[next]) == null
             }
@@ -236,7 +245,7 @@ class FaceContext(
                     lightNormalBuffer[ofs] = lNorm
                     expandDirBuffer[ofs] = f
                     thicknessDirBuffer[ofs] = if (includeExpand) f.outwardNormal else
-                        thicknessJoins.direction(f, position)
+                        thicknessJoins.direction(f, position, presentationWidth)
                     rimDirBuffer[ofs] = Vec3.ZERO
                     rimMaxBuffer[ofs] = 0.0
                     colorBuffer[ofs] = faceColor
@@ -283,7 +292,7 @@ class FaceContext(
                         thicknessDirBuffer[ofs] = if (includeExpand || rim != 0) {
                             f.outwardNormal
                         } else {
-                            thicknessJoins.vertexDirection(f, f[i])
+                            thicknessJoins.vertexDirection(f, f[i], presentationWidth)
                         }
                         rimDirBuffer[ofs] = Vec3.ZERO
                         rimMaxBuffer[ofs] = 0.0
@@ -348,7 +357,7 @@ class FaceContext(
                         thicknessDirBuffer[bufOfs] = if (includeExpand) {
                             patchThicknessDirection
                         } else if (thicknessJoins.sourceEdgeOrNull(f, position) != null) {
-                            thicknessJoins.direction(f, position)
+                            thicknessJoins.direction(f, position, presentationWidth)
                         } else {
                             patchThicknessDirection
                         }
@@ -430,9 +439,6 @@ class FaceContext(
                         }
                         if (includeWidth && includeRim) {
                             makeBorder(f, fallbackRimVertices.getValue(f.id), faceColor, false)
-                            if (!thicknessJoins.usesExactMiterJoins) {
-                                makeBorder(f, f.fvs, faceColor, true)
-                            }
                         }
                     }
                 }

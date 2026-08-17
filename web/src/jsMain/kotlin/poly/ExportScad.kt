@@ -119,7 +119,21 @@ fun Polyhedron.exportSolidToScad(
                 "OpenSCAD piece-union export requires a positive face width"
             }
             val rimByFace = resolvedRims.associateBy(ResolvedRimGeometry::sourceFaceId)
-            val thicknessJoins = FaceThicknessJoins(this@exportSolidToScad)
+            val materialFaceIds = fs.filterTo(linkedSetOf()) { face ->
+                face.kind !in presentationHiddenKinds || exportParams.rim > 0.0
+            }.mapTo(linkedSetOf(), Face::id)
+            val candidateRimFaceIds = if (exportParams.rim > 0.0) {
+                fs.filterTo(linkedSetOf()) { face -> face.kind in presentationHiddenKinds }
+                    .mapTo(linkedSetOf(), Face::id)
+            } else {
+                emptySet()
+            }
+            val thicknessJoins = FaceThicknessJoins(
+                this@exportSolidToScad,
+                materialFaceIds,
+                candidateRimFaceIds.takeIf { this@exportSolidToScad.keepsConfiguredRimWidth }.orEmpty(),
+                exportParams.rim,
+            )
             if (exportParams.rim > 0.0) {
                 val missingRims = fs.filter { face -> face.kind in presentationHiddenKinds && face.id !in rimByFace }
                 require(missingRims.isEmpty()) {
@@ -232,7 +246,7 @@ private fun StringBuilder.appendMiteredRegion(
     val bottom = expanded.mapIndexed { index, point ->
         val sourcePoint = mesh.vertices[index]
         val direction = if (thicknessJoins.sourceEdgeOrNull(sourceFace, sourcePoint) != null) {
-            thicknessJoins.direction(sourceFace, sourcePoint)
+            thicknessJoins.direction(sourceFace, sourcePoint, exportParams.width)
         } else {
             outward
         }

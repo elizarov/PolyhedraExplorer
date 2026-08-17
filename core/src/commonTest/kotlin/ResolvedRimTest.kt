@@ -53,7 +53,8 @@ class ResolvedRimTest {
         val poly = Seed.Tetrahedron.poly
         val width = 0.1
         val configuredRim = 0.05
-        val joins = FaceThicknessJoins(poly)
+        val allFaces = poly.fs.mapTo(linkedSetOf()) { candidate -> candidate.id }
+        val joins = FaceThicknessJoins(poly, allFaces, allFaces, configuredRim)
         val expected = width * joins.rimFactor(poly.es.first())
         val rims = poly.resolvedRims(configuredRim, width)
 
@@ -246,7 +247,7 @@ class ResolvedRimTest {
     }
 
     @Test
-    fun asymmetricAcuteStarPyramidUsesIndependentConstantWidthFacePieces() {
+    fun asymmetricAcuteStarPyramidBoundsCollapsedMitersWithoutChangingItsTopRim() {
         val poly = polyhedron {
             repeat(5) { index ->
                 val angle = 2.0 * kotlin.math.PI * index / 5.0
@@ -258,19 +259,18 @@ class ResolvedRimTest {
                 face(listOf(index, apex.id, (index + 2) % 5), FaceKind(1))
             }
         }
-        val face = poly.fs.single { candidate -> candidate.kind == FaceKind(0) }
+        val face = poly.fs.first { candidate -> candidate.kind == FaceKind(1) }
         val configuredRim = 0.05
         val faceWidth = 0.1
         val joins = FaceThicknessJoins(poly)
 
-        assertTrue(!joins.usesExactMiterJoins)
-        assertTrue(joins.effectiveRimWidths(face, configuredRim, faceWidth).all { it == configuredRim })
-        assertTrue(face.directedEdges.all { edge ->
-            (joins.edgeDirection(edge) - face.outwardNormal).norm <= 1e-12
+        assertTrue(face.fvs.any { vertex ->
+            joins.vertexDirection(face, vertex, faceWidth).norm <
+                joins.vertexDirection(face, vertex).norm - 1e-9
         })
-        assertTrue(face.fvs.all { vertex ->
-            (joins.vertexDirection(face, vertex) - face.outwardNormal).norm <= 1e-12
-        })
+        face.fvs.forEach { vertex ->
+            assertPointInsideFace(face, vertex - joins.vertexDirection(face, vertex, faceWidth) * faceWidth)
+        }
         val rim = poly.resolvedRims(configuredRim, faceWidth)[face.id]
         assertEquals(configuredRim, rim.width, 1e-9)
         assertTrue(rim.regions.all { region -> region.touchesSourceBoundary(face) })
@@ -298,17 +298,22 @@ class ResolvedRimTest {
         )
 
         assertNull(response.error)
-        val joins = FaceThicknessJoins(response.poly)
-        assertTrue(!joins.usesExactMiterJoins)
         val betaFaces = response.poly.fs.filter { face -> face.kind == FaceKind(1) }
+        val materialFaces = response.poly.fs.mapTo(linkedSetOf()) { face -> face.id }
+        val joins = FaceThicknessJoins(
+            response.poly,
+            materialFaces,
+            betaFaces.mapTo(linkedSetOf()) { face -> face.id },
+            rimWidth = 0.05,
+        )
         assertEquals(19, betaFaces.size)
         val tolerance = response.poly.circumradius * 1e-8
         for (face in betaFaces) {
             val rim = response.resolvedRims[face.id]
             assertEquals(0.05, rim.width, tolerance)
-            assertTrue(face.directedEdges.all { edge ->
-                (joins.edgeDirection(edge) - face.outwardNormal).norm <= tolerance
-            })
+            face.fvs.forEach { vertex ->
+                assertPointInsideFace(face, vertex - joins.vertexDirection(face, vertex, 0.1) * 0.1)
+            }
             for (point in rim.regions.flatMap { region ->
                 region.outer.vertices + region.holes.flatMap { hole -> hole.vertices }
             }) {
@@ -456,6 +461,19 @@ class ResolvedRimTest {
                 val along = ((point - a) * edge) / (edge * edge)
                 along in -tolerance..(1.0 + tolerance) && ((point - a) cross edge).norm <= tolerance * edge.norm
             }
+        }
+    }
+
+    private fun assertPointInsideFace(face: polyhedra.model.poly.Face, point: Vec3) {
+        val orientation = ((face.fvs[1] - face.fvs[0]) cross (face.fvs[2] - face.fvs[0])) * face
+        val sign = if (orientation >= 0.0) 1.0 else -1.0
+        for (index in face.fvs.indices) {
+            val a = face.fvs[index]
+            val b = face.fvs[(index + 1) % face.fvs.size]
+            assertTrue(
+                sign * (((b - a) cross (point - a)) * face) >= -1e-8,
+                "Point $point leaves face ${face.id} through edge $index",
+            )
         }
     }
 

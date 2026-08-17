@@ -10,6 +10,11 @@ import polyhedra.model.util.times
 import kotlin.math.abs
 import kotlin.math.sqrt
 
+/** Whether immersed or folded presentation faces must retain the user-configured top-rim width. */
+val Polyhedron.keepsConfiguredRimWidth: Boolean
+    get() = nonPlanarFaceKinds.isNotEmpty() ||
+        resolvedFaces.any(ResolvedFaceGeometry::sourceBoundarySelfIntersects)
+
 /**
  * Equal-distance inner face joins for a thick polyhedral surface.
  *
@@ -21,14 +26,17 @@ import kotlin.math.sqrt
 class FaceThicknessJoins(
     private val poly: Polyhedron,
     private val materialFaceIds: Set<Int> = poly.fs.mapTo(linkedSetOf(), Face::id),
+    private val rimFaceIds: Set<Int> = emptySet(),
+    private val rimWidth: Double = 0.0,
 ) {
-    /** Immersed/folded surfaces are emitted as independently closed pieces, not shared miters. */
-    val usesExactMiterJoins: Boolean = poly.nonPlanarFaceKinds.isEmpty() &&
-        poly.resolvedFaces.none(ResolvedFaceGeometry::sourceBoundarySelfIntersects)
+    init {
+        require(rimFaceIds.all(materialFaceIds::contains))
+        require(rimWidth.isFinite() && rimWidth >= 0.0)
+    }
 
     private val tolerance = maxOf(poly.circumradius, 1.0) * 1e-8
     private val edgeDirections = poly.directedEdges.associate { edge ->
-        directedEdgeKey(edge) to if (usesExactMiterJoins && hasMaterial(edge.r) && hasMaterial(edge.l)) {
+        directedEdgeKey(edge) to if (hasMaterial(edge.r) && hasMaterial(edge.l)) {
             solve(listOf(edge.r.outwardNormal, edge.l.outwardNormal))
         } else {
             edge.r.outwardNormal
@@ -36,10 +44,6 @@ class FaceThicknessJoins(
     }
     private val vertexDirections = buildMap {
         for (face in poly.fs) for (index in face.fvs.indices) {
-            if (!usesExactMiterJoins) {
-                put(face.id to face[index].id, face.outwardNormal)
-                continue
-            }
             val previous = face.sourceEdge((index + face.size - 1) % face.size)
             val next = face.sourceEdge(index)
             val normals = buildList {
@@ -51,19 +55,20 @@ class FaceThicknessJoins(
         }
     }
 
-    fun direction(face: Face, point: Vec3): Vec3 {
+    fun direction(face: Face, point: Vec3, width: Double = 0.0): Vec3 {
         face.fvs.firstOrNull { vertex -> (vertex - point).norm <= tolerance }?.let { vertex ->
-            return vertexDirections.getValue(face.id to vertex.id)
+            return vertexDirection(face, vertex, width)
         }
-        sourceEdgeOrNull(face, point)?.let(::edgeDirection)?.let { return it }
+        sourceEdgeOrNull(face, point)?.let { edge -> return edgeDirection(edge, point, width) }
         return face.outwardNormal
     }
 
-    fun direction(face: Face, point: Vec3, sourceSegmentIndex: Int): Vec3 {
+    fun direction(face: Face, point: Vec3, sourceSegmentIndex: Int, width: Double = 0.0): Vec3 {
         face.fvs.firstOrNull { vertex -> (vertex - point).norm <= tolerance }?.let { vertex ->
-            return vertexDirections.getValue(face.id to vertex.id)
+            return vertexDirection(face, vertex, width)
         }
-        return edgeDirection(face.sourceEdge(sourceSegmentIndex))
+        val edge = face.sourceEdge(sourceSegmentIndex)
+        return edgeDirection(edge, point, width)
     }
 
     fun sourceEdgeOrNull(face: Face, point: Vec3): Edge? =
@@ -74,22 +79,95 @@ class FaceThicknessJoins(
             a.isOnSegment(edge.a, edge.b) && b.isOnSegment(edge.a, edge.b)
         }
 
-    fun vertexDirection(face: Face, vertex: Vertex): Vec3 =
-        vertexDirections.getValue(face.id to vertex.id)
+    fun vertexDirection(face: Face, vertex: Vertex, width: Double = 0.0): Vec3 {
+        val direction = vertexDirections.getValue(face.id to vertex.id)
+        val incident = vertex.directedEdges.flatMap { edge -> listOf(edge.l, edge.r) }
+            .distinctBy(Face::id)
+            .filter(::hasMaterial)
+        return direction.boundedAt(vertex, incident, width)
+    }
 
-    fun edgeDirection(edge: Edge): Vec3 = edgeDirections.getValue(directedEdgeKey(edge))
+    fun edgeDirection(edge: Edge, width: Double = 0.0): Vec3 =
+        edgeDirection(edge, (edge.a + edge.b) * 0.5, width)
+
+    private fun edgeDirection(edge: Edge, point: Vec3, width: Double): Vec3 {
+        val direction = edgeDirections.getValue(directedEdgeKey(edge))
+        val incident = listOf(edge.r, edge.l).filter(::hasMaterial)
+        return direction.boundedAt(point, incident, width)
+    }
 
     /** In-face distance from the source edge to the unit-thickness inner bisector line. */
     fun rimFactor(edge: Edge): Double {
-        if (!usesExactMiterJoins || !hasMaterial(edge.r) || !hasMaterial(edge.l)) return 0.0
+        if (!hasMaterial(edge.r) || !hasMaterial(edge.l)) return 0.0
         val direction = edgeDirection(edge)
         return sqrt((direction * direction - 1.0).coerceAtLeast(0.0))
     }
 
-    fun effectiveRimWidths(face: Face, rim: Double, width: Double): List<Double> =
-        face.fvs.indices.map { index -> maxOf(rim, width * rimFactor(face.sourceEdge(index))) }
+    fun effectiveRimWidths(face: Face, rim: Double, width: Double): List<Double> {
+        if (poly.keepsConfiguredRimWidth) return List(face.size) { rim }
+        return face.fvs.indices.map { index ->
+            val edge = face.sourceEdge(index)
+            val direction = edgeDirection(edge, width)
+            val normalComponent = face.outwardNormal * direction
+            val tangent = direction - face.outwardNormal * normalComponent
+            maxOf(rim, width * tangent.norm)
+        }
+    }
 
     private fun hasMaterial(face: Face): Boolean = face.id in materialFaceIds
+
+    /**
+     * Keeps an exact equal-offset join until that join reaches the first boundary of any incident
+     * material face. Past a local offset-surface collapse the corner stays at that shared boundary
+     * instead of continuing through the face and producing an inverted, detached sheet.
+     */
+    private fun Vec3.boundedAt(point: Vec3, incident: List<Face>, width: Double): Vec3 {
+        if (width <= tolerance || incident.isEmpty()) return this
+        val scale = incident.minOf { face -> face.maximumFilledPrefix(point, this, width) }
+        return this * scale
+    }
+
+    private fun Face.maximumFilledPrefix(point: Vec3, direction: Vec3, width: Double): Double {
+        val normal = outwardNormal
+        val normalComponent = normal * direction
+        val tangent = direction - normal * normalComponent
+        val rimScale = if (id in rimFaceIds && tangent.norm * width > rimWidth) {
+            rimWidth / (tangent.norm * width)
+        } else {
+            1.0
+        }
+        if (!isPlanar || rimScale <= 0.0) return rimScale
+        val delta = tangent * -width
+        if (delta.norm <= tolerance) return 1.0
+        val geometry = poly.resolvedFaces[id]
+        val events = geometry.edges.asSequence()
+            .filter { edge -> !edge.internalToFill }
+            .mapNotNull { edge ->
+                val a = geometry.vertices[edge.a].position
+                val b = geometry.vertices[edge.b].position
+                val segment = b - a
+                val denominator = (delta cross segment) * normal
+                if (abs(denominator) <= tolerance * delta.norm * segment.norm) return@mapNotNull null
+                val offset = a - point
+                val parameter = ((offset cross segment) * normal) / denominator
+                val along = ((offset cross delta) * normal) / denominator
+                parameter.takeIf {
+                    it > 1e-10 && it < 1.0 - 1e-10 && along >= -1e-9 && along <= 1.0 + 1e-9
+                }
+            }
+            .sorted()
+            .distinctBy { parameter -> (parameter * 1e10).toLong() }
+            .toList()
+        var start = 0.0
+        for (end in events + 1.0) {
+            if (end - start > 1e-10) {
+                val sample = point + delta * ((start + end) * 0.5)
+                if (!geometry.contains(sample, normal, tolerance)) return minOf(start, rimScale)
+            }
+            start = end
+        }
+        return rimScale
+    }
 
     private fun Vec3.isOnSegment(a: Vec3, b: Vec3): Boolean {
         val edge = b - a
@@ -100,6 +178,20 @@ class FaceThicknessJoins(
         return ((this - a) cross edge).norm <= tolerance * edge.norm
     }
 }
+
+private fun ResolvedFaceGeometry.contains(point: Vec3, normal: Vec3, tolerance: Double): Boolean =
+    triangles.any { triangle ->
+        val a = vertices[triangle.a].position
+        val b = vertices[triangle.b].position
+        val c = vertices[triangle.c].position
+        val orientation = ((b - a) cross (c - a)) * normal
+        if (abs(orientation) <= tolerance * tolerance) return@any false
+        val sign = if (orientation >= 0.0) 1.0 else -1.0
+        fun insideEdge(first: Vec3, second: Vec3): Boolean =
+            sign * (((second - first) cross (point - first)) * normal) >=
+                -tolerance * (second - first).norm
+        insideEdge(a, b) && insideEdge(b, c) && insideEdge(c, a)
+    }
 
 private fun Face.sourceEdge(index: Int): Edge {
     val a = fvs[index]

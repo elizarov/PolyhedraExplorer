@@ -169,13 +169,15 @@ that measurement does not alter presentation geometry.
 
 The result is tessellation-free `ResolvedRimGeometry`: deterministic outer and hole cycles,
 source-edge provenance, the applied width, and the maximum width before the rim covers the complete
-fill. Embedded planar surfaces share exact bisector joins between adjacent face offsets. Immersed or
-folded surfaces instead extrude independently closed face and rim pieces along their local normals;
-using a shared bisector there can turn an acute crossing into an unbounded displacement unrelated to
-the configured thickness. WebGL resolves overlaps with its depth buffer, STL resolves the closed
-pieces in its solid arrangement, and OpenSCAD unions them. Simple-face inset and non-planar rim
-behavior remain owned by [Non-convex geometry](non-convex.md); export postconditions are specified in
-[Export](export.md).
+fill. Adjacent face offsets share the same angle-bisector edge and corner joins for embedded and
+immersed surfaces alike. Immersed rims retain the configured top width; a steep dihedral never
+widens the visible strip. If an acute miter reaches the inner boundary of that rim, or the first
+boundary of a filled incident face, before the configured depth, the shared join stops at that local
+offset-surface collapse instead of continuing through the material into an inverted, detached sheet.
+The underside tapers to the bounded join while the top rim is unchanged. Every incident face uses
+the same join point, so corners remain connected and ordinary immersed triangles retain the same
+construction as their embedded counterparts. Simple-face inset and non-planar rim behavior remain owned by
+[Non-convex geometry](non-convex.md); export postconditions are specified in [Export](export.md).
 
 ## Invariants
 
