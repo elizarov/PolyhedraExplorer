@@ -185,14 +185,16 @@ private fun Face.resolvedRim(
 ): ResolvedRimGeometry {
     require(requestedEdgeWidths.size == size)
     require(requestedEdgeWidths.all { width -> width.isFinite() && width >= 0.0 })
-    val minimum = requestedEdgeWidths.minOrNull() ?: 0.0
-    val maximum = requestedEdgeWidths.maxOrNull() ?: 0.0
+    require(maximumWidth.isFinite() && maximumWidth >= 0.0)
+    val edgeWidths = requestedEdgeWidths.map { width -> min(width, maximumWidth) }
+    val minimum = edgeWidths.minOrNull() ?: 0.0
+    val maximum = edgeWidths.maxOrNull() ?: 0.0
     if (maximum - minimum <= maxOf(maximum, 1.0) * 1e-12) {
         return resolvedRim(resolved, maximum, maximumWidth)
     }
     if (maximum <= 0.0) return ResolvedRimGeometry(id, kind, 0.0, emptyList(), maximumWidth)
     return if (isPlanar || resolved.sourceBoundarySelfIntersects) {
-        resolvedRimAtWidths(resolved, requestedEdgeWidths, maximumWidth)
+        resolvedRimAtWidths(resolved, edgeWidths, maximumWidth)
     } else {
         // Folded faces are already split into independently planar patches. A conservative common
         // width keeps their shared clipping topology stable while still satisfying every edge.

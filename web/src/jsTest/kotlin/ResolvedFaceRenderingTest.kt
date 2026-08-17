@@ -80,11 +80,14 @@ class ResolvedFaceRenderingTest {
             val capBufferSize = 2 * rimMeshes.sumOf { (_, mesh) -> mesh.vertices.size }
             val capIndexSize = 2 * rimMeshes.sumOf { (_, mesh) -> mesh.triangles.size }
             val joins = FaceThicknessJoins(poly)
+            assertTrue(!joins.usesExactMiterJoins)
             val boundarySegments = rimMeshes.sumOf { (face, mesh) ->
                 mesh.cycles.sumOf { cycle ->
                     cycle.vertices.indices.count { index ->
                         if (mesh.triangulationPatch && cycle.segmentSources[index].isEmpty()) {
                             false
+                        } else if (!joins.usesExactMiterJoins) {
+                            true
                         } else {
                             val next = (index + 1) % cycle.vertices.size
                             joins.sourceEdgeOrNull(

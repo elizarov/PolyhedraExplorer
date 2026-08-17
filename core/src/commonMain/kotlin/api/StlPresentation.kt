@@ -47,10 +47,11 @@ internal suspend fun CoreStlPresentation.toTriangleRequest(
 
     val source = poly
     val hiddenKinds = (hiddenFaceKinds + source.nonPlanarFaceKinds).toSet()
-    val useMiteredShell = !stableJoinsFallback &&
-        hiddenKinds.isNotEmpty() && width > 0.0 && expand == 0.0
+    val thicknessJoins = FaceThicknessJoins(source)
+    val useClosedSourcePieces = hiddenKinds.isNotEmpty() && width > 0.0 && expand == 0.0
+    val useMiteredShell = !stableJoinsFallback && useClosedSourcePieces && thicknessJoins.usesExactMiterJoins
     val allSourceFacesHidden = source.fs.all { face -> face.kind in hiddenKinds }
-    val physical = if (useMiteredShell || allSourceFacesHidden) {
+    val physical = if (useClosedSourcePieces || allSourceFacesHidden) {
         reportProgress(20)
         source
     } else {
@@ -85,16 +86,15 @@ internal suspend fun CoreStlPresentation.toTriangleRequest(
     val hasHiddenFaces = hiddenPhysicalFaces.isNotEmpty()
 
     if (useMiteredShell) {
-        val joins = FaceThicknessJoins(source)
         source.fs.forEachIndexed { index, face ->
             if (face.kind !in hiddenKinds) {
-                builder.addMiteredFace(face, source.resolvedFaces[face.id], joins)
+                builder.addMiteredFace(face, source.resolvedFaces[face.id], thicknessJoins)
             }
             reportProgress(20 + 5 * (index + 1) / source.fs.size)
         }
         if (rim > 0.0) for (face in source.fs.filter { candidate -> candidate.kind in hiddenKinds }) {
             val geometry = rimBySourceFace[face.id] ?: continue
-            for (region in geometry.regions) builder.addMiteredRimRegion(region, face, joins)
+            for (region in geometry.regions) builder.addMiteredRimRegion(region, face, thicknessJoins)
         }
         return builder.request()
     }

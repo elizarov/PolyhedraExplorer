@@ -132,6 +132,7 @@ class FaceContext(
                 index: Int,
             ): Boolean {
                 if (mesh.triangulationPatch && cycle.segmentSources[index].isEmpty()) return false
+                if (!thicknessJoins.usesExactMiterJoins) return true
                 val next = (index + 1) % cycle.vertices.size
                 return sourceEdgeOrNull(face, cycle.vertices[index], cycle.vertices[next]) == null
             }
@@ -429,6 +430,9 @@ class FaceContext(
                         }
                         if (includeWidth && includeRim) {
                             makeBorder(f, fallbackRimVertices.getValue(f.id), faceColor, false)
+                            if (!thicknessJoins.usesExactMiterJoins) {
+                                makeBorder(f, f.fvs, faceColor, true)
+                            }
                         }
                     }
                 }

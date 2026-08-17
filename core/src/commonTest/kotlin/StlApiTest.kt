@@ -16,6 +16,7 @@ import polyhedra.model.api.CoreStlTriangle
 import polyhedra.model.api.MAX_STL_CANDIDATE_PAIRS
 import polyhedra.model.api.MAX_STL_INPUT_TRIANGLES
 import polyhedra.model.poly.FaceKind
+import polyhedra.model.poly.FaceThicknessJoins
 import polyhedra.model.poly.Polyhedron
 import polyhedra.model.poly.VertexKind
 import polyhedra.model.util.MutableVec3
@@ -77,7 +78,11 @@ class StlApiTest {
                 expand = 0.0,
             )
             val request = presentation.toTriangleRequest {}
-            assertTrue(request.triangles.all { triangle -> triangle.solid == 0 }, name)
+            if (FaceThicknessJoins(source).usesExactMiterJoins) {
+                assertTrue(request.triangles.all { triangle -> triangle.solid == 0 }, name)
+            } else {
+                assertTrue(request.triangles.map { triangle -> triangle.solid }.distinct().size > 1, name)
+            }
             val response = convertStl(CoreStlRequest(presentation = presentation))
             assertNull(response.error, "$name: ${response.error?.reason}")
             response.toValidationPolyhedron().validateProperGeometry()

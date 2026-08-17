@@ -22,9 +22,13 @@ class FaceThicknessJoins(
     private val poly: Polyhedron,
     private val materialFaceIds: Set<Int> = poly.fs.mapTo(linkedSetOf(), Face::id),
 ) {
+    /** Immersed/folded surfaces are emitted as independently closed pieces, not shared miters. */
+    val usesExactMiterJoins: Boolean = poly.nonPlanarFaceKinds.isEmpty() &&
+        poly.resolvedFaces.none(ResolvedFaceGeometry::sourceBoundarySelfIntersects)
+
     private val tolerance = maxOf(poly.circumradius, 1.0) * 1e-8
     private val edgeDirections = poly.directedEdges.associate { edge ->
-        directedEdgeKey(edge) to if (hasMaterial(edge.r) && hasMaterial(edge.l)) {
+        directedEdgeKey(edge) to if (usesExactMiterJoins && hasMaterial(edge.r) && hasMaterial(edge.l)) {
             solve(listOf(edge.r.outwardNormal, edge.l.outwardNormal))
         } else {
             edge.r.outwardNormal
@@ -32,6 +36,10 @@ class FaceThicknessJoins(
     }
     private val vertexDirections = buildMap {
         for (face in poly.fs) for (index in face.fvs.indices) {
+            if (!usesExactMiterJoins) {
+                put(face.id to face[index].id, face.outwardNormal)
+                continue
+            }
             val previous = face.sourceEdge((index + face.size - 1) % face.size)
             val next = face.sourceEdge(index)
             val normals = buildList {
@@ -73,7 +81,7 @@ class FaceThicknessJoins(
 
     /** In-face distance from the source edge to the unit-thickness inner bisector line. */
     fun rimFactor(edge: Edge): Double {
-        if (!hasMaterial(edge.r) || !hasMaterial(edge.l)) return 0.0
+        if (!usesExactMiterJoins || !hasMaterial(edge.r) || !hasMaterial(edge.l)) return 0.0
         val direction = edgeDirection(edge)
         return sqrt((direction * direction - 1.0).coerceAtLeast(0.0))
     }

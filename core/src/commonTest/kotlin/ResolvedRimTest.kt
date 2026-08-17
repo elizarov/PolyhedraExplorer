@@ -17,6 +17,7 @@ import polyhedra.model.poly.MutableVertex
 import polyhedra.model.poly.ResolvedRimGeometry
 import polyhedra.model.poly.VertexKind
 import polyhedra.model.poly.resolveFaceGeometry
+import polyhedra.model.poly.outwardNormal
 import polyhedra.model.poly.size
 import polyhedra.model.util.Vec3
 import polyhedra.model.util.cross
@@ -245,6 +246,37 @@ class ResolvedRimTest {
     }
 
     @Test
+    fun asymmetricAcuteStarPyramidUsesIndependentConstantWidthFacePieces() {
+        val poly = polyhedron {
+            repeat(5) { index ->
+                val angle = 2.0 * kotlin.math.PI * index / 5.0
+                vertex(kotlin.math.cos(angle), kotlin.math.sin(angle), 0.0, VertexKind(0))
+            }
+            val apex = vertex(0.08, -0.03, 0.002, VertexKind(1))
+            face(listOf(0, 2, 4, 1, 3), FaceKind(0))
+            repeat(5) { index ->
+                face(listOf(index, apex.id, (index + 2) % 5), FaceKind(1))
+            }
+        }
+        val face = poly.fs.single { candidate -> candidate.kind == FaceKind(0) }
+        val configuredRim = 0.05
+        val faceWidth = 0.1
+        val joins = FaceThicknessJoins(poly)
+
+        assertTrue(!joins.usesExactMiterJoins)
+        assertTrue(joins.effectiveRimWidths(face, configuredRim, faceWidth).all { it == configuredRim })
+        assertTrue(face.directedEdges.all { edge ->
+            (joins.edgeDirection(edge) - face.outwardNormal).norm <= 1e-12
+        })
+        assertTrue(face.fvs.all { vertex ->
+            (joins.vertexDirection(face, vertex) - face.outwardNormal).norm <= 1e-12
+        })
+        val rim = poly.resolvedRims(configuredRim, faceWidth)[face.id]
+        assertEquals(configuredRim, rim.width, 1e-9)
+        assertTrue(rim.regions.all { region -> region.touchesSourceBoundary(face) })
+    }
+
+    @Test
     fun immersedRimCyclesAndProvenanceAreDeterministic() {
         val poly = requireNotNull("SP7_3".toSeedOrNull()).poly
         val face = poly.fs.first { it.kind.id == 0 }
@@ -253,6 +285,44 @@ class ResolvedRimTest {
 
         assertEquals(CoreJson.encodeToString(first), CoreJson.encodeToString(second))
         assertTrue(first.regions.flatMap { region -> region.sourceEdges }.isNotEmpty())
+    }
+
+    @Test
+    fun pyramidNineteenNinthsKeepsTriangularFaceRimsInsideTheirFaces() = runTest {
+        val response = evaluateCore(
+            CoreRequest(
+                CoreState("SY19_9", emptyList(), "c"),
+                rimWidth = 0.05,
+                faceWidth = 0.1,
+            ),
+        )
+
+        assertNull(response.error)
+        val joins = FaceThicknessJoins(response.poly)
+        assertTrue(!joins.usesExactMiterJoins)
+        val betaFaces = response.poly.fs.filter { face -> face.kind == FaceKind(1) }
+        assertEquals(19, betaFaces.size)
+        val tolerance = response.poly.circumradius * 1e-8
+        for (face in betaFaces) {
+            val rim = response.resolvedRims[face.id]
+            assertEquals(0.05, rim.width, tolerance)
+            assertTrue(face.directedEdges.all { edge ->
+                (joins.edgeDirection(edge) - face.outwardNormal).norm <= tolerance
+            })
+            for (point in rim.regions.flatMap { region ->
+                region.outer.vertices + region.holes.flatMap { hole -> hole.vertices }
+            }) {
+                for (index in face.fvs.indices) {
+                    val a = face.fvs[index]
+                    val b = face.fvs[(index + 1) % face.fvs.size]
+                    assertTrue(
+                        ((b - a) cross (point - a)) * face <= tolerance,
+                        "Face ${face.id} rim point $point is outside edge $index",
+                    )
+                }
+            }
+            assertRimStaysNearSourceEdges(face, rim)
+        }
     }
 
     @Test
@@ -371,6 +441,44 @@ class ResolvedRimTest {
     private fun ResolvedRimGeometry.containsProjected(point: Vec3): Boolean = regions.any { region ->
         region.outer.vertices.containsProjected(point) && region.holes.none { hole ->
             hole.vertices.containsProjected(point)
+        }
+    }
+
+    private fun polyhedra.model.poly.ResolvedRimRegion.touchesSourceBoundary(
+        face: polyhedra.model.poly.Face,
+    ): Boolean {
+        val tolerance = face.fvs.maxOf(Vec3::norm).coerceAtLeast(1.0) * 1e-8
+        return outer.vertices.any { point ->
+            face.fvs.indices.any { index ->
+                val a = face.fvs[index]
+                val b = face.fvs[(index + 1) % face.fvs.size]
+                val edge = b - a
+                val along = ((point - a) * edge) / (edge * edge)
+                along in -tolerance..(1.0 + tolerance) && ((point - a) cross edge).norm <= tolerance * edge.norm
+            }
+        }
+    }
+
+    private fun assertRimStaysNearSourceEdges(
+        face: polyhedra.model.poly.Face,
+        rim: ResolvedRimGeometry,
+    ) {
+        val tolerance = face.fvs.maxOf(Vec3::norm).coerceAtLeast(1.0) * 1e-8
+        val maximumDistance = rim.width * 4.0 + tolerance
+        for (point in rim.regions.flatMap { region ->
+            region.outer.vertices + region.holes.flatMap { hole -> hole.vertices }
+        }) {
+            val nearest = face.fvs.indices.minOf { index ->
+                val a = face.fvs[index]
+                val edge = face.fvs[(index + 1) % face.fvs.size] - a
+                val parameter = (((point - a) * edge) / (edge * edge)).coerceIn(0.0, 1.0)
+                (point - (a + edge * parameter)).norm
+            }
+            assertTrue(
+                nearest <= maximumDistance,
+                "Face ${face.id} rim point $point is $nearest from every source edge " +
+                    "(limit $maximumDistance)",
+            )
         }
     }
 
