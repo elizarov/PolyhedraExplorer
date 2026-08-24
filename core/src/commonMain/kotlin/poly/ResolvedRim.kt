@@ -222,13 +222,34 @@ private fun Face.resolvedRimAtWidths(
     require(edgeWidths.size == size)
     val plane = rimPlane(resolved)
     val points = resolved.vertices.map { vertex -> plane.project(vertex.position) }
-    val cellBoundaries = resolved.cells.map { cell -> cell.boundary.map(points::get) }
+    val filledCells = resolved.cells.map { cell -> cell.boundary.map(points::get) }
+    val filledBoundaries = resolved.filledBoundaryCycles(points, plane.tolerance)
     return continuousSourceEdgeRim(
         edgeWidths,
         maximumWidth,
         plane,
-        clipBoundaries = cellBoundaries.takeIf { coverageOnly },
+        clipBoundaries = filledBoundaries.takeIf { coverageOnly },
+        clipCells = filledCells.takeIf { coverageOnly },
     )
+}
+
+/** Removes cell-internal arrangement edges before the filled face is used as a clipping region. */
+private fun ResolvedFaceGeometry.filledBoundaryCycles(
+    points: List<RimPoint>,
+    tolerance: Double,
+): List<List<RimPoint>> {
+    val edgeUses = linkedMapOf<RimEdge, MutableList<Pair<Int, Int>>>()
+    for (cell in cells) for (index in cell.boundary.indices) {
+        val a = cell.boundary[index]
+        val b = cell.boundary[(index + 1) % cell.boundary.size]
+        edgeUses.getOrPut(rimEdge(a, b), ::arrayListOf) += a to b
+    }
+    require(edgeUses.values.all { uses -> uses.size <= 2 }) {
+        "Resolved face $sourceFaceId has a non-manifold planar fill arrangement"
+    }
+    return edgeUses.values.mapNotNull { uses ->
+        uses.singleOrNull()?.let { (a, b) -> RimSegment(points[a], points[b], emptySet()) }
+    }.toCycles(tolerance, rimWidth = 0.0, miterJoins = false).map(RimCycle2::points)
 }
 
 /**
@@ -242,6 +263,7 @@ private fun Face.continuousSourceEdgeRim(
     maximumWidth: Double,
     plane: RimPlane,
     clipBoundaries: List<List<RimPoint>>? = null,
+    clipCells: List<List<RimPoint>>? = clipBoundaries,
 ): ResolvedRimGeometry {
     val width = edgeWidths.maxOrNull() ?: 0.0
     val sourceBoundary = fvs.map(plane::project)
@@ -275,8 +297,8 @@ private fun Face.continuousSourceEdgeRim(
     val boundarySegments = inputSegments.splitAtIntersections(plane.tolerance).selectBoundary(
         plane.tolerance,
         inside = { point ->
-            (clipBoundaries == null || clipBoundaries.any { boundary ->
-                boundary.contains(point, plane.tolerance)
+            (clipCells == null || clipCells.any { cell ->
+                cell.contains(point, plane.tolerance)
             }) && allStrips.any { strip -> strip.polygon.contains(point, plane.tolerance) }
         },
     )
@@ -539,7 +561,15 @@ private fun Face.immersedRimMaximum(resolved: ResolvedFaceGeometry): Double {
     )
     val areaTolerance = maxOf(plane.tolerance * scale * 64.0, fillArea * 1e-9)
     fun covered(width: Double): Boolean {
-        val area = resolvedRimAtWidth(resolved, width, coverageOnly = true).regions.sumOf { region ->
+        // An exact topology-change width can make several union cycles meet at one point. It is
+        // not a usable presentation maximum; keep searching on the covered side for the first
+        // nearby width whose boundary is still a collection of manifold cycles.
+        val geometry = try {
+            resolvedRimAtWidth(resolved, width, coverageOnly = true)
+        } catch (_: IllegalArgumentException) {
+            return false
+        }
+        val area = geometry.regions.sumOf { region ->
             val outer = region.outer.vertices.map(plane::project).signedArea()
             val holes = region.holes.sumOf { cycle ->
                 abs(cycle.vertices.map(plane::project).signedArea())
@@ -731,8 +761,14 @@ private fun List<RimSegment>.toCycles(
     ) {
         val sources = outgoing.keys - incoming.keys
         val sinks = incoming.keys - outgoing.keys
+        val imbalanced = (outgoing.keys + incoming.keys).distinct().mapNotNull { node ->
+            val out = outgoing[node].orEmpty().size
+            val `in` = incoming[node].orEmpty().size
+            nodes[node].point.takeIf { out != `in` }?.let { point -> "$point:$`in`->$out" }
+        }
         "Resolved rim boundary is not a collection of manifold cycles " +
-            "(sources=${sources.map { nodes[it].point }}, sinks=${sinks.map { nodes[it].point }})"
+            "(sources=${sources.map { nodes[it].point }}, sinks=${sinks.map { nodes[it].point }}, " +
+            "imbalanced=$imbalanced)"
     }
     val remaining = directed.keys.toMutableSet()
     val successor = directed.keys.associateWith { edge ->

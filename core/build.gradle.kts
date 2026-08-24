@@ -78,3 +78,21 @@ tasks.register<JavaExec>("benchmarkGreatenedSnubCube") {
         jvmArgs("-XX:StartFlightRecording=filename=${recording.absolutePath},settings=profile,dumponexit=true")
     }
 }
+
+tasks.register<JavaExec>("benchmarkGreatenedRhombicTriacontahedron") {
+    group = "benchmark"
+    description = "Benchmarks uncached enumeration of all Greatened Rhombic Triacontahedron results."
+    dependsOn("jvmTestClasses")
+    mainClass.set("polyhedra.core.GreatenedRhombicTriacontahedronBenchmarkKt")
+    classpath = jvmTestCompilation.output.allOutputs + jvmTestCompilation.runtimeDependencyFiles
+    val warmups = providers.gradleProperty("benchmarkWarmups").orElse("1")
+    val samples = providers.gradleProperty("benchmarkSamples").orElse("5")
+    argumentProviders.add(CommandLineArgumentProvider { listOf(warmups.get(), samples.get()) })
+    if (providers.gradleProperty("benchmarkJfr").orNull == "true") {
+        val recording = layout.buildDirectory.file(
+            "reports/benchmarks/greatened-rhombic-triacontahedron.jfr",
+        ).get().asFile
+        doFirst { recording.parentFile.mkdirs() }
+        jvmArgs("-XX:StartFlightRecording=filename=${recording.absolutePath},settings=profile,dumponexit=true")
+    }
+}

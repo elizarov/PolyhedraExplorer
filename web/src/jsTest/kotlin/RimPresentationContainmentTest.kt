@@ -1,10 +1,16 @@
 package polyhedra.web
 
 import kotlinx.browser.document
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.promise
 import org.khronos.webgl.WebGLRenderingContext
 import org.w3c.dom.HTMLCanvasElement
+import polyhedra.core.api.evaluateCore
 import polyhedra.core.poly.resolvedRims
 import polyhedra.core.poly.toSeedOrNull
+import polyhedra.model.api.CoreRequest
+import polyhedra.model.api.CoreState
 import polyhedra.model.poly.FaceKind
 import polyhedra.model.poly.Polyhedron
 import polyhedra.model.util.Vec3
@@ -21,7 +27,10 @@ import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.roundToLong
+import kotlin.js.Promise
+import kotlin.test.AfterTest
 import kotlin.test.Test
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -29,6 +38,13 @@ import kotlin.test.assertTrue
  * High-winding cases with intentional internal sheets use the independent local tests instead.
  */
 class RimPresentationContainmentTest {
+    private val scope = MainScope()
+
+    @AfterTest
+    fun tearDown() {
+        scope.cancel()
+    }
+
     @Test
     fun convexRimPresentationsStayInsideTheirResolvedSolids() {
         val settings = listOf(
@@ -104,6 +120,20 @@ class RimPresentationContainmentTest {
         }
     }
 
+    @Test
+    fun fourthIcosahedronStellationRimsStayInsideItsResolvedSolid(): Promise<Unit> = scope.promise {
+        val response = evaluateCore(CoreRequest(CoreState("I", listOf("S~l=4"), "c")))
+        assertNull(response.error, response.error?.detail)
+        val poly = response.poly
+        assertRimPresentationContained(
+            "Stellated 4 Icosahedron",
+            poly,
+            rim = 0.05,
+            width = 0.10,
+            denseSamples = 6,
+        )
+    }
+
     private val challengingSettings = listOf(
         0.015 to 0.03,
         0.015 to 0.1,
@@ -116,13 +146,21 @@ class RimPresentationContainmentTest {
         rim: Double,
         width: Double,
         hiddenKinds: Set<FaceKind>? = null,
+    ) = assertRimPresentationContained(tag, requireNotNull(tag.toSeedOrNull()).poly, rim, width, hiddenKinds)
+
+    private fun assertRimPresentationContained(
+        tag: String,
+        poly: Polyhedron,
+        rim: Double,
+        width: Double,
+        hiddenKinds: Set<FaceKind>? = null,
+        denseSamples: Int = 1,
     ) {
-        val poly = requireNotNull(tag.toSeedOrNull()).poly
         val rendered = poly.renderedRimTriangles(rim, width, hiddenKinds ?: poly.faceKinds.keys)
         assertClosedPresentation(tag, rim, width, hiddenKinds, rendered, poly.circumradius)
         val solid = ResolvedSolid(poly)
         for ((triangleIndex, triangle) in rendered.withIndex()) {
-            solid.firstOutsidePoint(triangle)?.let { point ->
+            solid.firstOutsidePoint(triangle, denseSamples)?.let { point ->
                 assertTrue(
                     false,
                     "$tag rim=$rim width=$width rim triangle $triangleIndex protrudes outside " +
@@ -343,16 +381,32 @@ private class ResolvedSolid(poly: Polyhedron) {
         }
     }
 
-    fun firstOutsidePoint(triangle: TestTriangle): Vec3? {
-        val samples = listOf(
-            triangle.a,
-            triangle.b,
-            triangle.c,
-            (triangle.a + triangle.b) * 0.5,
-            (triangle.b + triangle.c) * 0.5,
-            (triangle.c + triangle.a) * 0.5,
-            (triangle.a + triangle.b + triangle.c) * (1.0 / 3.0),
-        )
+    fun firstOutsidePoint(triangle: TestTriangle, subdivisions: Int = 1): Vec3? {
+        val samples = buildList {
+            addAll(
+                listOf(
+                    triangle.a,
+                    triangle.b,
+                    triangle.c,
+                    (triangle.a + triangle.b) * 0.5,
+                    (triangle.b + triangle.c) * 0.5,
+                    (triangle.c + triangle.a) * 0.5,
+                    (triangle.a + triangle.b + triangle.c) * (1.0 / 3.0),
+                ),
+            )
+            if (subdivisions > 1) {
+                for (aWeight in 0..subdivisions) {
+                    for (bWeight in 0..subdivisions - aWeight) {
+                        val cWeight = subdivisions - aWeight - bWeight
+                        add(
+                            (triangle.a * aWeight.toDouble() +
+                                triangle.b * bWeight.toDouble() +
+                                triangle.c * cWeight.toDouble()) * (1.0 / subdivisions),
+                        )
+                    }
+                }
+            }
+        }
         samples.firstOrNull { point -> !containsOrOnBoundary(point) }?.let { return it }
 
         for (boundary in surface) {

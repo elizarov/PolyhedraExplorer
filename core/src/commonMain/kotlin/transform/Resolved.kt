@@ -722,6 +722,7 @@ private class WindingGroup(
     val maxY = triangles.maxOf { triangle -> maxOf(triangle.a.y, triangle.b.y, triangle.c.y) }
     val minZ = triangles.minOf { triangle -> minOf(triangle.a.z, triangle.b.z, triangle.c.z) }
     val maxZ = triangles.maxOf { triangle -> maxOf(triangle.a.z, triangle.b.z, triangle.c.z) }
+    private val triangleIndex = WindingTriangleIndex(triangles)
 
     fun center(axis: Int): Double = when (axis) {
         0 -> (minX + maxX) / 2.0
@@ -740,13 +741,88 @@ private class WindingGroup(
         // surfaces. Retry degeneracies from another direction, then retain solid angle as the
         // boundary-safe fallback when every ray touches an edge, vertex, or coplanar triangle.
         for (axis in 0..2) {
-            triangles.rayWindingOrNull(point, axis, tolerance)?.let { winding -> return winding != 0 }
+            triangleIndex.rayWindingOrNull(point, axis, tolerance)?.let { winding -> return winding != 0 }
         }
         return triangles.hasNonzeroSolidAngleWinding(point, tolerance)
     }
 }
 
-private fun List<SourceTriangle>.rayWindingOrNull(
+/**
+ * A ray only needs triangles whose two-dimensional projection contains the query point and whose
+ * positive-axis extent reaches it. Resolved classifies many fragments against the same triangle
+ * soup, so indexing those three ray queries avoids rescanning the complete surface for each side
+ * of every fragment.
+ */
+private class WindingTriangleIndex private constructor(
+    triangles: List<SourceTriangle>,
+    private val minX: Double,
+    private val maxX: Double,
+    private val minY: Double,
+    private val maxY: Double,
+    private val minZ: Double,
+    private val maxZ: Double,
+) {
+    constructor(triangles: List<SourceTriangle>) : this(
+        triangles,
+        triangles.minOf(SourceTriangle::minX),
+        triangles.maxOf(SourceTriangle::maxX),
+        triangles.minOf(SourceTriangle::minY),
+        triangles.maxOf(SourceTriangle::maxY),
+        triangles.minOf(SourceTriangle::minZ),
+        triangles.maxOf(SourceTriangle::maxZ),
+    )
+
+    private val leaf = triangles.takeIf { it.size <= 8 }
+    private val children: List<WindingTriangleIndex> = if (leaf != null) {
+        emptyList()
+    } else {
+        val spans = listOf(maxX - minX, maxY - minY, maxZ - minZ)
+        val splitAxis = spans.indices.maxBy(spans::get)
+        val ordered = triangles.sortedBy { triangle ->
+            when (splitAxis) {
+                0 -> (triangle.minX + triangle.maxX) / 2.0
+                1 -> (triangle.minY + triangle.maxY) / 2.0
+                else -> (triangle.minZ + triangle.maxZ) / 2.0
+            }
+        }
+        val middle = ordered.size / 2
+        listOf(
+            WindingTriangleIndex(ordered.subList(0, middle)),
+            WindingTriangleIndex(ordered.subList(middle, ordered.size)),
+        )
+    }
+
+    fun rayWindingOrNull(point: Vec3, axis: Int, tolerance: Double): Int? {
+        val reachesPositiveRay = when (axis) {
+            0 -> point.x <= maxX + tolerance &&
+                point.y in minY - tolerance..maxY + tolerance &&
+                point.z in minZ - tolerance..maxZ + tolerance
+            1 -> point.y <= maxY + tolerance &&
+                point.x in minX - tolerance..maxX + tolerance &&
+                point.z in minZ - tolerance..maxZ + tolerance
+            else -> point.z <= maxZ + tolerance &&
+                point.x in minX - tolerance..maxX + tolerance &&
+                point.y in minY - tolerance..maxY + tolerance
+        }
+        if (!reachesPositiveRay) return 0
+        leaf?.let { triangles ->
+            var winding = 0
+            for (triangle in triangles) {
+                val contribution = triangle.rayWindingContributionOrNull(point, axis, tolerance)
+                    ?: return null
+                winding += contribution
+            }
+            return winding
+        }
+        var winding = 0
+        for (child in children) {
+            winding += child.rayWindingOrNull(point, axis, tolerance) ?: return null
+        }
+        return winding
+    }
+}
+
+private fun SourceTriangle.rayWindingContributionOrNull(
     point: Vec3,
     axis: Int,
     tolerance: Double,
@@ -756,37 +832,33 @@ private fun List<SourceTriangle>.rayWindingOrNull(
         1 -> Vec3(0.0, 1.0, 0.0)
         else -> Vec3(0.0, 0.0, 1.0)
     }
-    var winding = 0
-    for (triangle in this) {
-        val projectionContainsPoint = when (axis) {
-            0 -> point.y in triangle.minY - tolerance..triangle.maxY + tolerance &&
-                point.z in triangle.minZ - tolerance..triangle.maxZ + tolerance
-            1 -> point.x in triangle.minX - tolerance..triangle.maxX + tolerance &&
-                point.z in triangle.minZ - tolerance..triangle.maxZ + tolerance
-            else -> point.x in triangle.minX - tolerance..triangle.maxX + tolerance &&
-                point.y in triangle.minY - tolerance..triangle.maxY + tolerance
-        }
-        if (!projectionContainsPoint) continue
-        val p = direction cross triangle.ac
-        val determinant = triangle.ab * p
-        if (abs(determinant) <= tolerance * triangle.edgeScale) continue
-        val inverse = 1.0 / determinant
-        val offset = point - triangle.a
-        val u = (offset * p) * inverse
-        val q = offset cross triangle.ab
-        val v = (direction * q) * inverse
-        val barycentricTolerance = tolerance / triangle.edgeScale
-        if (u < -barycentricTolerance || v < -barycentricTolerance ||
-            u + v > 1.0 + barycentricTolerance
-        ) continue
-        val distance = (triangle.ac * q) * inverse
-        if (distance < -tolerance) continue
-        if (distance <= tolerance || u <= barycentricTolerance || v <= barycentricTolerance ||
-            1.0 - u - v <= barycentricTolerance
-        ) return null
-        winding += triangle.windingMultiplicity * if (triangle.normal * direction > 0.0) 1 else -1
+    val projectionContainsPoint = when (axis) {
+        0 -> point.y in minY - tolerance..maxY + tolerance &&
+            point.z in minZ - tolerance..maxZ + tolerance
+        1 -> point.x in minX - tolerance..maxX + tolerance &&
+            point.z in minZ - tolerance..maxZ + tolerance
+        else -> point.x in minX - tolerance..maxX + tolerance &&
+            point.y in minY - tolerance..maxY + tolerance
     }
-    return winding
+    if (!projectionContainsPoint) return 0
+    val p = direction cross ac
+    val determinant = ab * p
+    if (abs(determinant) <= tolerance * edgeScale) return 0
+    val inverse = 1.0 / determinant
+    val offset = point - a
+    val u = (offset * p) * inverse
+    val q = offset cross ab
+    val v = (direction * q) * inverse
+    val barycentricTolerance = tolerance / edgeScale
+    if (u < -barycentricTolerance || v < -barycentricTolerance ||
+        u + v > 1.0 + barycentricTolerance
+    ) return 0
+    val distance = (ac * q) * inverse
+    if (distance < -tolerance) return 0
+    if (distance <= tolerance || u <= barycentricTolerance || v <= barycentricTolerance ||
+        1.0 - u - v <= barycentricTolerance
+    ) return null
+    return windingMultiplicity * if (normal * direction > 0.0) 1 else -1
 }
 
 private fun List<SourceTriangle>.hasNonzeroSolidAngleWinding(point: Vec3, tolerance: Double): Boolean {

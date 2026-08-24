@@ -64,6 +64,37 @@ Run the regression benchmark with:
 Add `-PbenchmarkJfr=true` to capture
 `core/build/reports/benchmarks/greatened-snub-cube.jfr` for another profile.
 
+## Cold Greatened Rhombic Triacontahedron construction
+
+This JVM benchmark clears the constellation cache before every measurement, enumerates all 33
+Greatened results, verifies their stable order, and constructs Result 7 with presentation rims.
+
+| Implementation | Median | Min | Max | Samples |
+| --- | ---: | ---: | ---: | ---: |
+| Eager resolved-boundary validation for every result | 3.653 s | 3.638 s | 3.814 s | 5 |
+| Integral-winding filter and lazy selected-result analysis | 0.322 s | 0.302 s | 0.466 s | 5 |
+
+The current construction is **11.34x faster**, reducing the cold median by 91.2%. A Flight
+Recorder profile showed that candidate faceting was not the bottleneck: most time was spent
+building and classifying a complete resolved physical boundary for every result. Candidate
+enumeration now rejects a non-closed oriented immersion with a cheap generalized-winding probe at
+the origin. Geometry-contract analysis and physical-boundary construction remain lazy, cached
+properties of the selected result. An independent JVM regression still constructs and validates
+the resolved boundary of all 33 published results.
+
+The resolved-boundary classifier also indexes its source triangles in an AABB tree. Repeated ray
+winding queries traverse only triangles whose projected bounds can meet the ray; solid-angle
+classification remains the boundary-degeneracy fallback.
+
+Run the benchmark with:
+
+```shell
+./gradlew :core:benchmarkGreatenedRhombicTriacontahedron
+```
+
+Add `-PbenchmarkJfr=true` to capture
+`core/build/reports/benchmarks/greatened-rhombic-triacontahedron.jfr`.
+
 ## Interactive star-result enumeration
 
 Uncached Stellated enumeration for Deltoidal hexecontahedron is a JVM regression workload. It must
@@ -72,9 +103,9 @@ immersion and resolved physical boundary. The candidate search reuses one plane 
 orbit, expands it through geometric symmetries, uses spatial indices for tolerant point merging,
 and constructs physical stratum boundaries only when they are needed. Greatened and Stellated
 enumeration both publish monotonic intermediate worker progress; cached result sets complete
-without repeating candidate discovery. Each cached result also retains its geometry-contract
-analysis, full point-group and F/E/V orbit classification, orbit-action availability, and its most
-recent presentation-rim geometry. Returning to a large result therefore avoids repeated
+without repeating candidate discovery. Each cached result also retains its lazily computed
+geometry-contract analysis, full point-group and F/E/V orbit classification, orbit-action
+availability, and its most recent presentation-rim geometry. Returning to a large result therefore avoids repeated
 classification and derives Stellate-face availability with one full-Kis
 construction instead of one construction per face orbit. Switching between two Stellated Results
 does not evaluate the previous result because this discrete setting has no animation keyframes.

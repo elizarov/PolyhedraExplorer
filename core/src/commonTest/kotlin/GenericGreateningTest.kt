@@ -5,6 +5,7 @@ import kotlinx.serialization.encodeToString
 import polyhedra.core.api.evaluateCore
 import polyhedra.core.poly.*
 import polyhedra.core.transform.ConstellationOperation
+import polyhedra.core.transform.clearStellationCandidateCache
 import polyhedra.core.transform.sameGeometryAs
 import polyhedra.core.transform.stellationCandidatesAsync
 import polyhedra.core.transform.resolved
@@ -131,6 +132,23 @@ class GenericGreateningTest {
         assertEquals(FEV(56, 210, 60), response.poly.fev())
         assertTrue(response.animation.isEmpty())
         assertTrue(CoreJson.encodeToString(response).isNotEmpty())
+    }
+
+    @Test
+    fun workerConstructsSeventhRhombicTriacontahedronGreatening() = runTest {
+        clearStellationCandidateCache()
+        val response = evaluateCore(
+            CoreRequest(
+                CoreState("daD", listOf("G~l=7"), "c"),
+                rimWidth = 0.05,
+                faceWidth = 0.10,
+            ),
+        )
+
+        assertNull(response.error, response.error?.detail)
+        assertEquals(33.0, response.transformTweakRanges.single().single().max)
+        response.poly.validateRenderableImmersion()
+        assertEquals(response.poly.fs.size, response.resolvedRims.size)
     }
 }
 

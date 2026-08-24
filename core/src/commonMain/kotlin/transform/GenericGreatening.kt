@@ -4,7 +4,6 @@ import polyhedra.core.poly.geometricSymmetryOperations
 import polyhedra.core.poly.analyzeGeometry
 import polyhedra.core.poly.polyhedron
 import polyhedra.core.poly.scaled
-import polyhedra.core.poly.validateProperGeometry
 import polyhedra.core.poly.validateRenderableImmersion
 import polyhedra.core.util.OperationProgressContext
 import polyhedra.core.util.reportProgress
@@ -24,6 +23,7 @@ import polyhedra.model.util.times
 import polyhedra.model.util.unit
 import kotlin.math.abs
 import kotlin.math.atan2
+import kotlin.math.PI
 import kotlin.math.roundToLong
 
 private const val MAX_FACETING_TRIPLES = 2_000_000L
@@ -91,10 +91,11 @@ internal suspend fun Polyhedron.buildGenericGreateningCandidates(
             faceted.validateRenderableImmersion()
             val candidate = alignGreateningToSourcePlanes(faceted.directDual(), planeTolerance)
                 ?: return@runCatching null
-            candidate.validateRenderableImmersion()
-            val geometryAnalysis = candidate.analyzeGeometry()
-            candidate.resolved(candidateProgress, geometryAnalysis).validateProperGeometry()
-            StellationCandidate(candidate, knownGeometryAnalysis = geometryAnalysis)
+            if (!candidate.hasIntegralOriginWinding()) return@runCatching null
+            // Geometry-contract analysis belongs to the selected cached candidate. Keeping it
+            // lazy avoids classifying every unselected Result while still computing it once when
+            // CoreResponse consumes that candidate.
+            StellationCandidate(candidate)
         }.getOrNull()
         candidateProgress?.reportProgress(100)
         candidate
@@ -114,6 +115,32 @@ internal suspend fun Polyhedron.buildGenericGreateningCandidates(
         ))
     progress?.reportProgress(100)
     return result
+}
+
+/**
+ * A closed oriented immersion has an integer generalized winding at every off-surface point.
+ * Greatening preserves nonzero source-plane distances, so the origin is a deterministic safe
+ * probe. This rejects inconsistent facetings without constructing every candidate's much heavier
+ * Resolved physical boundary merely to discover the same non-closure.
+ */
+private fun Polyhedron.hasIntegralOriginWinding(): Boolean {
+    var solidAngle = 0.0
+    for (face in fs) {
+        val resolved = resolvedFaces[face.id]
+        for (cell in resolved.cells) for (triangle in cell.triangles) {
+            val a = resolved.vertices[triangle.a].position
+            val b = resolved.vertices[triangle.b].position
+            val c = resolved.vertices[triangle.c].position
+            val la = a.norm
+            val lb = b.norm
+            val lc = c.norm
+            val numerator = a * (b cross c)
+            val denominator = la * lb * lc + (a * b) * lc + (b * c) * la + (c * a) * lb
+            solidAngle += abs(cell.winding) * 2.0 * atan2(numerator, denominator)
+        }
+    }
+    val winding = solidAngle / (4.0 * PI)
+    return winding.isFinite() && abs(winding - winding.roundToLong()) <= 1e-6
 }
 
 private fun Polyhedron.facePatternMismatchCount(source: Polyhedron): Int =

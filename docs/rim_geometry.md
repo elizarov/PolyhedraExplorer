@@ -116,7 +116,11 @@ actual offset-line intersection at every source vertex.
 
 The maximum slider width is the first width whose sheet union covers all nonzero-winding cells. It
 is found by scale-based upper-bound growth followed by binary search; this is a UI range, not a
-catalogue-specific value and not a different presentation geometry.
+catalogue-specific value and not a different presentation geometry. Coverage clips against the
+external cycles of the filled face arrangement; cell-internal arrangement edges are discarded.
+An exact topology-event width can make several union cycles meet at one point. Such a non-manifold
+probe is treated as uncovered, and the search selects the nearest manifold width on the covered
+side instead of publishing an unusable boundary.
 
 ### Simple non-planar faces
 

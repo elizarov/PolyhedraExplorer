@@ -595,7 +595,12 @@ Result 1 is omitted from serialization. Later results use `G~l=n`, display `n` a
 on the Greatened pill, and use `_n` in generated export filenames. The popup's compact left/right
 controls select the previous or next greatening and keep the Result slider synchronized.
 Uncached Result discovery reports its faceting-plane, symmetry-orbit, exact-cover, and candidate
-validation phases on the Greatened pill. Cached discovery completes immediately.
+filtering phases on the Greatened pill. A candidate must have integer generalized winding at the
+origin, as every closed oriented immersion does at an off-surface point. This inexpensive generic
+closure test avoids resolving every unselected candidate. Geometry-contract analysis, symmetry,
+orbit actions, and presentation rims are computed once when a result is selected and retained in
+its cache record. The test suite independently resolves every published result for representative
+large candidate sets. Cached discovery completes immediately.
 
 Greatened is immediate because its changed immersed topology has no stable collapsed correspondence
 to the input surface.
