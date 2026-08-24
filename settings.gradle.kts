@@ -15,4 +15,4 @@ dependencyResolutionManagement {
     }
 }
 
-include(":model", ":core", ":web", ":benchmarks")
+include(":model", ":core", ":web", ":benchmarks", ":renderer")

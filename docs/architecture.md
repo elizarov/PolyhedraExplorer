@@ -5,9 +5,10 @@
 | Module | Targets | Responsibility |
 | --- | --- | --- |
 | `model` | JVM, JS, WasmGC | Serializable mesh/presentation types, shared concave/non-planar face triangulation, vector math needed for rendering and inspection, the browser core-request/response contract, and shared typed transform notation and macro definitions. It contains no seed generator or manipulation transform. |
-| `core` | JVM, JS, WasmGC | Seed construction, topology manipulation, transforms, scaling, validation, browser API evaluation, and JVM tests. The browser executes this module only as WasmGC; its JS target exists solely for the controlled baseline benchmark. |
+| `core` | JVM, JS, WasmGC | Seed construction, topology manipulation, transforms, scaling, validation, browser API evaluation, and JVM tests. The browser executes this module only as WasmGC; its JS target is limited to the controlled baseline benchmark and standalone diagnostic renderer. |
 | `web` | JS | Compose HTML controls, URL parameter state, animation interpolation, inspection/export UI, and the WebGL renderer. It consumes completed meshes and metadata; it does not invoke manipulation transforms. |
 | `benchmarks` | JS, WasmGC | Identical production benchmark workloads over the core algorithms. |
+| `renderer` | JS (Node) | Standalone diagnostic PNG rendering with the core JS target, the web module's real shaders, `headless-gl`, and `pngjs`. It has no browser, DOM, HTTP-server, or Wasm-worker dependency. |
 
 ## Source layout and package names
 
@@ -20,6 +21,7 @@ Kotlin sources use a compact directory layout. Every package starts with `polyhe
 | `core/src/jsMain/kotlin/util/RunSynchronously.kt` | `polyhedra.core.util` |
 | `web/src/jsMain/kotlin/main/RootPane.kt` | `polyhedra.web.main` |
 | `benchmarks/src/commonMain/kotlin/BenchmarkMain.kt` | `polyhedra.benchmarks` |
+| `renderer/src/jsMain/kotlin/Renderer.kt` | `polyhedra.renderer` |
 
 A file directly under a source set's `kotlin` directory uses the module root package, such as `polyhedra.core` or `polyhedra.web`. Do not duplicate the namespace as physical `polyhedra/<module>` directories and do not use `package-info.kt` marker files. Imports across module and subpackage boundaries must name the owning package explicitly.
 
@@ -45,6 +47,15 @@ flowchart LR
 Propeller, Whirl, and Quinto first build their exact local Conway incidence structure, apply a small orbit-preserving radial perturbation to avoid a degenerate circle-packing start, and then use the same progress-capable canonical solver to return a convex realization. Their final geometry is cached by input polyhedron and chirality. Progress identifies the active logical transform index and reports a stage-local percentage; multiple primitive operations inside one macro are mapped into a monotonic `0…100` range for that macro pill.
 
 The generated Kotlin loader and the worker's dynamic-import expression are the only JavaScript interop required for core execution. The production web bundle depends on `model`, not `core`, so it cannot contain a JavaScript fallback copy of the manipulation engine.
+
+The separate `renderer` executable is a development diagnostic, not a browser fallback. It parses
+the same `RootParams` serialization, evaluates the `CoreRequest` through the core's Kotlin/JS Node
+target, applies the resulting `CoreResponse` to the web view model, and passes a `headless-gl`
+context to the same `DrawContext`, buffer builders, shader sources, lighting, and environment passes
+used by the browser. It reads RGBA pixels from that context, flips WebGL's bottom-up rows, and uses
+`pngjs` only for PNG encoding. Its Gradle setup owns Node/npm provisioning and the native addon
+installation; `tools/render-config.ps1` only converts Unicode arguments safely and invokes the
+Gradle task.
 
 Canonical representation invariants and the current circle-packing solver are specified in [Canonicalization](canonicalization.md). The solver validates rotational kind groups, relaxes only one edge point and face plane per symmetry orbit, and expands the converged vertex planes through precomputed proper rotations once during final reconstruction.
 

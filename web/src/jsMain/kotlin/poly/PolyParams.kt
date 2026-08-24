@@ -209,8 +209,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
                 if (requestId != activeRequestId || requestedState != state) return@success
                 cancelCoreRequest = null
                 resetTransformProgress()
-                applyResponse(state, response)
-                notifyUpdated(TargetValue)
+                applyCoreResponse(state, response)
                 performUpdate(null, 0.0)
             },
             onFailure = failure@{ cause ->
@@ -309,6 +308,12 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         appliedState = state
         updateAnimation(response.animation.toUiAnimation())
         updateSuggestedSeed(state, response)
+    }
+
+    /** Applies a response evaluated outside the browser Wasm worker, such as by the Node renderer. */
+    fun applyCoreResponse(state: CoreState, response: CoreResponse) {
+        applyResponse(state, response)
+        notifyUpdated(TargetValue)
     }
 
     internal fun updateAvailableOrbitTransforms(availableTransforms: List<List<String>>) {

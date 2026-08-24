@@ -10,13 +10,21 @@ import polyhedra.web.params.*
 import org.khronos.webgl.WebGLRenderingContext as GL
 
 class DrawContext(
-    canvas: HTMLCanvasElement,
+    val gl: GL,
     params: RenderParams,
     private val onUpdate: () -> Unit,
 ) : Param.Context(params) {
-    val transparentFaces by { params.view.transparentFaces.value }
+    constructor(
+        canvas: HTMLCanvasElement,
+        params: RenderParams,
+        onUpdate: () -> Unit,
+    ) : this(
+        canvas.getContext("webgl", js("({ premultipliedAlpha: false, stencil: true })") as Any) as GL,
+        params,
+        onUpdate,
+    )
 
-    val gl: GL = canvas.getContext("webgl", js("({ premultipliedAlpha: false, stencil: true })") as Any) as GL
+    val transparentFaces by { params.view.transparentFaces.value }
 
     val view = ViewContext(params.view)
     val lighting = LightingContext(params.lighting)
@@ -48,9 +56,10 @@ private fun DrawContext.initGL() {
 }
 
 fun DrawContext.drawScene() {
-    val width = gl.canvas.width
-    val height = gl.canvas.height
+    drawScene(gl.canvas.width, gl.canvas.height)
+}
 
+fun DrawContext.drawScene(width: Int, height: Int) {
     view.initProjection(width, height)
     gl.viewport(0, 0, width, height)
     gl.clear(GL.COLOR_BUFFER_BIT or GL.DEPTH_BUFFER_BIT or GL.STENCIL_BUFFER_BIT)

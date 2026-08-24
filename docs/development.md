@@ -68,8 +68,9 @@ python -m http.server 8765 --directory build/dist/browser/development
 ```
 
 For repeatable visual inspection, the standalone renderer accepts the exact compact configuration
-stored after `#/` and writes a PNG. By default it builds the development distribution, starts an
-isolated temporary HTTP server, launches headless Chrome with a fresh profile, and shuts both down:
+stored after `#/` and writes a PNG with the production WebGL shaders. It evaluates the core through
+the Kotlin/JS Node target and renders through `headless-gl`; it does not build a browser distribution,
+start an HTTP server, or launch a browser:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools/render-config.ps1 `
@@ -77,12 +78,19 @@ powershell -ExecutionPolicy Bypass -File tools/render-config.ps1 `
     'build/rendered/antiprism-5-2.png'
 ```
 
-Use `-NoBuild` to reuse the current development distribution, or `-ApplicationUrl` to render from
-an already-running server. `-Width`, `-Height`, and `-WaitMilliseconds` make the viewport and worker
-readiness timeout explicit. The renderer waits for the Wasm status to clear and for the canvas to
-reach the requested dimensions before capturing it through Chrome DevTools. `-BeforeCaptureScript`
-is available for controlled rendering diagnostics; it evaluates the supplied JavaScript only after
-the scene is ready and immediately before capture.
+`-Width` and `-Height` set the drawing-buffer and PNG dimensions. The PowerShell file is only a thin
+argument wrapper around `:renderer:renderConfig`. It transfers the configuration as UTF-8 Base64 so
+orbit letters survive the Windows batch boundary; Gradle decodes it before launching Node. Gradle
+provisions and caches Node, `headless-gl`, `pngjs`, and their npm dependencies, compiles the core,
+renderer, and CLI, and tracks the native `headless-gl` binding incrementally. When no binding exists
+for the managed Node version, the Gradle setup task builds it with `node-gyp`; that first build needs
+the platform's normal native C++ toolchain and Python. Later renders reuse the installed binding.
+
+The equivalent Gradle entry point is `:renderer:renderConfig` with `renderConfiguration` (or the
+UTF-8 `renderConfigurationBase64` used by the wrapper), `renderOutput`, `renderWidth`, and
+`renderHeight` project properties. `./gradlew :renderer:jsNodeTest` renders the immersed Antiprism
+5/2 regression with the actual shaders and verifies both opaque compositing and serialized
+hidden-face rim selection.
 
 ## Release and deployment
 
@@ -109,6 +117,7 @@ core/src/wasmJsMain/       exported Wasm browser API
 core/src/commonTest/       algorithm and API tests
 web/src/jsMain/kotlin/     Compose DOM UI and WebGL renderer
 web/src/jsMain/resources/  HTML and CSS
+renderer/src/jsMain/       Node/headless-gl PNG renderer and CLI
 benchmarks/src/commonMain/ identical JS/Wasm workloads
 docs/                      live specification
 ```
