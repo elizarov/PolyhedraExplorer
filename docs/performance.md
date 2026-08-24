@@ -31,6 +31,39 @@ Canonicalization's symmetry quotient reduces this benchmark from 36 edge points 
 
 These figures measure computation kernels only. Wasm download/instantiation, JSON transfer, Compose work, and WebGL rendering are outside the timed region.
 
+## Cold Greatened Snub Cube construction
+
+The focused JVM benchmark measures full, uncached enumeration and validation of the two supported
+Greatened Snub Cube results. It clears the constellation candidate cache immediately before each
+timed construction and verifies the stable candidate sequence `F/E/V = 38/240/158, 38/252/156`.
+The cache used for normal Result switching therefore cannot shorten the measured operation.
+
+| Winding classification | Median | Min | Max | Samples |
+| --- | ---: | ---: | ---: | ---: |
+| Solid angle for every query | 16.882 s | 16.746 s | 16.984 s | 3 |
+| Axis ray with solid-angle fallback | 2.917 s | 2.905 s | 3.318 s | 5 |
+
+The current classifier is **5.79x faster** on this construction, reducing the median by 82.7%.
+Measurements used the Gradle-managed JDK 25 on an AMD Ryzen 9 5900X, with one warmup construction
+before each measured run.
+
+A baseline Flight Recorder profile attributed 93% of execution samples to resolved-boundary
+construction and 86% specifically to solid-angle winding classification. Transcendental angle
+functions accounted for about 71% of top-frame samples, while faceting search accounted for about
+2%. The resolved-boundary classifier now tries three axis rays, which compute the same generalized
+winding for closed oriented embedded or immersed surfaces, and uses the solid-angle calculation
+only when every ray is degenerate on a boundary feature. This preserves the robust boundary path
+without paying its trigonometric cost for ordinary classification points.
+
+Run the regression benchmark with:
+
+```shell
+./gradlew :core:benchmarkGreatenedSnubCube
+```
+
+Add `-PbenchmarkJfr=true` to capture
+`core/build/reports/benchmarks/greatened-snub-cube.jfr` for another profile.
+
 ## Interactive star-result enumeration
 
 Uncached Stellated enumeration for Deltoidal hexecontahedron is a JVM regression workload. It must

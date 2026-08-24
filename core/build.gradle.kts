@@ -62,3 +62,19 @@ tasks.register<JavaExec>("stlStressCampaign") {
     val seed = providers.gradleProperty("stlStressSeed").orElse("20260813")
     argumentProviders.add(CommandLineArgumentProvider { listOf(cases.get(), seed.get()) })
 }
+
+tasks.register<JavaExec>("benchmarkGreatenedSnubCube") {
+    group = "benchmark"
+    description = "Benchmarks an uncached generic Greatened construction of the Snub Cube."
+    dependsOn("jvmTestClasses")
+    mainClass.set("polyhedra.core.GreatenedSnubCubeBenchmarkKt")
+    classpath = jvmTestCompilation.output.allOutputs + jvmTestCompilation.runtimeDependencyFiles
+    val warmups = providers.gradleProperty("benchmarkWarmups").orElse("1")
+    val samples = providers.gradleProperty("benchmarkSamples").orElse("5")
+    argumentProviders.add(CommandLineArgumentProvider { listOf(warmups.get(), samples.get()) })
+    if (providers.gradleProperty("benchmarkJfr").orNull == "true") {
+        val recording = layout.buildDirectory.file("reports/benchmarks/greatened-snub-cube.jfr").get().asFile
+        doFirst { recording.parentFile.mkdirs() }
+        jvmArgs("-XX:StartFlightRecording=filename=${recording.absolutePath},settings=profile,dumponexit=true")
+    }
+}

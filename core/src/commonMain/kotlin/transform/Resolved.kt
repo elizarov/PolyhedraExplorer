@@ -672,10 +672,10 @@ private class WindingClassifier(
     private val independentSolids = source.all { triangle -> triangle.solidId >= 0 }
     private val groups: List<WindingGroup> = if (independentSolids) {
         source.groupBy(SourceTriangle::solidId).entries.sortedBy { entry -> entry.key }.map { (solidId, triangles) ->
-            WindingGroup(solidId, triangles, useRayClassifier = true)
+            WindingGroup(solidId, triangles)
         }
     } else {
-        listOf(WindingGroup(-1, source, useRayClassifier = false))
+        listOf(WindingGroup(-1, source))
     }
     private val index = WindingGroupIndex(groups)
 
@@ -715,7 +715,6 @@ private class WindingGroupIndex(groups: List<WindingGroup>) {
 private class WindingGroup(
     val solidId: Int,
     val triangles: List<SourceTriangle>,
-    private val useRayClassifier: Boolean,
 ) {
     val minX = triangles.minOf(SourceTriangle::minX)
     val maxX = triangles.maxOf(SourceTriangle::maxX)
@@ -737,7 +736,10 @@ private class WindingGroup(
 
     fun contains(point: Vec3, tolerance: Double): Boolean {
         if (!boundsContain(point, tolerance)) return false
-        if (useRayClassifier) for (axis in 0..2) {
+        // Axis rays compute the same generalized winding for embedded and immersed closed
+        // surfaces. Retry degeneracies from another direction, then retain solid angle as the
+        // boundary-safe fallback when every ray touches an edge, vertex, or coplanar triangle.
+        for (axis in 0..2) {
             triangles.rayWindingOrNull(point, axis, tolerance)?.let { winding -> return winding != 0 }
         }
         return triangles.hasNonzeroSolidAngleWinding(point, tolerance)
