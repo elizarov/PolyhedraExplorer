@@ -67,13 +67,34 @@ fun DrawContext.drawScene() {
         faces.draw(view, lighting, -1)
         edges.draw(view, -1)
     } else {
-        // regular draw faces
-        faces.draw(view, lighting)
-        edges.draw(view)
+        drawOpaqueFacesAndEdges(gl, view, lighting, faces, edges)
     }
     gl[GL.DEPTH_TEST] = true
     gl[GL.BLEND] = false
     symmetryOverlay.draw(view)
     vertices.draw(view)
+}
+
+internal fun drawOpaqueFacesAndEdges(
+    gl: GL,
+    view: ViewContext,
+    lighting: LightingContext,
+    faces: FaceContext,
+    edges: EdgeContext,
+) {
+    faces.draw(view, lighting)
+    // Edge occurrences are stored once per adjacent face. Keep only occurrences belonging to a
+    // front-facing face, just as triangle rasterization does for the face itself. The edge shader
+    // represents culled fragments with zero alpha, so compositing must remain enabled; without it
+    // those fragments overwrite opaque face pixels with transparent holes. Lines are an overlay
+    // and must not alter the depth buffer used by the later symmetry and vertex passes.
+    gl[GL.BLEND] = true
+    gl.depthMask(false)
+    try {
+        edges.draw(view, -1)
+    } finally {
+        gl.depthMask(true)
+        gl[GL.BLEND] = false
+    }
 }
 

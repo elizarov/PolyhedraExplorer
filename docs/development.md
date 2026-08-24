@@ -67,6 +67,23 @@ Serve `build/dist/browser/development` or `build/dist/browser/production` over H
 python -m http.server 8765 --directory build/dist/browser/development
 ```
 
+For repeatable visual inspection, the standalone renderer accepts the exact compact configuration
+stored after `#/` and writes a PNG. By default it builds the development distribution, starts an
+isolated temporary HTTP server, launches headless Chrome with a fresh profile, and shuts both down:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/render-config.ps1 `
+    'a(r(n))s(SA5_2)hf(γ,β,α)v(r(-42,-22.1,-110.3)s(0.11)fw(0.06666667)fr(0.03333333))' `
+    'build/rendered/antiprism-5-2.png'
+```
+
+Use `-NoBuild` to reuse the current development distribution, or `-ApplicationUrl` to render from
+an already-running server. `-Width`, `-Height`, and `-WaitMilliseconds` make the viewport and worker
+readiness timeout explicit. The renderer waits for the Wasm status to clear and for the canvas to
+reach the requested dimensions before capturing it through Chrome DevTools. `-BeforeCaptureScript`
+is available for controlled rendering diagnostics; it evaluates the supplied JavaScript only after
+the scene is ready and immediately before capture.
+
 ## Release and deployment
 
 Releases are initiated locally with one version tag:

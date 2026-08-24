@@ -20,6 +20,7 @@ import polyhedra.web.poly.RenderParams
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
+import kotlin.math.roundToLong
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -78,6 +79,25 @@ class RimPresentationContainmentTest {
     }
 
     @Test
+    fun fiveHalvesStarAntiprismRimPresentationsAreClosedAndContained() {
+        for ((rim, width) in challengingSettings + (1.0 / 30.0 to 1.0 / 15.0)) {
+            assertRimPresentationContained("SA5_2", rim, width)
+        }
+    }
+
+    @Test
+    fun fifteenSeventhsPyramidRimsAreClosedAtDifferentDimensions() {
+        for ((rim, width) in listOf(0.015 to 0.1, 0.1 to 0.1)) {
+            assertRimPresentationClosed("SY15_7", rim, width)
+        }
+    }
+
+    @Test
+    fun nineteenNinthsPyramidWideRimsAreClosed() {
+        assertRimPresentationClosed("SY19_9", rim = 0.08, width = 0.03)
+    }
+
+    @Test
     fun stellatedDodecahedronRimsStayInsideItsResolvedSolid() {
         for ((rim, width) in challengingSettings + (0.015 to 0.129)) {
             assertRimPresentationContained("SD", rim, width)
@@ -99,6 +119,7 @@ class RimPresentationContainmentTest {
     ) {
         val poly = requireNotNull(tag.toSeedOrNull()).poly
         val rendered = poly.renderedRimTriangles(rim, width, hiddenKinds ?: poly.faceKinds.keys)
+        assertClosedPresentation(tag, rim, width, hiddenKinds, rendered, poly.circumradius)
         val solid = ResolvedSolid(poly)
         for ((triangleIndex, triangle) in rendered.withIndex()) {
             solid.firstOutsidePoint(triangle)?.let { point ->
@@ -110,6 +131,92 @@ class RimPresentationContainmentTest {
                 )
             }
         }
+    }
+
+    private fun assertRimPresentationClosed(
+        tag: String,
+        rim: Double,
+        width: Double,
+        hiddenKinds: Set<FaceKind>? = null,
+    ) {
+        val poly = requireNotNull(tag.toSeedOrNull()).poly
+        val rendered = poly.renderedRimTriangles(rim, width, hiddenKinds ?: poly.faceKinds.keys)
+        assertClosedPresentation(tag, rim, width, hiddenKinds, rendered, poly.circumradius)
+    }
+
+    private fun assertClosedPresentation(
+        tag: String,
+        rim: Double,
+        width: Double,
+        hiddenKinds: Set<FaceKind>?,
+        triangles: List<TestTriangle>,
+        scale: Double,
+    ) {
+        val tolerance = maxOf(scale, 1.0) * 2e-6
+        assertConnectedPresentation(tag, rim, width, hiddenKinds, triangles, tolerance)
+        val edges = triangles.flatMapIndexed { triangleIndex, triangle ->
+            listOf(
+                TestEdge(triangle.a, triangle.b, triangleIndex),
+                TestEdge(triangle.b, triangle.c, triangleIndex),
+                TestEdge(triangle.c, triangle.a, triangleIndex),
+            )
+        }.filter { edge -> edge.length > tolerance }
+        val directIncidences = edges.groupingBy { edge -> edge.quantizedKey(tolerance) }.eachCount()
+        for (edge in edges) {
+            if (directIncidences.getValue(edge.quantizedKey(tolerance)) > 1) continue
+            val covered = triangles.asSequence()
+                .mapIndexedNotNull { triangleIndex, triangle ->
+                    if (triangleIndex == edge.triangleIndex) null else edge.surfaceOverlap(triangle, tolerance)
+                }
+                .sortedBy(Pair<Double, Double>::first)
+                .toList()
+            var end = 0.0
+            for ((start, candidateEnd) in covered) {
+                if (start > end + tolerance / edge.length) break
+                if (candidateEnd > end) end = candidateEnd
+                if (end >= 1.0 - tolerance / edge.length) break
+            }
+            assertTrue(
+                end >= 1.0 - tolerance / edge.length,
+                "$tag hidden=${hiddenKinds ?: "all"} rim=$rim width=$width has an open " +
+                    "presentation edge from ${edge.a} to " +
+                    "${edge.b}; surface coverage ends at ${(end * 100.0).toInt()}% " +
+                    "(triangle ${edge.triangleIndex})",
+            )
+        }
+    }
+
+    private fun assertConnectedPresentation(
+        tag: String,
+        rim: Double,
+        width: Double,
+        hiddenKinds: Set<FaceKind>?,
+        triangles: List<TestTriangle>,
+        tolerance: Double,
+    ) {
+        if (triangles.isEmpty()) return
+        val connected = BooleanArray(triangles.size)
+        val pending = arrayListOf(0)
+        connected[0] = true
+        while (pending.isNotEmpty()) {
+            val currentIndex = pending.removeAt(pending.lastIndex)
+            val current = triangles[currentIndex]
+            for (candidateIndex in triangles.indices) {
+                if (connected[candidateIndex] || candidateIndex == currentIndex) continue
+                val candidate = triangles[candidateIndex]
+                if (current.touches(candidate, tolerance)) {
+                    connected[candidateIndex] = true
+                    pending += candidateIndex
+                }
+            }
+        }
+        val disconnected = connected.indices.filterNot(connected::get)
+        assertTrue(
+            disconnected.isEmpty(),
+            "$tag hidden=${hiddenKinds ?: "all"} rim=$rim width=$width has " +
+                "${disconnected.size} disconnected triangles; first=${disconnected.firstOrNull()} " +
+                "of ${triangles.size}",
+        )
     }
 
     private fun Polyhedron.renderedRimTriangles(
@@ -138,6 +245,49 @@ class RimPresentationContainmentTest {
     }
 }
 
+private data class TestEdge(val a: Vec3, val b: Vec3, val triangleIndex: Int) {
+    private val vector = b - a
+    val length = vector.norm
+
+    fun quantizedKey(tolerance: Double): QuantizedEdge {
+        val first = a.quantized(tolerance)
+        val second = b.quantized(tolerance)
+        return if (first <= second) QuantizedEdge(first, second) else QuantizedEdge(second, first)
+    }
+
+    fun surfaceOverlap(triangle: TestTriangle, tolerance: Double): Pair<Double, Double>? {
+        if (abs((a - triangle.a) * triangle.normal) > tolerance) return null
+        if (abs((b - triangle.a) * triangle.normal) > tolerance) return null
+        var start = 0.0
+        var end = 1.0
+        for ((first, second) in triangle.sides) {
+            val side = second - first
+            val threshold = -tolerance * side.norm
+            val atStart = ((side cross (a - first)) * triangle.normal)
+            val atEnd = ((side cross (b - first)) * triangle.normal)
+            if (atStart < threshold && atEnd < threshold) return null
+            if (atStart < threshold || atEnd < threshold) {
+                val crossing = (threshold - atStart) / (atEnd - atStart)
+                if (atStart < threshold) start = maxOf(start, crossing) else end = minOf(end, crossing)
+            }
+        }
+        return (start to end).takeIf { end > start + tolerance / length }
+    }
+}
+
+private fun Vec3.quantized(tolerance: Double) = QuantizedPoint(
+    (x / tolerance).roundToLong(),
+    (y / tolerance).roundToLong(),
+    (z / tolerance).roundToLong(),
+)
+
+private data class QuantizedPoint(val x: Long, val y: Long, val z: Long) : Comparable<QuantizedPoint> {
+    override fun compareTo(other: QuantizedPoint): Int =
+        compareValuesBy(this, other, QuantizedPoint::x, QuantizedPoint::y, QuantizedPoint::z)
+}
+
+private data class QuantizedEdge(val first: QuantizedPoint, val second: QuantizedPoint)
+
 private data class TestTriangle(val a: Vec3, val b: Vec3, val c: Vec3, val multiplicity: Int = 1) {
     val vertices = listOf(a, b, c)
     val normalVector = (b - a) cross (c - a)
@@ -149,6 +299,7 @@ private data class TestTriangle(val a: Vec3, val b: Vec3, val c: Vec3, val multi
     val maxY = maxOf(a.y, b.y, c.y)
     val minZ = minOf(a.z, b.z, c.z)
     val maxZ = maxOf(a.z, b.z, c.z)
+    val sides = listOf(a to b, b to c, c to a)
 
     fun containsInPlane(point: Vec3, tolerance: Double): Boolean {
         if (abs((point - a) * normal) > tolerance) return false
@@ -161,6 +312,19 @@ private data class TestTriangle(val a: Vec3, val b: Vec3, val c: Vec3, val multi
         minX <= other.maxX + tolerance && other.minX <= maxX + tolerance &&
             minY <= other.maxY + tolerance && other.minY <= maxY + tolerance &&
             minZ <= other.maxZ + tolerance && other.minZ <= maxZ + tolerance
+
+    fun touches(other: TestTriangle, tolerance: Double): Boolean {
+        if (!boundsOverlap(other, tolerance)) return false
+        if (sides.any { (first, second) ->
+            TestEdge(first, second, -1).surfaceOverlap(other, tolerance) != null
+            }
+        ) return true
+        if (other.sides.any { (first, second) ->
+            TestEdge(first, second, -1).surfaceOverlap(this, tolerance) != null
+            }
+        ) return true
+        return intersectionSegment(other, tolerance) != null
+    }
 }
 
 private class ResolvedSolid(poly: Polyhedron) {

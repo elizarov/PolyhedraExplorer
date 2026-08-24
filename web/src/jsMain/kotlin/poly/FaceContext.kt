@@ -135,11 +135,8 @@ class FaceContext(
                 thicknessJoins,
                 resolvedRimByFace,
             )
-            val simpleFaceIds = poly.resolvedFaces
-                .filterNot(ResolvedFaceGeometry::sourceBoundarySelfIntersects)
-                .mapTo(linkedSetOf(), ResolvedFaceGeometry::sourceFaceId)
-            val immersedRimGeometryByFace = if (includeWidth && !includeExpand) {
-                candidateRimFaceIds.mapNotNull { faceId ->
+            val immersedRimFaceIds = if (includeWidth && !includeExpand) {
+                candidateRimFaceIds.mapNotNullTo(linkedSetOf()) { faceId ->
                     val face = poly.fs[faceId]
                     val rim = resolvedRimByFace[faceId]
                     if (
@@ -148,18 +145,28 @@ class FaceContext(
                     ) {
                         null
                     } else {
-                        faceId to face.immersedRimGeometry(
-                            rim.width,
-                            presentationWidth,
-                            thicknessJoins,
-                            poly.resolvedFaces[faceId].sourceBoundarySelfIntersects,
-                            simpleFaceIds,
-                            immersedBottomCorners,
-                        )
+                        faceId
                     }
-                }.toMap()
+                }
             } else {
-                emptyMap()
+                emptySet()
+            }
+            val immersedBottomRoles = poly.immersedBottomRoles(
+                immersedRimFaceIds,
+                poly.fs.filterTo(linkedSetOf(), ::faceShown).mapTo(linkedSetOf(), Face::id),
+            )
+            val immersedRimGeometryByFace = immersedRimFaceIds.associateWith { faceId ->
+                val face = poly.fs[faceId]
+                val rim = resolvedRimByFace.getValue(faceId)
+                face.immersedRimGeometry(
+                    rim.width,
+                    presentationWidth,
+                    thicknessJoins,
+                    poly.resolvedFaces,
+                    immersedBottomCorners,
+                    immersedBottomRoles,
+                    immersedRimFaceIds,
+                )
             }
 
             fun sourceEdgeOrNull(face: Face, a: Vec3, b: Vec3): Edge? =
@@ -614,14 +621,38 @@ internal data class ImmersedRimGeometry(
 
 internal data class ImmersedBottomCorners(
     val full: Map<Int, Vec3>,
-    val rimLimited: Map<Int, Vec3>,
 )
+
+internal enum class ImmersedBottomRole {
+    Full,
+    Standard,
+}
+
+internal fun Polyhedron.immersedBottomRoles(
+    immersedRimFaceIds: Set<Int>,
+    shownFaceIds: Set<Int>,
+): Map<Int, ImmersedBottomRole> {
+    require(immersedRimFaceIds.intersect(shownFaceIds).isEmpty())
+    return buildMap {
+        for (faceId in immersedRimFaceIds) {
+            put(
+                faceId,
+                if (resolvedFaces[faceId].sourceBoundarySelfIntersects) {
+                    ImmersedBottomRole.Full
+                } else {
+                    ImmersedBottomRole.Standard
+                },
+            )
+        }
+        for (faceId in shownFaceIds) put(faceId, ImmersedBottomRole.Standard)
+    }
+}
 
 /**
  * Safe bottom corners for an immersed source topology. At a reflex source vertex, extending either
  * edge's offset independently reaches outside the other edge's winding-interior sector. The full
- * and rim-limited variants trim that corner for the immersed sheet and its ordinary neighbors;
- * their difference is closed explicitly along the shared edge.
+ * outline trims that corner for the immersed sheet. Ordinary neighboring faces retain the global
+ * bisector join, and their difference is closed explicitly along the shared edge.
  */
 internal fun Polyhedron.immersedBottomCorners(
     faceWidth: Double,
@@ -629,7 +660,6 @@ internal fun Polyhedron.immersedBottomCorners(
     rimsByFace: Map<Int, ResolvedRimGeometry>,
 ): ImmersedBottomCorners {
     val fullCandidates = hashMapOf<Int, MutableList<Vec3>>()
-    val limitedCandidates = hashMapOf<Int, MutableList<Vec3>>()
     for (face in fs.filter { candidate ->
         candidate.isPlanar && resolvedFaces[candidate.id].sourceBoundarySelfIntersects
     }) {
@@ -637,49 +667,20 @@ internal fun Polyhedron.immersedBottomCorners(
         val fullWidths = joins.requiredRimWidths(face, faceWidth).map { required ->
             min(required, rim.maximumWidth)
         }
-        val limitedWidths = fullWidths.map { required -> min(required, rim.width) }
         val full = face.insetVertices(fullWidths)
-        val limited = face.insetVertices(limitedWidths)
         for (index in face.fvs.indices) {
             val vertex = face.fvs[index]
             val vertexId = vertex.id
-            val fullTangentialDistance = (full[index] - vertex).norm
-            val limitedFraction = if (fullTangentialDistance <= EPS) {
-                1.0
-            } else {
-                ((limited[index] - vertex).norm / fullTangentialDistance).coerceIn(0.0, 1.0)
-            }
             fullCandidates.getOrPut(vertexId, ::arrayListOf) +=
                 full[index] - face.outwardNormal * faceWidth
-            limitedCandidates.getOrPut(vertexId, ::arrayListOf) +=
-                limited[index] - face.outwardNormal * (faceWidth * limitedFraction)
         }
-    }
-    for (vertex in vs) {
-        if (vertex.id in limitedCandidates) continue
-        val incidentFaces = fs.filter { face -> vertex in face.fvs }
-        val referenceFace = incidentFaces.firstOrNull() ?: continue
-        val direction = joins.vertexDirection(referenceFace, vertex)
-        val displacement = direction * faceWidth
-        val limitedFraction = incidentFaces.minOf { face ->
-            val normal = face.outwardNormal
-            val tangentialDistance = (displacement - normal * (normal * displacement)).norm
-            val rim = rimsByFace[face.id]?.width ?: 0.0
-            if (tangentialDistance <= EPS) 1.0 else min(1.0, rim / tangentialDistance)
-        }
-        fullCandidates.getOrPut(vertex.id, ::arrayListOf) += vertex - displacement
-        limitedCandidates.getOrPut(vertex.id, ::arrayListOf) +=
-            vertex - displacement * limitedFraction
     }
     fun closest(candidates: Map<Int, List<Vec3>>): Map<Int, Vec3> =
         candidates.mapValues { (vertexId, points) ->
             val vertex = vs[vertexId]
             points.minBy { point -> (point - vertex).norm }
         }
-    return ImmersedBottomCorners(
-        full = closest(fullCandidates),
-        rimLimited = closest(limitedCandidates),
-    )
+    return ImmersedBottomCorners(full = closest(fullCandidates))
 }
 
 /**
@@ -692,12 +693,67 @@ internal fun Face.immersedRimGeometry(
     rimWidth: Double,
     faceWidth: Double,
     joins: FaceThicknessJoins,
-    sourceBoundarySelfIntersects: Boolean,
-    simpleFaceIds: Set<Int>,
+    resolvedFaces: List<ResolvedFaceGeometry>,
     bottomCorners: ImmersedBottomCorners,
+    bottomRoles: Map<Int, ImmersedBottomRole>,
+    immersedRimFaceIds: Set<Int>,
 ): ImmersedRimGeometry {
     val topInner = insetVertices(List(size) { rimWidth })
-    val selectedCorners = if (sourceBoundarySelfIntersects) bottomCorners.full else bottomCorners.rimLimited
+    fun corners(face: Face): Map<Int, Vec3> = when (bottomRoles.getValue(face.id)) {
+        ImmersedBottomRole.Full -> bottomCorners.full
+        ImmersedBottomRole.Standard -> face.fvs.associate { vertex ->
+            vertex.id to vertex - joins.vertexDirection(face, vertex) * faceWidth
+        }
+    }
+    data class RailPoint(val parameter: Double, val point: Vec3)
+
+    /** Actual lower rail of one source edge; a shown face can kink at resolved edge vertices. */
+    fun rail(face: Face, a: Vertex, b: Vertex): List<RailPoint> {
+        val faceCorners = corners(face)
+        if (face.id in immersedRimFaceIds) {
+            return listOf(
+                RailPoint(0.0, faceCorners.getValue(a.id)),
+                RailPoint(1.0, faceCorners.getValue(b.id)),
+            )
+        }
+        val edge = b - a
+        val lengthSquared = edge * edge
+        val tolerance = maxOf(edge.norm, 1.0) * 1e-8
+        return (resolvedFaces[face.id].vertices.asSequence().map(ResolvedFaceVertex::position) +
+            sequenceOf<Vec3>(a, b))
+            .mapNotNull { position ->
+                val parameter = ((position - a) * edge) / lengthSquared
+                if (
+                    parameter < -tolerance || parameter > 1.0 + tolerance ||
+                    ((position - a) cross edge).norm > tolerance * edge.norm
+                ) {
+                    null
+                } else {
+                    RailPoint(
+                        parameter.coerceIn(0.0, 1.0),
+                        position - joins.direction(face, position) * faceWidth,
+                    )
+                }
+            }
+            .sortedBy(RailPoint::parameter)
+            .fold(arrayListOf()) { result: ArrayList<RailPoint>, point ->
+                if (result.isEmpty() || point.parameter - result.last().parameter > tolerance) {
+                    result += point
+                }
+                result
+            }
+    }
+    fun List<RailPoint>.pointAt(parameter: Double): Vec3 {
+        val next = indexOfFirst { point -> point.parameter >= parameter }
+        if (next <= 0) return first().point
+        if (next < 0) return last().point
+        val previous = this[next - 1]
+        val following = this[next]
+        val fraction = (parameter - previous.parameter) /
+            (following.parameter - previous.parameter)
+        return previous.point + (following.point - previous.point) * fraction
+    }
+    val selectedCorners = corners(this)
     val bottomOuter = fvs.map { vertex ->
         selectedCorners[vertex.id]
             ?: vertex - joins.vertexDirection(this, vertex) * faceWidth
@@ -747,37 +803,51 @@ internal fun Face.immersedRimGeometry(
         )
         orientedSurfaces(vertices, innerNormal)
     }
-    val transitionWalls = if (!sourceBoundarySelfIntersects) {
-        emptyList()
-    } else {
-        fvs.indices.flatMap { index ->
-            val edge = joins.sourceEdge(this, index)
-            if (edge.l.id !in simpleFaceIds) return@flatMap emptyList()
-            val next = (index + 1) % size
-            val fullA = bottomCorners.full.getValue(fvs[index].id)
-            val fullB = bottomCorners.full.getValue(fvs[next].id)
-            val limitedA = bottomCorners.rimLimited.getValue(fvs[index].id)
-            val limitedB = bottomCorners.rimLimited.getValue(fvs[next].id)
+    val transitionWalls = fvs.indices.flatMap { index ->
+        val edge = joins.sourceEdge(this, index)
+        if (edge.l.id !in bottomRoles) return@flatMap emptyList()
+        // A shown neighbor cannot own presentation geometry; two hidden neighbors use face order.
+        if (edge.l.id in immersedRimFaceIds && id > edge.l.id) return@flatMap emptyList()
+        val next = (index + 1) % size
+        val ownRail = rail(this, fvs[index], fvs[next])
+        val neighborRail = rail(edge.l, fvs[index], fvs[next])
+        val parameters = (ownRail + neighborRail).map(RailPoint::parameter).distinct().sorted()
+        parameters.zipWithNext().flatMap { (start, end) ->
+            val ownA = ownRail.pointAt(start)
+            val ownB = ownRail.pointAt(end)
+            val neighborA = neighborRail.pointAt(start)
+            val neighborB = neighborRail.pointAt(end)
+            val tolerance = maxOf((fvs[next] - fvs[index]).norm, 1.0) * 1e-8
+            if ((ownA - neighborA).norm <= tolerance && (ownB - neighborB).norm <= tolerance) {
+                return@flatMap emptyList()
+            }
             val vertices = listOf(
-                ImmersedRimVertex(fullA, Vec3.ZERO, inner = true),
-                ImmersedRimVertex(fullB, Vec3.ZERO, inner = true),
-                ImmersedRimVertex(limitedB, Vec3.ZERO, inner = true),
-                ImmersedRimVertex(limitedA, Vec3.ZERO, inner = true),
+                ImmersedRimVertex(ownA, Vec3.ZERO, inner = true),
+                ImmersedRimVertex(ownB, Vec3.ZERO, inner = true),
+                ImmersedRimVertex(neighborB, Vec3.ZERO, inner = true),
+                ImmersedRimVertex(neighborA, Vec3.ZERO, inner = true),
             )
-            val preferred = (fullB - fullA) cross (limitedA - fullA)
+            val wallCenter = (ownA + ownB + neighborA + neighborB) / 4.0
+            val sourceCenter = (fvs[index] + fvs[next]) / 2.0
+            var preferred = (ownB - ownA) cross (neighborA - ownA)
+            // In the edge-normal cross-section, the source edge is inside the material and the
+            // lower transition is its exterior boundary. Face/edge order alone cannot choose the
+            // visible side for immersed topology, so orient the sheet away from that source edge.
+            if (preferred * (sourceCenter - wallCenter) > 0.0) preferred = -preferred
             orientedSurfaces(vertices, preferred)
         }
     }
     val openingWalls = fvs.indices.flatMap { index ->
         val next = (index + 1) % size
+        // Keep the quad cyclic: top A, bottom A, bottom B, top B.
         val vertices = listOf(
             ImmersedRimVertex(topInner[index], outwardNormal, inner = false),
             ImmersedRimVertex(bottomInner[index], Vec3.ZERO, inner = true),
-            ImmersedRimVertex(topInner[next], outwardNormal, inner = false),
             ImmersedRimVertex(bottomInner[next], Vec3.ZERO, inner = true),
+            ImmersedRimVertex(topInner[next], outwardNormal, inner = false),
         )
-        val inward = (fvs[next] - fvs[index]) cross outwardNormal
-        orientedSurfaces(vertices, inward)
+        val towardOpening = outwardNormal cross (fvs[next] - fvs[index])
+        orientedSurfaces(vertices, towardOpening)
     }
     return ImmersedRimGeometry(undersides, transitionWalls, openingWalls)
 }
@@ -815,40 +885,48 @@ data class FaceExportParams(
 // cullMode: 0 - no, 1 - cull front, -1 - cull back
 fun FaceContext.draw(view: ViewContext, lighting: LightingContext, cullMode: Int = 0) {
     if (!drawFaces) return
+    val renderTwoSided = hiddenFaces.isNotEmpty() &&
+        poly.resolvedFaces.any(ResolvedFaceGeometry::sourceBoundarySelfIntersects)
+    val restoreCulling = renderTwoSided && gl.isEnabled(GL.CULL_FACE)
+    if (renderTwoSided) gl.disable(GL.CULL_FACE)
     val animation = animation
     val prevOrTarget = if (animation != null) prev else target
-    program.use {
-        assignView(view, cullMode)
+    try {
+        program.use {
+            assignView(view, cullMode)
 
-        uLightColor by lighting.lightColor
-        uFillColor by lighting.fillColor
-        uLightPosition by lighting.lightPosition
-        uKeyLightIntensity by lighting.keyLightIntensity
-        uFillLightIntensity by lighting.fillLightIntensity
-        uRoughness by lighting.roughness
-        uFresnelF0 by lighting.fresnelF0
+            uLightColor by lighting.lightColor
+            uFillColor by lighting.fillColor
+            uLightPosition by lighting.lightPosition
+            uKeyLightIntensity by lighting.keyLightIntensity
+            uFillLightIntensity by lighting.fillLightIntensity
+            uRoughness by lighting.roughness
+            uFresnelF0 by lighting.fresnelF0
 
-        uTargetFraction by (animation?.targetFraction ?: 1.0)
-        uPrevFraction by (animation?.prevFraction ?: 0.0)
+            uTargetFraction by (animation?.targetFraction ?: 1.0)
+            uPrevFraction by (animation?.prevFraction ?: 0.0)
 
-        aPosition by target.positionBuffer
-        aLightNormal by target.lightNormalBuffer
-        aExpandDir by target.expandDirBuffer
-        aThicknessDir by target.thicknessDirBuffer
-        aRimDir by target.rimDirBuffer
-        aRimMax by target.rimMaxBuffer
-        aColor by target.colorBuffer
-        aPrevPosition by prevOrTarget.positionBuffer
-        aPrevLightNormal by prevOrTarget.lightNormalBuffer
-        aPrevExpandDir by prevOrTarget.expandDirBuffer
-        aPrevThicknessDir by prevOrTarget.thicknessDirBuffer
-        aPrevRimDir by prevOrTarget.rimDirBuffer
-        aPrevRimMax by prevOrTarget.rimMaxBuffer
-        aPrevColor by prevOrTarget.colorBuffer
-        aInner by innerBuffer
-        aFaceMode by faceModeBuffer
+            aPosition by target.positionBuffer
+            aLightNormal by target.lightNormalBuffer
+            aExpandDir by target.expandDirBuffer
+            aThicknessDir by target.thicknessDirBuffer
+            aRimDir by target.rimDirBuffer
+            aRimMax by target.rimMaxBuffer
+            aColor by target.colorBuffer
+            aPrevPosition by prevOrTarget.positionBuffer
+            aPrevLightNormal by prevOrTarget.lightNormalBuffer
+            aPrevExpandDir by prevOrTarget.expandDirBuffer
+            aPrevThicknessDir by prevOrTarget.thicknessDirBuffer
+            aPrevRimDir by prevOrTarget.rimDirBuffer
+            aPrevRimMax by prevOrTarget.rimMaxBuffer
+            aPrevColor by prevOrTarget.colorBuffer
+            aInner by innerBuffer
+            aFaceMode by faceModeBuffer
+        }
+        gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, indexBuffer.glBuffer)
+        gl.drawElements(GL.TRIANGLES, indexSize, GL.UNSIGNED_INT, 0)
+    } finally {
+        if (restoreCulling) gl.enable(GL.CULL_FACE)
     }
-    gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, indexBuffer.glBuffer)
-    gl.drawElements(GL.TRIANGLES, indexSize, GL.UNSIGNED_INT, 0)
 }
 

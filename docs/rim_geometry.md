@@ -23,11 +23,25 @@ The result is polygonal and tessellation-free. Each consumer triangulates it for
 
 ## Hard geometry contracts
 
-The presentation with hidden faces must not protrude into the unbounded exterior of the complete
-resolved polyhedron with every face present. For cases whose exterior is described directly by the
-nonzero generalized-winding solid, the reusable presentation-containment test builds the actual
-WebGL triangles, tests vertices and edge/centroid samples, probes both sides of every transverse
-surface intersection, and reports the first offending triangle and point.
+The presentation with hidden faces must satisfy three independent whole-presentation invariants:
+
+- it must not protrude into the unbounded exterior of the complete resolved polyhedron with every
+  face present;
+- its emitted surfaces must be closed. Surfaces may intersect and need not share the same
+  triangulation, but every triangle edge must be covered completely by another surface. Exact
+  paired edges, subdivided edges, and an edge meeting the interior of another surface are all
+  valid; an uncovered interval is a hole.
+- all emitted triangles must belong to one geometrically connected material complex. A shared
+  edge, positive-length coplanar overlap, or positive-length transverse intersection connects two
+  surfaces; an isolated point contact does not make a detached sheet valid.
+
+The reusable presentation validator builds the actual WebGL triangles. For cases whose exterior is
+described directly by the nonzero generalized-winding solid, it tests vertices and edge/centroid
+samples, probes both sides of every transverse surface intersection, and reports the first
+protruding triangle and point. Its closure pass first pairs exact mesh edges, then tests remaining
+edges against intersecting triangle surfaces so that valid T-junctions do not produce false holes.
+Its connectivity pass walks those same positive-length surface contacts and reports detached
+components separately from holes.
 
 That external test is necessary but cannot validate internal immersed sheets: a legitimate source
 sheet can pass through a zero-winding three-dimensional cell that is nevertheless enclosed by the
@@ -35,17 +49,32 @@ outer presentation. The construction therefore also has independent local contra
 
 - thickness direction is derived only from incident source faces, never from resolved-solid point
   classification or from which face orbits happen to be visible;
-- incident bottom outlines either share an edge or are joined by one explicit transition wall;
+- every ordinary face uses the same all-face bisector-derived bottom join as an embedded convex
+  presentation; an adjacent immersed face cannot replace or scale that join in its own plane;
+- incident bottom outlines either share the same geometric rail or are joined by one explicit
+  transition wall; role labels alone never decide whether the wall is needed;
+- every top-to-opening, opening-to-underside, and face-to-face seam is fully surface-covered;
 - every occurrence of a given bottom-corner role uses the same locally constructed point;
 - every emitted top, underside, transition-wall, and opening-wall triangle is finite,
   non-degenerate, and consistently oriented with its own surface normal;
+- every opening wall is wound and lit toward its opening;
+- an immersed WebGL presentation is two-sided. Immersion can expose either side of a source sheet
+  to an exterior winding cell, so global back-face culling cannot decide material coverage. A
+  raster regression starts with culling enabled, compares the result with an explicitly two-sided
+  reference, and requires zero pixels where culling exposes background that the reference covers.
+  Back-facing fragments reverse their lighting normal so they remain recognizable as material;
+- the opaque edge overlay draws only source-edge occurrences belonging to front-facing adjacent
+  faces. Every resulting edge pixel must overlay face material; a back-facing occurrence cannot
+  float across an opening or erase an already-rendered face pixel;
 - hiding or showing another face cannot move an existing source-edge or source-vertex join.
 
-Tests exercise both contracts over convex, stellated, and star-family examples. Rim smaller than
-thickness, rim equal to thickness, rim larger than thickness, and narrow-rim/large-thickness cases
-are separate settings in the test matrix. High-winding pyramids are included in local closure tests
-even where a global nonzero-winding containment classifier cannot distinguish an internal sheet
-from the exterior.
+Tests exercise these contracts over convex, stellated, and star-family examples, including complete
+and mixed face-orbit visibility. Rim smaller than thickness, rim equal to thickness, rim larger
+than thickness, and narrow-rim/large-thickness cases are separate settings in the test matrix.
+High-winding pyramids are included in whole-presentation closure and local-join tests even where a
+global nonzero-winding containment classifier cannot distinguish an internal sheet from the
+exterior. Screen-space coverage tests use multiple rotations and canvas projections for immersed
+Antiprism, Prism, Pyramid, and stellated catalogue presentations.
 
 ## Face fill and rim regions
 
@@ -130,44 +159,48 @@ edges and makes an ordinary side face protrude from the seam.
 
 WebGL therefore keeps two representations with distinct jobs. The visible top uses the resolved
 planar union. The underside uses one uninterrupted sheet per authoritative source edge and two
-locally derived bottom-corner outlines:
+locally derived bottom-corner roles:
 
 1. The **full outline** intersects the two width-offset edge lines in the self-intersecting source
    face. Its tangential inset is capped by that face's arrangement-derived maximum.
-2. The **rim-limited outline** caps that tangential inset by `Rim`. Its perpendicular displacement
-   is scaled by the same fraction, so the corner lies between the original vertex and the full
-   miter instead of combining a shallow tangential inset with the full depth outside the solid.
-3. A self-intersecting source sheet uses the full outline. An ordinary neighboring face uses the
-   rim-limited outline. One explicit transition sheet closes the difference along their shared
-   edge.
+2. The **standard outline** uses the shared all-face bisector join. Every ordinary hidden or shown
+   face uses this outline, just as it does when no immersed face is present.
+3. Exactly one explicit transition sheet closes every shared edge whose actual lower rails differ.
+   Against a shown face, its rail follows every resolved source-edge vertex rather than
+   approximating the potentially kinked inner boundary by one endpoint-to-endpoint segment.
 4. The inner boundary of each bottom rim is a uniform `Rim` inset of its actual bottom outline,
    rather than an unrelated inset of the original top face.
 
 At an immersed vertex not belonging to a self-intersecting face, such as the apex of a star
-pyramid, the all-face join is limited by the largest tangential excursion over its incident faces.
-The complete displacement is scaled by the same rim-derived fraction, so all incident sheets reuse
-one watertight corner without pulling the apex through the model.
+pyramid, every incident ordinary sheet reuses the all-face join. The standard outline consequently
+keeps the configured perpendicular depth and stays watertight even when the dihedral angles are
+more acute than in the corresponding non-star family member.
 
 Opening walls connect the configured top inset to the independently constructed bottom inset and
-may therefore be sloped or twisted. Every selected triangle is emitted as its own surface with its
-own normal; no planar-quad normal is assumed. Degenerate triangles are omitted and the diagonal
-with the stronger valid area is selected. Overlapping source sheets represent the same material and
-are resolved by the depth buffer; no union triangle can bridge unrelated openings.
+may therefore be sloped or twisted. Their preferred winding and lighting normal point toward the
+opening. Every selected triangle is emitted as its own surface with its own normal; no planar-quad
+normal is assumed. Degenerate triangles are omitted and the diagonal with the stronger valid area
+is selected. Overlapping source sheets represent the same material and are resolved by the depth
+buffer; no union triangle can bridge unrelated openings.
 
 For an ordinary embedded surface, the visible rim is widened when necessary to let a perpendicular
 opening wall reach the shared inner bisector. The required in-face distance is the tangential part
 of `Width · d`. If the polyhedron contains an immersed face, every visible top rim instead retains
 the configured width. This keeps an ordinary triangular neighbor visually identical to the same
 triangle in a non-star pyramid even when the immersed dihedral becomes extremely acute. The
-full and rim-limited bottom outlines, their transition sheet, and sloped opening walls absorb the
+full and standard bottom outlines, their transition sheet, and sloped opening walls absorb the
 depth transition without changing that visible band.
 
 ## Consumer geometry
 
 - **WebGL** triangulates the returned outer and hole cycles. Embedded presentations emit the top and
   shared inner surfaces plus walls around actual opening cycles. An immersed hidden face uses the
-  continuous source-sheet underside, tapered bottom corners, and explicit full-to-limited
-  transition sheets described above.
+  continuous source-sheet underside, arrangement-limited bottom corners, and explicit full-to-standard
+  transition sheets described above. The face pass temporarily disables physical back-face culling
+  for the whole immersed presentation and flips back-fragment normals in the material shader; depth
+  testing still selects the nearest sheet. It restores the incoming WebGL culling state before the
+  edge and overlay passes. Opaque source-edge lines are composited afterward without depth writes
+  and are culled using their adjacent face occurrence, matching triangle visibility.
 - **STL** constructs the complete thick presentation, corefines all triangle intersections, and
   selects the zero/nonzero-winding solid boundary. High-winding arrangements remain an indexed
   triangle boundary through quantization; they are not converted back into source-style polygon
@@ -189,10 +222,10 @@ pieces use their own perpendicular extrusion and are unioned downstream.
 | Collapsed projected edge or 180-degree planar corner | No unique finite inset exists, so the simple-face maximum rim is zero. |
 | Concave corner collision | The maximum rim stops before the first invalid inset, even when that precedes an edge collapse. |
 | Source-edge crossing | The continuous one-sided sheets overlap and are resolved as a planar union; they are not clipped into independent edge fragments. |
-| Very acute embedded dihedral | The full outline is arrangement-limited; the neighboring outline tapers tangential inset and depth together, and an explicit transition wall closes them. |
-| Simple face adjacent to an immersed face | Its visible and bottom bands retain the configured rim; a local transition wall absorbs the acute depth difference. |
+| Very acute embedded dihedral | The immersed full outline is arrangement-limited; the ordinary neighboring outline keeps its bisector join, and an explicit transition wall closes their difference. |
+| Simple face adjacent to an immersed face | Its visible band retains the configured rim and its bottom uses the ordinary full-depth join; a local transition wall absorbs the difference from the immersed outline. |
 | Missing material on one adjacent face | The remaining face normal supplies the offset direction on that side. |
-| More than three non-concurrent offset planes at one immersed vertex | The all-face join supplies a candidate direction; excessive tangential travel scales the complete displacement toward the source vertex, and all incident sheets reuse the result. |
+| More than three non-concurrent offset planes at one immersed vertex | The minimum feasible all-face join is selected from active one-, two-, and three-plane constraints; all ordinary incident sheets reuse the result. |
 | Internal immersed structure | Source-face orientation and incident topology choose the side; resolved-solid containment never chooses or reverses it. |
 | Non-planar face | Projection is used only for clipping; triangle-wise barycentric lifting restores the actual folded surface. |
 | Multiple coplanar or transverse STL pieces | The three-dimensional arrangement splits intersections and removes internal fragments by solid winding. |

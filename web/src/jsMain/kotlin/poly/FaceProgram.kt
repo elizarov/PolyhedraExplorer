@@ -109,7 +109,9 @@ class FaceProgram(gl: GL) : ViewBaseProgram(gl) {
     }
 
     override val fragmentShader = shader(ShaderType.Fragment) {
-        val normal by normalize(vNormal)
+        // Immersed rim presentations are rendered two-sided. Flip the shading frame on a back
+        // fragment so the exposed reverse side reads as material instead of an unlit gray sheet.
+        val normal by select(gl_FrontFacing, normalize(vNormal), normalize(vNormal) * -1.0)
         val toCamera by normalize(vToCamera)
         val toLight by normalize(vToLight)
         val halfVector by normalize(toCamera + toLight)

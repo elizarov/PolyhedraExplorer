@@ -15,6 +15,7 @@ import org.khronos.webgl.WebGLRenderingContext as GL
 abstract class GLProgram(val gl: GL) {
     val gl_Position by builtin(GLType.vec4)
     val gl_FragColor by builtin(GLType.vec4)
+    val gl_FrontFacing by builtin(GLType.bool)
 
     abstract val vertexShader: Shader<ShaderType.Vertex>
     abstract val fragmentShader: Shader<ShaderType.Fragment>

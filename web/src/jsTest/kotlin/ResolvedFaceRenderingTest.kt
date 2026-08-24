@@ -23,7 +23,9 @@ import polyhedra.web.glsl.get
 import polyhedra.web.poly.FaceContext
 import polyhedra.web.poly.RenderParams
 import polyhedra.web.poly.FaceExportParams
+import polyhedra.web.poly.ImmersedBottomRole
 import polyhedra.web.poly.immersedBottomCorners
+import polyhedra.web.poly.immersedBottomRoles
 import polyhedra.web.poly.immersedRimGeometry
 import polyhedra.web.poly.triangulate
 import polyhedra.web.params.Param
@@ -78,15 +80,17 @@ class ResolvedFaceRenderingTest {
                 joins,
                 rimsByFace,
             )
-            val simpleFaceIds = poly.simpleResolvedSourceFaceIds()
+            val immersedFaceIds = poly.planarFaceIds()
+            val bottomRoles = poly.immersedBottomRoles(immersedFaceIds, emptySet())
             val geometryByFace = poly.fs.associate { face ->
                 face.id to face.immersedRimGeometry(
                     rimsByFace.getValue(face.id).width,
                     faceWidth,
                     joins,
-                    poly.resolvedFaces[face.id].sourceBoundarySelfIntersects,
-                    simpleFaceIds,
+                    poly.resolvedFaces,
                     bottomCorners,
+                    bottomRoles,
+                    immersedFaceIds,
                 )
             }
             assertTrue(geometryByFace.values.all { geometry -> geometry.surfaces.isNotEmpty() })
@@ -125,6 +129,15 @@ class ResolvedFaceRenderingTest {
     }
 
     @Test
+    fun starAntiprismOrdinaryFacesKeepBisectorDerivedBottomJoins() {
+        assertRenderedSourceEdgeJoins(
+            requireNotNull("SA5_2".toSeedOrNull()).poly,
+            rimWidth = 0.03333333,
+            faceWidth = 0.06666667,
+        )
+    }
+
+    @Test
     fun convexRimsPreserveAllSharedUndersideEdges() {
         assertRenderedSourceEdgeJoins(requireNotNull("C".toSeedOrNull()).poly, 0.12, 0.112)
         assertRenderedSourceEdgeJoins(requireNotNull("T".toSeedOrNull()).poly, 0.08, 0.1)
@@ -136,10 +149,18 @@ class ResolvedFaceRenderingTest {
         val tags = listOf(
             "SP5_2", "SP7_3",
             "SY5_2", "SY7_3",
-            "SA7_3",
+            "SA5_2", "SA7_3",
             "SD",
         )
         assertImmersedSettings(tags)
+    }
+
+    @Test
+    fun fiveHalvesStarAntiprismOpeningWallsFaceItsOpeningsAtReportedDimensions() {
+        assertImmersedSettings(
+            listOf("SA5_2"),
+            listOf(1.0 / 30.0 to 1.0 / 15.0),
+        )
     }
 
     @Test
@@ -195,18 +216,29 @@ class ResolvedFaceRenderingTest {
             joins,
             rimsByFace,
         )
-        val simpleFaceIds = poly.simpleResolvedSourceFaceIds()
         val immersedFaces = poly.fs.filter { face -> face.isPlanar }
+        val immersedFaceIds = immersedFaces.mapTo(linkedSetOf()) { face -> face.id }
+        val bottomRoles = poly.immersedBottomRoles(immersedFaceIds, emptySet())
         assertTrue(immersedFaces.isNotEmpty(), "$tag must exercise immersed source sheets")
         for (face in immersedFaces) {
             val geometry = face.immersedRimGeometry(
                 rimsByFace.getValue(face.id).width,
                 faceWidth,
                 joins,
-                poly.resolvedFaces[face.id].sourceBoundarySelfIntersects,
-                simpleFaceIds,
+                poly.resolvedFaces,
                 bottomCorners,
+                bottomRoles,
+                immersedFaceIds,
             )
+            for ((surfaceIndex, surface) in geometry.openingWalls.withIndex()) {
+                val sourceEdge = surfaceIndex / 2
+                val next = (sourceEdge + 1) % face.size
+                val towardOpening = face.outwardNormal cross (face.fvs[next] - face.fvs[sourceEdge])
+                assertTrue(
+                    surface.normal * towardOpening > 0.0,
+                    "$tag face ${face.id} opening surface $surfaceIndex is culled from its opening",
+                )
+            }
             for ((surfaceIndex, surface) in geometry.surfaces.withIndex()) {
                 val rendered = surface.vertices.map { vertex -> vertex.rendered(faceWidth) }
                 val orientations = surface.triangles.chunked(3).map { (a, b, c) ->
@@ -249,17 +281,22 @@ class ResolvedFaceRenderingTest {
             joins,
             rimsByFace,
         )
-        val simpleFaceIds = poly.simpleResolvedSourceFaceIds()
-        val geometryByFace = poly.fs.filter { face ->
-            hasImmersedFaces && face.isPlanar
-        }.associate { face ->
-            face.id to face.immersedRimGeometry(
+        val shownFaceIds = poly.fs.filter { face -> face.kind !in hiddenKinds }
+            .mapTo(linkedSetOf()) { face -> face.id }
+        val immersedFaceIds = poly.fs.filter { face ->
+            hasImmersedFaces && face.isPlanar && face.kind in hiddenKinds
+        }.mapTo(linkedSetOf()) { face -> face.id }
+        val bottomRoles = poly.immersedBottomRoles(immersedFaceIds, shownFaceIds)
+        val geometryByFace = immersedFaceIds.associateWith { faceId ->
+            val face = poly.fs[faceId]
+            face.immersedRimGeometry(
                 rimsByFace.getValue(face.id).width,
                 faceWidth,
                 joins,
-                poly.resolvedFaces[face.id].sourceBoundarySelfIntersects,
-                simpleFaceIds,
+                poly.resolvedFaces,
                 bottomCorners,
+                bottomRoles,
+                immersedFaceIds,
             )
         }
         val canvas = document.createElement("canvas") as HTMLCanvasElement
@@ -301,24 +338,21 @@ class ResolvedFaceRenderingTest {
             for (edge in poly.directedEdges) for (vertex in listOf(edge.a, edge.b)) {
                 for (face in listOf(edge.r, edge.l)) {
                     val hiddenSourceSheet = face.kind in hiddenKinds && face.id in geometryByFace
-                    val selectedCorners = if (poly.resolvedFaces[face.id].sourceBoundarySelfIntersects) {
-                        bottomCorners.full
+                    val expectedPoint = if (hiddenSourceSheet) {
+                        when (bottomRoles.getValue(face.id)) {
+                            ImmersedBottomRole.Full -> bottomCorners.full.getValue(vertex.id)
+                            ImmersedBottomRole.Standard ->
+                                vertex - joins.vertexDirection(face, vertex) * faceWidth
+                        }
                     } else {
-                        bottomCorners.rimLimited
-                    }
-                    val expectedPoints = if (hiddenSourceSheet && vertex.id in selectedCorners) {
-                        listOf(selectedCorners.getValue(vertex.id))
-                    } else {
-                        listOf(vertex - joins.vertexDirection(face, vertex) * faceWidth)
+                        vertex - joins.vertexDirection(face, vertex) * faceWidth
                     }
                     val actual = bottomsByFaceVertex.getValue(face.id to vertex.id)
-                    for (expected in expectedPoints) {
-                        assertTrue(
-                            actual.any { point -> (point - expected).norm <= 1e-6 },
-                            "Face ${face.id} omits its local bottom join at edge " +
-                                "${edge.a.id}-${edge.b.id}, vertex ${vertex.id}",
-                        )
-                    }
+                    assertTrue(
+                        actual.any { point -> (point - expectedPoint).norm <= 1e-6 },
+                        "Face ${face.id} omits its local bottom join at edge " +
+                            "${edge.a.id}-${edge.b.id}, vertex ${vertex.id}",
+                    )
                 }
             }
         } finally {
@@ -373,15 +407,18 @@ class ResolvedFaceRenderingTest {
                 joins,
                 rimsByFace,
             )
-            val simpleFaceIds = poly.simpleResolvedSourceFaceIds()
+            val immersedFaceIds = hiddenFaceIds
+            val shownFaceIds = poly.fs.mapTo(linkedSetOf()) { face -> face.id } - hiddenFaceIds
+            val bottomRoles = poly.immersedBottomRoles(immersedFaceIds, shownFaceIds)
             val immersedSurfaces = poly.fs.filter { face -> face.kind == FaceKind(0) }.flatMap { face ->
                 face.immersedRimGeometry(
                     rimsByFace.getValue(face.id).width,
                     params.view.faceWidth.targetValue,
                     joins,
-                    poly.resolvedFaces[face.id].sourceBoundarySelfIntersects,
-                    simpleFaceIds,
+                    poly.resolvedFaces,
                     bottomCorners,
+                    bottomRoles,
+                    immersedFaceIds,
                 ).surfaces
             }
             val visibleBufferSize = 5 * 4 * 2
@@ -411,9 +448,8 @@ class ResolvedFaceRenderingTest {
         }
     }
 
-    private fun Polyhedron.simpleResolvedSourceFaceIds(): Set<Int> =
-        resolvedFaces.filterNot { resolved -> resolved.sourceBoundarySelfIntersects }
-            .mapTo(linkedSetOf()) { resolved -> resolved.sourceFaceId }
+    private fun Polyhedron.planarFaceIds(): Set<Int> =
+        fs.filter { face -> face.isPlanar }.mapTo(linkedSetOf()) { face -> face.id }
 
     private fun rimBoundarySegments(
         poly: Polyhedron,
