@@ -1,4 +1,15 @@
 import org.gradle.process.CommandLineArgumentProvider
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
+import java.nio.charset.StandardCharsets
+import java.util.Base64
+
+abstract class InspectConfigurationArguments : CommandLineArgumentProvider {
+    @get:Input
+    abstract val configuration: Property<String>
+
+    override fun asArguments(): Iterable<String> = listOf(configuration.get())
+}
 
 plugins {
     kotlin("multiplatform")
@@ -51,6 +62,23 @@ tasks.named<org.jetbrains.kotlin.gradle.targets.js.ir.KotlinJsIrLink>(
 
 val jvmTestCompilation = kotlin.targets.getByName<org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget>("jvm")
     .compilations.getByName("test")
+val jvmMainCompilation = kotlin.targets.getByName<org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget>("jvm")
+    .compilations.getByName("main")
+
+val inspectedConfiguration = providers.gradleProperty("inspectConfigurationBase64")
+    .map { encoded -> String(Base64.getDecoder().decode(encoded), StandardCharsets.UTF_8) }
+    .orElse(providers.gradleProperty("inspectConfiguration"))
+
+tasks.register<JavaExec>("inspectConfiguration") {
+    group = "application"
+    description = "Prints timed core metadata and geometric orbit memberships for a compact configuration."
+    dependsOn("jvmMainClasses")
+    mainClass.set("polyhedra.core.debug.InspectConfigurationKt")
+    classpath = jvmMainCompilation.output.allOutputs + jvmMainCompilation.runtimeDependencyFiles
+    argumentProviders.add(objects.newInstance<InspectConfigurationArguments>().apply {
+        configuration.set(inspectedConfiguration)
+    })
+}
 
 tasks.register<JavaExec>("stlStressCampaign") {
     group = "verification"

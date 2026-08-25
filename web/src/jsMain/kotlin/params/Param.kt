@@ -4,6 +4,7 @@
 
 package polyhedra.web.params
 
+import polyhedra.model.serialization.ParsedParameter
 import polyhedra.model.util.*
 import kotlin.math.*
 import kotlin.reflect.*
@@ -233,7 +234,7 @@ abstract class Param(val tag: String) {
         }
 
         override fun loadFrom(parsed: ParsedParam, update: (Param) -> Unit) {
-            if (parsed !is ParsedParam.Composite) return
+            if (parsed !is ParsedParameter.Composite) return
             val defaultParam = tagMap[""]
             for ((k, v) in parsed.map) {
                 val param = tagMap[k]
@@ -267,7 +268,7 @@ abstract class ValueParam<T>(tag: String, value: T) : Param(tag) {
     override fun valueToString(): String = value.toString()
 
     override fun loadFrom(parsed: ParsedParam, update: (Param) -> Unit) {
-        if (parsed !is ParsedParam.Value) return
+        if (parsed !is ParsedParameter.Value) return
         parseValue(parsed.value)?.let { targetValue = it }
         update(this)
     }

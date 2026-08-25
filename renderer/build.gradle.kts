@@ -124,6 +124,7 @@ val installHeadlessGl = tasks.register<InstallHeadlessGl>("installHeadlessGl") {
         rootProject.tasks.named("kotlinNpmInstall"),
         rootProject.tasks.named("kotlinNodeJsSetup"),
         tasks.named("kotlinNodeJsSetup"),
+        project(":web").tasks.named("kotlinNodeJsSetup"),
     )
     nodeExecutable.fileProvider(nodeJs.executable.map(::file))
     nodeModulesDirectory.set(nodeModules)

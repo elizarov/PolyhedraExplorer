@@ -78,6 +78,12 @@ powershell -ExecutionPolicy Bypass -File tools/render-config.ps1 `
     'build/rendered/antiprism-5-2.png'
 ```
 
+Every renderer invocation also prints a live core progress bar followed by the same diagnostic
+report as the JVM inspector: core and orbit-analysis timings, result and geometry metadata,
+transform stages, stored F/E/V kinds, full geometric orbit memberships, and the mapping between
+stored kinds and geometric orbits. This makes a rendered regression image and its underlying core
+classification available in one run.
+
 `-Width` and `-Height` set the drawing-buffer and PNG dimensions. The PowerShell file is only a thin
 argument wrapper around `:renderer:renderConfig`. It transfers the configuration as UTF-8 Base64 so
 orbit letters survive the Windows batch boundary; Gradle decodes it before launching Node. Gradle
@@ -91,6 +97,19 @@ UTF-8 `renderConfigurationBase64` used by the wrapper), `renderOutput`, `renderW
 `renderHeight` project properties. `./gradlew :renderer:jsNodeTest` renders the immersed Antiprism
 5/2 regression with the actual shaders and verifies both opaque compositing and serialized
 hidden-face rim selection.
+
+For faster geometry and orbit debugging without Node, WebGL, or a PNG, use the JVM inspector:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/inspect-config.ps1 `
+    'a(r(n))s(eC)t(G~l=3,d)v(fw(0.03333333)fr(0.03333333))'
+```
+
+The inspector accepts either the compact fragment or a complete URL. Its progress bar identifies
+the transform currently consuming the core, and its separately reported `Core construction` time
+includes the complete requested core evaluation. The additional geometric-orbit expansion is
+timed independently. The direct Gradle entry point is `:core:inspectConfiguration` with
+`inspectConfiguration` or UTF-8 `inspectConfigurationBase64`.
 
 ## Release and deployment
 
@@ -113,6 +132,7 @@ The repository's Pages publishing source is **GitHub Actions**. The custom domai
 ```text
 model/src/commonMain/      serializable presentation model and core contract
 core/src/commonMain/       seed generation, manipulation algorithms, and core API
+core/src/jvmMain/          JVM-only debugging command-line tools
 core/src/wasmJsMain/       exported Wasm browser API
 core/src/commonTest/       algorithm and API tests
 web/src/jsMain/kotlin/     Compose DOM UI and WebGL renderer

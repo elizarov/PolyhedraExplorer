@@ -69,6 +69,26 @@ internal data class GeometricSymmetryOperations(
     val all: List<GeometricSymmetryOperation> get() = proper + reversing
 }
 
+internal data class GeometricOrbitDetails(
+    val properOperationCount: Int,
+    val reversingOperationCount: Int,
+    val faceOrbits: List<List<Int>>,
+    val edgeOrbits: List<List<Int>>,
+    val vertexOrbits: List<List<Int>>,
+)
+
+internal fun Polyhedron.geometricOrbitDetails(): GeometricOrbitDetails {
+    val operations = geometricSymmetryOperations()
+    val orbits = symmetryOrbits(operations.proper)
+    return GeometricOrbitDetails(
+        properOperationCount = operations.proper.size,
+        reversingOperationCount = operations.reversing.size,
+        faceOrbits = orbits.faces,
+        edgeOrbits = orbits.edges,
+        vertexOrbits = orbits.vertices,
+    )
+}
+
 internal fun Polyhedron.geometricSymmetryOperations(): GeometricSymmetryOperations {
     val radius = circumradius.coerceAtLeast(1.0)
     val tolerance = radius * SYMMETRY_TOLERANCE
@@ -331,7 +351,18 @@ private fun OrthogonalTransform.rotationOrder(): Int {
     error("Cannot determine rotation order for angle $angle")
 }
 
-private fun Polyhedron.symmetryOrbitCounts(operations: List<GeometricSymmetryOperation>): FEV {
+private data class SymmetryOrbits(
+    val faces: List<List<Int>>,
+    val edges: List<List<Int>>,
+    val vertices: List<List<Int>>,
+) {
+    val counts: FEV get() = FEV(faces.size, edges.size, vertices.size)
+}
+
+private fun Polyhedron.symmetryOrbitCounts(operations: List<GeometricSymmetryOperation>): FEV =
+    symmetryOrbits(operations).counts
+
+private fun Polyhedron.symmetryOrbits(operations: List<GeometricSymmetryOperation>): SymmetryOrbits {
     val vertexSets = DisjointSets(vs.size)
     val edgeSets = DisjointSets(es.size)
     val faceSets = DisjointSets(fs.size)
@@ -347,7 +378,7 @@ private fun Polyhedron.symmetryOrbitCounts(operations: List<GeometricSymmetryOpe
             faceSets.union(faceIndex, requireNotNull(topology.targetFaceId(permutation, face, operation.orientation)))
         }
     }
-    return FEV(faceSets.count, edgeSets.count, vertexSets.count)
+    return SymmetryOrbits(faceSets.groups, edgeSets.groups, vertexSets.groups)
 }
 
 private class DisjointSets(size: Int) {
@@ -371,7 +402,12 @@ private class DisjointSets(size: Int) {
         return result
     }
 
-    val count: Int get() = parent.indices.count { root(it) == it }
+    val groups: List<List<Int>>
+        get() = parent.indices
+            .groupBy(::root)
+            .values
+            .map(List<Int>::sorted)
+            .sortedBy { group -> group.first() }
 }
 
 private data class SpatialKey(val x: Long, val y: Long, val z: Long)

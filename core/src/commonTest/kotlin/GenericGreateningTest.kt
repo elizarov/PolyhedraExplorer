@@ -104,6 +104,23 @@ class GenericGreateningTest {
     }
 
     @Test
+    fun dualPreservesDistinctGreateningFaceOrbitsForRhombicuboctahedron() = runTest {
+        val response = evaluateCore(
+            CoreRequest(
+                CoreState("eC", listOf("G~l=3", "d"), "c"),
+                calculateTweakRanges = false,
+            ),
+        )
+
+        assertNull(response.error, response.error?.detail)
+        assertEquals(FEV(48, 72, 26), response.poly.fev())
+        assertEquals(FEV(2, 3, 3), response.symmetry.orbitCounts)
+        assertEquals(response.symmetry.orbitCounts.f, response.poly.faceKinds.size)
+        assertEquals(response.symmetry.orbitCounts.e, response.poly.edgeKinds.size)
+        assertEquals(response.symmetry.orbitCounts.v, response.poly.vertexKinds.size)
+    }
+
+    @Test
     fun deltoidalHexecontahedronGreateningHasOneCompleteAuthoritativeFaceOrbit() = runTest {
         val greatened = Seed.DeltoidalHexecontahedron.poly.greatenings().single().poly
 

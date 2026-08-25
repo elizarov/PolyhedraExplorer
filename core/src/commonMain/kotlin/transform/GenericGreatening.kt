@@ -81,7 +81,11 @@ internal suspend fun Polyhedron.buildGenericGreateningCandidates(
         .take(MAX_FACETING_ORBITS)
     if (orbits.isEmpty()) return emptyList()
 
-    val facetedDuals = dual.assembleFacetings(orbits, progress?.subrange(17, 25))
+    val facetedDuals = dual.assembleFacetings(
+        orbits,
+        symmetries.proper.map { operation -> operation.vertexPermutation },
+        progress?.subrange(17, 25),
+    )
     val candidates = facetedDuals.mapIndexedNotNull { index, faceted ->
         val candidateProgress = progress?.subrange(
             25 + 73 * index / facetedDuals.size.coerceAtLeast(1),
@@ -326,6 +330,7 @@ private fun convexHull(
 
 private fun Polyhedron.assembleFacetings(
     orbits: List<FacetingFaceOrbit>,
+    properPermutations: List<IntArray>,
     progress: OperationProgressContext?,
 ): List<Polyhedron> {
     val result = arrayListOf<Polyhedron>()
@@ -339,6 +344,7 @@ private fun Polyhedron.assembleFacetings(
     }
     var searchNodes = 0
     var lastReportedProgress = -1
+    val properFaceOrbits = orbits.map { orbit -> orbit.splitByProperRotations(properPermutations) }
 
     fun build(chosen: List<Int>) {
         val key = chosen.sorted().joinToString(",")
@@ -348,10 +354,14 @@ private fun Polyhedron.assembleFacetings(
             chosen.sumOf { orbitId -> orbits[orbitId].edgeUses.count { it.value == 2 } }
         if (edgeCount > MAX_POLYHEDRON_EDGES || faceCount < 4) return
         runCatching {
-            polyhedron(mergeIndistinguishableKinds = true) {
+            polyhedron {
                 this@assembleFacetings.vs.forEach { vertex -> vertex(vertex, vertex.kind) }
-                chosen.forEachIndexed { kindId, orbitId ->
-                    orbits[orbitId].faces.forEach { face -> face(face.vertexIds, FaceKind(kindId)) }
+                var kindId = 0
+                chosen.forEach { orbitId ->
+                    properFaceOrbits[orbitId].forEach { faceOrbit ->
+                        faceOrbit.forEach { face -> face(face.vertexIds, FaceKind(kindId)) }
+                        kindId++
+                    }
                 }
             }
         }.getOrNull()?.takeIf { candidate -> candidate.surfaceComponentCount() == 1 }?.let(result::add)
@@ -418,6 +428,24 @@ private fun Polyhedron.assembleFacetings(
     }
     progress?.reportProgress(100)
     return result
+}
+
+private fun FacetingFaceOrbit.splitByProperRotations(
+    permutations: List<IntArray>,
+): List<List<FacetingFace>> {
+    val facesByKey = faces.associateBy(FacetingFace::key)
+    val remaining = facesByKey.keys.toMutableSet()
+    val result = arrayListOf<List<FacetingFace>>()
+    while (remaining.isNotEmpty()) {
+        val representative = facesByKey.getValue(remaining.first())
+        val orbit = permutations.map { permutation ->
+            val mapped = representative.vertexIds.map { vertexId -> permutation[vertexId] }
+            facesByKey.getValue(canonicalCycle(mapped).joinToString(","))
+        }.distinctBy(FacetingFace::key).sortedBy(FacetingFace::key)
+        remaining.removeAll(orbit.map(FacetingFace::key).toSet())
+        result += orbit
+    }
+    return result.sortedBy { orbit -> orbit.first().key }
 }
 
 private fun List<FacetingFaceOrbit>.pruneUnmatchableOrbits(): List<FacetingFaceOrbit> {

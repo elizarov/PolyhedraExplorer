@@ -5,10 +5,10 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.promise
 import org.khronos.webgl.Uint8Array
 import org.khronos.webgl.WebGLRenderingContext
-import polyhedra.core.api.evaluateCore
-import polyhedra.model.api.CoreRequest
-import polyhedra.model.api.CoreState
-import polyhedra.web.catalog.Transform
+import polyhedra.core.api.CoreInspection
+import polyhedra.core.api.formatCoreProgress
+import polyhedra.core.api.inspectCompactConfiguration
+import polyhedra.model.api.CoreProgress
 import polyhedra.web.glsl.set
 import polyhedra.web.main.RootParams
 import polyhedra.web.params.Param
@@ -25,28 +25,22 @@ data class RenderedImage(
 )
 
 suspend fun renderConfiguration(configuration: String, width: Int, height: Int): RenderedImage {
+    val inspection = inspectCompactConfiguration(
+        configuration,
+        calculateTweakRanges = false,
+        detectSeed = false,
+    )
+    return renderConfiguration(inspection, width, height)
+}
+
+private fun renderConfiguration(inspection: CoreInspection, width: Int, height: Int): RenderedImage {
     require(width > 0) { "Width must be positive" }
     require(height > 0) { "Height must be positive" }
 
-    val serialized = normalizeConfiguration(configuration)
+    val serialized = inspection.configuration.normalized
     val params = RootParams()
     params.loadFromString(serialized)
-    val polyParams = params.render.poly
-    val state = CoreState(
-        seedTag = polyParams.seed.value.tag,
-        transformTags = polyParams.transforms.value.map(Transform::tag),
-        scaleTag = polyParams.baseScale.value.tag,
-    )
-    val rimWidth = params.render.view.faceRim.targetValue.takeIf { it > 0.0 }
-    val response = evaluateCore(
-        CoreRequest(
-            state = state,
-            calculateTweakRanges = false,
-            rimWidth = rimWidth,
-            faceWidth = params.render.view.faceWidth.targetValue.takeIf { rimWidth != null && it > 0.0 },
-        ),
-    )
-    params.render.poly.applyCoreResponse(state, response)
+    params.render.poly.applyCoreResponse(inspection.configuration.state, inspection.response)
 
     val gl = createContext(width, height)
     val draw = DrawContext(gl, params.render) {}
@@ -119,11 +113,6 @@ private fun flipVertically(source: Uint8Array, width: Int, height: Int): Uint8Ar
     return target
 }
 
-private fun normalizeConfiguration(configuration: String): String {
-    val fragment = configuration.substringAfter("#/", configuration).removePrefix("/")
-    return decodeURIComponent(fragment)
-}
-
 @OptIn(DelicateCoroutinesApi::class)
 fun main() {
     GlobalScope.promise {
@@ -139,11 +128,48 @@ private suspend fun runCommandLine() {
     require(args.size == 4) {
         "Usage: render-config <configuration> <output.png> <width> <height>"
     }
+    val configuration = args[0]
+    val transformTags = polyhedra.core.api.parseCompactCoreConfiguration(configuration).state.transformTags
+    val progress = NodeConsoleProgress(transformTags)
+    val inspection = try {
+        inspectCompactConfiguration(
+            configuration,
+            calculateTweakRanges = false,
+            detectSeed = false,
+            reportProgress = progress::update,
+        )
+    } finally {
+        progress.finish()
+    }
+    println(inspection.report)
     val image = renderConfiguration(
-        configuration = args[0],
+        inspection = inspection,
         width = args[2].toInt(),
         height = args[3].toInt(),
     )
     val output = writePng(image, args[1])
     println("Rendered $output (${image.width}x${image.height})")
+}
+
+private class NodeConsoleProgress(private val transformTags: List<String>) {
+    private var visible = false
+    private var previousLength = 0
+    private var previousLine: String? = null
+
+    fun update(progress: CoreProgress) {
+        val line = formatCoreProgress(progress, transformTags)
+        if (line == previousLine) return
+        val padding = " ".repeat((previousLength - line.length).coerceAtLeast(0))
+        process.stdout.write("\r$line$padding")
+        previousLength = line.length
+        previousLine = line
+        visible = true
+    }
+
+    fun finish() {
+        if (visible) process.stdout.write("\n")
+        visible = false
+        previousLength = 0
+        previousLine = null
+    }
 }
