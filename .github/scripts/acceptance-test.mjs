@@ -116,7 +116,7 @@ async function runCase(sessionId, testCase, index) {
 
 async function runStlExportCase(sessionId) {
     const testCase = {
-        name: "immersed STL worker export",
+        name: "immersed presentation for STL export",
         hash: "#/s(SP5_2)hf(α)",
         counts: { faces: 7, edges: 15, vertices: 10 },
         labels: ["Prism 5/2"],
@@ -126,11 +126,41 @@ async function runStlExportCase(sessionId) {
         script: `
             window.__acceptedStlDownload = null;
             window.__acceptedStlHref = null;
+            window.__acceptedStlSummary = null;
+            window.__acceptedStlError = null;
             const originalClick = HTMLAnchorElement.prototype.click;
             HTMLAnchorElement.prototype.click = function() {
                 if (this.download?.endsWith(".stl")) {
                     window.__acceptedStlDownload = this.download;
                     window.__acceptedStlHref = this.href;
+                    fetch(this.href)
+                        .then(response => {
+                            if (!response.ok) throw new Error(
+                                "download returned HTTP " + response.status
+                            );
+                            return response.text();
+                        })
+                        .then(text => {
+                            const lines = text.trim().split(/\\r?\\n/);
+                            const facetCount = lines.filter(line => line.startsWith("facet normal ")).length;
+                            const vertexCount = lines.filter(line => line.startsWith("vertex ")).length;
+                            const solidName = lines[0]?.startsWith("solid ") ? lines[0].slice(6) : null;
+                            const endName = lines.at(-1)?.startsWith("endsolid ")
+                                ? lines.at(-1).slice(9)
+                                : null;
+                            window.__acceptedStlSummary = {
+                                length: text.length,
+                                facetCount,
+                                vertexCount,
+                                solidName,
+                                endName,
+                                valid: text.length > 0 && facetCount > 0 &&
+                                    vertexCount === facetCount * 3 && solidName === endName,
+                            };
+                        })
+                        .catch(error => {
+                            window.__acceptedStlError = String(error?.message ?? error);
+                        });
                     return;
                 }
                 return originalClick.call(this);
@@ -164,6 +194,8 @@ async function runStlExportCase(sessionId) {
                 return {
                     download: window.__acceptedStlDownload,
                     href: window.__acceptedStlHref,
+                    summary: window.__acceptedStlSummary,
+                    downloadError: window.__acceptedStlError,
                     error: document.querySelector(".save-error")?.textContent?.trim() ?? null,
                     status: document.querySelector(".core-status")?.textContent?.trim() ?? null,
                 };
@@ -172,13 +204,17 @@ async function runStlExportCase(sessionId) {
         })
         if (state.status?.startsWith("Wasm core error:")) throw new Error(state.status)
         if (state.error) throw new Error(`STL export failed: ${state.error}`)
-        if (state.download && state.href?.startsWith("data:text/plain;charset=utf-8,solid%20")) {
-            console.log(`PASS: ${testCase.name} (${state.download})`)
+        if (state.downloadError) throw new Error(`Could not inspect STL download: ${state.downloadError}`)
+        if (state.download?.endsWith(".stl") && state.summary?.valid) {
+            console.log(
+                `PASS: immersed STL worker export (${state.download}, ` +
+                `${state.summary.facetCount} facets, ${state.summary.length} bytes)`,
+            )
             return
         }
         await sleep(250)
     }
-    throw new Error("immersed STL worker export did not complete")
+    throw new Error(`immersed STL worker export did not complete: ${JSON.stringify(state)}`)
 }
 
 let sessionId
