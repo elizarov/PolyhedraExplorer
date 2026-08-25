@@ -15,6 +15,8 @@ class ViewContext(params: ViewParams) : Param.Context(params) {
     private val rotate by { params.rotate.value }
 
     val expandFaces by { params.expandFaces.value }
+    val cutEnabled by { params.cutEnabled.value }
+    private val cutPosition by { params.cutPosition.value }
     val transparentFaces by { params.transparentFaces.value }
     val faceWidth by { params.faceWidth.value }
     val faceRim by { params.faceRim.value }
@@ -25,6 +27,8 @@ class ViewContext(params: ViewParams) : Param.Context(params) {
     val normalMatrix = mat3.create()
     var scaleFactor = 1.0
         private set
+    val cutPlanePosition: Double
+        get() = cutPosition * scaleFactor
 
     private val cameraFieldOfViewDegrees = 45.0
 

@@ -17,6 +17,13 @@ abstract class ViewBaseProgram(gl: GL) : GLProgram(gl) {
     val uFaceWidth by uniform(GLType.float)
     val uFaceRim by uniform(GLType.float)
     val uCullMode by uniform(GLType.float) // 0 - no, 1 - cull front, -1 - cull back
+    val uCutEnabled by uniform(GLType.float, GLPrecision.lowp)
+    val uCutPosition by uniform(GLType.float)
+    val vCutDepth by varying(GLType.float)
+
+    fun GLBlockBuilder<GLType.void>.discardCutFragments() {
+        discardIf((uCutEnabled gt 0.5.literal) and (vCutDepth gt uCutPosition))
+    }
 
     val fViewPosition by function(
         GLType.vec4,
@@ -59,6 +66,8 @@ abstract class ViewBaseProgram(gl: GL) : GLProgram(gl) {
             uFaceWidth by faceWidth
             uFaceRim by faceRim
             uCullMode by cullMode.toDouble()
+            uCutEnabled by if (cutEnabled) 1.0 else 0.0
+            uCutPosition by cutPlanePosition
         }
     }
 }

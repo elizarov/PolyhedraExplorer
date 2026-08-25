@@ -24,10 +24,12 @@ class VertexProgram(gl: GL) : ViewBaseProgram(gl) {
         val normal by normalize(uNormalMatrix * aNormal)
         val toCamera by normalize(uCameraPosition - position.xyz)
         gl_Position by uProjectionMatrix * position
+        vCutDepth by position.z
         vShade by 0.45.literal + 0.55.literal * max(dot(normal, toCamera), 0.0)
     }
 
     override val fragmentShader = shader(ShaderType.Fragment) {
+        discardCutFragments()
         gl_FragColor by uVertexColor * vShade
     }
 }

@@ -126,6 +126,7 @@ class TableShadowProgram(gl: GL) : ViewBaseProgram(gl) {
 
     override val vertexShader = shader(ShaderType.Vertex) {
         val position by fViewPosition(fInterpolatedPosition(), fInterpolatedExpandDir()).xyz
+        vCutDepth by position.z
         val lightRay by position - uLightPosition
         val intersection by (uTableHeight - uLightPosition.y) / lightRay.y
         val projected by uLightPosition + lightRay * intersection +
@@ -134,6 +135,7 @@ class TableShadowProgram(gl: GL) : ViewBaseProgram(gl) {
     }
 
     override val fragmentShader = shader(ShaderType.Fragment) {
+        discardCutFragments()
         gl_FragColor by vec4(0.0.literal, 0.0.literal, 0.0.literal, uShadowOpacity)
     }
 }

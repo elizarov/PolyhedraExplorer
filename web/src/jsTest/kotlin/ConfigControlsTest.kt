@@ -6,12 +6,14 @@ import kotlinx.browser.window
 import org.jetbrains.compose.web.renderComposable
 import org.jetbrains.compose.web.dom.Text
 import org.w3c.dom.HTMLDivElement
+import org.w3c.dom.HTMLElement
 import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.HTMLSelectElement
 import org.w3c.dom.events.Event
 import polyhedra.model.util.Tagged
 import polyhedra.web.components.*
 import polyhedra.web.main.RootParams
+import polyhedra.web.main.ConfigPopup
 import polyhedra.web.params.BooleanParam
 import polyhedra.web.params.DoubleParam
 import polyhedra.web.params.EnumParam
@@ -191,6 +193,43 @@ class ConfigControlsTest {
         }.then {
             input = host.querySelector("input[type=checkbox]") as HTMLInputElement
             assertFalse(input.checked, "Programmatic changes must update the DOM checked state")
+        }
+    }
+
+    @Test
+    fun cutControlEnablesItsSignedPositionSlider(): Promise<Unit> {
+        val params = RootParams()
+        composition = renderComposable(host) { ConfigPopup(params) }
+        val cutRow = (0 until host.querySelectorAll("tr.control").length)
+            .map { host.querySelectorAll("tr.control").item(it) as HTMLElement }
+            .single { it.querySelector("td")?.textContent == "Cut" }
+        val configRows = (0 until host.querySelectorAll("tr.control").length)
+            .map { host.querySelectorAll("tr.control").item(it) as HTMLElement }
+        val checkbox = cutRow.querySelector(".checkbox") as HTMLDivElement
+        var range = cutRow.querySelector("input[type=range]") as HTMLInputElement
+
+        assertTrue(configRows.all { row ->
+            val cells = row.querySelectorAll("td")
+            cells.length == 3 || cells.length == 2 &&
+                (cells.item(0) as HTMLElement).getAttribute("colspan") == "2"
+        }, "Rows without a checkbox must span the label and checkbox columns")
+        assertFalse(params.render.view.cutEnabled.value)
+        assertTrue(range.disabled)
+        assertEquals("-100", range.min)
+        assertEquals("100", range.max)
+        assertEquals("0", range.value)
+
+        checkbox.click()
+        assertTrue(params.render.view.cutEnabled.value)
+        return awaitRecomposition().then {
+            range = cutRow.querySelector("input[type=range]") as HTMLInputElement
+            assertFalse(range.disabled)
+            range.value = "-35"
+            range.dispatchEvent(Event("input"))
+            assertEquals(-0.35, params.render.view.cutPosition.targetValue, absoluteTolerance = 1e-12)
+            awaitRecomposition()
+        }.then {
+            assertEquals("-35", range.value)
         }
     }
 

@@ -100,6 +100,7 @@ class FaceProgram(gl: GL) : ViewBaseProgram(gl) {
         // position
         val position by fPosition()
         gl_Position by uProjectionMatrix * position
+        vCutDepth by position.z
         // lighting & color
         vNormal by fLightNormal()
         vToCamera by uCameraPosition - position.xyz
@@ -109,6 +110,7 @@ class FaceProgram(gl: GL) : ViewBaseProgram(gl) {
     }
 
     override val fragmentShader = shader(ShaderType.Fragment) {
+        discardCutFragments()
         // Immersed rim presentations are rendered two-sided. Flip the shading frame on a back
         // fragment so the exposed reverse side reads as material instead of an unlit gray sheet.
         val normal by select(gl_FrontFacing, normalize(vNormal), normalize(vNormal) * -1.0)

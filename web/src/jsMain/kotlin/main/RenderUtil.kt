@@ -31,9 +31,16 @@ fun TableBody(content: @Composable () -> Unit) {
 }
 
 @Composable
-fun ControlRow(label: String, content: @Composable () -> Unit) {
+fun ControlRow(
+    label: String,
+    labelColumnSpan: Int = 1,
+    content: @Composable () -> Unit,
+) {
+    require(labelColumnSpan >= 1)
     Tr(attrs = { classes("control") }) {
-        Td { Text(label) }
+        Td(attrs = {
+            if (labelColumnSpan > 1) attr("colspan", labelColumnSpan.toString())
+        }) { Text(label) }
         Td { content() }
     }
 }

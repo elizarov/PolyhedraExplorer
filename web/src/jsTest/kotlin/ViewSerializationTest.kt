@@ -17,8 +17,12 @@ class ViewSerializationTest {
         val source = RootParams()
         source.render.view.rotate.rotate(0.4, -0.7, 0.2, Param.TargetValue)
         source.render.view.scale.updateValue(0.35, Param.TargetValue)
+        source.render.view.cutEnabled.updateValue(true, Param.TargetValue)
+        source.render.view.cutPosition.updateValue(-0.37, Param.TargetValue)
         val serialized = source.toString()
         assertTrue(serialized.contains("v(r("), serialized)
+        assertTrue(serialized.contains("c(y)"), serialized)
+        assertTrue(serialized.contains("cp(-0.37)"), serialized)
 
         val restored = RootParams()
         restored.loadFromString(serialized)
@@ -29,6 +33,8 @@ class ViewSerializationTest {
         assertEquals(expectedAxis.x, view.modelMatrix[0].toDouble(), tolerance)
         assertEquals(expectedAxis.y, view.modelMatrix[1].toDouble(), tolerance)
         assertEquals(expectedAxis.z, view.modelMatrix[2].toDouble(), tolerance)
+        assertTrue(view.cutEnabled)
+        assertEquals(-0.37 * 2.0.pow(0.35), view.cutPlanePosition, tolerance)
         view.destroy()
     }
 

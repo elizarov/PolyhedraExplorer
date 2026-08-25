@@ -42,10 +42,12 @@ class EdgeProgram(gl: GL) : ViewBaseProgram(gl) {
     override val vertexShader = shader(ShaderType.Vertex) {
         val position by fPosition()
         gl_Position by uProjectionMatrix * position
+        vCutDepth by position.z
         vColorMul by fCullMull(position, fNormal())
     }
 
     override val fragmentShader = shader(ShaderType.Fragment) {
+        discardCutFragments()
         gl_FragColor by uVertexColor * vColorMul
     }
 }

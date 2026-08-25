@@ -34,6 +34,11 @@ class GLBlockBuilder<T : GLType<T>>(
             else -> deps += decl
         }
     }
+
+    fun discardIf(condition: GLExpr<GLType.bool>) {
+        using(condition)
+        +"if ($condition) discard;"
+    }
 }
 
 fun functionVoid(builder: GLBlockBuilder<GLType.void>.() -> Unit): DelegateProvider<GLFun0<GLType.void>> =

@@ -885,8 +885,8 @@ data class FaceExportParams(
 // cullMode: 0 - no, 1 - cull front, -1 - cull back
 fun FaceContext.draw(view: ViewContext, lighting: LightingContext, cullMode: Int = 0) {
     if (!drawFaces) return
-    val renderTwoSided = hiddenFaces.isNotEmpty() &&
-        poly.resolvedFaces.any(ResolvedFaceGeometry::sourceBoundarySelfIntersects)
+    val renderTwoSided = view.cutEnabled ||
+        hiddenFaces.isNotEmpty() && poly.resolvedFaces.any(ResolvedFaceGeometry::sourceBoundarySelfIntersects)
     val restoreCulling = renderTwoSided && gl.isEnabled(GL.CULL_FACE)
     if (renderTwoSided) gl.disable(GL.CULL_FACE)
     val animation = animation
