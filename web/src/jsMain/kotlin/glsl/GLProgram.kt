@@ -16,6 +16,7 @@ abstract class GLProgram(val gl: GL) {
     val gl_Position by builtin(GLType.vec4)
     val gl_FragColor by builtin(GLType.vec4)
     val gl_FrontFacing by builtin(GLType.bool)
+    val gl_FragCoord by builtin(GLType.vec4)
 
     abstract val vertexShader: Shader<ShaderType.Vertex>
     abstract val fragmentShader: Shader<ShaderType.Fragment>
@@ -45,6 +46,10 @@ abstract class GLProgram(val gl: GL) {
         if (isUsed) {
             gl.uniform1i(location, value)
         }
+    }
+
+    fun Uniform<GLType.sampler2D>.textureUnit(value: Int) {
+        if (isUsed) gl.uniform1i(location, value)
     }
 
     infix fun Uniform<GLType.float>.by(value: Double) {

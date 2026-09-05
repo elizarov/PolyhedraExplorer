@@ -15,6 +15,54 @@ import kotlin.time.measureTime
 
 class RendererTest {
     @Test
+    fun acrylicReusesItsTextureAndDrawsCutsRimsCompoundsWithoutGeometryWork() = runTest {
+        for (configuration in listOf("s(C)", "s(SA5_2)hf(α,β,γ)", "s(C5T)")) {
+            val inspection = inspectCompactConfiguration(configuration, calculateTweakRanges = false, detectSeed = false)
+            val params = RootParams()
+            params.loadFromString(configuration + "v(t(y)c(y)e(0.1))a(r(n))")
+            params.render.poly.applyCoreResponse(inspection.configuration.state, inspection.response)
+            val gl = createContext(480, 360)
+            val draw = DrawContext(gl, params.render) {}
+            try {
+                params.performUpdate(null, 0.0)
+                draw.drawScene(480, 360)
+                gl.finish()
+                var uploads = 0
+                var allocations = 0
+                val bufferData = gl.asDynamic().bufferData
+                val copyImage = gl.asDynamic().copyTexImage2D
+                gl.asDynamic().bufferData = { target: Int, data: dynamic, usage: Int ->
+                    uploads++
+                    bufferData.call(gl, target, data, usage)
+                }
+                gl.asDynamic().copyTexImage2D = { target: Int, level: Int, format: Int, x: Int, y: Int, width: Int, height: Int, border: Int ->
+                    allocations++
+                    copyImage.call(gl, target, level, format, x, y, width, height, border)
+                }
+                val elapsed = measureTime {
+                    repeat(24) {
+                        params.render.view.rotate.rotate(0.03, 0.05, 0.01, Param.TargetValue)
+                        params.performUpdate(null, 0.0)
+                        draw.drawScene(480, 360)
+                        gl.finish()
+                        assertEquals(GL.NO_ERROR, gl.getError(), configuration)
+                    }
+                }
+                assertEquals(0, uploads)
+                assertEquals(0, allocations, "Texture storage must be reused between frames")
+                draw.drawScene(400, 300)
+                assertEquals(1, allocations, "Only resize reallocates the snapshot")
+                assertEquals(GL.NO_ERROR, gl.getError())
+                println("Acrylic $configuration: 24 rotating 480x360 frames in $elapsed, no allocations or mesh uploads")
+            } finally {
+                draw.destroy()
+                params.destroy()
+                destroyContext(gl)
+            }
+        }
+    }
+
+    @Test
     fun cutFacesRetainsAFaintShellWireframeUnlessFacesOnlyOrPrintPreview() = runTest {
         // At -1 the entire cube is removed, isolating the ghost from retained faces and edges.
         fun configuration(view: String, preview: String = "") = "a(r(n))s(C)v(env(n)$view)$preview"
@@ -61,20 +109,22 @@ class RendererTest {
                             rotate.rotate(0.03, 0.05, 0.01, Param.TargetValue)
                             cutPosition.updateValue(-0.5 + frame / 24.0, Param.TargetValue)
                             scale.updateValue(frame / 48.0, Param.TargetValue)
-                            transparentFaces.updateValue(if (frame % 2 == 0) 0.0 else 0.3, Param.TargetValue)
+                            transparencyEnabled.updateValue(frame % 2 != 0)
+                            transparentFaces.updateValue(0.3 + frame / 48.0, Param.TargetValue)
                         }
                         params.performUpdate(null, 0.0)
                         draw.drawScene(480, 360)
                         gl.finish()
                         assertEquals(GL.NO_ERROR, gl.getError(), "$seed frame $frame")
                         assertTrue(gl.isEnabled(GL.CULL_FACE), "Cut must restore culling after drawing")
-                        val radius = gl.getUniform(draw.faces.program.program, draw.faces.program.uInteriorRadius.location) as Double
+                        val program = if (draw.view.transparencyEnabled) draw.faces.acrylicProgram else draw.faces.program
+                        val radius = gl.getUniform(program.program, program.uInteriorRadius.location) as Double
                         val expected = (draw.faces.poly.circumradius + draw.view.expandFaces) * draw.view.scaleFactor
                         assertEquals(expected, radius, 1e-5, "Interior scale must update on every frame")
                     }
                 }
                 assertEquals(0, uploads, "Rotation, cut, zoom and transparency must not rebuild face buffers")
-                println("Cutaway $seed: 24 rotating 480x360 frames in $elapsed (no mesh uploads)")
+                println("Cutaway/acrylic $seed: 24 rotating 480x360 frames in $elapsed (no mesh uploads)")
             } finally {
                 draw.destroy()
                 params.destroy()

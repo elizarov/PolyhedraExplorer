@@ -13,6 +13,8 @@ class LightingContext(params: LightingParams) : Param.Context(params) {
     val fillLightIntensity by { params.fillLight.value }
     val roughness by { params.roughness.value }
     val fresnelF0 by { dielectricF0(params.ior.value) }
+    val acrylicRoughness by { params.acrylicRoughness.value }
+    val acrylicIor by { params.acrylicIor.value }
 
     // A neutral-warm key and subtle cool environment produce readable studio lighting without IBL.
     val lightColor = float32Of(1.0, 0.97, 0.92)

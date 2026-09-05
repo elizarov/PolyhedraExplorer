@@ -16,6 +16,25 @@ import kotlin.test.assertTrue
 /** Pixel-level tests of the application's actual GLSL, with geometry/lighting held constant. */
 class FaceLightingTest {
     @Test
+    fun acrylicRimLayerUsesRenderedTriangleNotTheHiddenSourceFace() {
+        // A rim wall is still visible when its originating (hidden) face passes edge-on.
+        // Its source direction is metadata, not the rasterized wall's facing direction.
+        for (reverse in listOf(false, true)) {
+            val retainedPass = if (reverse) 1 else -1
+            val reference = sample(acrylic = true, reverseWinding = reverse, cullMode = retainedPass)
+            assertEquals(255, reference.alpha)
+            for (source in listOf(Vec3(1.0, 0.0, -0.001), Vec3(1.0, 0.0, 0.001), Vec3(0.0, 0.0, -1.0))) {
+                assertEquals(reference,
+                    sample(acrylic = true, reverseWinding = reverse, cullMode = retainedPass, sourceNormal = source),
+                    "Changing the source face must not move a rim wall between acrylic layers")
+                assertEquals(0,
+                    sample(acrylic = true, reverseWinding = reverse, cullMode = -retainedPass, sourceNormal = source).alpha,
+                    "Each material boundary belongs to exactly one layer")
+            }
+        }
+    }
+
+    @Test
     fun cutBandMarksTheLipAndFadesToUnmodifiedSurfaceLighting() {
         val ordinary = sample(tilt = 0.75)
         val lip = sample(tilt = 0.75, cutDepth = 0.002)
@@ -83,10 +102,45 @@ class FaceLightingTest {
     }
 
     @Test
-    fun transparencyOnlyChangesAlphaAndCutDoesNotChangeIt() {
+    fun opaqueCoverageAlphaIsIndependentOfCutLighting() {
         val opaque = sample(underside = true, cutDepth = 0.5)
         val transparent = sample(underside = true, cutDepth = 0.5, opacity = 0.4)
         assertEquals(opaque.copy(alpha = 102), transparent)
+    }
+
+    @Test
+    fun acrylicTransmitsBackgroundInLinearLightAndRetainsReflectionAtFullTransmission() {
+        val black = sample(acrylic = true, transmission = 1.0, background = 0.0)
+        val white = sample(acrylic = true, transmission = 1.0, background = 1.0)
+        assertEquals(255, black.alpha)
+        assertTrue(black.red > 10, "Clear acrylic still reflects the environment: $black")
+        assertTrue(white.red > black.red + 150, "Acrylic must transmit the scene, not fade its own color")
+        assertTrue(white.green > black.green + 150)
+        assertTrue(white.blue > black.blue + 150)
+        assertEquals(sample(acrylic = true, transmission = 0.0, background = 0.0),
+            sample(acrylic = true, transmission = 0.0, background = 1.0), "Zero transmission blocks the scene")
+    }
+
+    @Test
+    fun acrylicAbsorptionGrowsWithThicknessAndKeepsColoredTransmission() {
+        val thin = sample(acrylic = true, opticalThickness = 0.01)
+        val thick = sample(acrylic = true, opticalThickness = 0.2)
+        assertTrue(thin.red > thick.red && thin.green > thick.green && thin.blue > thick.blue, "$thin / $thick")
+        assertTrue(thick.red > thick.green && thick.green > thick.blue, "Absorption must tint transmitted background")
+        assertEquals(sample(acrylic = true, transmission = 1.0, opticalThickness = 0.01),
+            sample(acrylic = true, transmission = 1.0, opticalThickness = 0.2), "Unpigmented acrylic does not absorb")
+    }
+
+    @Test
+    fun acrylicGrazingReflectionAndMaterialExtremesRemainFinite() {
+        val faceOn = sample(acrylic = true, transmission = 1.0, background = 0.0, key = 0.0)
+        val grazing = sample(acrylic = true, transmission = 1.0, background = 0.0, key = 0.0, tilt = 5.0)
+        assertTrue(grazing.red > faceOn.red + 10, "$faceOn / $grazing")
+        for (roughness in listOf(0.08, 0.12, 1.0)) for (ior in listOf(1.3, 1.49, 1.7)) {
+            val pixel = sample(acrylic = true, roughness = roughness, ior = ior, opticalThickness = 0.2, tilt = 3.0)
+            assertEquals(255, pixel.alpha)
+            assertTrue(pixel.red > 0 && pixel.green > 0 && pixel.blue > 0, pixel.toString())
+        }
     }
 }
 
@@ -103,10 +157,28 @@ private fun sample(
     roughness: Double = 0.45,
     opacity: Double = 1.0,
     tilt: Double = 0.0,
+    acrylic: Boolean = false,
+    transmission: Double = 0.85,
+    opticalThickness: Double = 0.1,
+    background: Double = 1.0,
+    ior: Double = 1.49,
+    cullMode: Int = 0,
+    sourceNormal: Vec3? = null,
 ): Pixel {
     val gl = createContext(32, 32)
     try {
-        val program = FaceProgram(gl)
+        val program = FaceProgram(gl, acrylic)
+        if (acrylic) {
+            val texture = gl.createTexture()
+            gl.bindTexture(GL.TEXTURE_2D, texture)
+            val texels = Uint8Array(32 * 32 * 4)
+            for (i in 0 until texels.length) texels.asDynamic()[i] = if (i % 4 == 3) 255 else (background * 255).toInt()
+            gl.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA, 32, 32, 0, GL.RGBA, GL.UNSIGNED_BYTE, texels)
+            gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.LINEAR)
+            gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.LINEAR)
+            gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE)
+            gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE)
+        }
         val positions = createBuffer(gl, GLType.vec3)
         // Tilt a real plane around the sampled pixel, whose NDC y is 1/32. Its depth stays zero.
         val vertices = listOf(-1.0 to -1.0, 1.0 to -1.0, 0.0 to 1.0).map { (x, y) ->
@@ -116,7 +188,7 @@ private fun sample(
         positions.bindBufferData(gl)
         val planeNormal = Vec3(0.0, tilt, 1.0).unit
         val normal = planeNormal * if (reverseWinding) -1.0 else 1.0
-        val outward = if (wall) Vec3(1.0, 0.0, 0.0) else
+        val outward = sourceNormal ?: if (wall) Vec3(1.0, 0.0, 0.0) else
             planeNormal * if (reverseWinding xor underside) -1.0 else 1.0
         fun GLProgram.Attribute<GLType.vec3>.constant(v: Vec3) {
             gl.vertexAttrib3f(location, v.x.toFloat(), v.y.toFloat(), v.z.toFloat())
@@ -135,7 +207,14 @@ private fun sample(
             uKeyLightIntensity by key
             uFillLightIntensity by fill
             uRoughness by roughness
-            uFresnelF0 by ((1.46 - 1.0) / (1.46 + 1.0)).pow(2)
+            val materialIor = if (acrylic) ior else 1.46
+            uFresnelF0 by ((materialIor - 1.0) / (materialIor + 1.0)).pow(2)
+            uTransmission by transmission
+            uIor by materialIor
+            uOpticalThickness by opticalThickness
+            uModelScale by 1.0
+            uSceneColor.textureUnit(0)
+            uSceneSize by float32Of(32.0, 32.0)
             uInteriorRadius by radius
             uTargetFraction by 1.0
             uPrevFraction by 0.0
@@ -145,7 +224,7 @@ private fun sample(
             uFaceWidth by 0.0
             uFaceRim by 0.0
             uExpand by 0.0
-            uCullMode by 0.0
+            uCullMode by cullMode.toDouble()
             aPosition by positions
             aPrevPosition by positions
             aLightNormal.constant(normal)

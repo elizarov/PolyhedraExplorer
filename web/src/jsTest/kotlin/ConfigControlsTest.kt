@@ -197,6 +197,43 @@ class ConfigControlsTest {
     }
 
     @Test
+    fun transparencyCheckboxKeepsAmountAndSwitchesMaterialControls(): Promise<Unit> {
+        val params = RootParams()
+        composition = renderComposable(host) { ConfigPopup(params) }
+        fun row(label: String) = (0 until host.querySelectorAll("tr.control").length)
+            .map { host.querySelectorAll("tr.control").item(it) as HTMLElement }
+            .single { it.querySelector("td")?.textContent == label }
+        fun amount() = row("Transparent").querySelector("input[type=range]") as HTMLInputElement
+        fun roughness() = row("Roughness").querySelector(".slider-value-input") as HTMLInputElement
+        assertTrue(amount().disabled)
+        assertEquals("85", amount().value)
+        assertEquals("0.45", roughness().value)
+        (row("Transparent").querySelector(".checkbox") as HTMLElement).click()
+        return awaitRecomposition().then {
+            assertTrue(params.render.view.transparencyEnabled.value)
+            assertFalse(amount().disabled)
+            assertEquals("0.12", roughness().value)
+            amount().value = "72"
+            amount().dispatchEvent(Event("input"))
+            awaitRecomposition()
+        }.then {
+            assertEquals(0.72, params.render.view.transparentFaces.targetValue)
+            params.render.view.transparencyEnabled.updateValue(false)
+            awaitRecomposition()
+        }.then {
+            assertTrue(amount().disabled)
+            assertEquals("72", amount().value)
+            assertEquals("0.45", roughness().value)
+            params.render.view.transparencyEnabled.updateValue(true)
+            awaitRecomposition()
+        }.then {
+            assertFalse(amount().disabled)
+            assertEquals("72", amount().value)
+            assertEquals("0.12", roughness().value)
+        }
+    }
+
+    @Test
     fun cutControlEnablesItsSignedPositionSlider(): Promise<Unit> {
         val params = RootParams()
         composition = renderComposable(host) { ConfigPopup(params) }

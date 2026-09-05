@@ -17,7 +17,8 @@ class ViewContext(params: ViewParams) : Param.Context(params) {
     val expandFaces by { params.expandFaces.value }
     val cutEnabled by { params.cutEnabled.value }
     private val cutPosition by { params.cutPosition.value }
-    val transparentFaces by { params.transparentFaces.value }
+    val transparencyEnabled by { params.transparencyEnabled.value }
+    val transparentFaces by { if (params.transparencyEnabled.value) params.transparentFaces.value else 0.0 }
     val faceWidth by { params.faceWidth.value }
     val faceRim by { params.faceRim.value }
 

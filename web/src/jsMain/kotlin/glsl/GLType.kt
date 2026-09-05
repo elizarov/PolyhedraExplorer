@@ -29,6 +29,7 @@ interface GLType<T : GLType<T>> {
     interface MatrixFloats<T : MatrixFloats<T>> : VecOrMatrixFloats<T>
 
     object void : GLTypeBase<void>()
+    object sampler2D : GLTypeBase<sampler2D>()
 
     object bool : GLTypeBase<bool>(
         bufferSize = 1

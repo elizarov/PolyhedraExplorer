@@ -24,8 +24,6 @@ class DrawContext(
         onUpdate,
     )
 
-    val transparentFaces by { params.view.transparentFaces.value }
-
     val view = ViewContext(params.view)
     val lighting = LightingContext(params.lighting)
     val faces = FaceContext(gl, params)
@@ -33,6 +31,17 @@ class DrawContext(
     val vertices = VertexContext(gl, params)
     val environment = EnvironmentContext(gl, params)
     val symmetryOverlay = SymmetryOverlayContext(gl, params)
+    private var acrylicContext: AcrylicContext? = null
+
+    fun drawAcrylic(width: Int, height: Int) {
+        val context = acrylicContext ?: AcrylicContext(gl).also { acrylicContext = it }
+        context.draw(view, lighting, faces, edges, width, height)
+    }
+
+    override fun destroy() {
+        acrylicContext?.destroy()
+        super.destroy()
+    }
 
     init {
         setup()
@@ -66,15 +75,11 @@ fun DrawContext.drawScene(width: Int, height: Int) {
 
     environment.draw(view, lighting, faces)
 
-    val transparentFaces = faces.drawFaces && transparentFaces != 0.0
-    gl[GL.DEPTH_TEST] = !transparentFaces
-    gl[GL.BLEND] = transparentFaces
+    val transparentFaces = faces.drawFaces && view.transparencyEnabled
+    gl[GL.DEPTH_TEST] = true
+    gl[GL.BLEND] = false
     if (transparentFaces) {
-        // special code for transparent faces - draw back "front faces", then front "front faces"
-        faces.draw(view, lighting, 1)
-        edges.draw(view, 1)
-        faces.draw(view, lighting, -1)
-        edges.draw(view, -1)
+        drawAcrylic(width, height)
     } else {
         drawOpaqueFacesAndEdges(gl, view, lighting, faces, edges)
     }

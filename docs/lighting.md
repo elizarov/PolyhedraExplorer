@@ -1,14 +1,14 @@
 # Lighting and plastic material
 
-Polyhedra Explorer uses a compact physically based model for opaque 3D-printing
-plastics. It is a single-layer dielectric Cook-Torrance BRDF with an isotropic
+Polyhedra Explorer uses compact physically based models for opaque 3D-printing
+plastics and transparent acrylic sheets. Both use a dielectric Cook-Torrance BRDF with an isotropic
 GGX microfacet distribution, height-correlated Smith visibility, Schlick
 Fresnel, and an energy-conserving Lambert diffuse lobe. Face colors are decoded
 from sRGB before lighting and encoded back to sRGB for display.
 
-The material is deliberately always non-metallic and opaque: metalness,
-transmission, clear coat, anisotropy, and texture controls would not improve
-the intended plastic exploration enough to justify their cost or UI surface.
+Both materials are non-metallic. Transparent mode transmits the rendered scene instead of
+reducing the opacity of an opaque plastic color. No metalness, clear-coat, anisotropy,
+or material-texture controls are exposed.
 
 ## Surface response
 
@@ -56,7 +56,8 @@ Reverse faces and explicit undersides retain the same plastic BRDF and orbit
 color, but receive less incident light. This is an analytic cavity-shadow
 approximation, not a different material and not a ray-traced or shadow-mapped
 visibility test. It makes exposed interiors read as recesses instead of bright
-outer faces, including during Cut, rotation, expansion, and transparency.
+outer faces during Cut, rotation, and expansion. Acrylic does not use this opaque-cavity
+occlusion proxy: its exposed reverse surfaces transmit scene light and retain dielectric reflections.
 
 Cut faces defaults to `+0.5` of the selected base-scale radius, retaining more of the
 front shell around the opening. Its range is `-1` (back) to `+1` (front); `0`
@@ -75,8 +76,8 @@ shell; retained edges keep their normal appearance. The existing Display control
 governs this overlay: Faces-only hides it, and print preview also suppresses it.
 The ghost uses the existing edge draw, with no face-direction culling in the
 removed region. Each face occurrence contributes 12% opacity (about 23% for a
-shared unexpanded edge); the transparency back pass skips it to avoid doubling
-the contribution. Depth testing still respects retained geometry.
+shared unexpanded edge). Opaque rendering depth-tests it against retained geometry;
+acrylic draws it once after both optical passes, together with the other edge overlays.
 
 `FaceProgram` treats every reverse-facing material boundary as interior. This
 includes the reverse of a rim's underside and side walls seen through a cut:
@@ -127,30 +128,94 @@ reducing chroma while preserving lightness and hue.
 ## Controls
 
 The View group selects the scene environment. Two controls describe illumination
-and two are necessary to vary opaque plastics.
+and two describe the active material. Opaque and acrylic Roughness/IOR values are remembered
+independently; changing material mode never overwrites the other pair.
 
 | Group | Control | Default | Range | Meaning |
 | --- | --- | ---: | ---: | --- |
 | View | Environment | `Table` | `None`, `Table` | Keep the background-only view, or add the lit table and cast shadow. |
+| Faces | Transparent | Off; amount `0.85` | Checkbox and `0–1` slider | Enable acrylic; vary transmission while retaining surface reflections. Disabling it remembers the amount. |
 | Lighting | Key light | `2.5` | `0.0–5.0` | Radiance multiplier for the fixed neutral-warm studio point light. |
 | Lighting | Fill light | `0.22` | `0.0–1.0` | Intensity of the cool constant environment approximation. |
-| Material | Roughness | `0.45` | `0.15–1.0` | Perceived microsurface roughness; lower is glossier and higher is more matte. |
-| Material | IOR | `1.46` | `1.30–1.70` | Plastic index of refraction, converted to dielectric `F0`. |
+| Material | Roughness | PLA `0.45`; acrylic `0.12` | PLA `0.15–1.0`; acrylic `0.08–1.0` | Perceived microsurface roughness; acrylic also blurs transmitted scene detail. |
+| Material | IOR | PLA `1.46`; acrylic `1.49` | `1.30–1.70` | Index of refraction, used for Fresnel reflection and acrylic refraction. |
 | Export | Print preview | Off, red | Basic colors or OKLCH | Use one filament base color for every rendered surface and hide edge overlays; this does not alter exported geometry. |
 
-The environment, all four lighting/material values, and print-preview color are
+The environment, both material profiles, transparency mode/amount, and print-preview color are
 URL-backed. `Table` is omitted; None is stored as `env(n)` in the View
 parameters. Deserialization maps `Ambient` to Fill light and `Diffuse` to Key
 light. It ignores Specular and Shininess because Fresnel and roughness determine
 those effects.
 
+`v(t(y))` enables acrylic; `v(ta(...))` stores a non-default amount independently of the
+checkbox. Numeric legacy `v(t(...))` values load as the corresponding acrylic amount, enabled
+when positive. Material tags `l(r(...)i(...))` describe PLA and `l(ar(...)ai(...))` acrylic.
+Defaults are omitted. Saved configurations use the same representation.
+
+## Transparent acrylic
+
+The calibrated acrylic IOR is `1.49`, giving approximately 3.9% reflection at a head-on
+air/acrylic interface. A clear parallel sheet transmits approximately 92.5% through its two
+interfaces, consistent with PLEXIGLAS optical-sheet specifications. Roughness `0.12` and
+transmission amount `0.85` are visual defaults for polished, lightly colored acrylic, not
+measured universal material constants.
+
+Each visible source-face layer is approximated as a locally parallel sheet. For view cosine
+`cosθ`, Snell's law gives the internal ray and `cosθt`; its material path is `Width / cosθt`.
+The face/preview color is converted to linear RGB and defines the Beer–Lambert absorption tint:
+
+```text
+A = clamp(baseColor, 0.02, 1) ^ ((Width / cosθt) / 0.1 × (1 - amount))
+R_sheet = 2 F / (1 + F)
+T_sheet = (1 - F) / (1 + F)
+L = reflected/scattered light + amount × T_sheet × A × sampled scene light
+```
+
+`F` is Schlick Fresnel at the viewing angle. The sheet factors include repeated interface
+reflections in the zero-absorption limit; colored absorption is then applied once to the
+transmission. Reflections are white and remain at amount `1`; the diffuse scattering lobe
+is weighted by `1 - amount`. At amount `0` no background is transmitted. Increasing Width
+deepens the color and increases refraction. Width and the `0.1` absorption reference are in
+selected base-radius units, making zoom independent of material absorption; this is not a
+millimeter-calibrated pigment concentration.
+
+A parallel sheet's outgoing ray is parallel to its incoming ray but laterally displaced.
+The shader projects this Snell-law displacement into screen coordinates, capped at 4% of
+screen height. Four symmetric texture samples approximate roughness blur. The background is
+decoded to linear RGB before absorption and reflection are combined, then encoded for display.
+Transparent canvas regions use the same neutral page background as headless PNG rendering.
+
+The renderer snapshots the table/background, renders the nearest back-facing material layer,
+snapshots again, then renders the nearest front-facing material layer. Layer selection uses the
+rasterized triangle's facing, including rim walls and undersides, never the hidden source face's
+orientation or a vertex-interpolated visibility mask. GPU depth testing chooses each layer independently
+of triangle order. Culling is disabled, supporting cut faces, rims, and immersed surfaces.
+Edges are drawn once over the completed acrylic image, including edges visible through the
+material. They are never put into different optical layers according to source-face direction;
+Cut's optional removed-shell wireframe is likewise drawn only once. Geometry,
+export, and core computations are unchanged. The table shadow is reduced by estimated sheet
+transmission, with a nonzero reflection loss even for clear acrylic.
+
 ## Performance and limits
 
 The face fragment shader evaluates one point light and one constant environment.
-It uses no material textures, lookup tables, cubemaps, or shadow maps. Its main
+The opaque path uses no textures, lookup tables, cubemaps, or shadow maps. Its main
 non-polynomial work is normalizing the light vectors, two square roots for
 correlated Smith visibility, and small fixed powers for Fresnel and color-space
 conversion.
+
+Acrylic uses a separately compiled shader and one lazily allocated RGBA8 screen-sized texture
+(`4 × width × height` bytes). Each frame makes two GPU framebuffer copies and two face draws,
+with four texture reads per covered fragment. The texture is reused until resize and deleted
+with its drawing context. There is no CPU readback, triangle sorting, geometry rebuild, ray
+marching, float framebuffer requirement, or additional WASM work. The same WebGL 1 path runs
+in browsers and the Node/headless-gl renderer.
+
+This is a bounded two-layer screen-space approximation, not volumetric ray tracing: compounds
+and immersed models may have more layers than are represented; offscreen objects cannot be
+refracted; edges can reveal screen-space discontinuities. It does not simulate solid-lens
+refraction, total-internal-reflection paths across unrelated faces, colored caustics, or exact
+multiple scattering. Roughness blur and the neutral table shadow are inexpensive approximations.
 
 Interior shading adds one scalar varying, one radius uniform, and fixed-cost
 arithmetic per fragment. It reuses existing normals and depth, adds no draw
@@ -171,6 +236,10 @@ projections, so they do not create self-shadowing and can only be received by
 the table plane.
 
 ## References
+
+- [Khronos transmission extension](https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_transmission/README.md) — dielectric transmission is distinct from alpha coverage and preserves specular reflection.
+- [Khronos volume extension](https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_volume/README.md) — thickness, refraction, and Beer–Lambert absorption.
+- [PLEXIGLAS Optical sheet data](https://www.plexiglas.de/files/plexiglas-content/pdf/technische-informationen/232-25-EN-PLEXIGLAS-Optical-0Z024.pdf) — IOR `1.49` and 92% transmittance at 3 mm.
 
 - [Khronos glTF 2.0 BRDF specification](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#appendix-b-brdf-implementation) — dielectric Fresnel mixing, GGX microfacets, and energy-conserving diffuse/specular composition.
 - [Physically Based Rendering in Filament](https://google.github.io/filament/Filament.md.html) — real-time Cook-Torrance/GGX design and material parameterization.

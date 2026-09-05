@@ -101,10 +101,49 @@ class LightingModelTest {
     }
 
     @Test
+    fun acrylicModeAndRememberedProfilesRoundTripIncludingDisabledAmount() {
+        val source = RootParams()
+        assertFalse(source.render.view.transparencyEnabled.value)
+        assertEquals(0.85, source.render.view.transparentFaces.targetValue)
+        assertEquals(1.49, source.render.lighting.acrylicIor.targetValue)
+        assertEquals(0.12, source.render.lighting.acrylicRoughness.targetValue)
+        assertFalse("ta(" in source.toString())
+        source.render.view.transparentFaces.updateValue(0.72, Param.TargetValue)
+        source.render.lighting.acrylicRoughness.updateValue(0.23, Param.TargetValue)
+        source.render.lighting.acrylicIor.updateValue(1.52, Param.TargetValue)
+        for (enabled in listOf(false, true)) {
+            source.render.view.transparencyEnabled.updateValue(enabled)
+            val restored = RootParams()
+            restored.loadFromString(source.toString())
+            assertEquals(enabled, restored.render.view.transparencyEnabled.value)
+            assertEquals(0.72, restored.render.view.transparentFaces.targetValue)
+            assertEquals(0.23, restored.render.lighting.acrylicRoughness.targetValue)
+            assertEquals(1.52, restored.render.lighting.acrylicIor.targetValue)
+            assertEquals(0.45, restored.render.lighting.roughness.targetValue)
+            assertEquals(1.46, restored.render.lighting.ior.targetValue)
+        }
+    }
+
+    @Test
+    fun legacyTransparencyLoadsAsAcrylicWithoutAmbiguousReserialization() {
+        for (amount in listOf(0.0, 0.3, 1.0)) {
+            val params = RootParams()
+            params.loadFromString("v(t($amount))")
+            assertEquals(amount > 0.0, params.render.view.transparencyEnabled.value)
+            assertEquals(amount, params.render.view.transparentFaces.targetValue)
+            val restored = RootParams()
+            restored.loadFromString(params.toString())
+            assertEquals(params.render.view.transparencyEnabled.value, restored.render.view.transparencyEnabled.value)
+            assertEquals(amount, restored.render.view.transparentFaces.targetValue)
+        }
+    }
+
+    @Test
     fun facePbrShaderCompilesInWebGl() {
         val canvas = document.createElement("canvas") as HTMLCanvasElement
         val gl = assertNotNull(canvas.getContext("webgl") as? WebGLRenderingContext)
 
         assertNotNull(FaceProgram(gl).program)
+        assertNotNull(FaceProgram(gl, acrylic = true).program)
     }
 }

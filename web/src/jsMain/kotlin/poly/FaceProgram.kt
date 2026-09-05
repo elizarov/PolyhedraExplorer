@@ -8,7 +8,7 @@ import polyhedra.web.glsl.*
 import kotlin.math.PI
 import org.khronos.webgl.WebGLRenderingContext as GL
 
-class FaceProgram(gl: GL) : ViewBaseProgram(gl) {
+class FaceProgram(gl: GL, private val acrylic: Boolean = false) : ViewBaseProgram(gl) {
     val uLightColor by uniform(GLType.vec3)
     val uFillColor by uniform(GLType.vec3)
     val uLightPosition by uniform(GLType.vec3)
@@ -17,6 +17,12 @@ class FaceProgram(gl: GL) : ViewBaseProgram(gl) {
     val uRoughness by uniform(GLType.float)
     val uFresnelF0 by uniform(GLType.float)
     val uInteriorRadius by uniform(GLType.float)
+    val uTransmission by uniform(GLType.float)
+    val uIor by uniform(GLType.float)
+    val uOpticalThickness by uniform(GLType.float)
+    val uSceneColor by uniform(GLType.sampler2D)
+    val uSceneSize by uniform(GLType.vec2)
+    val uModelScale by uniform(GLType.float)
 
     val uTargetFraction by uniform(GLType.float)
     val uPrevFraction by uniform(GLType.float)
@@ -66,7 +72,14 @@ class FaceProgram(gl: GL) : ViewBaseProgram(gl) {
         val alpha by roughness * roughness
         val alphaSquared by alpha * alpha
         val denominator by noH * noH * (alphaSquared - 1.0.literal) + 1.0.literal
-        alphaSquared / (PI.literal * denominator * denominator)
+        alphaSquared / max(PI.literal * denominator * denominator, 0.000001)
+    }
+
+    // The canvas may be transparent above the table. Composite its snapshot over the page color
+    // before converting to linear light, identically in the browser and headless renderer.
+    private val fSceneLight by function(GLType.vec3, "uv", GLType.vec2) { uv ->
+        val pixel by texture2D(uSceneColor, uv)
+        pow(pixel.rgb * pixel.a + vec3(0.95) * (1.0.literal - pixel.a), vec3(2.2))
     }
 
     val fInterpolatedPosition by function(GLType.vec3) {
@@ -111,11 +124,18 @@ class FaceProgram(gl: GL) : ViewBaseProgram(gl) {
         vToCamera by uCameraPosition - position.xyz
         vToLight by uLightPosition - position.xyz
         vColor by fInterpolatedColor() * aFaceMode
-        vColorAlpha by uColorAlpha * fCullMull(position, uNormalMatrix * fInterpolatedExpandDir())
+        vColorAlpha by if (acrylic) uColorAlpha else
+            uColorAlpha * fCullMull(position, uNormalMatrix * fInterpolatedExpandDir())
     }
 
     override val fragmentShader = shader(ShaderType.Fragment) {
         discardCutFragments()
+        if (acrylic) {
+            // Partition the actual material boundary, not its source polygon. Rim walls and
+            // undersides stay visible when the hidden source face crosses a grazing angle.
+            // Rasterizer facing is constant across each triangle, never an interpolated mask.
+            discardIf(select(gl_FrontFacing, 1.0.literal, (-1.0).literal) * uCullMode gt 0.0.literal)
+        }
         // Keep the dielectric shading frame facing the viewer on two-sided surfaces.
         val normal by select(gl_FrontFacing, normalize(vNormal), normalize(vNormal) * -1.0)
         // A reversed material boundary always exposes its interior, even for an underside or
@@ -126,8 +146,8 @@ class FaceProgram(gl: GL) : ViewBaseProgram(gl) {
         // reduced incident light suppresses implausible exterior-like highlights on backsides.
         val cavityDepth by max(uCutPosition - vCutDepth, 0.0) * uCutEnabled / max(uInteriorRadius, 0.0001)
         val aperture by 1.0.literal / (1.0.literal + cavityDepth * cavityDepth)
-        val keyAccess by 1.0.literal - interior * (0.94.literal - 0.28.literal * aperture)
-        val fillAccess by 1.0.literal - interior * (0.75.literal - 0.40.literal * aperture)
+        val keyAccess by if (acrylic) 1.0.literal else 1.0.literal - interior * (0.94.literal - 0.28.literal * aperture)
+        val fillAccess by if (acrylic) 1.0.literal else 1.0.literal - interior * (0.75.literal - 0.40.literal * aperture)
         val toCamera by normalize(vToCamera)
         val toLight by normalize(vToLight)
         val halfVector by normalize(toCamera + toLight)
@@ -146,8 +166,10 @@ class FaceProgram(gl: GL) : ViewBaseProgram(gl) {
 
         // Face colors are authored as sRGB; evaluate the BRDF in linear light.
         val baseColor by pow(max(vColor, 0.0), vec3(2.2))
-        val diffuseBrdf by baseColor * ((1.0.literal - fresnel) / PI.literal)
-        val specularBrdf by vec3(distribution * visibility * fresnel)
+        val diffuseWeight by if (acrylic) 1.0.literal - uTransmission else 1.0.literal
+        val diffuseBrdf by baseColor * ((1.0.literal - fresnel) / PI.literal) * diffuseWeight
+        val specularBrdf by vec3(distribution * visibility * fresnel) *
+            (if (acrylic) 2.0.literal / (1.0.literal + fresnel) else 1.0.literal)
         // Normalize inverse-square falloff at the model origin, so the control remains intuitive.
         val keyAttenuation by dot(uLightPosition, uLightPosition) / max(dot(vToLight, vToLight), 0.01)
         val directLight by (diffuseBrdf + specularBrdf) * uLightColor * (
@@ -157,11 +179,35 @@ class FaceProgram(gl: GL) : ViewBaseProgram(gl) {
         // One constant environment term gives printed plastic visible fill and grazing reflection
         // without an environment texture or another rendering pass.
         val viewFresnel by fSchlickFresnel(noV, uFresnelF0)
-        val fillDiffuse by (baseColor * uFillColor) * ((1.0.literal - viewFresnel) * uFillLightIntensity)
+        val fillDiffuse by (baseColor * uFillColor) * ((1.0.literal - viewFresnel) * uFillLightIntensity) * diffuseWeight
         val fillSpecular by uFillColor * (
             viewFresnel * uFillLightIntensity * (1.0.literal - uRoughness * 0.5.literal)
-        )
-        val linearColor by directLight + (fillDiffuse + fillSpecular) * fillAccess
+        ) * (if (acrylic) 2.0.literal / (1.0.literal + viewFresnel) else 1.0.literal)
+        val reflectedLight by directLight + (fillDiffuse + fillSpecular) * fillAccess
+        val linearColor by if (acrylic) {
+            // Snell's law inside a locally parallel sheet. The emergent ray is parallel to the
+            // incident ray, with a thickness-dependent lateral displacement (not a solid lens).
+            val ray by refract(toCamera * -1.0, normal, 1.0.literal / uIor)
+            val cosInside by max(0.0.literal - dot(ray, normal), 0.0001)
+            val path by uOpticalThickness / cosInside
+            val displacement by (ray + toCamera * (cosInside / noV)) * path * uModelScale
+            val uv by gl_FragCoord.xy / uSceneSize
+            // Bound the screen approximation at silhouettes; no offscreen information is available.
+            val offset by max(min(displacement.xy * (1.20710678.literal / max(vToCamera.z, 0.1)), 0.04), -0.04)
+            val aspectCorrection by vec2(uSceneSize.y / uSceneSize.x, 1.0.literal)
+            val sampleUv by uv + offset * aspectCorrection
+            val blur by vec2(uRoughness * uRoughness * 0.015.literal, uRoughness * uRoughness * 0.015.literal) * aspectCorrection
+            val incidentLight by (fSceneLight(sampleUv + blur) + fSceneLight(sampleUv - blur) +
+                fSceneLight(sampleUv + vec2(blur.x, 0.0.literal - blur.y)) +
+                fSceneLight(sampleUv + vec2(0.0.literal - blur.x, blur.y))) * 0.25
+            // Beer-Lambert absorption: orbit/preview color is the transmittance tint at a reference
+            // thickness of 0.1 base radius. Higher transmission reduces both pigment and scattering.
+            val absorption by pow(max(min(baseColor, 1.0), 0.02), vec3(path * 10.0.literal * (1.0.literal - uTransmission)))
+            // Two interfaces of an incoherent parallel sheet, including repeated internal Fresnel
+            // reflections at zero absorption: R_sheet = 2F/(1+F), T_sheet = (1-F)/(1+F).
+            val sheetTransmission by (1.0.literal - viewFresnel) / (1.0.literal + viewFresnel)
+            reflectedLight + incidentLight * absorption * (uTransmission * sheetTransmission)
+        } else reflectedLight
         val displayColor by pow(max(linearColor, 0.0), vec3(1.0 / 2.2))
         // A surface-distance band, not a slab in z: keep its width consistent on oblique faces.
         // Parallel/coplanar surfaces have no cut contour and must not become entirely tinted.

@@ -11,6 +11,7 @@ fun ConfigPopup(params: RootParams) {
     params.observe()
     val hasFaces = params.render.view.display.value.hasFaces()
     val cutEnabled = params.render.view.cutEnabled.value
+    val transparent = params.render.view.transparencyEnabled.value
     val animateUpdates = params.animationParams.animateValueUpdates.value
     val rotate = params.animationParams.animatedRotation.value
     val scale = params.export.size.targetValue / 2
@@ -29,8 +30,8 @@ fun ConfigPopup(params: RootParams) {
 
     GroupHeader("Faces")
     TableBody {
-        ConfigControlRow("Transparent") {
-            PSlider(params.render.view.transparentFaces, !hasFaces, ariaLabel = "Transparency")
+        ControlRow2("Transparent", { PCheckbox(params.render.view.transparencyEnabled, !hasFaces) }) {
+            PSlider(params.render.view.transparentFaces, !hasFaces || !transparent, ariaLabel = "Transparency")
         }
         ConfigControlRow("Width") {
             PSlider(
@@ -83,8 +84,14 @@ fun ConfigPopup(params: RootParams) {
 
     GroupHeader("Material")
     TableBody {
-        ConfigControlRow("Roughness") { PSlider(params.render.lighting.roughness, !hasFaces, ariaLabel = "Roughness") }
-        ConfigControlRow("IOR") { PSlider(params.render.lighting.ior, !hasFaces, ariaLabel = "Index of refraction") }
+        ConfigControlRow("Roughness") {
+            PSlider(if (transparent) params.render.lighting.acrylicRoughness else params.render.lighting.roughness,
+                !hasFaces, ariaLabel = "Roughness")
+        }
+        ConfigControlRow("IOR") {
+            PSlider(if (transparent) params.render.lighting.acrylicIor else params.render.lighting.ior,
+                !hasFaces, ariaLabel = "Index of refraction")
+        }
     }
 }
 

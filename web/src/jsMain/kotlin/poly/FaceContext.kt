@@ -24,7 +24,7 @@ class FaceContext(
     val poly by { polyProvider() }
     val animation by { params.poly.transformAnimation }
     val selectedFace by { params.poly.selectedFace.value }
-    val drawFaces by { params.view.display.value.hasFaces() && params.view.transparentFaces.value < 1.0 }
+    val drawFaces by { params.view.display.value.hasFaces() }
     val hasExpand by { params.view.expandFaces.value > 0.0 }
     val hasRim by { params.view.faceRim.value > 0.0 }
     val hasWidth by { params.view.faceWidth.value > 0.0 }
@@ -45,6 +45,7 @@ class FaceContext(
     }
 
     val program = FaceProgram(gl)
+    val acrylicProgram by lazy { FaceProgram(gl, acrylic = true) }
 
     var indexSize = 0
     var bufferSize = 0
@@ -885,7 +886,8 @@ data class FaceExportParams(
 // cullMode: 0 - no, 1 - cull front, -1 - cull back
 fun FaceContext.draw(view: ViewContext, lighting: LightingContext, cullMode: Int = 0) {
     if (!drawFaces) return
-    val renderTwoSided = view.cutEnabled ||
+    val program = if (view.transparencyEnabled) acrylicProgram else program
+    val renderTwoSided = view.transparencyEnabled || view.cutEnabled ||
         hiddenFaces.isNotEmpty() && poly.resolvedFaces.any(ResolvedFaceGeometry::sourceBoundarySelfIntersects)
     val restoreCulling = renderTwoSided && gl.isEnabled(GL.CULL_FACE)
     if (renderTwoSided) gl.disable(GL.CULL_FACE)
@@ -900,8 +902,14 @@ fun FaceContext.draw(view: ViewContext, lighting: LightingContext, cullMode: Int
             uLightPosition by lighting.lightPosition
             uKeyLightIntensity by lighting.keyLightIntensity
             uFillLightIntensity by lighting.fillLightIntensity
-            uRoughness by lighting.roughness
-            uFresnelF0 by lighting.fresnelF0
+            uRoughness by if (view.transparencyEnabled) lighting.acrylicRoughness else lighting.roughness
+            uFresnelF0 by if (view.transparencyEnabled) dielectricF0(lighting.acrylicIor) else lighting.fresnelF0
+            uTransmission by view.transparentFaces
+            uIor by lighting.acrylicIor
+            uOpticalThickness by view.faceWidth
+            uModelScale by view.scaleFactor
+            // Acrylic transmits sampled scene radiance, never the alpha of opaque plastic.
+            if (view.transparencyEnabled) uColorAlpha by 1.0
             val radius = if (animation == null) poly.circumradius else
                 poly.circumradius * animation.targetFraction + animation.prevPoly.circumradius * animation.prevFraction
             uInteriorRadius by (radius + view.expandFaces) * view.scaleFactor

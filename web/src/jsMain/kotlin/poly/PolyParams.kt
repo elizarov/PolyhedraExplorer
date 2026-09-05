@@ -8,6 +8,7 @@ import kotlinx.browser.window
 import polyhedra.model.poly.*
 import polyhedra.model.util.*
 import polyhedra.model.api.*
+import polyhedra.model.serialization.ParsedParameter
 import polyhedra.web.catalog.*
 import polyhedra.web.main.*
 import polyhedra.web.params.*
@@ -471,7 +472,8 @@ class ViewParams(
     val expandFaces = using(DoubleParam("e", 0.0, 0.0, 2.0, 0.01, animationParams))
     val cutEnabled = using(BooleanParam("c", false))
     val cutPosition = using(DoubleParam("cp", 0.5, -1.0, 1.0, 0.01, animationParams))
-    val transparentFaces = using(DoubleParam("t", 0.0, 0.0, 1.0, 0.01, animationParams))
+    val transparencyEnabled = using(BooleanParam("t", false))
+    val transparentFaces = using(DoubleParam("ta", 0.85, 0.0, 1.0, 0.01, animationParams))
     val faceWidth = using(
         DoubleParam("fw", 0.10, 0.0, 0.2, 0.001, animationParams, serializationPrecision = 8),
     )
@@ -482,6 +484,19 @@ class ViewParams(
     val symmetryAxisSize = using(DoubleParam("as", 1.2, 1.0, 2.0, 0.01))
     val display = using(EnumParam("d", Display.All, Displays))
     val environment = using(EnumParam("env", SceneEnvironment.Table, SceneEnvironments))
+
+    override fun loadFrom(parsed: ParsedParam, update: (Param) -> Unit) {
+        // Numeric t was the legacy opacity-fade control. New URLs separate mode from amount.
+        val values = (parsed as? ParsedParameter.Composite)?.map
+        val legacy = (values?.get("t") as? ParsedParameter.Value)?.value?.toDoubleOrNull()
+        if (legacy != null && legacy.isFinite()) {
+            val migrated = values + mapOf(
+                "t" to ParsedParameter.Value(if (legacy > 0.0) "y" else "n"),
+                "ta" to (values["ta"] ?: ParsedParameter.Value(legacy.coerceIn(0.0, 1.0).toString())),
+            )
+            super.loadFrom(ParsedParameter.Composite(migrated), update)
+        } else super.loadFrom(parsed, update)
+    }
 }
 
 class LightingParams(tag: String, animationParams: ViewAnimationParams?) : Param.Composite(tag) {
@@ -489,6 +504,8 @@ class LightingParams(tag: String, animationParams: ViewAnimationParams?) : Param
     val fillLight = using(DoubleParam("a", 0.22, 0.0, 1.0, 0.01, animationParams))
     val roughness = using(DoubleParam("r", 0.45, 0.15, 1.0, 0.01, animationParams))
     val ior = using(DoubleParam("i", 1.46, 1.3, 1.7, 0.01, animationParams))
+    val acrylicRoughness = using(DoubleParam("ar", 0.12, 0.08, 1.0, 0.01, animationParams))
+    val acrylicIor = using(DoubleParam("ai", 1.49, 1.3, 1.7, 0.01, animationParams))
 }
 
 internal const val DEFAULT_PRINT_LIGHTNESS = 0.58

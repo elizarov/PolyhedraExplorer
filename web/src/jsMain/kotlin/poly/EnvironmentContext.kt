@@ -112,7 +112,11 @@ class EnvironmentContext(private val gl: GL, params: RenderParams) : Param.Conte
         tableHeight: Double,
     ) {
         if (!faces.drawFaces || faces.indexSize == 0) return
-        val materialOpacity = 1.0 - view.transparentFaces
+        // A clear sheet still reflects light away from the receiver at its two interfaces.
+        // This single planar shadow does not trace colored caustics or accumulate overlapping sheets.
+        val f0 = dielectricF0(lighting.acrylicIor)
+        val materialOpacity = if (view.transparencyEnabled)
+            1.0 - view.transparentFaces * (1.0 - f0) / (1.0 + f0) else 1.0
         val shadowOpacity = SHADOW_OPACITY * lighting.keyLightIntensity /
             (lighting.keyLightIntensity + 1.5 * lighting.fillLightIntensity + 0.8) * materialOpacity
         if (shadowOpacity <= 0.001) return
