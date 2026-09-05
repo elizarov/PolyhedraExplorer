@@ -178,6 +178,12 @@ private class OrbitRotationSum(rotations: List<OrbitRotation>) {
  */
 @OptIn(ExperimentalTime::class)
 suspend fun Polyhedron.canonical(progress: OperationProgressContext?): Polyhedron {
+    if (isCompound) {
+        val members = componentPolyhedra()
+        return compound(members.mapIndexed { index, member ->
+            member.canonical(progress?.subrange(100 * index / members.size, 100 * (index + 1) / members.size))
+        })
+    }
     return canonicalWithFallback(progress)
 }
 

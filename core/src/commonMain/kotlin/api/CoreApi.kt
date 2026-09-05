@@ -509,7 +509,12 @@ private suspend fun applyTransform(
             // intermediate into an apparently valid macro result. Each logical construction stage
             // is part of the operation's geometric meaning and must satisfy the surface contract.
             when (primitiveOutputContract) {
-                PolyhedronContract.RenderableImmersion -> poly.validateRenderableImmersion()
+                PolyhedronContract.RenderableImmersion -> {
+                    poly.validateRenderableImmersion()
+                    if (primitiveInput.isCompound && primitive.support.outputPolicy == TransformOutputPolicy.EmbeddedBoundary) {
+                        poly.componentPolyhedra().forEach { it.validateProperGeometry() }
+                    }
+                }
                 PolyhedronContract.EmbeddedBoundary -> poly.validateProperGeometry()
                 PolyhedronContract.AbstractSurface -> error("Primitive output must be renderable")
             }

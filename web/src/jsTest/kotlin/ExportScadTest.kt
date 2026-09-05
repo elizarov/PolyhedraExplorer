@@ -57,6 +57,27 @@ class ExportScadTest {
     }
 
     @Test
+    fun regularCompoundsExportClosedMembersOrHiddenRimPieces() {
+        for (seed in Seeds.filter { it.type == SeedType.RegularCompounds }) {
+            val poly = seed.poly
+            for (hidden in listOf(false, true)) {
+                val scad = poly.exportSolidToScad(
+                    "compound", seed.tag, exportParams,
+                    hiddenFaceKinds = if (hidden) poly.faceKinds.keys.toSet() else emptySet(),
+                    resolvedRims = if (hidden) poly.resolvedRims(exportParams.rim, exportParams.width) else emptyList(),
+                    embeddedBoundary = false,
+                )
+                assertContains(scad, "union() {")
+                val pieces = Regex("polyhedron\\(").findAll(scad).count()
+                if (hidden) assertTrue(pieces >= poly.fs.size, seed.tag)
+                else assertEquals(poly.components.size, pieces, seed.tag)
+                assertTrue("linear_extrude" !in scad)
+                assertTrue("NaN" !in scad && "Infinity" !in scad)
+            }
+        }
+    }
+
+    @Test
     fun triangulatesConcaveFacesForOpenScad() {
         val scad = concavePrismFixture().exportGeometryToScad("concave", "concave test")
 
@@ -178,7 +199,7 @@ class ExportScadTest {
     @Test
     fun foldedFacesAutomaticallyUseRimPatchUnion(): Promise<Unit> = scope.promise {
         val response = evaluateCore(
-            CoreRequest(CoreState("O", listOf("S", "t"), "c"), rimWidth = exportParams.rim),
+            CoreRequest(CoreState("O", listOf("S", "R", "t"), "c"), rimWidth = exportParams.rim),
         )
         val source = response.poly
         assertTrue(source.nonPlanarFaceKinds.isNotEmpty())

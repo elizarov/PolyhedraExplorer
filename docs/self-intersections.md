@@ -67,15 +67,16 @@ Geometry checks are layered, and each stronger contract contains the preceding g
 
 | Contract | Guarantees | Principal consumers |
 | --- | --- | --- |
-| `AbstractSurface` | One connected, consistently oriented combinatorial two-manifold with valid source incidence | Topological operations, F/E/V, and orbit analysis |
+| `AbstractSurface` | A consistently oriented combinatorial two-manifold with valid source incidence in every component | Topological operations, F/E/V, and orbit analysis |
 | `RenderableImmersion` | Valid resolved-face records with finite, consistently oriented, non-degenerate presentation triangles | WebGL, picking, intersection analysis, and Resolved |
 | `EmbeddedBoundary` | A renderable immersion with no contact between unrelated surface features | Operations that require a physical boundary |
 
 Renderable immersions may contain transverse self-crossings within a source face, intersections
-between unrelated face surfaces, and isolated singular contacts. Persistent line or area overlap,
-coincident distinct source vertices, degenerate source elements, disconnected source components,
-or invalid resolved triangles are rejected. Signed-volume cancellation is not itself an immersion
-error.
+between unrelated face surfaces, and isolated singular contacts. Distinct components may also have
+coincident vertices and coplanar overlap; their IDs remain separate. Coincident distinct vertices
+within one component, degenerate source elements, or invalid resolved triangles are rejected.
+Signed-volume cancellation is not itself an immersion error. Component semantics and matching
+belong to [Compounds](compounds.md).
 
 `analyzeGeometry` reports the strongest satisfied contract. The evaluated core stage carries that
 intersection summary with its response, so the UI can reuse it. `SelfCrossingFace` and
@@ -85,32 +86,34 @@ reaching the renderer.
 
 ## Resolved
 
-`Resolved` (`R`) converts a renderable immersion into one connected embedded boundary of its
-nonzero-winding material. It is a generic geometry operation, not a catalog-seed substitution.
+`Resolved` (`R`) converts a renderable immersion into the embedded boundary of its
+nonzero-winding material, retaining all physical components. It is a generic geometry operation,
+not a catalog-seed substitution. Compound members contribute independent nonzero-winding solids
+whose material is unioned, not canceled against neighboring members.
 Its production path:
 
 1. Takes the presentation triangles supplied by every resolved source face. Each triangle carries
    its cell's absolute face-winding multiplicity into the generalized solid-winding sum; the
    geometric fragment itself is still emitted only once.
 2. Uses sorted bounding intervals to find overlapping triangle candidates.
-3. Splits triangles along actual non-coplanar intersection segments and rejects positive-area
-   coplanar source-face overlap.
+3. Splits triangles along actual non-coplanar intersection segments. Overlapping coplanar compound
+   faces share all arrangement cuts and a deterministic triangulation, so coincident material
+   fragments are deduplicated consistently.
 4. Samples generalized winding on both sides of each resulting fragment and retains only fragments
    separating zero from nonzero winding.
 5. Welds matching fragment vertices with a scale-aware tolerance, cancels duplicate internal
    interfaces, and makes split boundary edges conforming.
 6. Merges adjacent coplanar fragments with the same source set only when their boundary is one
    simple cycle, then removes arrangement-only degree-two points.
-7. Requires exactly two incident faces per physical edge, one connected component, and no more than
+7. Requires exactly two incident faces per physical edge and no more than
    the shared 32,767-edge polyhedron limit.
 8. Builds an outward-oriented polyhedron, records many-to-many source provenance, merges
    geometrically indistinguishable kinds, and validates the result as an embedded boundary.
 
 Resolved is identity on an embedded input, and repeated Resolved makes no further geometric change.
 The explicit transform remains in the chain and can be removed with its recycle action. If
-nonzero-winding material has multiple components, no boundary, unsupported coplanar overlap, or an
-oversized result, Resolved returns a structured error; it never drops components or invents
-connections.
+nonzero-winding material has no valid manifold boundary or an oversized result, Resolved returns
+a structured error; it never drops components or invents connections.
 
 The four Kepler-Poinsot meshes retained as historical embedded fixtures are test oracles only. They
 do not select production Resolved output and are not used by catalog recognition. A resolved solid
@@ -170,7 +173,7 @@ by [Rim geometry](rim_geometry.md). Export postconditions are owned by [Export](
 - Source topology is never rewritten merely to make an immersion renderable.
 - Resolved-face geometry is derived data and never becomes transform input implicitly.
 - Face and solid fill use the same nonzero-winding semantics.
-- A successful Resolved result is one connected embedded boundary; compounds are rejected.
+- A successful Resolved result is an embedded boundary retaining every physical component.
 - Catalog recognition compares authoritative geometry, so Resolved output cannot be proposed as its
   immersed source seed.
 - All numerically sensitive arrangement work runs in the Wasm core or export worker, not in DOM or

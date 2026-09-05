@@ -56,7 +56,7 @@ class ValidatePolyhedra {
     fun validateSeeds() {
         testParameter("seed", Seeds) { seed ->
             val poly = seed.poly
-            if (seed.type == SeedType.KeplerPoinsot) {
+            if (seed.type == SeedType.KeplerPoinsot || seed.type == SeedType.RegularCompounds) {
                 poly.validateRenderableImmersion()
             } else {
                 poly.validate()
@@ -73,6 +73,7 @@ class ValidatePolyhedra {
                 SeedType.Families,
                 SeedType.StarFamilies,
                 SeedType.Catalan,
+                SeedType.RegularCompounds,
                 SeedType.KeplerPoinsot -> Unit
             }
             // check FEV counts

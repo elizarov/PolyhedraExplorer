@@ -179,7 +179,7 @@ class ResolvedRimTest {
     @Test
     fun truncatedStellatedOctahedronUsesSymmetricCenterFacetsAtEveryEquivalentFace() = runTest {
         val response = evaluateCore(
-            CoreRequest(CoreState("O", listOf("S", "t"), "c"), rimWidth = 0.05)
+            CoreRequest(CoreState("O", listOf("S", "R", "t"), "c"), rimWidth = 0.05)
         )
         assertNull(response.error)
         val foldedFaces = response.poly.fs.filterNot { face -> face.isPlanar }

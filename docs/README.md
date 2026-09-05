@@ -14,6 +14,7 @@ specifications.
 - [Architecture](architecture.md) — module boundaries, runtime flow, and invariants.
 - [Non-convex geometry](non-convex.md) — surface validity, shared triangulation, rims, and transform applicability.
 - [Self-intersecting polyhedra](self-intersections.md) — immersed surfaces, nonzero-winding face geometry, Resolved, and intersection UI.
+- [Compounds](compounds.md) — independent component topology, symmetry, transforms, and physical material.
 - [Rim geometry](rim_geometry.md) — face insets, continuous immersed rims, perpendicular thickness, shared joins, and edge cases.
 - [Export](export.md) — STL conversion, OpenSCAD construction, validation, and browser resource limits.
 - [Features](features.md) — user-visible capabilities and supported operations.

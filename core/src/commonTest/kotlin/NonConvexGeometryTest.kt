@@ -63,7 +63,7 @@ class NonConvexGeometryTest {
     }
 
     @Test
-    fun disconnectedClosedSurfacesAreRejectedAsCompound() {
+    fun disconnectedClosedSurfacesAreValidCompounds() {
         val tetrahedron = Seed.Tetrahedron.poly
         val compound = polyhedron {
             tetrahedron.vs.forEach { vertex(it) }
@@ -72,8 +72,8 @@ class NonConvexGeometryTest {
             tetrahedron.fs.forEach { face(it.fvs.map { vertex -> vertex.id + tetrahedron.vs.size }) }
         }
 
-        val failure = assertFailsWith<IllegalArgumentException> { compound.validateMeshGeometry() }
-        assertContains(failure.message.orEmpty(), "2 disconnected surface components")
+        compound.validateProperGeometry()
+        assertEquals(2, compound.components.size)
     }
 
     @Test

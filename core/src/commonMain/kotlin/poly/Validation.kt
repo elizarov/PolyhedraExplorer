@@ -33,9 +33,9 @@ fun Polyhedron.validateRenderableImmersion() {
         require(v.directedEdges.isNotEmpty()) { "$v is not part of the surface" }
     }
     val lengthTolerance = EPS * circumradius
-    val areaTolerance = lengthTolerance * circumradius
     for (first in vs.indices) for (second in (first + 1) until vs.size) {
-        require((vs[first] - vs[second]).norm > lengthTolerance) {
+        require(vertexComponentIds[first] != vertexComponentIds[second] ||
+            (vs[first] - vs[second]).norm > lengthTolerance) {
             "Distinct source vertices $first and $second have coincident positions"
         }
     }
@@ -60,31 +60,22 @@ fun Polyhedron.validateRenderableImmersion() {
             val a = resolved.vertices[triangle.a].position
             val b = resolved.vertices[triangle.b].position
             val c = resolved.vertices[triangle.c].position
-            val normal = (b - a) cross (c - a)
-            require(normal.norm > areaTolerance) { "$f has a degenerate triangle" }
+            val ab = b - a
+            val ac = c - a
+            val bc = c - b
+            val normal = ab cross ac
+            // Resolved intersections can create tiny but well-shaped triangles on a large
+            // surface. Degeneracy is an aspect-ratio test, not a global minimum face area.
+            val areaTolerance = EPS * maxOf(ab * ab, ac * ac, bc * bc)
+            require(normal.norm > areaTolerance) { "$f has a degenerate triangle: $a, $b, $c; area2=${normal.norm}, tolerance=$areaTolerance" }
             require(normal * f > EPS * normal.norm) {
                 "$f has inconsistent resolved-triangle orientation"
             }
         }
     }
 
-    // A disconnected closed mesh is a compound (or an unused nested shell), not one polyhedron.
-    val visited = HashSet<Face>()
-    var componentCount = 0
-    for (first in fs) {
-        if (first in visited) continue
-        componentCount++
-        val pending = ArrayDeque<Face>()
-        pending += first
-        while (pending.isNotEmpty()) {
-            val face = pending.removeFirst()
-            if (!visited.add(face)) continue
-            for (edge in face.directedEdges) pending += edge.l
-        }
-    }
-    require(componentCount == 1) {
-        "Polyhedron has $componentCount disconnected surface components"
-    }
+    // Every vertex still has one manifold fan (checked by Polyhedron). Multiple closed
+    // components are compounds, not malformed surfaces.
 }
 
 /** Legacy rendering/export gate: renderable plus positive aggregate signed volume. */

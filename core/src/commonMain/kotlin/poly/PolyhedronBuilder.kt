@@ -129,6 +129,8 @@ class PolyhedronBuilder(
         )
         // return the result if face kind merging is not requested
         if (!mergeIndistinguishableKinds) return poly
+        // Local edge figures cannot tell apart component arrangements or chiral member sets.
+        if (poly.isCompound) return poly.withGeometricKinds()
         // Group indistinguishable face kinds
         val ge = poly.isoEdges.groupIndistinguishable()
         val gk = ge.mapTo(HashSet()) { list ->

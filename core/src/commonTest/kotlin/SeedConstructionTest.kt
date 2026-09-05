@@ -3,6 +3,7 @@ package polyhedra.core
 import kotlinx.coroutines.test.runTest
 import polyhedra.core.api.evaluateCore
 import polyhedra.core.poly.Seeds
+import polyhedra.core.transform.toTransformOrNull
 import polyhedra.model.api.CoreRequest
 import polyhedra.model.api.CoreState
 import polyhedra.model.api.TransformMacros
@@ -23,7 +24,7 @@ class SeedConstructionTest {
             )
 
             assertNull(response.error, edge.description)
-            assertEquals(edge.transformTags, response.validTransformTags, edge.description)
+            assertEquals(edge.transformTags.map { it.toTransformOrNull()?.tag }, response.validTransformTags, edge.description)
             assertEquals(edge.targetTag, response.recognizedSeedTag, edge.description)
         }
     }
@@ -31,7 +32,7 @@ class SeedConstructionTest {
     @Test
     fun diagramReachesEveryFixedSeedFromTetrahedronUsingOnlyPrimitives() {
         assertEquals(
-            58,
+            66,
             DIAGRAM_CONSTRUCTION_EDGES.size,
             "Keep the documented directed-edge count current",
         )
@@ -96,6 +97,16 @@ private val DIAGRAM_CONSTRUCTION_EDGES = listOf(
     edge("O", "d", "C"),
     edge("T", "s", "I"),
     edge("I", "d", "D"),
+
+    // Regular compounds: geometric stellation circuits and memberwise duality.
+    edge("O", "S", "C2T"),
+    edge("I", "S~l=3", "C5O"),
+    edge("I", "S~l=8", "C10T"),
+    edge("I", "S~l=7", "C5T"),
+    edge("I", "S~l=6", "C5T'"),
+    edge("C5O", "d", "C5C"),
+    edge("C5C", "d", "C5O"),
+    edge("daD", "S~l=5", "C5C"),
 
     // Kepler-Poinsot regular stars and their classical duality.
     edge("D", "S", "SD"),

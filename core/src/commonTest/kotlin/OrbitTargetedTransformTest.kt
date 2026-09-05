@@ -134,7 +134,8 @@ class OrbitTargetedTransformTest {
             val poly = seed.poly
             for (transform in poly.availableOrbitTransforms) {
                 if (transform is KisFace || transform is TruncateVertex || transform is RectifyVertex) {
-                    poly.transformed(transform).validate()
+                    val result = poly.transformed(transform)
+                    if (poly.isCompound) result.validateRenderableImmersion() else result.validate()
                 }
             }
         }

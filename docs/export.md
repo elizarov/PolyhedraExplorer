@@ -39,11 +39,11 @@ partial, open, intersecting, or resource-truncated mesh.
    and rim extrusions retain piece identities, allowing winding tests to reject non-overlapping
    bounding boxes and classify large pieces by accelerated ray crossings without changing Boolean
    semantics.
-4. Require one connected, outward-oriented edge-closed boundary and keep the corefined arrangement
+4. Require an outward-oriented edge-closed boundary, retaining every material component, and keep the corefined arrangement
    triangulated. The STL path does not reconstruct source-style polygon faces or require one source
    vertex fan at a high-winding point junction.
 5. Quantize coordinates to eight decimal places, rebuild indexed triangles, orient positive volume,
-   and recheck exact edge incidence, orientation, connectivity, and finite coordinates. The
+   and recheck exact edge incidence, orientation, and finite coordinates on every shell. The
    arrangement has already performed the surface-intersection validation, and final rounding is
    finer than its weld tolerance.
 6. Serialize ASCII STL only after the independent final-mesh checks succeed.
@@ -54,7 +54,8 @@ plane. That conservative fallback can make farther face orbits thicker, but neve
 configured width.
 
 The final mesh requires finite non-degenerate triangles, two oppositely directed uses of every
-edge, one connected component, outward positive volume, and no duplicate triangles. The
+edge, outward positive material volume, and no duplicate triangles. Separate closed components are
+valid; intersecting compound members are unioned before serialization. The
 arrangement has already selected the solid boundary before quantization. These are postconditions
 of STL conversion, not properties inferred from the input `Polyhedron`.
 
@@ -89,11 +90,14 @@ OpenSCAD receives polygonal construction geometry and owns final tessellation an
 evaluation. It does not call the STL arrangement and remains available after an STL topology or
 resource error.
 
-Two output forms are used:
+The output form follows the geometry:
 
 - **Closed polyhedron.** An already embedded presentation with every face visible and zero face
   expansion is emitted as one `polyhedron`. Planar resolved cells remain polygon cycles; simple
   non-planar faces use their deterministic triangles.
+- **Closed compound.** With every face visible, zero expansion, and convex members, an explicit
+  `union()` contains each member's closed `polyhedron`. Shared positions are welded only within a
+  member. OpenSCAD performs their Boolean union; the compound is not exported as a hollow shell.
 - **Piece union.** An immersed presentation, hidden face orbit, or nonzero expansion is emitted as
   one explicit `union()` of individually closed face or rim pieces. At zero expansion each piece is
   a `polyhedron` whose bottom vertices use the same equal-offset face-plane joins as WebGL and STL;
@@ -110,7 +114,11 @@ engine removes internal walls and produces the final solid when the script is re
 Focused core tests cover presentation construction, arrangement, quantization, final STL
 validation, every resource guard, deterministic output, and the no-partial-download rule. Structural
 OpenSCAD tests distinguish closed-polyhedron and piece-union output, verify closed mitered pieces,
-and cover regular, asymmetric, immersed, and folded fixtures.
+and cover regular, asymmetric, immersed, and folded fixtures. All five regular compounds are tested
+with full faces and hidden rims through STL conversion and OpenSCAD generation. A separated-member
+fixture verifies that valid disconnected material is retained. Geometry validation uses local
+triangle scale for degeneracy and intersection contacts, so tiny valid arrangement fragments are
+not rejected solely because the complete model is much larger.
 Shared regressions include immersed catalog solids, concave and non-planar faces,
 expanded pieces, hidden rims, Prism 5/2 with hidden caps, all-rim Antiprism 5/2 and Antiprism 7/3,
 the acute triangular rims of resolved Bipyramid 7/2, and Pyramid 7/2 with either only its immersed

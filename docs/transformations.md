@@ -122,6 +122,11 @@ names and immersion semantics are defined in
 | Greatened, Stellated | Planar authoritative faces produce a valid finite face-plane constellation | Renderable immersion |
 | Resolved | Valid resolved-face planar arrangement | Embedded boundary |
 
+For compounds, local prerequisites apply to every affected member. An embedded-output policy is
+validated separately on each member, whose intersections with other members remain permissible.
+Resolved alone requires the combined physical boundary to be embedded. Canonicalizable topology
+means a sphere per member. Star operations can have no further result, as for Two tetrahedra.
+
 Macros use the domain of their realized primitive sequence or fused kernel. They cannot use a later
 stage to conceal an undefined intermediate. Dynamic parameter ranges run the same output validation
 as the selected operation.
@@ -556,14 +561,15 @@ below.
 Greatening is implemented as generic symmetric faceting of the polar dual. Source faces become
 dual vertices; candidate planes through those vertices supply convex and regular-star circuits.
 The full geometric point group expands each circuit into a face orbit, and an exact-cover search
-combines orbit sets that use every dual vertex and every edge exactly twice. Each connected valid
+combines orbit sets that use every dual vertex and every edge exactly twice. Each valid manifold
 faceting is reciprocated and aligned back to the source planes. There is no catalog-specific
 construction or fallback; catalog recognition runs only on the completed result.
 
-Every result therefore keeps exactly one authoritative face on every source face plane, so `F`
-is unchanged, while its face boundary, `E`, and `V` may change. Generic ordering first minimizes
-changes to the source faces' side counts and winding steps, then total cyclic changes and circuit
-radius. This geometry-only ordering makes the classical result the default without naming it in
+Every result retains all source face planes. Independent vertex fans can produce compound members,
+with several faces on one plane; coincident source planes are treated as one geometric constraint.
+Generic ordering first minimizes face-count changes, then changes to the source faces' side counts
+and winding steps, total cyclic changes, and circuit radius. This geometry-only ordering makes the
+classical result the default without naming it in
 the algorithm. It produces the classical identities:
 
 | Input | Output |
@@ -579,9 +585,9 @@ and kind signature. If several strict extensions survive, the Result setting sel
 generic order above. A missing or out-of-range result reports
 `TransformNotApplicable` rather than substituting a catalog mesh.
 
-Greatening and Stellated are related but distinct. Greatening facets the polar dual and preserves
-one face per source plane. Stellated fills a complete cell-power stratum of the source plane
-arrangement; a source plane may contribute several output faces, so its face count commonly grows.
+Greatening and Stellated are related but distinct. Greatening facets the polar dual and prioritizes
+face-count-preserving extensions. Stellated constructs cell-power strata and symmetric circuit
+orbits of the source plane arrangement; its face count commonly grows. Both can produce compounds.
 Distinct nonzero-winding presentation cells inside one self-crossing Greatened face remain derived
 geometry and do not create additional authoritative face orbits. Applying Resolved promotes the
 embedded physical boundary and classifies its completed faces into their own proper-rotation
@@ -610,15 +616,20 @@ to the input surface.
 Stellation constructs the bounded arrangement of all authoritative source-face planes. Each
 arrangement cell is identified by the set of source planes crossed from the convex core, so its
 cell power is its exact graph distance from that core. The main line adds complete successive
-power strata. It reconstructs a connected immersed source surface when the plane-diagram
-boundaries form one, and otherwise retains the proper physical stratum boundary. Results are
-ordered from the closest supported stratum outwards.
+power strata. It reconstructs an immersed source surface, including independent compound members,
+when plane-diagram boundaries close, and otherwise retains the proper physical stratum boundary.
+Additional circuits are expanded under proper rotations and the full point group. Non-coprime
+ring steps contribute their separate closed circuits rather than being discarded.
 
 The candidate search is entirely geometry-based: it does not inspect seed tags, catalog names, or
-stored catalog meshes. Disconnected source surfaces (compounds), open incidence, collapsed edges,
-non-planar sources, and invalid immersed surfaces are discarded. In particular, the icosahedron's
-`C` stratum is the compound of five octahedra and is not offered. Its supported main line therefore
-contains `B`, `D`, `E`, `F`, `G`, and `H`; `G` is recognized afterward as the Great icosahedron.
+stored catalog meshes. Open incidence, collapsed edges, non-planar sources, and invalid immersed
+surfaces are discarded. The icosahedron's main line includes `B` through `H`, including `C` (Five
+octahedra). Circuit orbits additionally discover both chiral Five tetrahedra arrangements and their
+Ten tetrahedra union. An octahedron produces Two tetrahedra, and Rhombic triacontahedron produces
+Five cubes. A compound is not merged with another
+source surface merely because their resolved physical envelopes coincide.
+Results sort by mean face-circuit radius, then stratum (when present) and F/E/V, with a rotation-invariant, handed geometric
+tie-breaker. Radius ties use a geometric tolerance to keep numbering stable across orientations.
 Each surviving candidate derives its face and vertex kinds from the geometric automorphism orbits
 of the generated surface; edge kinds follow from their endpoint and incident-face kinds. One source
 face plane can therefore contribute several distinct face orbits in a later stratum, and those
@@ -633,7 +644,7 @@ The classical dodecahedral results are:
 The dodecahedron's three outward strata are Stellated dodecahedron, Great dodecahedron, and Great
 stellated dodecahedron in that order. Consequently, both `D -> G -> S` and `D -> S -> G` reach the
 great stellated dodecahedron. A qualifying non-catalog input is transformed directly from its own
-planes. The Result gear enumerates only surviving supported strata; Result 1 is the closest and is
+planes. The Result gear enumerates surviving strata and compound circuits; Result 1 is the closest and is
 omitted from serialization, while later results use `S~l=n`. A non-first result is shown as an HTML
 subscript on the Stellated transform pill and as `_n` in generated export filenames. The slider's
 compact tap controls share the popup's bottom action row with Reset, select the previous or next

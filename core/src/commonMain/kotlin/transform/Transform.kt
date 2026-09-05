@@ -50,7 +50,10 @@ sealed class Transform : Tagged {
         val outputContract = when (support.outputPolicy) {
             TransformOutputPolicy.Preserve -> inputAnalysis.strongestContract
             TransformOutputPolicy.RenderableImmersion -> PolyhedronContract.RenderableImmersion
-            TransformOutputPolicy.EmbeddedBoundary -> PolyhedronContract.EmbeddedBoundary
+            TransformOutputPolicy.EmbeddedBoundary -> if (poly.isCompound && id.operation != TransformOperation.Resolved) {
+                // Each member can remain embedded while members intersect each other.
+                PolyhedronContract.RenderableImmersion
+            } else PolyhedronContract.EmbeddedBoundary
         }
         val rejection = when {
             inputAnalysis.strongestContract.ordinal < support.inputContract.ordinal ->

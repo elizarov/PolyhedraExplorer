@@ -10,6 +10,11 @@ A **canonical representation** is the normalized geometric realization of a poly
 
 The representation is unique up to rotation and reflection. **Canonicalization** is the iterative numerical operation used to find that representation. The UI names this operation `Canonical`.
 
+For a [compound](compounds.md), this statement applies to each member individually, not to the
+relative arrangement of all members. The solver processes members independently in their existing
+orientation and combines them at the common origin and edge-tangency scale; it does not try to
+separate intersecting members or find a unique compound arrangement.
+
 ## Processing model
 
 The implementation uses an edge-nearpoint/circle-packing relaxation derived from the Koebe-Andreev-Thurston construction and the algorithm implemented by [Antiprism](https://github.com/antiprism/antiprism/blob/master/base/canonical.cc).

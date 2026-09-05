@@ -52,17 +52,17 @@ class FacePlaneConstellationTest {
     }
 
     @Test
-    fun icosahedronMainLineFiltersCompoundsAndKeepsEverySupportedStratum() = runTest {
+    fun icosahedronMainLineIncludesCompoundsAndKeepsEverySupportedStratum() = runTest {
         val candidates = Seed.Icosahedron.poly
             .stellationCandidatesAsync(ConstellationOperation.Stellate)
 
-        assertEquals(6, candidates.size, candidates.map { candidate ->
+        assertEquals(10, candidates.size, candidates.map { candidate ->
             Triple(candidate.fev, candidate.poly.recognizedSeedOrNull()?.tag, candidate.poly.isConvexGeometry)
         }.toString())
-        assertEquals(listOf(1, 3, 4, 5, 6, 7), candidates.map { candidate -> candidate.stratum })
+        assertTrue(candidates.mapNotNull { it.stratum }.containsAll(listOf(1, 2, 3, 4, 5, 6, 7)))
         assertEquals(1, candidates.count { candidate -> candidate.poly.recognizedSeedOrNull()?.tag == "GI" })
         assertTrue(candidates.all { candidate -> runCatching { candidate.poly.validateRenderableImmersion() }.isSuccess })
-        assertTrue(candidates.all { candidate -> candidate.poly.surfaceComponentCountForTest() == 1 })
+        assertTrue(candidates.any { candidate -> candidate.poly.isCompound })
         candidates.forEach { candidate -> candidate.poly.assertKindsMatchGeometricOrbits() }
     }
 
@@ -148,13 +148,13 @@ class FacePlaneConstellationTest {
         val range = response.transformTweakRanges.single().single()
 
         assertEquals(1.0, range.min)
-        assertEquals(6.0, range.max)
-        assertEquals(listOf(1, 2, 3, 4, 5, 6), range.options.map { option -> option.value })
+        assertEquals(10.0, range.max)
+        assertEquals((1..10).toList(), range.options.map { option -> option.value })
         assertEquals(response.poly.fev(), range.options.first().fev)
 
-        val farthest = evaluateCore(CoreRequest(CoreState("I", listOf("S~l=6"), "c")))
+        val farthest = evaluateCore(CoreRequest(CoreState("I", listOf("S~l=10"), "c")))
         assertEquals(null, farthest.error)
-        assertEquals(6.0, farthest.validTransformTags.single().parseTransformTag()?.tweaks?.get(TransformTweak.StellationResult))
+        assertEquals(10.0, farthest.validTransformTags.single().parseTransformTag()?.tweaks?.get(TransformTweak.StellationResult))
         farthest.poly.validateRenderableImmersion()
     }
 
@@ -174,21 +174,4 @@ private fun Polyhedron.assertKindsMatchGeometricOrbits() {
     val orbits = analyzeSymmetry().orbitCounts
     assertEquals(orbits.f, faceKinds.size, "face kinds for $orbits / ${fev()}")
     assertEquals(orbits.v, vertexKinds.size, "vertex kinds for $orbits / ${fev()}")
-}
-
-private fun Polyhedron.surfaceComponentCountForTest(): Int {
-    val visited = hashSetOf<Int>()
-    var components = 0
-    for (first in fs) {
-        if (first.id in visited) continue
-        components++
-        val pending = ArrayDeque<Int>()
-        pending += first.id
-        while (pending.isNotEmpty()) {
-            val face = fs[pending.removeFirst()]
-            if (!visited.add(face.id)) continue
-            face.directedEdges.mapTo(pending) { edge -> edge.l.id }
-        }
-    }
-    return components
 }

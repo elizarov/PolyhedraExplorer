@@ -19,7 +19,7 @@ class SymmetryTest {
     fun catalogSymmetryMatchesDeclaredPointGroupsAndKinds() {
         val tetrahedralTags = setOf("T", "tT", "dtT")
         val octahedralTags = setOf(
-            "C", "O", "aC", "tC", "tO", "eC", "bC", "sC", "sC'",
+            "C", "O", "C2T", "aC", "tC", "tO", "eC", "bC", "sC", "sC'",
             "daC", "dtC", "dtO", "deC", "dbC", "dsC", "dsC'",
         )
         for (seed in Seeds) {

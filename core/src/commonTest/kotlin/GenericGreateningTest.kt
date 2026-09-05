@@ -163,7 +163,7 @@ class GenericGreateningTest {
         )
 
         assertNull(response.error, response.error?.detail)
-        assertEquals(33.0, response.transformTweakRanges.single().single().max)
+        assertEquals(47.0, response.transformTweakRanges.single().single().max)
         response.poly.validateRenderableImmersion()
         assertEquals(response.poly.fs.size, response.resolvedRims.size)
     }

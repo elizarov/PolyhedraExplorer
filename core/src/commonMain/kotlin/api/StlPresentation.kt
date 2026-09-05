@@ -247,8 +247,9 @@ private class PresentationMeshBuilder(
     }
 
     fun addMiteredFace(face: Face, geometry: ResolvedFaceGeometry, joins: FaceThicknessJoins) {
-        addFace(face, geometry, inner = false, solid = MITERED_SHELL_SOLID)
-        addFace(face, geometry, inner = true, solid = MITERED_SHELL_SOLID) { point ->
+        val solid = settings.poly.vertexComponentIds[face.fvs.first().id]
+        addFace(face, geometry, inner = false, solid = solid)
+        addFace(face, geometry, inner = true, solid = solid) { point ->
             joins.direction(face, point)
         }
     }
@@ -338,7 +339,7 @@ private class PresentationMeshBuilder(
                 patchNormal
             }
         }
-        val solid = MITERED_SHELL_SOLID
+        val solid = settings.poly.vertexComponentIds[face.fvs.first().id]
         addMiteredRimSurface(region, regionFace, face, inner = false, solid = solid) { patchNormal }
         addMiteredRimSurface(
             region,
@@ -424,8 +425,4 @@ private class PresentationMeshBuilder(
         return CoreStlRequest(vertices, triangles)
     }
 
-    private companion object {
-        /** One watertight presentation shell whose coplanar pieces may be merged before resolving. */
-        const val MITERED_SHELL_SOLID = 0
-    }
 }

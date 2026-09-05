@@ -138,7 +138,7 @@ private suspend fun Polyhedron.resolvedSurface(
         maximumEdges = maximumEdges,
         provenanceSource = this.takeIf { retainProvenance },
         mergeFaces = true,
-        allowCoplanarOverlap = false,
+        allowCoplanarOverlap = isCompound,
         toleranceFloor = 0.0,
         validateResult = true,
     )
@@ -194,6 +194,15 @@ private suspend fun resolveBoundary(
     val windingClassifier = WindingClassifier(source, tolerance)
 
     val cuts = List(source.size) { mutableListOf<CutLine>() }
+    val coplanarParents = IntArray(source.size) { it }
+    fun coplanarRoot(index: Int): Int {
+        var current = index
+        while (coplanarParents[current] != current) {
+            coplanarParents[current] = coplanarParents[coplanarParents[current]]
+            current = coplanarParents[current]
+        }
+        return current
+    }
     val ordered = source.indices.sortedWith(compareBy({ source[it].minX }, { it }))
     for (firstPosition in ordered.indices) {
         val firstIndex = ordered[firstPosition]
@@ -216,6 +225,7 @@ private suspend fun resolveBoundary(
                 // triangle.
                 second.edges.forEach { edge -> cuts[firstIndex].addCut(first, edge, tolerance) }
                 first.edges.forEach { edge -> cuts[secondIndex].addCut(second, edge, tolerance) }
+                coplanarParents[coplanarRoot(firstIndex)] = coplanarRoot(secondIndex)
                 continue
             }
             triangleIntersectionSegment(first, second, tolerance)?.let { segment ->
@@ -226,10 +236,26 @@ private suspend fun resolveBoundary(
         progress?.reportProgress(35 * (firstPosition + 1) / ordered.size)
     }
 
+    // Every overlapping coplanar source must see the same arrangement lines, including cuts
+    // introduced by third-party faces. Otherwise identical material gets incompatible partitions.
+    for (group in source.indices.groupBy(::coplanarRoot).values) if (group.size > 1) {
+        val combined = arrayListOf<CutLine>()
+        for (index in group) for (cut in cuts[index]) if (combined.none {
+            (it.normal - cut.normal).norm <= EPS * 32.0 && abs(it.distance - cut.distance) <= tolerance
+        }) combined += cut
+        group.forEach { cuts[it].clear(); cuts[it].addAll(combined) }
+    }
     val fragments = ArrayList<OrientedTriangle>()
     for ((index, triangle) in source.withIndex()) {
         val polygons = triangle.splitBy(cuts[index], tolerance)
-        for (polygon in polygons) {
+        for (rawPolygon in polygons) {
+            // A canonical fan root makes coincident arrangement cells triangulate identically.
+            val first = rawPolygon.indices.minWith(compareBy(
+                { kotlin.math.round(rawPolygon[it].x / tolerance).toLong() },
+                { kotlin.math.round(rawPolygon[it].y / tolerance).toLong() },
+                { kotlin.math.round(rawPolygon[it].z / tolerance).toLong() },
+            ))
+            val polygon = List(rawPolygon.size) { rawPolygon[(first + it) % rawPolygon.size] }
             for (fanIndex in 1 until polygon.lastIndex) {
                 val fragment = OrientedTriangle(
                     polygon[0],
@@ -289,13 +315,6 @@ private suspend fun resolveBoundary(
             "Resolved boundary exceeds the $maximumEdges-edge limit",
         )
     }
-    val componentCount = boundary.componentCount(boundaryEdges)
-    if (componentCount != 1) {
-        throw TransformApplicabilityException(
-            CoreIssueCode.DisconnectedMaterial,
-            "Resolved produced $componentCount disconnected material components",
-        )
-    }
     progress?.reportProgress(90)
     return boundary
 }
@@ -339,6 +358,7 @@ private fun Polyhedron.resolvedSurfaceTriangles(): List<SourceTriangle> = fs.fla
                 resolved.vertices[triangle.b].position,
                 resolved.vertices[triangle.c].position,
                 windingMultiplicity = abs(cell.winding),
+                solidId = if (isCompound) vertexComponentIds[face.fvs.first().id] else -1,
             )
         }
     }
@@ -904,28 +924,6 @@ private fun PolygonBoundary.edgeKeys(): Set<IndexEdge> = buildSet {
     for (face in faceVertexIds) for (index in face.indices) {
         add(indexEdge(face[index], face[(index + 1) % face.size]))
     }
-}
-
-private fun PolygonBoundary.componentCount(edges: Set<IndexEdge>): Int {
-    val neighbors = HashMap<Int, MutableSet<Int>>()
-    for (edge in edges) {
-        neighbors.getOrPut(edge.a, ::linkedSetOf) += edge.b
-        neighbors.getOrPut(edge.b, ::linkedSetOf) += edge.a
-    }
-    val visited = HashSet<Int>()
-    var count = 0
-    for (start in neighbors.keys.sorted()) {
-        if (start in visited) continue
-        count++
-        val pending = ArrayDeque<Int>()
-        pending += start
-        while (pending.isNotEmpty()) {
-            val current = pending.removeFirst()
-            if (!visited.add(current)) continue
-            pending.addAll(neighbors[current].orEmpty())
-        }
-    }
-    return count
 }
 
 private data class PolygonRecord(

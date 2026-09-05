@@ -11,8 +11,15 @@ import polyhedra.model.api.PointGroupSuffix
 import polyhedra.model.poly.Edge
 import polyhedra.model.poly.FEV
 import polyhedra.model.poly.Face
+import polyhedra.model.poly.FaceKind
+import polyhedra.model.poly.MutableFace
+import polyhedra.model.poly.MutableFaceKindSource
+import polyhedra.model.poly.MutableVertex
 import polyhedra.model.poly.Polyhedron
 import polyhedra.model.poly.Vertex
+import polyhedra.model.poly.VertexKind
+import polyhedra.model.poly.Scale
+import polyhedra.model.poly.IsoDir
 import polyhedra.model.poly.len
 import polyhedra.model.util.MutableVec3
 import polyhedra.model.util.Vec3
@@ -89,6 +96,37 @@ internal fun Polyhedron.geometricOrbitDetails(): GeometricOrbitDetails {
     )
 }
 
+/** Catalogue equivalence for whole compounds includes the members' relative orientation. */
+internal fun Polyhedron.matchesCompoundGeometry(other: Polyhedron): Boolean {
+    val source = scaled(Scale.Circumradius)
+    val target = other.scaled(Scale.Circumradius)
+    val tolerance = SYMMETRY_TOLERANCE * 8.0
+    val edge = source.directedEdges.first()
+    val frame = edgeFrame(edge, tolerance) ?: return false
+    return target.directedEdges.any { candidate ->
+        if (!edge.hasMatchingGeometry(candidate, tolerance, reverseSides = false)) return@any false
+        val targetFrame = edgeFrame(candidate, tolerance) ?: return@any false
+        source.geometricVertexPermutation(target, OrthogonalTransform(frame, targetFrame, 1), 1, tolerance) != null
+    }
+}
+
+internal fun Polyhedron.withGeometricKinds(): Polyhedron {
+    val orbits = geometricOrbitDetails()
+    val vertexKinds = IntArray(vs.size)
+    val faceKinds = IntArray(fs.size)
+    orbits.vertexOrbits.forEachIndexed { kind, ids -> ids.forEach { vertexKinds[it] = kind } }
+    orbits.faceOrbits.forEachIndexed { kind, ids -> ids.forEach { faceKinds[it] = kind } }
+    val vertices = vs.map { MutableVertex(it.id, it, VertexKind(vertexKinds[it.id])) }
+    val faces = fs.map { face ->
+        MutableFace(face.id, face.fvs.map { vertices[it.id] }, FaceKind(faceKinds[face.id]))
+    }
+    val sources = fs.map { face ->
+        val oldSource = faceKindSources?.firstOrNull { it.kind == face.kind }?.source ?: face.kind
+        MutableFaceKindSource(FaceKind(faceKinds[face.id]), oldSource)
+    }.distinct()
+    return Polyhedron(vertices, faces, sources, resolvedTopologyProvenance = resolvedTopologyProvenance)
+}
+
 internal fun Polyhedron.geometricSymmetryOperations(): GeometricSymmetryOperations {
     val radius = circumradius.coerceAtLeast(1.0)
     val tolerance = radius * SYMMETRY_TOLERANCE
@@ -104,7 +142,9 @@ internal fun Polyhedron.geometricSymmetryOperations(): GeometricSymmetryOperatio
         val targetFrame = edgeFrame(targetEdge, tolerance) ?: continue
         if (sourceEdge.hasMatchingGeometry(targetEdge, tolerance, reverseSides = false)) {
             symmetryOperation(sourceFrame, targetFrame, orientation = 1, vertexIndex, topology)
-                ?.let(proper::add)
+                ?.let { operation ->
+                    if (proper.none { it.transform.approximatelyEquals(operation.transform) }) proper += operation
+                }
         }
         if (improperSeed == null && sourceEdge.hasMatchingGeometry(targetEdge, tolerance, reverseSides = true)) {
             improperSeed = symmetryOperation(
@@ -200,6 +240,11 @@ private fun Polyhedron.symmetryOperation(
     topology: SymmetryTopology,
 ): GeometricSymmetryOperation? {
     val transform = OrthogonalTransform(source, target, orientation)
+    if (isCompound) {
+        val permutation = geometricVertexPermutation(this, transform, orientation, circumradius.coerceAtLeast(1.0) * SYMMETRY_TOLERANCE)
+            ?: return null
+        return GeometricSymmetryOperation(transform, permutation, orientation)
+    }
     val permutation = IntArray(vs.size)
     for (vertex in vs) {
         permutation[vertex.id] = vertexIndex.find(transform(vertex)) ?: return null
@@ -208,11 +253,71 @@ private fun Polyhedron.symmetryOperation(
     return GeometricSymmetryOperation(transform, permutation, orientation)
 }
 
+/** Matches complete oriented component maps, not just possibly coincident vertex positions. */
+internal fun Polyhedron.geometricVertexPermutation(
+    target: Polyhedron,
+    transform: OrthogonalTransform,
+    orientation: Int,
+    tolerance: Double,
+): IntArray? {
+    if (vs.size != target.vs.size || es.size != target.es.size || fs.size != target.fs.size ||
+        components.size != target.components.size) return null
+    val positions = vs.map(transform::invoke)
+    val permutation = IntArray(vs.size) { -1 }
+    val occupiedComponents = hashSetOf<Int>()
+    for (component in components) {
+        val start = component.first().directedEdges.first()
+        var match: Map<Int, Int>? = null
+        for (candidate in target.directedEdges) {
+            if (target.vertexComponentIds[candidate.a.id] in occupiedComponents ||
+                (positions[start.a.id] - candidate.a).norm > tolerance ||
+                (positions[start.b.id] - candidate.b).norm > tolerance) continue
+            val mapped = hashMapOf<Int, Int>()
+            val inverse = hashMapOf<Int, Int>()
+            val darts = hashMapOf<Long, Long>()
+            val pending = ArrayDeque<Pair<Edge, Edge>>()
+            pending += start to candidate
+            var valid = true
+            while (pending.isNotEmpty() && valid) {
+                val (a, b) = pending.removeFirst()
+                val sourceKey = directedEdgeKey(a.a.id, a.b.id)
+                val targetKey = directedEdgeKey(b.a.id, b.b.id)
+                val previous = darts.put(sourceKey, targetKey)
+                if (previous != null) {
+                    if (previous != targetKey) valid = false
+                    continue
+                }
+                for ((sv, tv) in listOf(a.a to b.a, a.b to b.b)) {
+                    if ((positions[sv.id] - tv).norm > tolerance ||
+                        mapped[sv.id]?.let { it != tv.id } == true ||
+                        inverse[tv.id]?.let { it != sv.id } == true) { valid = false; break }
+                    mapped[sv.id] = tv.id
+                    inverse[tv.id] = sv.id
+                }
+                if (!valid) break
+                pending += a.reversed to b.reversed
+                pending += a.next(IsoDir.R) to b.next(if (orientation > 0) IsoDir.R else IsoDir.L)
+            }
+            if (valid) { match = mapped; break }
+        }
+        val matched = match ?: return null
+        matched.forEach { (a, b) -> permutation[a] = b }
+        occupiedComponents += target.vertexComponentIds[matched.getValue(start.a.id)]
+    }
+    return permutation.takeIf { it.all { id -> id >= 0 } }
+}
+
 internal class OrthogonalTransform(
     val xx: Double, val xy: Double, val xz: Double,
     val yx: Double, val yy: Double, val yz: Double,
     val zx: Double, val zy: Double, val zz: Double,
 ) {
+    fun approximatelyEquals(other: OrthogonalTransform): Boolean =
+        abs(xx - other.xx) < MATRIX_TOLERANCE && abs(xy - other.xy) < MATRIX_TOLERANCE &&
+            abs(xz - other.xz) < MATRIX_TOLERANCE && abs(yx - other.yx) < MATRIX_TOLERANCE &&
+            abs(yy - other.yy) < MATRIX_TOLERANCE && abs(yz - other.yz) < MATRIX_TOLERANCE &&
+            abs(zx - other.zx) < MATRIX_TOLERANCE && abs(zy - other.zy) < MATRIX_TOLERANCE &&
+            abs(zz - other.zz) < MATRIX_TOLERANCE
     constructor(source: OrthonormalFrame, target: OrthonormalFrame, orientation: Int) : this(
         xx = target.radial.x * source.radial.x + target.tangent.x * source.tangent.x +
             orientation * target.bitangent.x * source.bitangent.x,
@@ -367,15 +472,34 @@ private fun Polyhedron.symmetryOrbits(operations: List<GeometricSymmetryOperatio
     val edgeSets = DisjointSets(es.size)
     val faceSets = DisjointSets(fs.size)
     val topology = SymmetryTopology(this)
-    for (operation in operations) {
-        val permutation = operation.vertexPermutation
+    fun merge(permutation: IntArray, orientation: Int) {
         for (vertex in vs) vertexSets.union(vertex.id, permutation[vertex.id])
         for ((edgeIndex, edge) in es.withIndex()) {
             val target = requireNotNull(topology.edgeIndex(permutation[edge.a.id], permutation[edge.b.id]))
             edgeSets.union(edgeIndex, target)
         }
         for ((faceIndex, face) in fs.withIndex()) {
-            faceSets.union(faceIndex, requireNotNull(topology.targetFaceId(permutation, face, operation.orientation)))
+            faceSets.union(faceIndex, requireNotNull(topology.targetFaceId(permutation, face, orientation)))
+        }
+    }
+    for (operation in operations) merge(operation.vertexPermutation, operation.orientation)
+    if (isCompound) {
+        // Completely coincident members can be exchanged by the identity rotation. Count these
+        // lifts in element orbits, but never as extra rotations in the geometric point group.
+        val members = componentPolyhedra()
+        val globalIds = components.map { faces -> faces.flatMap { it.fvs }.map { it.id }.distinct().sorted() }
+        val identity = operations.first { abs(it.transform.trace - 3.0) < MATRIX_TOLERANCE }.transform
+        val tolerance = circumradius.coerceAtLeast(1.0) * SYMMETRY_TOLERANCE
+        for (a in members.indices) for (b in a + 1 until members.size) {
+            val mapping = members[a].geometricVertexPermutation(members[b], identity, 1, tolerance) ?: continue
+            val exchange = IntArray(vs.size) { it }
+            for (i in mapping.indices) {
+                val first = globalIds[a][i]
+                val second = globalIds[b][mapping[i]]
+                exchange[first] = second
+                exchange[second] = first
+            }
+            merge(exchange, 1)
         }
     }
     return SymmetryOrbits(faceSets.groups, edgeSets.groups, vertexSets.groups)

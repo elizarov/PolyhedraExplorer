@@ -31,9 +31,13 @@ The presentation with hidden faces must satisfy three independent whole-presenta
   triangulation, but every triangle edge must be covered completely by another surface. Exact
   paired edges, subdivided edges, and an edge meeting the interior of another surface are all
   valid; an uncovered interval is a hole.
-- all emitted triangles must belong to one geometrically connected material complex. A shared
+- within each source member, emitted triangles must form one geometrically connected material complex. A shared
   edge, positive-length coplanar overlap, or positive-length transverse intersection connects two
   surfaces; an isolated point contact does not make a detached sheet valid.
+
+Compounds retain independently closed members, which need not touch. Joins use only the two
+incident faces of that member; intersections with another member do not redirect a rim. The exterior
+containment constraint still applies to the complete resolved material union.
 
 The reusable presentation validator builds the actual WebGL triangles. For cases whose exterior is
 described directly by the nonzero generalized-winding solid, it tests vertices and edge/centroid
@@ -210,7 +214,8 @@ depth transition without changing that visible band.
   triangle boundary through quantization; they are not converted back into source-style polygon
   faces, because a valid STL boundary can contain junctions that have no single abstract source
   vertex fan. Every final triangle is non-degenerate, every edge has two opposite incidences, the
-  mesh is connected, and volume is positive before serialization.
+  material is outward-oriented, and volume is positive before serialization. Separate closed
+  material components are retained.
 - **OpenSCAD** receives closed polygonal face and rim pieces. Shared joins define their lower
   vertices; OpenSCAD performs the final union and tessellation.
 

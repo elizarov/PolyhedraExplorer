@@ -32,7 +32,7 @@ class StellationPerformanceTest {
                 .stellationCandidatesAsync(ConstellationOperation.Stellate)
         }
 
-        assertEquals(27, candidates.size)
+        assertEquals(30, candidates.size)
         assertTrue(duration < 3.seconds, "Deltoidal hexecontahedron stellation took $duration")
         candidates.forEach { candidate ->
             candidate.poly.validateRenderableImmersion()
@@ -78,7 +78,7 @@ class StellationPerformanceTest {
         )
 
         assertNull(response.error)
-        assertEquals(27.0, response.transformTweakRanges.single().single().max)
+        assertEquals(30.0, response.transformTweakRanges.single().single().max)
         val done = progress.filter { item -> item.transformIndex == 0 }.map(CoreProgress::done)
         assertEquals(0, done.first())
         assertEquals(1, done.first { value -> value > 0 })

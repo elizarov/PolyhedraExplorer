@@ -2,10 +2,10 @@
 
 Polyhedra Explorer contains the complete classical catalog of 31 convex fixed
 seed types: 5 Platonic, 13 Archimedean, and 13 Catalan solids, plus all four
-regular non-convex Kepler-Poinsot solids. It also provides four ordinary parameterized
+regular non-convex Kepler-Poinsot solids and five classical regular compounds. It also provides four ordinary parameterized
 families—Prism, Antiprism, Pyramid, and Bipyramid—for every `n` from 3 through 100,
 plus their regular-star analogues for every canonical `(n, q)` pair. The two chiral
-Archimedean solids and their Catalan duals
+Archimedean solids, their Catalan duals, and Five tetrahedra
 also have prime-tagged mirror forms.
 
 ## Categories
@@ -67,6 +67,16 @@ A Catalan solid is the dual of an Archimedean solid. Its faces are congruent and
 the symmetry group is face-transitive, but the faces are generally not regular
 polygons and its vertices are not all equivalent. There are 13 types. The duals
 of the two snub solids are chiral and also have two mirror realizations.
+
+### Regular compounds
+
+A compound is an arrangement of several complete polyhedral members, with separate edge/vertex
+incidence even at shared coordinates. The classical regular set comprises Two tetrahedra (the
+stella octangula), Five tetrahedra, Ten tetrahedra, Five cubes, and Five octahedra. Every member is
+a congruent Platonic solid and the complete arrangement has tetrahedral/octahedral or icosahedral
+symmetry. Five tetrahedra is chiral; its two orientations together form Ten tetrahedra.
+This is the classical five-compound catalog, not an enumeration of every possible uniform
+compound. See [Compounds](compounds.md) for topology, transformations, and material semantics.
 
 ### Kepler-Poinsot solids
 
@@ -163,6 +173,14 @@ flowchart LR
         dsD["Pentagonal hexecontahedron / prime"]:::chiralDual
     end
 
+    subgraph Q["Regular compounds"]
+        C2T["Two tetrahedra"]:::compound
+        C5O["Five octahedra"]:::compound
+        C5C["Five cubes"]:::compound
+        C10T["Ten tetrahedra"]:::compound
+        C5T["Five tetrahedra / Five tetrahedra′"]:::chiral
+    end
+
     subgraph R["Kepler-Poinsot regular stars"]
         direction TB
         KPSD["Stellated dodecahedron (sD / SD)"]:::regularStar
@@ -184,6 +202,13 @@ flowchart LR
     D -->|"Rectified → Rectified"| eD
     D -->|"Rectified → Truncated"| bD
     D -->|"Snub / Snub′"| sD
+
+    O -->|Stellated| C2T
+    I -->|"Stellated₃"| C5O
+    I -->|"Stellated₈"| C10T
+    I -->|"Stellated₇ / Stellated₆"| C5T
+    C5O <-->|Dual| C5C
+    daD -->|"Stellated₅"| C5C
 
     D -->|Stellated| KPSD
     D -->|Greatened| KPGD
@@ -214,6 +239,7 @@ flowchart LR
     classDef chiral fill:#cffafe,stroke:#0891b2,color:#164e63
     classDef chiralDual fill:#fae8ff,stroke:#a21caf,color:#4a044e
     classDef regularStar fill:#fee2e2,stroke:#dc2626,color:#450a0a
+    classDef compound fill:#dcfce7,stroke:#15803d,color:#14532d
 ```
 
 The construction test executes every arrow above through the core, including
@@ -288,6 +314,19 @@ both commuting paths to the great stellated dodecahedron and the two Kepler-Poin
 | Disdyakis triacontahedron (`dbD`) | Hexakis icosahedron | Rhombitruncated icosidodecahedron | `120 / 180 / 62` | `I_h` | `2 / 3 / 3` | `bD + d` |
 | Pentagonal hexecontahedron (`dsD`, `dsD'`) | — | Snub dodecahedron | `60 / 150 / 92` | `I` | `1 / 3 / 3` | `sD/sD' + d` |
 
+### Regular compounds
+
+Counts include separate member copies at coincident coordinates. Orbits use proper rotations of
+the whole arrangement; full-group reflections may exchange two of those orbits.
+
+| Seed (tag) | Common alternative names | Dual | `F / E / V` | Full point group | `F / E / V` orbits | Primitive construction |
+| --- | --- | --- | --- | --- | --- | --- |
+| Two tetrahedra (`C2T`) | Stella octangula; stellated octahedron | Two tetrahedra | `8 / 12 / 8` | `O_h` | `1 / 1 / 1` | `O + S` |
+| Five tetrahedra (`C5T`, `C5T'`) | Tetrahedron five-compound | Opposite handed Five tetrahedra | `20 / 30 / 20` | `I` | `1 / 1 / 1` | `I + S~l=7` / `I + S~l=6` |
+| Ten tetrahedra (`C10T`) | Tetrahedron ten-compound | Ten tetrahedra | `40 / 60 / 40` | `I_h` | `2 / 2 / 2` | `I + S~l=8` |
+| Five cubes (`C5C`) | Cube five-compound | Five octahedra | `30 / 60 / 40` | `I_h` | `1 / 1 / 2` | `C5O + d` or `daD + S~l=5` |
+| Five octahedra (`C5O`) | Octahedron five-compound | Five cubes | `40 / 60 / 30` | `I_h` | `2 / 1 / 1` | `I + S~l=3` |
+
 ### Kepler-Poinsot
 
 | Seed (URL tag; Conway form) | Schläfli symbol | Dual | `F / E / V` | Full point group | `F / E / V` orbits | Primitive construction |
@@ -299,18 +338,19 @@ both commuting paths to the great stellated dodecahedron and the two Kepler-Poin
 
 ## Completeness and validation
 
-- The fixed catalog contains 35 unique base tags: exactly 5 Platonic, 13 Archimedean,
-  13 Catalan, and 4 Kepler-Poinsot types. These match the complete classical
+- The fixed catalog contains 40 unique base tags: exactly 5 Platonic, 13 Archimedean,
+  13 Catalan, 5 regular compounds, and 4 Kepler-Poinsot types. These match the complete classical
   enumerations of their categories. The four ordinary family selectors add 392 concrete members;
   the four star-family selectors add 1,844 canonical `(family, n, q)` members.
 - The 13 Catalan rows pair one-to-one with the 13 Archimedean rows. Every pair
   has the same `E`, exchanged `F` and `V`, the same point group, and exchanged
   face/vertex orbit counts, as duality requires.
-- Every embedded row satisfies Euler's formula `F - E + V = 2`. Immersed Kepler-Poinsot and
+- Every single-component embedded row satisfies Euler's formula `F - E + V = 2`;
+  a regular compound with `k` members has `F - E + V = 2k`. Immersed Kepler-Poinsot and
   star-family rows retain their abstract-map counts; derived arrangement cells do not alter them.
-- The four chiral types add `sC'`, `sD'`, `dsC'`, and `dsD'` to the core without
-  adding new solid types. Thus the UI lists 35 fixed types plus four family
-  ordinary-family selectors and four star-family selectors, while the core supports 39 handed
+- The five chiral types add `sC'`, `sD'`, `dsC'`, `dsD'`, and `C5T'` without
+  adding new solid types. Thus the UI lists 40 fixed types plus four
+  ordinary-family selectors and four star-family selectors, while the core supports 45 handed
   fixed representations, 392 ordinary-family members, and 1,844 star-family members.
 - Fixed-row `F / E / V` and orbit counts are derived from each `Seed.poly`.
   The validation suite checks representative members of every family through
@@ -319,12 +359,12 @@ both commuting paths to the great stellated dodecahedron and the two Kepler-Poin
   diagram edges through the core and recognizes the stated target, including
   both directions of Dual and prime chirality. The regular-star suite validates every
   construction edge and both Kepler-Poinsot Dual pairs. Path assertions prove
-  that Tetrahedron alone reaches and constructs all 39 handed fixed representations.
+  that Tetrahedron alone reaches and constructs all 45 handed fixed representations.
 - Runtime symmetry tests independently recover the full point group,
   proper-rotation orbit counts, and mirror-plane counts of every fixed seed plus
   representative ordinary and star axial families directly from geometry, including chiral,
   strengthened, and even/odd star-antiprism cases.
-- No Platonic, classical Archimedean, Catalan, or Kepler-Poinsot solid is missing. The prism and
+- No Platonic, classical Archimedean, Catalan, classical regular compound, or Kepler-Poinsot solid is missing. The prism and
   antiprism families plus the pyramid and bipyramid families are included;
   Johnson solids beyond pyramids and nonconvex uniform solids beyond the Kepler-Poinsot set
   remain outside this catalog.
@@ -333,6 +373,7 @@ both commuting paths to the great stellated dodecahedron and the two Kepler-Poin
 
 - Fixed seed definitions: [`Seed.kt`](../core/src/commonMain/kotlin/poly/Seed.kt).
 - Classical regular-star source geometry: [`KeplerPoinsot.kt`](../core/src/commonMain/kotlin/poly/KeplerPoinsot.kt).
+- Regular compound geometry: [`RegularCompound.kt`](../core/src/commonMain/kotlin/poly/RegularCompound.kt).
 - Family seed definitions and geometry: [`FamilySeed.kt`](../core/src/commonMain/kotlin/poly/FamilySeed.kt).
 - UI seed types and prime variants: [`CoreOptions.kt`](../web/src/jsMain/kotlin/catalog/CoreOptions.kt).
 - Tested construction edges: [`SeedConstructionTest.kt`](../core/src/commonTest/kotlin/SeedConstructionTest.kt).
@@ -343,3 +384,5 @@ both commuting paths to the great stellated dodecahedron and the two Kepler-Poin
 - [George W. Hart: Archimedean Duals](https://georgehart.com/virtual-polyhedra/archimedean-duals-info.html).
 - [George W. Hart: Kepler-Poinsot Polyhedra](https://www.georgehart.com/virtual-polyhedra/kepler-poinsot-info.html).
 - [George W. Hart: Stellations](https://www.georgehart.com/virtual-polyhedra/stellations-info.html).
+- [Wolfram MathWorld: Icosahedron Stellations](https://mathworld.wolfram.com/IcosahedronStellations.html).
+- [Wolfram MathWorld: Cube Five-Compound](https://mathworld.wolfram.com/Cube5-Compound.html).

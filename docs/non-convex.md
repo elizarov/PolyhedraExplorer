@@ -6,7 +6,8 @@ face or surface crossings, nonzero-winding fill, and Resolved belong to
 
 ## Embedded surface contract
 
-A proper polyhedron is one connected, consistently oriented embedded two-manifold. Every
+A proper boundary is a consistently oriented embedded two-manifold, possibly with several closed
+components as described in [Compounds](compounds.md). Every
 undirected edge has exactly two oppositely directed face uses. Unrelated face surfaces meet nowhere;
 adjacent faces meet only at their declared common vertex or edge. The surface encloses positive
 signed volume and contains finite, non-degenerate geometry.
@@ -21,7 +22,6 @@ The core rejects a proper-surface candidate with:
 - a boundary edge, more than two uses of one edge, or equally directed adjacent uses;
 - repeated face vertices, coincident distinct source vertices, degenerate edges or triangles, or
   non-finite coordinates;
-- disconnected closed shells;
 - a self-intersection or contact outside explicitly shared topology; or
 - inward orientation or non-positive signed volume.
 

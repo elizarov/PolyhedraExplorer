@@ -21,6 +21,36 @@ class Polyhedron(
     val fs: List<Face> = mutableFaces
     val es: List<Edge>
     val directedEdges: List<Edge>
+    /** Authoritative connected surfaces; coincident positions never connect compound members. */
+    val components: List<List<Face>> by lazy {
+        val visited = BooleanArray(fs.size)
+        buildList {
+            for (first in fs) {
+                if (visited[first.id]) continue
+                val component = arrayListOf<Face>()
+                val pending = ArrayDeque<Face>()
+                pending += first
+                visited[first.id] = true
+                while (pending.isNotEmpty()) {
+                    val face = pending.removeFirst()
+                    component += face
+                    for (edge in face.directedEdges) if (!visited[edge.l.id]) {
+                        visited[edge.l.id] = true
+                        pending += edge.l
+                    }
+                }
+                add(component.sortedBy { it.id })
+            }
+        }
+    }
+    val isCompound: Boolean get() = components.size > 1
+    val vertexComponentIds: IntArray by lazy {
+        IntArray(vs.size) { -1 }.also { ids ->
+            components.forEachIndexed { index, faces ->
+                faces.forEach { face -> face.fvs.forEach { ids[it.id] = index } }
+            }
+        }
+    }
     val resolvedFaces: List<ResolvedFaceGeometry> by lazy {
         resolvedFaceGeometry ?: fs.map(::resolveFaceGeometry)
     }

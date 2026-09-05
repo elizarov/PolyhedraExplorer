@@ -435,24 +435,8 @@ private fun validateQuantizedStl(
     }?.let { (edge, incident) ->
         error("STL final edge $edge has invalid oriented incidence $incident")
     }
-    val neighbors = List(triangles.size) { linkedSetOf<Int>() }
-    for (incident in uses.values) {
-        val a = incident[0].first
-        val b = incident[1].first
-        neighbors[a] += b
-        neighbors[b] += a
-    }
-    val reached = linkedSetOf(0)
-    val pending = ArrayDeque<Int>()
-    pending += 0
-    while (pending.isNotEmpty()) {
-        for (neighbor in neighbors[pending.removeFirst()]) {
-            if (reached.add(neighbor)) pending += neighbor
-        }
-    }
-    require(reached.size == triangles.size) {
-        "STL final mesh has disconnected triangle components"
-    }
+    // Multiple closed shells are valid (disjoint compound material, or interior cavity shells).
+    // Edge incidence above checks every shell, not just the component containing triangle zero.
 }
 
 private fun checkLimit(stage: CoreStlStage, name: String, limit: Long, observed: Long) {

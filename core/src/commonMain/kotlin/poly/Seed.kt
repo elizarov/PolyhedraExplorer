@@ -15,6 +15,7 @@ enum class SeedType {
     StarFamilies,
     Archimedean,
     Catalan,
+    RegularCompounds,
     KeplerPoinsot,
 }
 
@@ -44,7 +45,8 @@ fun Polyhedron.recognizedSeedOrNull(): Seed? {
     if (candidates.isEmpty()) return null
     val geometryFingerprint = geometryFingerprint()
     return candidates.firstOrNull { seed ->
-        geometryFingerprint.matches(seed.geometryFingerprint)
+        geometryFingerprint.matches(seed.geometryFingerprint) &&
+            (!isCompound && !seed.poly.isCompound || matchesCompoundGeometry(seed.poly))
     }
 }
 
@@ -221,6 +223,24 @@ val SC.PentagonalHexecontahedron by seed(
     chirality = Chirality.Default,
 )
 
+// --------------------- 5 regular compounds ---------------------
+
+val SC.TwoTetrahedra by seed("C2T", SeedType.RegularCompounds, FEV(8, 12, 8), "Stellated octahedron") {
+    twoTetrahedraGeometry
+}
+val SC.FiveTetrahedra by seed(
+    "C5T", SeedType.RegularCompounds, FEV(20, 30, 20), "Compound of five tetrahedra", Chirality.Default,
+) { fiveTetrahedraGeometry }
+val SC.TenTetrahedra by seed("C10T", SeedType.RegularCompounds, FEV(40, 60, 40), "Compound of ten tetrahedra") {
+    tenTetrahedraGeometry
+}
+val SC.FiveCubes by seed("C5C", SeedType.RegularCompounds, FEV(30, 60, 40), "Compound of five cubes") {
+    fiveCubesGeometry
+}
+val SC.FiveOctahedra by seed("C5O", SeedType.RegularCompounds, FEV(40, 60, 30), "Compound of five octahedra") {
+    fiveOctahedraGeometry
+}
+
 // --------------------- 4 Kepler-Poinsot Solids ---------------------
 
 // Uppercase storage tags avoid the historical sD collision with Snub dodecahedron. Conventional
@@ -255,6 +275,7 @@ val Seeds: List<Seed> = registeredSeeds + listOf(
     SC.SnubDodecahedron,
     SC.PentagonalIcositetrahedron,
     SC.PentagonalHexecontahedron,
+    SC.FiveTetrahedra,
 ).map { seed ->
     Seed(
         tag = seed.tag.withChirality(Chirality.Flipped),

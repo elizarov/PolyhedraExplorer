@@ -16,7 +16,7 @@ class GreatenedRhombicTriacontahedronTest {
         clearStellationCandidateCache()
         val candidates = Seed.RhombicTriacontahedron.poly
             .stellationCandidatesAsync(ConstellationOperation.Greaten)
-        assertEquals(33, candidates.size)
+        assertEquals(47, candidates.size)
 
         val failures = candidates.mapIndexedNotNull { index, candidate ->
             // resolved() validates the constructed result as an embedded proper boundary.

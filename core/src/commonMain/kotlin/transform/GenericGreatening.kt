@@ -1,10 +1,11 @@
 package polyhedra.core.transform
 
 import polyhedra.core.poly.geometricSymmetryOperations
+import polyhedra.core.poly.GeometricSymmetryOperation
 import polyhedra.core.poly.analyzeGeometry
-import polyhedra.core.poly.polyhedron
 import polyhedra.core.poly.scaled
 import polyhedra.core.poly.validateRenderableImmersion
+import polyhedra.core.poly.surfaceFromCycles
 import polyhedra.core.util.OperationProgressContext
 import polyhedra.core.util.reportProgress
 import polyhedra.core.util.subrange
@@ -12,7 +13,6 @@ import polyhedra.model.api.MAX_POLYHEDRON_EDGES
 import polyhedra.model.poly.Face
 import polyhedra.model.poly.FaceKind
 import polyhedra.model.poly.Polyhedron
-import polyhedra.model.poly.VertexKind
 import polyhedra.model.poly.size
 import polyhedra.model.util.Vec3
 import polyhedra.model.util.averagePlane
@@ -55,6 +55,23 @@ private data class FacetingFaceOrbit(
     val key: String,
 )
 
+/** Faceting uses geometric positions, not coincident source-member copies of a dual vertex. */
+private data class FacetingPointSet(val vs: List<Vec3>, val symmetries: List<GeometricSymmetryOperation>)
+
+private fun Polyhedron.facetingPointSet(tolerance: Double): FacetingPointSet {
+    val points = arrayListOf<Vec3>()
+    val ids = IntArray(vs.size)
+    for (vertex in vs) {
+        val previous = if (isCompound) points.indexOfFirst { (it - vertex).norm <= tolerance } else -1
+        ids[vertex.id] = if (previous >= 0) previous else points.size.also { points += vertex }
+    }
+    val representatives = points.indices.map { id -> ids.indexOf(id) }
+    val operations = geometricSymmetryOperations().all.map { operation ->
+        operation.copy(vertexPermutation = IntArray(points.size) { ids[operation.vertexPermutation[representatives[it]]] })
+    }
+    return FacetingPointSet(points, operations)
+}
+
 /**
  * Enumerates symmetric facetings of the polar dual without moving or dropping any dual vertex,
  * then reciprocates them. Keeping every dual vertex preserves every authoritative source-face
@@ -64,26 +81,26 @@ internal suspend fun Polyhedron.buildGenericGreateningCandidates(
     tolerance: Double,
     progress: OperationProgressContext?,
 ): List<StellationCandidate> {
-    val dual = runCatching { directDual() }.getOrNull() ?: return emptyList()
+    val planeTolerance = maxOf(tolerance / circumradius.coerceAtLeast(1.0), 2e-7)
+    val dual = runCatching { directDual().facetingPointSet(planeTolerance) }.getOrNull() ?: return emptyList()
     if (dual.vs.size < 4) return emptyList()
-    val symmetries = runCatching { dual.geometricSymmetryOperations() }.getOrNull() ?: return emptyList()
+    val symmetries = dual.symmetries
     progress?.reportProgress(5)
-    val vertexRepresentatives = dual.vertexOrbitRepresentatives(symmetries.all.map { it.vertexPermutation })
+    val vertexRepresentatives = dual.vertexOrbitRepresentatives(symmetries.map { it.vertexPermutation })
     val estimatedTriples = vertexRepresentatives.size.toLong() *
         (dual.vs.size - 1L) * (dual.vs.size - 2L) / 2L
     if (estimatedTriples > MAX_FACETING_TRIPLES) return emptyList()
 
-    val planeTolerance = maxOf(tolerance / circumradius.coerceAtLeast(1.0), 2e-7)
     val planes = dual.facetingPlanes(vertexRepresentatives, planeTolerance, progress?.subrange(5, 10))
     if (planes.isEmpty()) return emptyList()
-    val orbits = dual.facetingFaceOrbits(planes, symmetries.all, planeTolerance, progress?.subrange(10, 17))
+    val orbits = dual.facetingFaceOrbits(planes, symmetries, planeTolerance, progress?.subrange(10, 17))
         .pruneUnmatchableOrbits()
         .take(MAX_FACETING_ORBITS)
     if (orbits.isEmpty()) return emptyList()
 
     val facetedDuals = dual.assembleFacetings(
         orbits,
-        symmetries.proper.map { operation -> operation.vertexPermutation },
+        symmetries.filter { it.orientation > 0 }.map { operation -> operation.vertexPermutation },
         progress?.subrange(17, 25),
     )
     val candidates = facetedDuals.mapIndexedNotNull { index, faceted ->
@@ -109,6 +126,7 @@ internal suspend fun Polyhedron.buildGenericGreateningCandidates(
 
     val result = candidates
         .sortedWith(compareBy<StellationCandidate>(
+            { candidate -> abs(candidate.poly.fs.size - fs.size) },
             { candidate -> candidate.poly.facePatternMismatchCount(this) },
             { candidate -> candidate.poly.totalFaceArityDelta(this) },
             { candidate -> candidate.poly.totalFaceWindingDelta(this) },
@@ -148,17 +166,21 @@ private fun Polyhedron.hasIntegralOriginWinding(): Boolean {
 }
 
 private fun Polyhedron.facePatternMismatchCount(source: Polyhedron): Int =
-    fs.indices.count { index ->
-        fs[index].size != source.fs[index].size || fs[index].circuitStep() != source.fs[index].circuitStep()
+    fs.count { face ->
+        val original = source.closestSourceFace(face)
+        face.size != original.size || face.circuitStep() != original.circuitStep()
     }
 
 private fun Polyhedron.totalFaceArityDelta(source: Polyhedron): Int =
-    fs.indices.sumOf { index -> abs(fs[index].size - source.fs[index].size) }
+    fs.sumOf { face -> abs(face.size - source.closestSourceFace(face).size) }
 
 private fun Polyhedron.totalFaceWindingDelta(source: Polyhedron): Int =
-    fs.indices.sumOf { index -> abs(fs[index].circuitStep() - source.fs[index].circuitStep()) }
+    fs.sumOf { face -> abs(face.circuitStep() - source.closestSourceFace(face).circuitStep()) }
 
-private fun Polyhedron.vertexOrbitRepresentatives(permutations: List<IntArray>): List<Int> {
+private fun Polyhedron.closestSourceFace(face: Face): Face =
+    fs.maxBy { it.outwardNormal() * face.outwardNormal() }
+
+private fun FacetingPointSet.vertexOrbitRepresentatives(permutations: List<IntArray>): List<Int> {
     val unseen = vs.indices.toMutableSet()
     val result = arrayListOf<Int>()
     while (unseen.isNotEmpty()) {
@@ -170,7 +192,7 @@ private fun Polyhedron.vertexOrbitRepresentatives(permutations: List<IntArray>):
     return result
 }
 
-private fun Polyhedron.facetingPlanes(
+private fun FacetingPointSet.facetingPlanes(
     representatives: List<Int>,
     tolerance: Double,
     progress: OperationProgressContext?,
@@ -216,9 +238,9 @@ private fun Polyhedron.facetingPlanes(
     }
 }
 
-private fun Polyhedron.facetingFaceOrbits(
+private fun FacetingPointSet.facetingFaceOrbits(
     planes: List<FacetingPlane>,
-    symmetries: List<polyhedra.core.poly.GeometricSymmetryOperation>,
+    symmetries: List<GeometricSymmetryOperation>,
     tolerance: Double,
     progress: OperationProgressContext?,
 ): List<FacetingFaceOrbit> {
@@ -263,7 +285,7 @@ private fun Polyhedron.facetingFaceOrbits(
     ))
 }
 
-private fun FacetingPlane.circuits(poly: Polyhedron, tolerance: Double): List<List<Int>> {
+private fun FacetingPlane.circuits(poly: FacetingPointSet, tolerance: Double): List<List<Int>> {
     val center = normal * distance
     val axis = if (abs(normal.x) < 0.8) Vec3(1.0, 0.0, 0.0) else Vec3(0.0, 1.0, 0.0)
     val u = (axis cross normal).unit
@@ -302,7 +324,7 @@ private data class ProjectedVertex(val id: Int, val x: Double, val y: Double)
 
 private fun convexHull(
     vertexIds: List<Int>,
-    poly: Polyhedron,
+    poly: FacetingPointSet,
     u: Vec3,
     v: Vec3,
 ): List<Int> {
@@ -328,7 +350,7 @@ private fun convexHull(
     return (lower.dropLast(1) + upper.dropLast(1)).map(ProjectedVertex::id)
 }
 
-private fun Polyhedron.assembleFacetings(
+private fun FacetingPointSet.assembleFacetings(
     orbits: List<FacetingFaceOrbit>,
     properPermutations: List<IntArray>,
     progress: OperationProgressContext?,
@@ -354,17 +376,17 @@ private fun Polyhedron.assembleFacetings(
             chosen.sumOf { orbitId -> orbits[orbitId].edgeUses.count { it.value == 2 } }
         if (edgeCount > MAX_POLYHEDRON_EDGES || faceCount < 4) return
         runCatching {
-            polyhedron {
-                this@assembleFacetings.vs.forEach { vertex -> vertex(vertex, vertex.kind) }
-                var kindId = 0
-                chosen.forEach { orbitId ->
-                    properFaceOrbits[orbitId].forEach { faceOrbit ->
-                        faceOrbit.forEach { face -> face(face.vertexIds, FaceKind(kindId)) }
-                        kindId++
-                    }
+            val cycles = arrayListOf<List<Int>>()
+            val kinds = arrayListOf<FaceKind>()
+            var kindId = 0
+            chosen.forEach { orbitId ->
+                properFaceOrbits[orbitId].forEach { faceOrbit ->
+                    faceOrbit.forEach { face -> cycles += face.vertexIds; kinds += FaceKind(kindId) }
+                    kindId++
                 }
             }
-        }.getOrNull()?.takeIf { candidate -> candidate.surfaceComponentCount() == 1 }?.let(result::add)
+            surfaceFromCycles(vs, cycles, kinds)
+        }.getOrNull()?.let(result::add)
     }
 
     fun search(
@@ -471,11 +493,14 @@ private fun Polyhedron.alignGreateningToSourcePlanes(
     candidate: Polyhedron,
     tolerance: Double,
 ): Polyhedron? {
-    if (candidate.fs.size != fs.size) return null
     val scaleFactors = arrayListOf<Double>()
-    for (index in fs.indices) {
-        val sourceFace = fs[index]
-        val candidateFace = candidate.fs[index]
+    val sources = candidate.fs.map { closestSourceFace(it) }
+    if (fs.any { source -> sources.none {
+        (it.outwardNormal() - source.outwardNormal()).norm <= tolerance * 16 &&
+            abs(abs(it.d) - abs(source.d)) <= tolerance * 16
+    } }) return null
+    for ((index, candidateFace) in candidate.fs.withIndex()) {
+        val sourceFace = sources[index]
         val sourceNormal = sourceFace.outwardNormal()
         val candidateNormal = candidateFace.outwardNormal()
         if (sourceNormal * candidateNormal < 1.0 - tolerance * 64.0) return null
@@ -490,8 +515,8 @@ private fun Polyhedron.alignGreateningToSourcePlanes(
     }
     val aligned = candidate.scaled(scaleFactor)
     var strictlyLarger = false
-    for (index in fs.indices) {
-        val sourceRadius = fs[index].circuitRadius()
+    for (index in aligned.fs.indices) {
+        val sourceRadius = sources[index].circuitRadius()
         val candidateRadius = aligned.fs[index].circuitRadius()
         if (candidateRadius < sourceRadius - tolerance * 64.0) return null
         if (candidateRadius > sourceRadius + tolerance * 64.0) strictlyLarger = true

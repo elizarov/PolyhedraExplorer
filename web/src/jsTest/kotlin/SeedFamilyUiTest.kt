@@ -64,6 +64,7 @@ class SeedFamilyUiTest {
                 "Archimedean",
                 "Catalan",
                 "Star families",
+                "Regular compounds",
                 "Kepler-Poinsot",
             ),
             elements(".dropdown .header").map { it.textContent.orEmpty().trim() },

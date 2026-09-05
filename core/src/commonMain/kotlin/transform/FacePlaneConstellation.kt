@@ -10,6 +10,9 @@ import polyhedra.core.poly.scaled
 import polyhedra.core.poly.signedVolume
 import polyhedra.core.poly.validateRenderableImmersion
 import polyhedra.core.poly.validateProperGeometry
+import polyhedra.core.poly.surfaceFromCycles
+import polyhedra.core.poly.rotationInvariantFaceKey
+import polyhedra.core.poly.compareGeometryKeys
 import polyhedra.core.util.OperationProgressContext
 import polyhedra.core.util.reportProgress
 import polyhedra.core.util.runSynchronously
@@ -18,7 +21,6 @@ import polyhedra.model.api.CoreGeometryAnalysis
 import polyhedra.model.api.CoreSymmetry
 import polyhedra.model.api.PolyhedronContract
 import polyhedra.model.poly.FEV
-import polyhedra.model.poly.Edge
 import polyhedra.model.poly.Face
 import polyhedra.model.poly.FaceKind
 import polyhedra.model.poly.Polyhedron
@@ -74,10 +76,6 @@ internal data class StellationCandidate(
     }
 }
 
-private class CompoundStellationException(componentCount: Int) : IllegalArgumentException(
-    "Main-line candidate is a compound with $componentCount disconnected surface components",
-)
-
 private data class ConstellationPlane(
     val face: Face,
     val normal: Vec3,
@@ -95,7 +93,7 @@ private data class ConstellationPlane(
 
 private data class RingKey(val size: Int, val radiusBin: Long)
 private data class FaceCircuit(val points: List<Vec3>, val step: Int, val radius: Double)
-private data class CandidateKey(val ring: RingKey, val step: Int)
+private data class CandidateKey(val ring: RingKey, val step: Int, val offset: Int = 0)
 private data class DiagramEdge(val a: Int, val b: Int)
 private data class PointSpatialKey(val x: Long, val y: Long, val z: Long)
 
@@ -235,13 +233,16 @@ private suspend fun Polyhedron.buildStellationCandidates(
     require(fs.all(Face::isPlanar)) { "Face-plane constellation requires planar source faces" }
     val scale = circumradius.coerceAtLeast(1.0)
     val tolerance = CONSTELLATION_EPS * scale
-    val planes = fs.map { face -> face.toConstellationPlane(tolerance) }
+    val planes = arrayListOf<ConstellationPlane>()
+    for (face in fs) {
+        val plane = face.toConstellationPlane(tolerance)
+        val previous = planes.indexOfFirst { it.coincidesWith(plane, tolerance) }
+        if (previous < 0) planes += plane
+        else if (plane.sourceRadius > planes[previous].sourceRadius) planes[previous] = plane
+    }
     require(planes.none { plane -> abs(plane.distance) <= tolerance }) {
         "Face-plane constellation contains a plane through the symmetry center"
     }
-    require(planes.indices.all { first ->
-        (first + 1 until planes.size).none { second -> planes[first].coincidesWith(planes[second], tolerance) }
-    }) { "Face-plane constellation contains coincident source planes" }
 
     if (operation == ConstellationOperation.Greaten) {
         return buildGenericGreateningCandidates(tolerance, progress)
@@ -258,7 +259,7 @@ private suspend fun Polyhedron.buildArrangementCircuitStellations(
     val pointsByPlane = List(planes.size) { TolerantPointIndex(tolerance) }
     val intersectionProgress = progress?.subrange(0, 45)
     val circuitProgress = progress?.subrange(45, 60)
-    val candidateProgress = progress?.subrange(60, 100)
+    val candidateProgress = progress?.subrange(60, 85)
     for (first in 0 until planes.size - 2) {
         for (second in first + 1 until planes.size - 1) {
             for (third in second + 1 until planes.size) {
@@ -292,7 +293,7 @@ private suspend fun Polyhedron.buildArrangementCircuitStellations(
         }) {
             null
         } else {
-            runCatching { buildCandidate(planes, circuits, tolerance) }
+            runCatching { buildCandidate(circuits, tolerance) }
                 .getOrNull()
                 ?.takeUnless { candidate -> candidate.poly.sameGeometryAs(this, tolerance) }
         }
@@ -301,23 +302,53 @@ private suspend fun Polyhedron.buildArrangementCircuitStellations(
     }
         .distinctBy { candidate -> candidate.poly.coordinateSignature(tolerance) to candidate.poly.edgeSignature(tolerance) }
 
-    progress?.reportProgress(100)
-    return constellationCandidates
+    val orbitCandidates = buildCircuitOrbitCandidates(planes, circuitsByPlane, tolerance, progress?.subrange(85, 100))
+    return (constellationCandidates + orbitCandidates)
         .distinctBy { candidate -> candidate.poly.coordinateSignature(tolerance) to candidate.poly.edgeSignature(tolerance) }
-        .sortedWith(compareBy(
-        { candidate -> candidate.poly.meanFaceCircuitRadius() },
-        { candidate -> candidate.fev.f },
-        { candidate -> candidate.fev.e },
-        { candidate -> candidate.fev.v },
-        ))
+        .sortedWith(stellationOrder(tolerance))
 }
 
 /**
- * Builds the main line directly from the arrangement of the source face planes. A point in an
- * arrangement cell has one positive half-space bit for every source plane crossed from the convex
- * core. Its power is therefore its exact graph distance from the core cell. The boundary between
- * powers [power] and [power] + 1 consists of the diagram facets of power [power].
+ * Complete circuit orbits under rotations and reflections can close as several manifold members.
+ * They retain source topology even when a main-line boundary has the same physical envelope.
  */
+private fun Polyhedron.buildCircuitOrbitCandidates(
+    planes: List<ConstellationPlane>,
+    circuits: List<Map<CandidateKey, FaceCircuit>>,
+    tolerance: Double,
+    progress: OperationProgressContext?,
+): List<StellationCandidate> {
+    val operations = geometricSymmetryOperations()
+    val result = arrayListOf<StellationCandidate>()
+    // Proper rotations retain a chiral compound; the full group also supplies its achiral union.
+    val groups = listOf(operations.proper, operations.all).distinctBy { it.size }
+    var done = 0
+    for (group in groups) {
+        for (circuit in circuits.first().values) {
+            progress?.reportProgress(done++, groups.size * circuits.first().size)
+            if (circuit.radius <= planes.first().sourceRadius + tolerance) continue
+            val positions = TolerantPointIndex(tolerance * 8.0)
+            val cycles = group.map { operation ->
+                val points = circuit.points.map(operation.transform::invoke)
+                val ids = (if (operation.orientation > 0) points else points.asReversed()).map(positions::index)
+                val first = ids.indexOf(ids.min())
+                List(ids.size) { ids[(first + it) % ids.size] }
+            }.distinct()
+            // This orbit must actually cover the complete source plane arrangement.
+            if (planes.any { plane -> cycles.none { cycle -> cycle.all { id ->
+                abs(plane.normal * positions.points[id] - plane.distance) <= tolerance * 16.0
+            } } }) continue
+            val candidate = runCatching {
+                surfaceFromCycles(positions.points, cycles).also { it.validateRenderableImmersion() }
+            }.getOrNull() ?: continue
+            if (candidate.isCompound) result += StellationCandidate(candidate)
+        }
+    }
+    progress?.reportProgress(100)
+    return result.distinctBy { it.poly.coordinateSignature(tolerance) to it.poly.edgeSignature(tolerance) }
+}
+
+/** A stratum is the boundary between arrangement cells crossing k and k + 1 source planes. */
 private suspend fun Polyhedron.buildMainLineStellations(
     planes: List<ConstellationPlane>,
     tolerance: Double,
@@ -346,9 +377,6 @@ private suspend fun Polyhedron.buildMainLineStellations(
         val end = 50 + 48 * (powerIndex + 1) / commonPowers.size.coerceAtLeast(1)
         val sourceResult = runCatching {
             buildMainLineCandidate(diagrams, power, tolerance, progress?.subrange(start, end))
-        }
-        if (sourceResult.exceptionOrNull() is CompoundStellationException) {
-            return@mapIndexedNotNull null
         }
         val mainLine = sourceResult.getOrNull()
         val physical = mainLine?.physical ?: runCatching {
@@ -379,11 +407,32 @@ private suspend fun Polyhedron.buildMainLineStellations(
             )
         }
         candidate.takeUnless { result -> result.poly.sameGeometryAs(this, tolerance) }
-    }.distinctBy { candidate ->
+    }.toMutableList()
+    // A compound can have the same physical envelope as a different source circuit, or occupy
+    // only one chiral half of a full-point-group stratum. Preserve its authoritative topology.
+    for (candidate in circuitCandidates) if (candidate.poly.isCompound && result.none {
+        it.poly.sameGeometryAs(candidate.poly, tolerance)
+    }) result += candidate
+    val distinct = result.distinctBy { candidate ->
         candidate.poly.coordinateSignature(tolerance) to candidate.poly.edgeSignature(tolerance)
-    }
+    }.sortedWith(stellationOrder(tolerance))
     progress?.reportProgress(100)
-    return result
+    return distinct
+}
+
+private fun stellationOrder(tolerance: Double): Comparator<StellationCandidate> {
+    val keys = mutableMapOf<Polyhedron, List<Long>>()
+    return compareBy<StellationCandidate>(
+        // Numerically equal radii must not reorder results after a rigid rotation or on Wasm.
+        { (it.poly.meanFaceCircuitRadius() / (tolerance * 64)).roundToLong() },
+        { it.stratum ?: Int.MAX_VALUE },
+        { it.fev.f }, { it.fev.e }, { it.fev.v },
+    ).thenComparator { first, second ->
+        compareGeometryKeys(
+            keys.getOrPut(first.poly) { first.poly.rotationInvariantFaceKey() },
+            keys.getOrPut(second.poly) { second.poly.rotationInvariantFaceKey() },
+        )
+    }
 }
 
 private fun Polyhedron.buildSymmetricPlaneDiagrams(
@@ -391,13 +440,16 @@ private fun Polyhedron.buildSymmetricPlaneDiagrams(
     tolerance: Double,
     progress: OperationProgressContext?,
 ): List<PlaneDiagram> {
-    val faceByVertices = fs.associateBy { face -> face.fvs.map { vertex -> vertex.id }.sorted() }
     val symmetryOperations = runCatching { geometricSymmetryOperations().all }.getOrDefault(emptyList())
     val operations = symmetryOperations.mapNotNull { operation ->
-        val facePermutation = IntArray(fs.size)
-        for (face in fs) {
-            val mappedVertices = face.fvs.map { vertex -> operation.vertexPermutation[vertex.id] }.sorted()
-            facePermutation[face.id] = faceByVertices[mappedVertices]?.id ?: return@mapNotNull null
+        val facePermutation = IntArray(planes.size)
+        for ((index, plane) in planes.withIndex()) {
+            val normal = operation.transform(plane.normal)
+            val target = planes.indexOfFirst {
+                (it.normal - normal).norm <= tolerance * 8 && abs(it.distance - plane.distance) <= tolerance * 8
+            }
+            if (target < 0) return@mapNotNull null
+            facePermutation[index] = target
         }
         operation to facePermutation
     }
@@ -569,16 +621,7 @@ private suspend fun buildMainLineCandidate(
         "Main-line stratum $power is not a closed two-manifold"
     }
 
-    val result = polyhedron(mergeIndistinguishableKinds = true) {
-        positions.forEachIndexed { index, point -> vertex(point, VertexKind(index)) }
-        faces.forEachIndexed { index, (face, sourceKind) ->
-            val kind = FaceKind(index)
-            face(face, kind)
-            faceKindSource(kind, sourceKind)
-        }
-    }
-    val components = result.surfaceComponentCount()
-    if (components != 1) throw CompoundStellationException(components)
+    val result = surfaceFromCycles(positions, faces.map { it.first })
     progress?.reportProgress(35)
     result.validateRenderableImmersion()
     progress?.reportProgress(45)
@@ -587,23 +630,6 @@ private suspend fun buildMainLineCandidate(
     physical.validateProperGeometry()
     progress?.reportProgress(100)
     return MainLineSource(result, physical, geometryAnalysis)
-}
-
-internal fun Polyhedron.surfaceComponentCount(): Int {
-    val visited = hashSetOf<Face>()
-    var components = 0
-    for (first in fs) {
-        if (first in visited) continue
-        components++
-        val pending = ArrayDeque<Face>()
-        pending += first
-        while (pending.isNotEmpty()) {
-            val face = pending.removeFirst()
-            if (!visited.add(face)) continue
-            face.directedEdges.mapTo(pending, Edge::l)
-        }
-    }
-    return components
 }
 
 private fun reconstructFaceCircuits(
@@ -692,8 +718,6 @@ private fun buildMainLinePhysicalBoundary(
             faceKindSource(kind, sourceKind)
         }
     }
-    val components = result.surfaceComponentCount()
-    if (components != 1) throw CompoundStellationException(components)
     require(result.signedVolume() > tolerance * tolerance * tolerance) {
         "Main-line stratum $power has non-positive volume"
     }
@@ -751,17 +775,18 @@ private fun ConstellationPlane.circuits(
         val radius = ordered.sumOf { point -> (point - center).norm } / ordered.size
         val ringKey = rawKey.copy(size = ordered.size)
         for (step in 1 until (ordered.size + 1) / 2) {
-            if (greatestCommonDivisor(ordered.size, step) != 1) continue
-            val raw = List(ordered.size) { index -> ordered[(index * step) % ordered.size] }
-            val pointsOriented = if (raw.averagePlane().let { plane -> plane * normal } >= 0.0) raw else raw.asReversed()
-            result[CandidateKey(ringKey, step)] = FaceCircuit(pointsOriented, step, radius)
+            val divisor = greatestCommonDivisor(ordered.size, step)
+            for (offset in 0 until divisor) {
+                val raw = List(ordered.size / divisor) { index -> ordered[(offset + index * step) % ordered.size] }
+                val pointsOriented = if (raw.averagePlane().let { plane -> plane * normal } >= 0.0) raw else raw.asReversed()
+                result[CandidateKey(ringKey, step, offset)] = FaceCircuit(pointsOriented, step, radius)
+            }
         }
     }
     return result
 }
 
 private suspend fun buildCandidate(
-    planes: List<ConstellationPlane>,
     circuits: List<FaceCircuit>,
     tolerance: Double,
 ): StellationCandidate {
@@ -779,16 +804,7 @@ private suspend fun buildCandidate(
     require(edgeUses.values.all { uses -> uses == 2 }) {
         "Constellation candidate is not a closed two-manifold"
     }
-    val result = polyhedron(mergeIndistinguishableKinds = true) {
-        positions.forEachIndexed { index, point -> vertex(point, VertexKind(index)) }
-        faceIndices.forEachIndexed { index, face ->
-            val kind = FaceKind(index)
-            face(face, kind)
-            faceKindSource(kind, planes[index].face.kind)
-        }
-    }
-    val components = result.surfaceComponentCount()
-    if (components != 1) throw CompoundStellationException(components)
+    val result = surfaceFromCycles(positions, faceIndices)
     result.validateRenderableImmersion()
     val geometryAnalysis = result.analyzeGeometry()
     result.resolved(null, geometryAnalysis).validateProperGeometry()

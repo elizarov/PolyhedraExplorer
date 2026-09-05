@@ -529,7 +529,7 @@ class ResolvedFaceRenderingTest {
     @Test
     fun foldedRimPatchesRenderAndExportWithoutInternalSeamWalls(): Promise<Unit> = scope.promise {
         val response = evaluateCore(
-            CoreRequest(CoreState("O", listOf("S", "t"), "c"), rimWidth = 0.05),
+            CoreRequest(CoreState("O", listOf("S", "R", "t"), "c"), rimWidth = 0.05),
         )
         val poly = response.poly
         val params = RenderParams("", null)

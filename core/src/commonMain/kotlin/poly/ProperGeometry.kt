@@ -10,20 +10,24 @@ import kotlin.math.abs
 private const val INTERSECTION_EPS = 1e-7
 
 /**
- * Verifies that the triangulated surface is an embedded, connected two-manifold. Non-planar faces
+ * Verifies that every component of the triangulated surface is an embedded two-manifold. Non-planar faces
  * are supported: their shared deterministic triangulation defines the face surface. Intersections
  * are allowed only along the vertex or edge explicitly shared by the two source faces.
  */
 fun Polyhedron.validateProperGeometry() {
     validateMeshGeometry()
-    val analysis = analyzeGeometryAfterRenderableValidation()
+    val contacts = arrayListOf<String>()
+    val analysis = analyzeGeometryAfterRenderableValidation { first, second, points ->
+        if (contacts.size < 3) contacts += "${first.face.id}/${second.face.id}: $points; " +
+            "first=${listOf(first.a, first.b, first.c)}, second=${listOf(second.a, second.b, second.c)}"
+    }
     require(analysis.strongestContract == PolyhedronContract.EmbeddedBoundary) {
         if (SurfaceIntersectionClass.SelfCrossingFace in analysis.intersectionCounts) {
             "Face boundary intersects itself; polyhedron is an immersed rather than embedded " +
                 "surface: ${analysis.intersectionCounts}"
         } else {
             "Faces intersect outside their shared boundary; polyhedron is an immersed rather than " +
-                "embedded surface: ${analysis.intersectionCounts}"
+                "embedded surface: ${analysis.intersectionCounts}; contacts=$contacts"
         }
     }
 }
@@ -35,7 +39,9 @@ fun Polyhedron.analyzeGeometry(): CoreGeometryAnalysis {
 }
 
 /** Classifies intersections after the caller has already validated the renderable surface. */
-private fun Polyhedron.analyzeGeometryAfterRenderableValidation(): CoreGeometryAnalysis {
+private fun Polyhedron.analyzeGeometryAfterRenderableValidation(
+    reportContact: (SurfaceTriangle, SurfaceTriangle, List<Vec3>) -> Unit = { _, _, _ -> },
+): CoreGeometryAnalysis {
     val counts = linkedMapOf<SurfaceIntersectionClass, Int>()
     val selfCrossings = resolvedFaces.sumOf { face ->
         if (!face.sourceBoundarySelfIntersects) 0 else face.vertices.count { vertex ->
@@ -57,11 +63,15 @@ private fun Polyhedron.analyzeGeometryAfterRenderableValidation(): CoreGeometryA
             val second = triangles[secondIndex]
             if (second.minX > first.maxX + tolerance) break
             if (first.face == second.face || !first.boundsOverlap(second, tolerance)) continue
-            val intersections = triangleIntersection(first, second, tolerance)
+            // Arrangement triangles can be orders of magnitude smaller than the whole model.
+            // A model-radius epsilon turns near misses beside their shared tips into overlaps.
+            val localTolerance = minOf(tolerance, INTERSECTION_EPS * minOf(first.edgeScale, second.edgeScale))
+            val intersections = triangleIntersection(first, second, localTolerance)
             if (intersections.isEmpty()) continue
             val sharedVertices = first.vertexIds.intersect(second.vertexIds).map { id -> vs[id] }
-            if (intersections.any { point -> !point.onSharedFeature(sharedVertices, tolerance * 10.0) }) {
+            if (intersections.any { point -> !point.onSharedFeature(sharedVertices, localTolerance * 10.0) }) {
                 interFaceCrossings++
+                reportContact(first, second, intersections)
             }
         }
     }
@@ -93,6 +103,7 @@ private class SurfaceTriangle(
     val a: Vec3 = resolved.vertices[triangle.a].position
     val b: Vec3 = resolved.vertices[triangle.b].position
     val c: Vec3 = resolved.vertices[triangle.c].position
+    val edgeScale = maxOf((a - b).norm, (b - c).norm, (c - a).norm)
     val vertexIds: Set<Int> = listOf(triangle.a, triangle.b, triangle.c)
         .flatMapTo(linkedSetOf()) { index -> resolved.vertices[index].provenance.sourceVertexIds }
     val minX = minOf(a.x, b.x, c.x)
@@ -140,7 +151,9 @@ private fun addPlaneIntersections(
         val da = (a - target.a) * targetNormal
         val db = (b - target.a) * targetNormal
         if (abs(da) <= tolerance && pointInTriangle(a, target, tolerance)) result += a
-        if (da * db < 0.0) {
+        // A shared endpoint already on the plane is the contact. Interpolating its rounding
+        // error along an almost coplanar edge invents a distant second intersection.
+        if (da > tolerance && db < -tolerance || da < -tolerance && db > tolerance) {
             val point = (da / (da - db)).atSegment(a, b)
             if (pointInTriangle(point, target, tolerance)) result += point
         }

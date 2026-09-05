@@ -28,9 +28,21 @@ const cases = [
     },
     {
         name: "farthest supported icosahedron main-line stellation",
-        hash: "#/s(I)t(S~l=6)",
+        hash: "#/s(I)t(S~l=10)",
         counts: { faces: 20, edges: 90, vertices: 60 },
         labels: ["Stellated", "Icosahedron"],
+    },
+    {
+        name: "regular compound stellation",
+        hash: "#/s(I)t(S~l=3)",
+        counts: { faces: 40, edges: 60, vertices: 30 },
+        labels: ["Stellated", "Icosahedron", "Five octahedra"],
+    },
+    {
+        name: "compound transformation",
+        hash: "#/s(C5C)t(t)",
+        counts: { faces: 70, edges: 180, vertices: 120 },
+        labels: ["Truncated", "Five cubes"],
     },
     {
         name: "higher-winding resolution",
@@ -114,8 +126,13 @@ async function runCase(sessionId, testCase, index) {
     throw new Error(`${testCase.name} did not become ready: ${JSON.stringify(state)}`)
 }
 
-async function runStlExportCase(sessionId) {
-    const testCase = {
+async function runStlExportCase(sessionId, compound = false) {
+    const testCase = compound ? {
+        name: "compound rims for STL export",
+        hash: "#/s(C2T)hf(α)",
+        counts: { faces: 8, edges: 12, vertices: 8 },
+        labels: ["Two tetrahedra"],
+    } : {
         name: "immersed presentation for STL export",
         hash: "#/s(SP5_2)hf(α)",
         counts: { faces: 7, edges: 15, vertices: 10 },
@@ -238,6 +255,7 @@ try {
         await runCase(sessionId, testCase, index)
     }
     await runStlExportCase(sessionId)
+    await runStlExportCase(sessionId, true)
     console.log("Production acceptance test passed")
 } finally {
     if (sessionId) {

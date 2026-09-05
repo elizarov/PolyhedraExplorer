@@ -15,6 +15,7 @@ enum class SeedType(private val displayName: String) {
     Archimedean("Archimedean"),
     Catalan("Catalan"),
     StarFamilies("Star families"),
+    RegularCompounds("Regular compounds"),
     KeplerPoinsot("Kepler-Poinsot"),
     ;
 
@@ -119,6 +120,12 @@ val SeedOptions: List<Seed> = listOf(
     Seed("dbD", "Disdyakis triacontahedron", SeedType.Catalan),
     Seed("dsD", "Pentagonal hexecontahedron", SeedType.Catalan, Chirality.Default),
 ) + DefaultStarFamilySeedOptions + listOf(
+    Seed("C2T", "Two tetrahedra", SeedType.RegularCompounds),
+    Seed("C5T", "Five tetrahedra", SeedType.RegularCompounds, Chirality.Default),
+    Seed("C10T", "Ten tetrahedra", SeedType.RegularCompounds),
+    Seed("C5C", "Five cubes", SeedType.RegularCompounds),
+    Seed("C5O", "Five octahedra", SeedType.RegularCompounds),
+
     Seed("SD", "Stellated dodecahedron", SeedType.KeplerPoinsot),
     Seed("GD", "Great dodecahedron", SeedType.KeplerPoinsot),
     Seed("GSD", "Great stellated dodecahedron", SeedType.KeplerPoinsot),

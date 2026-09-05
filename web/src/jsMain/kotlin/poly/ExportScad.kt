@@ -107,12 +107,23 @@ fun Polyhedron.exportSolidToScad(
 ): String {
     val presentationHiddenKinds = hiddenFaceKinds + nonPlanarFaceKinds
     val closedBoundary = embeddedBoundary && presentationHiddenKinds.isEmpty() && exportParams.expand == 0.0
+    val closedCompound = isCompound && presentationHiddenKinds.isEmpty() && exportParams.expand == 0.0 &&
+        components.all { faces ->
+            val vertices = faces.flatMap { it.fvs }.distinctBy { it.id }
+            faces.all { face -> face.isPlanar && vertices.all { face * it <= face.d + 1e-8 * circumradius } }
+        }
     return buildString {
         appendLine("// Solid: $name")
         appendLine("// $description")
         appendLine("// Polygonal geometry; OpenSCAD performs final tessellation and Boolean evaluation.")
         appendLine()
-        if (closedBoundary) {
+        if (closedCompound) {
+            // Keep touching source vertices local to each closed member. OpenSCAD unions the
+            // complete member solids, not hollow face slabs or a non-manifold welded compound.
+            appendLine("union() {")
+            components.forEach { faces -> appendClosedPolyhedron(this@exportSolidToScad, exportParams.scale, faces) }
+            appendLine("}")
+        } else if (closedBoundary) {
             appendClosedPolyhedron(this@exportSolidToScad, exportParams.scale)
         } else {
             require(exportParams.width > 0.0) {
@@ -295,7 +306,7 @@ private fun StringBuilder.appendMiteredRegion(
     appendLine("  );")
 }
 
-private fun StringBuilder.appendClosedPolyhedron(poly: Polyhedron, scale: Double) {
+private fun StringBuilder.appendClosedPolyhedron(poly: Polyhedron, scale: Double, sourceFaces: List<Face> = poly.fs) {
     val points = arrayListOf<Vec3>()
     fun pointIndex(point: Vec3): Int {
         val existing = points.indexOfFirst { candidate -> (candidate - point).norm <= 1e-10 * poly.circumradius }
@@ -304,7 +315,7 @@ private fun StringBuilder.appendClosedPolyhedron(poly: Polyhedron, scale: Double
         return points.lastIndex
     }
     val faces = arrayListOf<List<Int>>()
-    for (face in poly.fs) {
+    for (face in sourceFaces) {
         val resolved = poly.resolvedFaces[face.id]
         if (face.isPlanar) {
             for (cell in resolved.cells) {

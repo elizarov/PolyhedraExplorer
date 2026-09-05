@@ -151,6 +151,7 @@ private fun formatCoreInspection(
     appendLine("Failed transform index: ${response.errorIndex ?: "none"}")
     appendLine("Recognized seed: ${if (detectedSeed) response.recognizedSeedTag ?: "none" else "not requested"}")
     appendLine("Elements: ${poly.fev()}")
+    appendLine("Surface components: ${poly.components.size}${if (poly.isCompound) " (compound)" else ""}")
     appendLine("Stored kinds: $storedCounts")
     appendLine("Geometric orbits: $geometricCounts")
     appendLine("Kind/orbit consistency: ${if (storedCounts == geometricCounts) "OK" else "MISMATCH"}")

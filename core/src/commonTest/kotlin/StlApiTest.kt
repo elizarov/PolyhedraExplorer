@@ -360,12 +360,12 @@ class StlApiTest {
 
     @Test
     fun exportsTruncatedStellatedOctahedronFoldedFacesAsRims() = runTest {
-        assertFoldedRimExport(listOf("S", "t"), expectedNonPlanarFaces = 6)
+        assertFoldedRimExport(listOf("S", "R", "t"), expectedNonPlanarFaces = 6)
     }
 
     @Test
     fun exportsRepeatedlyTruncatedStellatedOctahedronFoldedFacesAsRims() = runTest {
-        assertFoldedRimExport(listOf("S", "t", "t"), expectedNonPlanarFaces = 6)
+        assertFoldedRimExport(listOf("S", "R", "t", "t"), expectedNonPlanarFaces = 6)
     }
 
     @Test
