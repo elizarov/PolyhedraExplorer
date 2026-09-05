@@ -50,6 +50,45 @@ therefore changes only the surroundings; polyhedron illumination remains
 identical. The receiver remains fixed while the polyhedron rotates, so the
 object reads as floating in a stable scene.
 
+## Interior and cutaway lighting
+
+Reverse faces and explicit undersides retain the same plastic BRDF and orbit
+color, but receive less incident light. This is an analytic cavity-shadow
+approximation, not a different material and not a ray-traced or shadow-mapped
+visibility test. It makes exposed interiors read as recesses instead of bright
+outer faces, including during Cut, rotation, expansion, and transparency.
+
+Cut defaults to `+0.5` of the selected base-scale radius, retaining more of the
+front shell around the opening. Its range is `-1` (back) to `+1` (front); `0`
+passes through the center. URLs omit the default position and use `cp(0)` for
+an explicit center cut.
+
+`FaceProgram` treats every reverse-facing material boundary as interior. This
+includes the reverse of a rim's underside and side walls seen through a cut:
+flipping the BRDF normal toward the viewer does not make these surfaces exterior.
+For front-facing surfaces, negative alignment of the lighting normal with the
+original face's outward normal identifies an explicit underside. Front-facing
+perpendicular rim walls retain their ordinary lighting; the vertex thickness
+flag cannot identify an underside because it also varies across those walls.
+Orientation comes from the source surface, not a resolved solid, so immersed
+internal sheets are treated consistently.
+
+For an interior fragment, let `d` be its nonnegative distance behind the cut
+plane and `R` the displayed circumradius, including face expansion. The light
+access proxy is `A = 1 / (1 + (d/R)²)`, inspired by the projected solid angle of
+a circular aperture viewed along its axis. With Cut off, `d = 0`. Incident key
+light is multiplied by `0.06 + 0.28 A`; environment fill and its reflection by
+`0.25 + 0.40 A`. Exterior factors remain exactly `1`. These calibrated floors
+preserve readable color in deep recesses, while attenuation of both diffuse and
+specular light avoids bright exterior-like highlights on backsides. No extra
+controls or serialization fields are needed.
+
+This proxy assumes inward surfaces have less access to illumination. It does
+not measure real apertures or neighboring-face occlusion: open and expanded
+models can be darker inside than a physical light-transport solution would
+predict. There are no moving shadow silhouettes, contact shadows, or secondary
+light bounces on the polyhedron itself.
+
 ## PLA default
 
 The default IOR is `1.46`. Visible-wavelength ellipsometry measured PLA from
@@ -85,7 +124,7 @@ and two are necessary to vary opaque plastics.
 | Export | Print preview | Off, red | Basic colors or OKLCH | Use one filament base color for every rendered surface and hide edge overlays; this does not alter exported geometry. |
 
 The environment, all four lighting/material values, and print-preview color are
-URL-backed. `None` is omitted; Table is stored as `env(t)` in the View
+URL-backed. `Table` is omitted; None is stored as `env(n)` in the View
 parameters. Deserialization maps `Ambient` to Fill light and `Diffuse` to Key
 light. It ignores Specular and Shininess because Fresnel and roughness determine
 those effects.
@@ -97,6 +136,12 @@ It uses no material textures, lookup tables, cubemaps, or shadow maps. Its main
 non-polynomial work is normalizing the light vectors, two square roots for
 correlated Smith visibility, and small fixed powers for Fresnel and color-space
 conversion.
+
+Interior shading adds one scalar varying, one radius uniform, and fixed-cost
+arithmetic per fragment. It reuses existing normals and depth, adds no draw
+calls, textures, geometry rebuilds, or core work, and follows animated position
+and normal interpolation directly. Headless WebGL pixel tests cover reversed
+faces, explicit undersides, walls, cut depth, scale, material extremes, and alpha.
 
 `None` adds no scene pass. `Table` adds one inexpensive receiver pass and one
 draw of the already-uploaded animated face mesh. The shadow vertex shader uses
@@ -114,4 +159,5 @@ the table plane.
 
 - [Khronos glTF 2.0 BRDF specification](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#appendix-b-brdf-implementation) — dielectric Fresnel mixing, GGX microfacets, and energy-conserving diffuse/specular composition.
 - [Physically Based Rendering in Filament](https://google.github.io/filament/Filament.md.html) — real-time Cook-Torrance/GGX design and material parameterization.
+- [PBRT: A Simple Path Tracer](https://www.pbr-book.org/4ed/Light_Transport_I_Surface_Reflection/A_Simple_Path_Tracer) — incident-light visibility is separate from the material response; the interior proxy approximates that visibility instead of tracing shadow rays.
 - M. H. Hutchinson, J. R. Dorgan, D. M. Knauss, and S. B. Hait, [Optical Properties of Polylactides](https://doi.org/10.1007/s10924-006-0001-z), *Journal of Polymers and the Environment* 14 (2006) — measured PLA dispersion and Cauchy coefficients.

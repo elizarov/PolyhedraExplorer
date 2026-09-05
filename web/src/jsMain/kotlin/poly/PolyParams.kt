@@ -470,7 +470,7 @@ class ViewParams(
     val scale = using(DoubleParam("s", 0.0, -2.0, 2.0, 0.01, animationParams))
     val expandFaces = using(DoubleParam("e", 0.0, 0.0, 2.0, 0.01, animationParams))
     val cutEnabled = using(BooleanParam("c", false))
-    val cutPosition = using(DoubleParam("cp", 0.0, -1.0, 1.0, 0.01, animationParams))
+    val cutPosition = using(DoubleParam("cp", 0.5, -1.0, 1.0, 0.01, animationParams))
     val transparentFaces = using(DoubleParam("t", 0.0, 0.0, 1.0, 0.01, animationParams))
     val faceWidth = using(
         DoubleParam("fw", 0.10, 0.0, 0.2, 0.001, animationParams, serializationPrecision = 8),

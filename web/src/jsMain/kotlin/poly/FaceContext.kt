@@ -902,6 +902,9 @@ fun FaceContext.draw(view: ViewContext, lighting: LightingContext, cullMode: Int
             uFillLightIntensity by lighting.fillLightIntensity
             uRoughness by lighting.roughness
             uFresnelF0 by lighting.fresnelF0
+            val radius = if (animation == null) poly.circumradius else
+                poly.circumradius * animation.targetFraction + animation.prevPoly.circumradius * animation.prevFraction
+            uInteriorRadius by (radius + view.expandFaces) * view.scaleFactor
 
             uTargetFraction by (animation?.targetFraction ?: 1.0)
             uPrevFraction by (animation?.prevFraction ?: 0.0)

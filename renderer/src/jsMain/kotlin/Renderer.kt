@@ -78,7 +78,7 @@ fun writePng(image: RenderedImage, output: String): String {
     return outputPath
 }
 
-private fun createContext(width: Int, height: Int): WebGLRenderingContext {
+internal fun createContext(width: Int, height: Int): WebGLRenderingContext {
     val options = js("({})")
     options.alpha = true
     options.depth = true
@@ -97,7 +97,7 @@ private fun createContext(width: Int, height: Int): WebGLRenderingContext {
     return gl
 }
 
-private fun destroyContext(gl: WebGLRenderingContext) {
+internal fun destroyContext(gl: WebGLRenderingContext) {
     val extension: dynamic = gl.getExtension("STACKGL_destroy_context")
     if (extension != null) extension.destroy()
 }

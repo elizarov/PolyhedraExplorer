@@ -9,9 +9,27 @@ import polyhedra.web.poly.ViewContext
 import kotlin.math.pow
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ViewSerializationTest {
+    @Test
+    fun cutDefaultsToHalfRadiusAndAnExplicitCenterCutRoundTrips() {
+        val params = RootParams()
+        assertEquals(0.5, params.render.view.cutPosition.value)
+        params.loadFromString("v(c(y))")
+        assertTrue(params.render.view.cutEnabled.value)
+        assertEquals(0.5, params.render.view.cutPosition.value)
+        assertFalse("cp(" in params.toString(), "The default position is omitted from URLs")
+
+        params.render.view.cutPosition.updateValue(0.0, Param.TargetValue)
+        val serialized = params.toString()
+        assertTrue("cp(0)" in serialized, "A center cut must now be explicit: $serialized")
+        val restored = RootParams()
+        restored.loadFromString(serialized)
+        assertEquals(0.0, restored.render.view.cutPosition.value)
+    }
+
     @Test
     fun serializedViewIsAppliedWhenRenderingContextIsCreatedAfterReload() {
         val source = RootParams()

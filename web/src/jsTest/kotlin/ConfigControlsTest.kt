@@ -217,7 +217,7 @@ class ConfigControlsTest {
         assertTrue(range.disabled)
         assertEquals("-100", range.min)
         assertEquals("100", range.max)
-        assertEquals("0", range.value)
+        assertEquals("50", range.value)
 
         checkbox.click()
         assertTrue(params.render.view.cutEnabled.value)

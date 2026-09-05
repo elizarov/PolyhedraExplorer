@@ -16,6 +16,7 @@ class FaceProgram(gl: GL) : ViewBaseProgram(gl) {
     val uFillLightIntensity by uniform(GLType.float)
     val uRoughness by uniform(GLType.float)
     val uFresnelF0 by uniform(GLType.float)
+    val uInteriorRadius by uniform(GLType.float)
 
     val uTargetFraction by uniform(GLType.float)
     val uPrevFraction by uniform(GLType.float)
@@ -44,6 +45,7 @@ class FaceProgram(gl: GL) : ViewBaseProgram(gl) {
     private val vToLight by varying(GLType.vec3)
     private val vColor by varying(GLType.vec3, GLPrecision.lowp)
     private val vColorAlpha by varying(GLType.float, GLPrecision.lowp)
+    private val vSurfaceSide by varying(GLType.float, GLPrecision.lowp)
 
     /** Schlick's inexpensive approximation of dielectric Fresnel reflectance. */
     private val fSchlickFresnel by function(
@@ -103,6 +105,9 @@ class FaceProgram(gl: GL) : ViewBaseProgram(gl) {
         vCutDepth by position.z
         // lighting & color
         vNormal by fLightNormal()
+        // Source-face orientation, not aInner (which also varies across rim walls).
+        // This identifies explicit undersides as well as reversed outer-face fragments.
+        vSurfaceSide by dot(normalize(fInterpolatedLightNormal()), normalize(fInterpolatedExpandDir()))
         vToCamera by uCameraPosition - position.xyz
         vToLight by uLightPosition - position.xyz
         vColor by fInterpolatedColor() * aFaceMode
@@ -111,9 +116,18 @@ class FaceProgram(gl: GL) : ViewBaseProgram(gl) {
 
     override val fragmentShader = shader(ShaderType.Fragment) {
         discardCutFragments()
-        // Immersed rim presentations are rendered two-sided. Flip the shading frame on a back
-        // fragment so the exposed reverse side reads as material instead of an unlit gray sheet.
+        // Keep the dielectric shading frame facing the viewer on two-sided surfaces.
         val normal by select(gl_FrontFacing, normalize(vNormal), normalize(vNormal) * -1.0)
+        // A reversed material boundary always exposes its interior, even for an underside or
+        // perpendicular rim wall. Flipping its BRDF normal must not turn it into an exterior.
+        val interior by select(gl_FrontFacing, min(max(0.0.literal - vSurfaceSide, 0.0), 1.0), 1.0.literal)
+        // Analytic cavity-light proxy: a disk aperture's view factor falls as R²/(R²+d²).
+        // No scene visibility is traced. The nonzero floors keep inner structure legible, while
+        // reduced incident light suppresses implausible exterior-like highlights on backsides.
+        val cavityDepth by max(uCutPosition - vCutDepth, 0.0) * uCutEnabled / max(uInteriorRadius, 0.0001)
+        val aperture by 1.0.literal / (1.0.literal + cavityDepth * cavityDepth)
+        val keyAccess by 1.0.literal - interior * (0.94.literal - 0.28.literal * aperture)
+        val fillAccess by 1.0.literal - interior * (0.75.literal - 0.40.literal * aperture)
         val toCamera by normalize(vToCamera)
         val toLight by normalize(vToLight)
         val halfVector by normalize(toCamera + toLight)
@@ -137,7 +151,7 @@ class FaceProgram(gl: GL) : ViewBaseProgram(gl) {
         // Normalize inverse-square falloff at the model origin, so the control remains intuitive.
         val keyAttenuation by dot(uLightPosition, uLightPosition) / max(dot(vToLight, vToLight), 0.01)
         val directLight by (diffuseBrdf + specularBrdf) * uLightColor * (
-            noL * uKeyLightIntensity * keyAttenuation
+            noL * uKeyLightIntensity * keyAttenuation * keyAccess
         )
 
         // One constant environment term gives printed plastic visible fill and grazing reflection
@@ -147,7 +161,7 @@ class FaceProgram(gl: GL) : ViewBaseProgram(gl) {
         val fillSpecular by uFillColor * (
             viewFresnel * uFillLightIntensity * (1.0.literal - uRoughness * 0.5.literal)
         )
-        val linearColor by directLight + fillDiffuse + fillSpecular
+        val linearColor by directLight + (fillDiffuse + fillSpecular) * fillAccess
         val displayColor by pow(max(linearColor, 0.0), vec3(1.0 / 2.2))
         gl_FragColor by vec4(displayColor, vColorAlpha)
     }
