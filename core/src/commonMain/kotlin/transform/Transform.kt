@@ -31,6 +31,7 @@ typealias AsyncTransform = suspend (poly: Polyhedron, progress: OperationProgres
 class TransformApplicabilityException(
     val issueCode: CoreIssueCode,
     message: String,
+    val fev: FEV? = null,
 ) : IllegalArgumentException(message)
 
 @Serializable
@@ -50,7 +51,8 @@ sealed class Transform : Tagged {
         val outputContract = when (support.outputPolicy) {
             TransformOutputPolicy.Preserve -> inputAnalysis.strongestContract
             TransformOutputPolicy.RenderableImmersion -> PolyhedronContract.RenderableImmersion
-            TransformOutputPolicy.EmbeddedBoundary -> if (poly.isCompound && id.operation != TransformOperation.Resolved) {
+            TransformOutputPolicy.EmbeddedBoundary -> if (poly.isCompound &&
+                id.operation != TransformOperation.Resolved && id.operation != TransformOperation.ConvexHull) {
                 // Each member can remain embedded while members intersect each other.
                 PolyhedronContract.RenderableImmersion
             } else PolyhedronContract.EmbeddedBoundary
@@ -103,6 +105,7 @@ sealed class Transform : Tagged {
         val Greatened: Transform by Greatened()
         val Stellated: Transform by Stellated()
         val Resolved: Transform by Resolved()
+        val ConvexHull: Transform by ConvexHull()
 
         val Transforms: List<Transform> = registeredTransforms.toList()
 
@@ -255,10 +258,15 @@ class Snub(
 }
 
 internal fun Transform.withTweaks(tweaks: Map<TransformTweak, Double>): Transform =
-    if (tweaks.isEmpty()) this else TweakedTransform(this, tweaks)
+    when {
+        tweaks.isEmpty() -> this
+        this is ConvexHull -> ConvexHull(tweaks[TransformTweak.CombineOriginal] == 1.0)
+        else -> TweakedTransform(this, tweaks)
+    }
 
 private fun Transform.supportsTweaks(tweaks: Set<TransformTweak>): Boolean {
     val supported = when (this) {
+        is ConvexHull -> setOf(TransformTweak.CombineOriginal)
         is Truncated -> setOf(TransformTweak.Depth)
         is Cantellated -> setOf(TransformTweak.Distance)
         is Bevelled -> setOf(TransformTweak.Distance, TransformTweak.Depth)

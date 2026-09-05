@@ -48,6 +48,40 @@ class TransformSettingsUiTest {
     }
 
     @Test
+    fun convexHullCheckboxUpdatesBothWaysAndResetOmitsDefault(): Promise<Unit> {
+        val params = PolyParams("", null)
+        params.transforms.updateValue(listOf(Transform.ConvexHull))
+        composition = renderComposable(host) {
+            ControlPane(params, Popup.TransformSettings(0), togglePopup = {})
+        }
+        fun checkbox() = host.querySelector("input[aria-label='Combine with original']") as HTMLInputElement
+        assertNotNull(host.querySelector(".transform-settings-button"))
+        assertNull(host.querySelector(".transform-setting-slider"))
+        assertTrue(!checkbox().checked)
+        checkbox().click()
+        assertEquals("H~b=1", params.transforms.value.single().tag)
+        return awaitRecomposition().then {
+            assertTrue(checkbox().checked)
+            val source = RootParams()
+            source.render.poly.transforms.updateValue(params.transforms.value)
+            val restored = RootParams()
+            restored.loadFromString(source.toString())
+            assertEquals("H~b=1", restored.render.poly.transforms.value.single().tag)
+            (host.querySelector(".transform-settings-reset") as HTMLButtonElement).click()
+            awaitRecomposition()
+        }.then {
+            assertEquals("H", params.transforms.value.single().tag)
+            assertTrue(!checkbox().checked)
+            params.transforms.updateValue(listOf(Transform.ConvexHull.withTweak(TransformTweak.CombineOriginal, 1.0)))
+            awaitRecomposition()
+        }.then {
+            assertTrue(checkbox().checked)
+            checkbox().click()
+            assertEquals("H", params.transforms.value.single().tag)
+        }
+    }
+
+    @Test
     fun gearFollowsNameAndSliderUpdatesTransformInBothDirections(): Promise<Unit> {
         val params = PolyParams("", null)
         params.transforms.updateValue(listOf(Transform.Truncated))

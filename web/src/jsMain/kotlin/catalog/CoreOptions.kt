@@ -184,6 +184,7 @@ data class Transform(
         val Quinto = transform(TransformOperation.Quinto, "Quinto")
         val Chamfered = transform(TransformOperation.Chamfered, "Chamfered")
         val Canonical = transform(TransformOperation.Canonical, "Canonical")
+        val ConvexHull = transform(TransformOperation.ConvexHull, "Convex hull")
         val Greatened = transform(TransformOperation.Greatened, "Greatened", TransformCategory.Star)
         val Stellated = transform(TransformOperation.Stellated, "Stellated", TransformCategory.Star)
         val Resolved = transform(TransformOperation.Resolved, "Resolved", TransformCategory.Star)
@@ -251,6 +252,7 @@ val PrimitiveTransforms: List<Transform> = listOf(
     Transform.Quinto,
     Transform.Chamfered,
     Transform.Canonical,
+    Transform.ConvexHull,
     Transform.Greatened,
     Transform.Stellated,
     Transform.Resolved,
@@ -297,10 +299,14 @@ val Transform.settings: List<TransformSetting>
     get() = id.transformTweakRanges().map { (tweak, range) ->
         TransformSetting(
             tweak,
-            if (tweak == TransformTweak.StellationResult) "Result" else tweak.name,
+            when (tweak) {
+                TransformTweak.StellationResult -> "Result"
+                TransformTweak.CombineOriginal -> "Combine with original"
+                else -> tweak.name
+            },
             range.min,
             range.max,
-            step = if (tweak == TransformTweak.StellationResult) 1.0 else 0.01,
+            step = if (tweak == TransformTweak.StellationResult || tweak.isBoolean) 1.0 else 0.01,
         )
     }
 
@@ -308,7 +314,8 @@ fun Transform.withTweak(tweak: TransformTweak, value: Double): Transform =
     copy(tweaks = tweaks.toMutableMap().apply {
         val setting = this@withTweak.settings.single { it.tweak == tweak }
         val boundedValue = value.coerceIn(setting.min, setting.max)
-        if (boundedValue == 1.0) remove(tweak) else put(tweak, boundedValue)
+        require(!tweak.isBoolean || boundedValue == 0.0 || boundedValue == 1.0)
+        if (boundedValue == tweak.defaultValue) remove(tweak) else put(tweak, boundedValue)
     })
 
 fun Transform.withoutTweaks(): Transform =

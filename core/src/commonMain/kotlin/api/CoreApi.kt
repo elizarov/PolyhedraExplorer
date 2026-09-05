@@ -367,6 +367,10 @@ private suspend fun LogicalTransform.safeTweakRanges(
 
     val result = ArrayList<CoreTransformTweakRange>(envelopes.size)
     for ((tweak, envelope) in envelopes) {
+        if (tweak.isBoolean) {
+            result += CoreTransformTweakRange(tweak, envelope.min, envelope.max)
+            continue
+        }
         safeTweakRange(spec, tweak, envelope, inputPoly, inputPendingRectification, outputScale)
             ?.let(result::add)
     }
@@ -383,7 +387,7 @@ private suspend fun safeTweakRange(
 ): CoreTransformTweakRange? {
     suspend fun isValid(value: Double): Boolean {
         val tweaks = spec.tweaks.toMutableMap().apply {
-            if (value == 1.0) remove(tweak) else put(tweak, value)
+            if (value == tweak.defaultValue) remove(tweak) else put(tweak, value)
         }
         val candidate = spec.copy(tweaks = tweaks).toLogicalTransformOrNull() ?: return false
         return applyTransform(
@@ -395,7 +399,7 @@ private suspend fun safeTweakRange(
         ) is TransformApplication.Success
     }
 
-    val current = (spec.tweaks[tweak] ?: 1.0).coerceIn(envelope.min, envelope.max)
+    val current = (spec.tweaks[tweak] ?: tweak.defaultValue).coerceIn(envelope.min, envelope.max)
     val anchors = buildList {
         add(current)
         if (current != 1.0 && 1.0 in envelope.min..envelope.max) add(1.0)
@@ -521,7 +525,7 @@ private suspend fun applyTransform(
             outputContract = primitiveOutputContract
         } catch (cause: TransformApplicabilityException) {
             return TransformApplication.Failure(
-                CoreIssue(cause.issueCode, transform.tag, detail = cause.message)
+                CoreIssue(cause.issueCode, transform.tag, fev = cause.fev, detail = cause.message)
             )
         } catch (cause: IllegalArgumentException) {
             return TransformApplication.Failure(
@@ -561,7 +565,7 @@ private suspend fun applyTransform(
         }
     } catch (cause: TransformApplicabilityException) {
         return TransformApplication.Failure(
-            CoreIssue(cause.issueCode, transform.tag, detail = cause.message)
+            CoreIssue(cause.issueCode, transform.tag, fev = cause.fev, detail = cause.message)
         )
     } catch (cause: IllegalArgumentException) {
         return TransformApplication.Failure(

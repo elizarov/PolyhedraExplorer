@@ -95,7 +95,7 @@ class DropOrbitUiTest {
             linkedMapOf(
                 "Transform" to listOf(
                     "Truncated", "Rectified", "Dual", "Snub", "Propeller", "Whirl", "Quinto",
-                    "Chamfered", "Canonical",
+                    "Chamfered", "Canonical", "Convex hull",
                 ),
                 "Macro" to listOf("Kis", "Join", "Needle", "Zip", "Cantellated", "Bevelled", "Ortho", "Meta", "Gyro"),
                 "Orbit-targeted" to listOf(

@@ -538,7 +538,17 @@ private fun TransformSettingsPopup(
         GroupHeader("$transform settings")
         TableBody {
             for (setting in transform.settings) {
-                val currentValue = transform.tweaks[setting.tweak] ?: 1.0
+                val currentValue = transform.tweaks[setting.tweak] ?: setting.tweak.defaultValue
+                if (setting.tweak.isBoolean) {
+                    ControlRow(setting.label) {
+                        Input(type = InputType.Checkbox, attrs = {
+                            attr("aria-label", setting.label)
+                            checked(currentValue == 1.0)
+                            onChange { onChange(setting, if (it.value) 1.0 else 0.0) }
+                        })
+                    }
+                    continue
+                }
                 val safeRange = safeRanges?.get(setting.tweak)
                 val minimum = safeRange?.min ?: setting.min
                 val maximum = safeRange?.max ?: setting.max

@@ -37,6 +37,9 @@ member's circle packing separately, so overlapping members do not repel each oth
 edge-tangency normalization applies to all members. Targeted operations address global rotation
 orbits, not member indices. Existing geometric applicability rules remain in force.
 
+Convex hull wraps all members in one envelope. Its optional combined mode adds that envelope as
+another independent member, retaining internal source surfaces; see [Transformations](transformations.md#convex-hull-h).
+
 Stellated and Greatened may return compounds; enumeration and ordering belong to
 [Transformations](transformations.md). The five classic regular seeds belong to [Seeds](seeds.md).
 Disconnectedness alone never disqualifies a candidate.

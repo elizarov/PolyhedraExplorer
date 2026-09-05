@@ -31,6 +31,7 @@ The transform popup is ordered as `Transform`, `Macro`, `Orbit-targeted`, then
 | Quinto | - | `q` | - | `F + 2E` | `6E` | `V + 3E` |
 | Chamfered | Chamfer, edge chamfering | `c` | - | `F + E` | `4E` | `V + 2E` |
 | Canonical | Canonicalization | `o` | - | `F` | `E` | `V` |
+| Convex hull | Convex envelope | `H` | - | geometry-dependent | geometry-dependent | geometry-dependent |
 | Greatened | Greatening | `G` | - | constellation-dependent | constellation-dependent | constellation-dependent |
 | Stellated | Stellation | `S` | - | constellation-dependent | constellation-dependent | constellation-dependent |
 | Resolved | Nonzero-winding resolution | `R` | - | arrangement-dependent | arrangement-dependent | arrangement-dependent |
@@ -59,15 +60,15 @@ Gyro.
 
 ## Continuous parameters
 
-The last transform has a gear button when it has a meaningful coordinate degree
-of freedom; earlier pills do not show or open settings. Slider values are
+The last transform has a gear button when it has configurable settings;
+earlier pills do not show or open settings. Continuous slider values are
 dimensionless percentages of the operation's
 regular construction: `100%` is the default, while lower or higher
 values move continuously away from it without changing the operation's
 topology. Default values are omitted from the URL. Non-default values follow the
 operation tag as `~key=value`, for example `t~d=0.7` for 70% truncation depth.
 The reset button in the popup's lower-right corner restores all controls to
-`100%` and restores the operation's standard chirality.
+their defaults and restores the operation's standard chirality.
 The bounds shown by a slider are not universal constants: the Wasm worker starts
 from a broad exploration envelope, applies the transform to the actual mesh at
 that chain position, and narrows it to the connected interval with finite,
@@ -99,6 +100,7 @@ main-line candidates for the actual input; the row displays `n of N` and that ca
 Result `1` is the default and is omitted, while later choices use tags such as `S~l=2`.
 
 Dual, Drop, Quinto, Canonical, Resolved, and None have no continuous geometric setting.
+Convex hull has a checkbox rather than a continuous slider; see its section below.
 
 ## Geometry domains
 
@@ -121,10 +123,11 @@ names and immersion semantics are defined in
 | Propeller, Whirl, Quinto, Canonical | Abstract topology is a canonicalizable sphere | Embedded canonical realization |
 | Greatened, Stellated | Planar authoritative faces produce a valid finite face-plane constellation | Renderable immersion |
 | Resolved | Valid resolved-face planar arrangement | Embedded boundary |
+| Convex hull | Vertices span three dimensions | One embedded convex boundary, or a renderable compound when combined with the source |
 
 For compounds, local prerequisites apply to every affected member. An embedded-output policy is
 validated separately on each member, whose intersections with other members remain permissible.
-Resolved alone requires the combined physical boundary to be embedded. Canonicalizable topology
+Resolved and uncombined Convex hull require the complete output boundary to be embedded. Canonicalizable topology
 means a sphere per member. Star operations can have no further result, as for Two tetrahedra.
 
 Macros use the domain of their realized primitive sequence or fused kernel. They cannot use a later
@@ -171,7 +174,7 @@ including Kis Height, are included in the same fused target.
 
 Animation is intentionally omitted where no stable, non-self-intersecting mesh
 correspondence exists: Drop, adding/removing or retargeting selective Kis face,
-Greatened, Stellated, Resolved, and chirality flips. Resolved changes the physical arrangement
+Greatened, Stellated, Resolved, Convex hull, and chirality flips. Resolved changes the physical arrangement
 topology; the regular-star operations change
 the resolved intersection-cell topology, and their classical collapsed forms would be immersed
 rather than proper meshes. A selective Kis Height change still interpolates because
@@ -319,6 +322,31 @@ midsphere. The result is unique only up to rotation and reflection.
 Canonical preserves connectivity, so animation directly interpolates every
 vertex from the current realization to the canonical coordinates. Removing a
 Canonical stage performs the same coordinate morph backward.
+
+### Convex hull (`H`)
+
+Wraps the complete vertex set in its smallest convex envelope. It bridges concavities and
+immersed crossings without following the original face circuits. All compound members participate
+in one hull. Coplanar triangles merge into full polygonal faces, and rotation-orbit kinds are
+recomputed from the resulting geometry. An already convex single polyhedron is unchanged and its
+pill shows the usual identity/recycle mark.
+
+The gear offers **Combine with original**, off by default. With it enabled (`H~b=1`), the source
+and its hull remain separate members of a compound: no coordinate welding, Boolean union, or
+removal of internal geometry. Even an already convex source retains two coincident members in this
+mode, so it is not an identity. Rendering and export use the usual compound semantics; see
+[Compounds](compounds.md). Reset turns the option off and the URL becomes `H` again.
+
+The core uses [Quickhull](https://www.cs.princeton.edu/research/techreps/264): start from a
+nondegenerate tetrahedron, assign outside points to facets, and repeatedly replace facets visible
+from a farthest outside point with a cone over their horizon. Only orphaned outside points are
+reassigned. Distances use a translated, unit-scale frame; duplicate, interior and straight-edge
+points disappear, while output coordinates remain those of the input. Adjacent coplanar facets
+merge through planar convex circuits. Construction reports progress and uses the normal worker
+result cache and geometry limits. Degenerate flat or collinear inputs cannot form a solid hull.
+
+**Animation:** immediate, including the combine toggle: the source and envelope need not have
+corresponding faces or vertices, so there is no general topology-preserving morph.
 
 ### Drop (`x[kind]`)
 

@@ -8,8 +8,8 @@ import polyhedra.model.util.fmt
 private const val TWEAK_SEPARATOR = "~"
 private const val TWEAK_ASSIGNMENT = "="
 
-/** Typed controls stored on a transform. A value of 1 is the regular/default choice. */
-enum class TransformTweak(val tag: String) {
+/** Typed controls stored on a transform, with defaults omitted from serialization. */
+enum class TransformTweak(val tag: String, val defaultValue: Double = 1.0, val isBoolean: Boolean = false) {
     Depth("d"),
     Distance("c"),
     Width("w"),
@@ -18,6 +18,7 @@ enum class TransformTweak(val tag: String) {
     Height("h"),
     Radius("R"),
     StellationResult("l"),
+    CombineOriginal("b", defaultValue = 0.0, isBoolean = true),
 }
 
 data class TransformTweakRange(val min: Double, val max: Double)
@@ -50,6 +51,9 @@ fun TransformId.transformTweakRanges(): Map<TransformTweak, TransformTweakRange>
         return linkedMapOf(TransformTweak.Radius to TransformTweakRanges.RadialRadius)
     }
     return when (operation) {
+        TransformOperation.ConvexHull -> linkedMapOf(
+            TransformTweak.CombineOriginal to TransformTweakRange(0.0, 1.0),
+        )
         TransformOperation.Truncated,
         TransformOperation.Needle,
         TransformOperation.Zip -> linkedMapOf(TransformTweak.Depth to TransformTweakRanges.TruncationDepth)
@@ -89,11 +93,11 @@ fun encodeTransformTag(
         append(']')
     }
     for (tweak in TransformTweak.entries) {
-        val value = tweaks[tweak]?.takeUnless { it == 1.0 } ?: continue
+        val value = tweaks[tweak]?.takeUnless { it == tweak.defaultValue } ?: continue
         append(TWEAK_SEPARATOR)
         append(tweak.tag)
         append(TWEAK_ASSIGNMENT)
-        append(value.fmt(12))
+        append(if (tweak.isBoolean) value.toInt().toString() else value.fmt(12))
     }
 }
 
@@ -129,7 +133,8 @@ fun String.parseTransformTag(): TransformSpec? {
         val valueText = part.substringAfter(TWEAK_ASSIGNMENT, missingDelimiterValue = "")
         val tweak = TransformTweak.entries.singleOrNull { it.tag == key } ?: return null
         val value = valueText.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 } ?: return null
+        if (tweak.isBoolean && value != 0.0 && value != 1.0) return null
         if (tweaks.put(tweak, value) != null) return null
     }
-    return TransformSpec(id, tweaks.filterValues { it != 1.0 })
+    return TransformSpec(id, tweaks.filter { (tweak, value) -> value != tweak.defaultValue })
 }

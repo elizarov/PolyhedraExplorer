@@ -37,6 +37,7 @@ enum class TransformOperation(
     Resolved("R"),
     Radial("r"),
     StellateFace("f"),
+    ConvexHull("H"),
 }
 
 /** Type-safe identity of a transform before continuous tweak values are applied. */
