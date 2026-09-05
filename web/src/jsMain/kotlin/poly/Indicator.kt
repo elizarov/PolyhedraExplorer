@@ -13,7 +13,10 @@ class Indicator<T>(
     val classes: String,
     val text: String,
     val tooltip: String,
+    val symbol: IndicatorSymbol? = null,
 )
+
+enum class IndicatorSymbol { Warning, Pentagram }
 
 class IndicatorMessage<T>(
     val indicator: Indicator<T>,
@@ -24,13 +27,13 @@ operator fun <T> Indicator<T>.invoke(value: T) = IndicatorMessage(this, value)
 operator fun Indicator<Unit>.invoke() = IndicatorMessage(this, Unit)
 
 val TransformFailed = Indicator<Transform>("emoji", "❌", "{} transformation has failed")
-val InvalidGeometry = Indicator<String>("emoji", "⚠️", "This setting produces invalid geometry: {}")
-val SomeFacesNotPlanar = Indicator<Unit>("emoji", "⚠️", "Some faces are not planar, apply canonical transformation")
-val FaceNotPlanar = Indicator<Unit>("emoji", "⚠️", "Face is not planar")
+val InvalidGeometry = Indicator<String>("", "", "This setting produces invalid geometry: {}", IndicatorSymbol.Warning)
+val SomeFacesNotPlanar = Indicator<Unit>("", "", "Some faces are not planar, apply canonical transformation", IndicatorSymbol.Warning)
+val FaceNotPlanar = Indicator<Unit>("", "", "Face is not planar", IndicatorSymbol.Warning)
 val TransformIsId = Indicator<Transform>("fa fa-recycle", "", "{} transformation is not doing anything here")
 val TransformNotApplicable = Indicator<Transform>("emoji", "🛑", "{} transformation is not applicable")
 val TooLarge = Indicator<FEV>("fa fa-ban", "", "Polyhedron is too large to display ({})")
-val ImmersedSurface = Indicator<String>("fa fa-star-o", "", "{}. Click to add Resolved")
+val ImmersedSurface = Indicator<String>("", "", "{}. Click to add Resolved", IndicatorSymbol.Pentagram)
 
 fun CoreGeometryAnalysis.toIntersectionIndicatorOrNull(): IndicatorMessage<String>? {
     if (!hasIntersections) return null

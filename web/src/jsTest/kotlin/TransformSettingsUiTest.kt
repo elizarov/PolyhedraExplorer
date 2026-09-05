@@ -1,6 +1,7 @@
 package polyhedra.web
 
 import androidx.compose.runtime.Composition
+import androidx.compose.runtime.mutableStateOf
 import kotlinx.browser.document
 import kotlinx.browser.window
 import org.jetbrains.compose.web.renderComposable
@@ -122,20 +123,24 @@ class TransformSettingsUiTest {
     }
 
     @Test
-    fun onlyLastTransformHasGearAndChiralityLivesInsideSettings() {
+    fun everyConfigurableTransformHasGearAndChiralityLivesInsideSettings() {
         val params = PolyParams("", null)
         params.transforms.updateValue(listOf(Transform.Truncated, Transform.Snub))
 
         composition = renderComposable(host) { ControlPane(params, popup = null, togglePopup = {}) }
-        assertEquals(1, host.querySelectorAll(".transform-settings-button").length)
+        assertEquals(2, host.querySelectorAll(".transform-settings-button").length)
         assertNull(host.querySelector(".chirality-flip"))
 
         composition?.dispose()
         composition = renderComposable(host) {
             ControlPane(params, popup = Popup.TransformSettings(0), togglePopup = {})
         }
-        assertNull(host.querySelector(".transform-settings"))
-        assertEquals(1, host.querySelectorAll(".transform-settings-button").length)
+        assertNotNull(host.querySelector(".transform-settings"))
+        assertEquals(2, host.querySelectorAll(".transform-settings-button").length)
+        val depth = host.querySelector(".transform-setting-slider") as HTMLInputElement
+        depth.value = "70"
+        depth.dispatchEvent(Event("input"))
+        assertEquals(listOf("t~d=0.7", "s"), params.transforms.value.map { it.tag })
 
         composition?.dispose()
         composition = renderComposable(host) {
@@ -143,6 +148,63 @@ class TransformSettingsUiTest {
         }
         assertNotNull(host.querySelector(".chirality-flip"))
         assertEquals(2, host.querySelectorAll(".transform-setting-slider").length)
+    }
+
+    @Test
+    fun greateningResultStepsKeepDualAndTheSettingsPopup(): Promise<Unit> {
+        val params = PolyParams("", null)
+        params.seed.updateValue(polyhedra.web.catalog.Seeds.first { it.tag == "I" })
+        params.transforms.updateValue(listOf(Transform.Greatened, Transform.Dual))
+        params.updateTransformTweakRanges(listOf(
+            listOf(CoreTransformTweakRange(TransformTweak.StellationResult, 1.0, 9.0)),
+            emptyList(),
+        ))
+        val popup = mutableStateOf<Popup?>(null)
+        composition = renderComposable(host) {
+            ControlPane(params, popup.value, togglePopup = { popup.value = it })
+        }
+        (host.querySelector(".transform-settings-button") as HTMLButtonElement).click()
+        return awaitRecomposition().then {
+            assertEquals(Popup.TransformSettings(0), popup.value)
+            (host.querySelector(".slider-step-next") as HTMLButtonElement).click()
+            awaitRecomposition()
+        }.then {
+            assertEquals(listOf("G~l=2", "d"), params.transforms.value.map { it.tag })
+            assertEquals("2", (host.querySelector(".transform-setting-slider") as HTMLInputElement).value)
+            assertEquals(Popup.TransformSettings(0), popup.value)
+            (host.querySelector(".slider-step-next") as HTMLButtonElement).click()
+            awaitRecomposition()
+        }.then {
+            assertEquals(listOf("G~l=3", "d"), params.transforms.value.map { it.tag })
+            assertEquals("3", (host.querySelector(".transform-setting-slider") as HTMLInputElement).value)
+            (host.querySelector(".slider-step-previous") as HTMLButtonElement).click()
+            awaitRecomposition()
+        }.then {
+            assertEquals(listOf("G~l=2", "d"), params.transforms.value.map { it.tag })
+            (host.querySelector(".transform-settings-reset") as HTMLButtonElement).click()
+            awaitRecomposition()
+        }.then {
+            assertEquals(listOf("G", "d"), params.transforms.value.map { it.tag })
+            assertEquals("1", (host.querySelector(".transform-setting-slider") as HTMLInputElement).value)
+            assertNotNull(host.querySelector(".transform-settings"))
+        }
+    }
+
+    @Test
+    fun earlierChiralityOnlyTransformCanFlipAndResetWithoutChangingLaterTransforms(): Promise<Unit> {
+        val params = PolyParams("", null)
+        params.transforms.updateValue(listOf(Transform.Propeller, Transform.ConvexHull, Transform.Dual))
+        composition = renderComposable(host) {
+            ControlPane(params, popup = Popup.TransformSettings(0), togglePopup = {})
+        }
+        assertEquals(2, host.querySelectorAll(".transform-settings-button").length)
+        assertNull(host.querySelector(".transform-setting-slider"))
+        (host.querySelector(".chirality-flip") as HTMLButtonElement).click()
+        assertEquals(listOf("p'", "H", "d"), params.transforms.value.map { it.tag })
+        return awaitRecomposition().then {
+            (host.querySelector(".transform-settings-reset") as HTMLButtonElement).click()
+            assertEquals(listOf("p", "H", "d"), params.transforms.value.map { it.tag })
+        }
     }
 
     @Test

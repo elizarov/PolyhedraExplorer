@@ -10,8 +10,13 @@ import polyhedra.web.poly.IndicatorMessage
 
 @Composable
 fun <T> MessageSpan(message: IndicatorMessage<T>) {
-    Span(attrs = { classes(*message.indicator.classes.split(' ').toTypedArray()) }) {
-        Text(message.indicator.text)
+    val symbol = message.indicator.symbol
+    if (symbol != null) {
+        IndicatorIcon(symbol)
+    } else {
+        Span(attrs = { classes(*message.indicator.classes.split(' ').toTypedArray()) }) {
+            Text(message.indicator.text)
+        }
     }
     Aside(attrs = { classes("tooltip-text") }) {
         Text(message.indicator.tooltip.replace("{}", message.value.toString()))

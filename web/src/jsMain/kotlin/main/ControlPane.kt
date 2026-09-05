@@ -348,11 +348,9 @@ internal fun ControlPane(
             val hasVariableStellationResult = transformSafeRanges
                 ?.get(TransformTweak.StellationResult)
                 ?.let { range -> range.max > range.min } == true
-            val hasSettings = index == transforms.lastIndex && (
-                transforms[index].settings.any { setting ->
-                    setting.tweak != TransformTweak.StellationResult || hasVariableStellationResult
-                } || transforms[index].isChiral
-                )
+            val hasSettings = transforms[index].settings.any { setting ->
+                setting.tweak != TransformTweak.StellationResult || hasVariableStellationResult
+            } || transforms[index].isChiral
             val itemActive = popup == itemPopup || popup == settingsPopup
             Div(attrs = { classes("btn", *(if (itemActive) arrayOf("active") else emptyArray())) }) {
                 if (index == transforms.lastIndex) {
@@ -367,7 +365,7 @@ internal fun ControlPane(
                     TransformSettingsPopup(
                         transform = transforms[index],
                         safeRanges = transformSafeRanges,
-                        canFlipChirality = index == transforms.lastIndex && transforms[index].isChiral,
+                        canFlipChirality = transforms[index].isChiral,
                         onChange = { setting, value -> updateTransformTweak(index, setting, value) },
                         onFlipChirality = { flipTransformChirality(index) },
                         onReset = { resetTransformSettings(index) },

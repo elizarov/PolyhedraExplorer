@@ -153,6 +153,26 @@ div.btn > button.txt {
 
 div.btn > button.msg {
     padding-right: 0.6em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.indicator-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1em;
+    height: 1em;
+    flex-shrink: 0;
+    line-height: 1;
+    vertical-align: middle;
+}
+
+.indicator-icon > svg {
+    display: block;
+    width: 100%;
+    height: 100%;
 }
 
 div.btn > div.vertical-controls {

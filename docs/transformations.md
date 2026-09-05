@@ -60,8 +60,11 @@ Gyro.
 
 ## Continuous parameters
 
-The last transform has a gear button when it has configurable settings;
-earlier pills do not show or open settings. Continuous slider values are
+Every transform with configurable settings has a gear button, at any position
+in the chain. Editing a stage preserves and recomputes the operations after it
+without closing its settings popup. For example, in Dual Greatened Icosahedron,
+stepping through Greatened results immediately displays their duals.
+Continuous slider values are
 dimensionless percentages of the operation's
 regular construction: `100%` is the default, while lower or higher
 values move continuously away from it without changing the operation's
