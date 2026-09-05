@@ -24,31 +24,55 @@ class AcrylicContext(private val gl: GL) {
             uSceneColor.textureUnit(0)
             uSceneSize by float32Of(width.toDouble(), height.toDouble())
         }
-        try {
-            // Each layer reads a snapshot, never its own partially rendered framebuffer. Depth
-            // selects its closest fragment, making triangle order immaterial within the layer.
-            for (cullMode in listOf(1, -1)) {
-                if (textureWidth != width || textureHeight != height) {
-                    gl.copyTexImage2D(GL.TEXTURE_2D, 0, GL.RGBA, 0, 0, width, height, 0)
-                    textureWidth = width
-                    textureHeight = height
-                } else {
-                    gl.copyTexSubImage2D(GL.TEXTURE_2D, 0, 0, 0, 0, 0, width, height)
-                }
-                gl.depthMask(true)
-                gl.clear(GL.DEPTH_BUFFER_BIT)
-                gl[GL.DEPTH_TEST] = true
-                gl[GL.BLEND] = false
-                faces.draw(view, lighting, cullMode)
+        fun snapshot() {
+            if (textureWidth != width || textureHeight != height) {
+                gl.copyTexImage2D(GL.TEXTURE_2D, 0, GL.RGBA, 0, 0, width, height, 0)
+                textureWidth = width
+                textureHeight = height
+            } else {
+                gl.copyTexSubImage2D(GL.TEXTURE_2D, 0, 0, 0, 0, 0, width, height)
             }
-            // Lines are an inspection overlay, not optical material. Draw every occurrence in
-            // one stable pass: switching a source polygon from front to back must not move its
-            // outlines into/out of the refracted background. Include edges seen through acrylic.
-            gl[GL.BLEND] = true
-            gl[GL.DEPTH_TEST] = false
-            gl.depthMask(false)
-            edges.draw(view)
+        }
+        try {
+            snapshot()
+            gl.depthMask(true)
+            gl.clear(GL.DEPTH_BUFFER_BIT)
+            gl[GL.DEPTH_TEST] = true
+            gl[GL.BLEND] = false
+            faces.draw(view, lighting, 1)
+
+            val hasEdges = edges.drawEdges || edges.selectedIndexSize > 0
+            gl.clear(GL.DEPTH_BUFFER_BIT)
+            if (hasEdges) {
+                // Partition lines by visibility against the front material, not source-face
+                // orientation. This also works for rim walls, cut faces and expanded geometry.
+                // A minimal shader writes depth only, with the same animated positions/cut.
+                gl.colorMask(false, false, false, false)
+                gl[GL.POLYGON_OFFSET_FILL] = true
+                gl.polygonOffset(1.0f, 1.0f)
+                faces.draw(view, lighting, -1, depthOnly = true)
+                gl[GL.POLYGON_OFFSET_FILL] = false
+                gl.colorMask(true, true, true, true)
+                gl.depthMask(false)
+                gl.depthFunc(GL.GREATER)
+                gl[GL.BLEND] = true
+                edges.draw(view)
+                gl.depthFunc(GL.LEQUAL)
+                gl[GL.BLEND] = false
+            }
+            // Rear edges and rear faces are now in the same snapshot, so refraction, blur and
+            // absorption affect them together. The front depth also prevents redrawing rear
+            // lines afterward at their unrefracted positions.
+            snapshot()
+            faces.draw(view, lighting, -1)
+            if (hasEdges) {
+                gl[GL.BLEND] = true
+                edges.draw(view)
+            }
         } finally {
+            gl.colorMask(true, true, true, true)
+            gl[GL.POLYGON_OFFSET_FILL] = false
+            gl.depthFunc(GL.LEQUAL)
             gl.depthMask(true)
             gl[GL.DEPTH_TEST] = true
             gl[GL.BLEND] = false

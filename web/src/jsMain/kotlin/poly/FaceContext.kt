@@ -46,6 +46,7 @@ class FaceContext(
 
     val program = FaceProgram(gl)
     val acrylicProgram by lazy { FaceProgram(gl, acrylic = true) }
+    val acrylicDepthProgram by lazy { FaceProgram(gl, depthOnly = true) }
 
     var indexSize = 0
     var bufferSize = 0
@@ -884,9 +885,13 @@ data class FaceExportParams(
 )
 
 // cullMode: 0 - no, 1 - cull front, -1 - cull back
-fun FaceContext.draw(view: ViewContext, lighting: LightingContext, cullMode: Int = 0) {
+fun FaceContext.draw(view: ViewContext, lighting: LightingContext, cullMode: Int = 0, depthOnly: Boolean = false) {
     if (!drawFaces) return
-    val program = if (view.transparencyEnabled) acrylicProgram else program
+    val program = when {
+        depthOnly -> acrylicDepthProgram
+        view.transparencyEnabled -> acrylicProgram
+        else -> program
+    }
     val renderTwoSided = view.transparencyEnabled || view.cutEnabled ||
         hiddenFaces.isNotEmpty() && poly.resolvedFaces.any(ResolvedFaceGeometry::sourceBoundarySelfIntersects)
     val restoreCulling = renderTwoSided && gl.isEnabled(GL.CULL_FACE)
@@ -918,21 +923,23 @@ fun FaceContext.draw(view: ViewContext, lighting: LightingContext, cullMode: Int
             uPrevFraction by (animation?.prevFraction ?: 0.0)
 
             aPosition by target.positionBuffer
-            aLightNormal by target.lightNormalBuffer
             aExpandDir by target.expandDirBuffer
             aThicknessDir by target.thicknessDirBuffer
             aRimDir by target.rimDirBuffer
             aRimMax by target.rimMaxBuffer
-            aColor by target.colorBuffer
             aPrevPosition by prevOrTarget.positionBuffer
-            aPrevLightNormal by prevOrTarget.lightNormalBuffer
             aPrevExpandDir by prevOrTarget.expandDirBuffer
             aPrevThicknessDir by prevOrTarget.thicknessDirBuffer
             aPrevRimDir by prevOrTarget.rimDirBuffer
             aPrevRimMax by prevOrTarget.rimMaxBuffer
-            aPrevColor by prevOrTarget.colorBuffer
             aInner by innerBuffer
-            aFaceMode by faceModeBuffer
+            if (!depthOnly) {
+                aLightNormal by target.lightNormalBuffer
+                aPrevLightNormal by prevOrTarget.lightNormalBuffer
+                aColor by target.colorBuffer
+                aPrevColor by prevOrTarget.colorBuffer
+                aFaceMode by faceModeBuffer
+            }
         }
         gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, indexBuffer.glBuffer)
         gl.drawElements(GL.TRIANGLES, indexSize, GL.UNSIGNED_INT, 0)

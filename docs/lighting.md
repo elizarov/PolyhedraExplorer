@@ -77,7 +77,8 @@ governs this overlay: Faces-only hides it, and print preview also suppresses it.
 The ghost uses the existing edge draw, with no face-direction culling in the
 removed region. Each face occurrence contributes 12% opacity (about 23% for a
 shared unexpanded edge). Opaque rendering depth-tests it against retained geometry;
-acrylic draws it once after both optical passes, together with the other edge overlays.
+acrylic partitions it by front-surface depth, with directly visible ghost lines drawn after
+refraction. Every line fragment belongs to just one of the two edge passes.
 
 `FaceProgram` treats every reverse-facing material boundary as interior. This
 includes the reverse of a rim's underside and side walls seen through a cut:
@@ -190,10 +191,14 @@ snapshots again, then renders the nearest front-facing material layer. Layer sel
 rasterized triangle's facing, including rim walls and undersides, never the hidden source face's
 orientation or a vertex-interpolated visibility mask. GPU depth testing chooses each layer independently
 of triangle order. Culling is disabled, supporting cut faces, rims, and immersed surfaces.
-Edges are drawn once over the completed acrylic image, including edges visible through the
-material. They are never put into different optical layers according to source-face direction;
-Cut's optional removed-shell wireframe is likewise drawn only once. Geometry,
-export, and core computations are unchanged. The table shadow is reduced by estimated sheet
+When edges are visible, a depth-only front-surface pass partitions their fragments by occlusion.
+Rear edge lines are included in the second snapshot, so the same refraction, absorption and blur
+apply to rear faces and their outlines. Only directly visible lines are overlaid afterward; no
+unrefracted duplicate remains behind the front surface. A small polygon depth offset prevents
+coplanar front edges from being misclassified as rear lines. The partition uses the actual cut,
+expanded, animated material geometry, never source-face direction. The same rule covers selected
+edges and Cut's optional removed-shell wireframe. Edges-only display bypasses acrylic entirely.
+Geometry, export, and core computations are unchanged. The table shadow is reduced by estimated sheet
 transmission, with a nonzero reflection loss even for clear acrylic.
 
 ## Performance and limits
@@ -206,7 +211,9 @@ conversion.
 
 Acrylic uses a separately compiled shader and one lazily allocated RGBA8 screen-sized texture
 (`4 × width × height` bytes). Each frame makes two GPU framebuffer copies and two face draws,
-with four texture reads per covered fragment. The texture is reused until resize and deleted
+with four texture reads per covered fragment. Visible edges add one minimal depth-only face draw
+(no lighting or texture sampling) and two complementary depth-tested line draws; they add no
+framebuffers or copies. The texture is reused until resize and deleted
 with its drawing context. There is no CPU readback, triangle sorting, geometry rebuild, ray
 marching, float framebuffer requirement, or additional WASM work. The same WebGL 1 path runs
 in browsers and the Node/headless-gl renderer.

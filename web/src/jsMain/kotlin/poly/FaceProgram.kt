@@ -8,7 +8,7 @@ import polyhedra.web.glsl.*
 import kotlin.math.PI
 import org.khronos.webgl.WebGLRenderingContext as GL
 
-class FaceProgram(gl: GL, private val acrylic: Boolean = false) : ViewBaseProgram(gl) {
+class FaceProgram(gl: GL, private val acrylic: Boolean = false, private val depthOnly: Boolean = false) : ViewBaseProgram(gl) {
     val uLightColor by uniform(GLType.vec3)
     val uFillColor by uniform(GLType.vec3)
     val uLightPosition by uniform(GLType.vec3)
@@ -116,19 +116,25 @@ class FaceProgram(gl: GL, private val acrylic: Boolean = false) : ViewBaseProgra
         val position by fPosition()
         gl_Position by uProjectionMatrix * position
         vCutDepth by position.z
-        // lighting & color
-        vNormal by fLightNormal()
-        // Source-face orientation, not aInner (which also varies across rim walls).
-        // This identifies explicit undersides as well as reversed outer-face fragments.
-        vSurfaceSide by dot(normalize(fInterpolatedLightNormal()), normalize(fInterpolatedExpandDir()))
-        vToCamera by uCameraPosition - position.xyz
-        vToLight by uLightPosition - position.xyz
-        vColor by fInterpolatedColor() * aFaceMode
-        vColorAlpha by if (acrylic) uColorAlpha else
-            uColorAlpha * fCullMull(position, uNormalMatrix * fInterpolatedExpandDir())
+        if (!depthOnly) {
+            // lighting & color
+            vNormal by fLightNormal()
+            // Source-face orientation, not aInner (which also varies across rim walls).
+            // This identifies explicit undersides as well as reversed outer-face fragments.
+            vSurfaceSide by dot(normalize(fInterpolatedLightNormal()), normalize(fInterpolatedExpandDir()))
+            vToCamera by uCameraPosition - position.xyz
+            vToLight by uLightPosition - position.xyz
+            vColor by fInterpolatedColor() * aFaceMode
+            vColorAlpha by if (acrylic) uColorAlpha else
+                uColorAlpha * fCullMull(position, uNormalMatrix * fInterpolatedExpandDir())
+        }
     }
 
-    override val fragmentShader = shader(ShaderType.Fragment) {
+    override val fragmentShader = if (depthOnly) shader(ShaderType.Fragment) {
+        discardCutFragments()
+        discardIf(select(gl_FrontFacing, 1.0.literal, (-1.0).literal) * uCullMode gt 0.0.literal)
+        gl_FragColor by vec4(0.0, 0.0, 0.0, 0.0)
+    } else shader(ShaderType.Fragment) {
         discardCutFragments()
         if (acrylic) {
             // Partition the actual material boundary, not its source polygon. Rim walls and

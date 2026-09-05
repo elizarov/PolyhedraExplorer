@@ -145,5 +145,6 @@ class LightingModelTest {
 
         assertNotNull(FaceProgram(gl).program)
         assertNotNull(FaceProgram(gl, acrylic = true).program)
+        assertNotNull(FaceProgram(gl, depthOnly = true).program)
     }
 }
