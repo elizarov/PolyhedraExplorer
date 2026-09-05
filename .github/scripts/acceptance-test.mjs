@@ -84,9 +84,13 @@ function countPattern(label, count) {
     return `${label}:\\s*${count}(?:\\/\\d+)?(?:\\s|$)`
 }
 
-async function runCase(sessionId, testCase, index) {
+let navigationIndex = 0
+
+async function runCase(sessionId, testCase) {
     const url = new URL(applicationUrl)
-    url.searchParams.set("acceptance", index.toString())
+    // Every case must reload the application, including successive export cases. Changing only
+    // the hash is a same-document navigation and does not rerun configuration initialization.
+    url.searchParams.set("acceptance", (navigationIndex++).toString())
     url.hash = testCase.hash
     await webdriver("POST", `/session/${sessionId}/url`, { url: url.toString() })
 
@@ -138,7 +142,7 @@ async function runStlExportCase(sessionId, compound = false) {
         counts: { faces: 7, edges: 15, vertices: 10 },
         labels: ["Prism 5/2"],
     }
-    await runCase(sessionId, testCase, cases.length)
+    await runCase(sessionId, testCase)
     await webdriver("POST", `/session/${sessionId}/execute/sync`, {
         script: `
             window.__acceptedStlDownload = null;
@@ -205,8 +209,9 @@ async function runStlExportCase(sessionId, compound = false) {
     if (!started) throw new Error("STL export control did not open")
 
     const deadline = Date.now() + 30_000
+    let state
     while (Date.now() < deadline) {
-        const state = await webdriver("POST", `/session/${sessionId}/execute/sync`, {
+        state = await webdriver("POST", `/session/${sessionId}/execute/sync`, {
             script: `
                 return {
                     download: window.__acceptedStlDownload,
@@ -251,8 +256,8 @@ try {
         },
     })
     sessionId = session.sessionId
-    for (const [index, testCase] of cases.entries()) {
-        await runCase(sessionId, testCase, index)
+    for (const testCase of cases) {
+        await runCase(sessionId, testCase)
     }
     await runStlExportCase(sessionId)
     await runStlExportCase(sessionId, true)
