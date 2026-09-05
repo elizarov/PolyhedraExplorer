@@ -15,6 +15,24 @@ import kotlin.time.measureTime
 
 class RendererTest {
     @Test
+    fun cutFacesRetainsAFaintShellWireframeUnlessFacesOnlyOrPrintPreview() = runTest {
+        // At -1 the entire cube is removed, isolating the ghost from retained faces and edges.
+        fun configuration(view: String, preview: String = "") = "a(r(n))s(C)v(env(n)$view)$preview"
+        val ghost = renderConfiguration(configuration("c(y)cp(-1)"), 320, 240)
+        val facesOnly = renderConfiguration(configuration("c(y)cp(-1)d(f)"), 320, 240)
+        val printPreview = renderConfiguration(configuration("c(y)cp(-1)", "p(e(y))"), 320, 240)
+        val opaqueEdges = renderConfiguration(configuration("d(e)"), 320, 240)
+        val transparentGhost = renderConfiguration(configuration("c(y)cp(-1)t(0.3)"), 320, 240)
+        assertTrue(nonBackgroundPixels(ghost) > 100, "Removed faces must leave the shell wireframe")
+        assertEquals(0, nonBackgroundPixels(facesOnly), "Faces-only must hide the ghost")
+        assertEquals(0, nonBackgroundPixels(printPreview), "Print preview must still suppress edges")
+        assertEquals(0, changedPixels(ghost, transparentGhost), "Transparency must not draw ghost edges twice")
+        val ghostInk = (0 until ghost.rgba.length step 4).sumOf { 242 - ghost.rgba.unsigned(it) }
+        val opaqueInk = (0 until opaqueEdges.rgba.length step 4).sumOf { 242 - opaqueEdges.rgba.unsigned(it) }
+        assertTrue(ghostInk in 1 until opaqueInk / 2, "Removed edges should be faint, not solid black")
+    }
+
+    @Test
     fun rotatingCutawayUpdatesLightingWithoutReuploadingGeometry() = runTest {
         for (seed in listOf("C", "SA5_2")) {
             val inspection = inspectCompactConfiguration(

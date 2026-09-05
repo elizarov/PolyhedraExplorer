@@ -20,7 +20,7 @@ fun ConfigPopup(params: RootParams) {
         ConfigControlRow("Base scale") { PDropdown(params.render.poly.baseScale) }
         ConfigControlRow("View scale") { PSlider(params.render.view.scale, ariaLabel = "View scale") }
         ConfigControlRow("Expand") { PSlider(params.render.view.expandFaces, ariaLabel = "Expand") }
-        ControlRow2("Cut", { PCheckbox(params.render.view.cutEnabled) }) {
+        ControlRow2("Cut faces", { PCheckbox(params.render.view.cutEnabled) }) {
             PSlider(params.render.view.cutPosition, !cutEnabled, ariaLabel = "Cut plane position")
         }
         ConfigControlRow("Display") { PDropdown(params.render.view.display) }

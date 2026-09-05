@@ -3,6 +3,8 @@ package polyhedra.renderer
 import org.khronos.webgl.Uint8Array
 import org.khronos.webgl.WebGLRenderingContext as GL
 import polyhedra.model.util.Vec3
+import polyhedra.model.util.unit
+import polyhedra.model.util.times
 import polyhedra.web.glsl.*
 import polyhedra.web.poly.FaceProgram
 import polyhedra.web.util.*
@@ -13,6 +15,20 @@ import kotlin.test.assertTrue
 
 /** Pixel-level tests of the application's actual GLSL, with geometry/lighting held constant. */
 class FaceLightingTest {
+    @Test
+    fun cutBandMarksTheLipAndFadesToUnmodifiedSurfaceLighting() {
+        val ordinary = sample(tilt = 0.75)
+        val lip = sample(tilt = 0.75, cutDepth = 0.002)
+        val innerEdge = sample(tilt = 0.75, cutDepth = 0.0054)
+        assertTrue(lip.red > ordinary.red + 40, "The lip must contrast with the material")
+        assertTrue(innerEdge.red < ordinary.red, "The inner line must separate the lip from the cavity")
+        assertEquals(ordinary, sample(tilt = 0.75, cutDepth = 0.1), "The band must be local to the cut")
+        assertEquals(lip, sample(tilt = 0.75, cutDepth = 0.004, radius = 2.0), "Band scales with the model")
+        assertEquals(lip.copy(alpha = 102), sample(tilt = 0.75, cutDepth = 0.002, opacity = 0.4))
+        assertEquals(0, sample(tilt = 0.75, cutDepth = -0.01).alpha, "The removed side must stay discarded")
+        assertEquals(sample(), sample(cutDepth = 0.0), "A coplanar face must not become an all-over band")
+    }
+
     @Test
     fun reverseFacesAndExplicitUndersidesReceiveTheSameInteriorShading() {
         val front = sample()
@@ -86,17 +102,22 @@ private fun sample(
     fill: Double = 0.22,
     roughness: Double = 0.45,
     opacity: Double = 1.0,
+    tilt: Double = 0.0,
 ): Pixel {
     val gl = createContext(32, 32)
     try {
         val program = FaceProgram(gl)
         val positions = createBuffer(gl, GLType.vec3)
-        val vertices = listOf(Vec3(-1.0, -1.0, 0.0), Vec3(1.0, -1.0, 0.0), Vec3(0.0, 1.0, 0.0))
+        // Tilt a real plane around the sampled pixel, whose NDC y is 1/32. Its depth stays zero.
+        val vertices = listOf(-1.0 to -1.0, 1.0 to -1.0, 0.0 to 1.0).map { (x, y) ->
+            Vec3(x, y, -tilt * (y - 1.0 / 32))
+        }
         (if (reverseWinding) vertices.reversed() else vertices).forEachIndexed { i, v -> positions[i] = v }
         positions.bindBufferData(gl)
-        val normal = Vec3(0.0, 0.0, if (reverseWinding) -1.0 else 1.0)
+        val planeNormal = Vec3(0.0, tilt, 1.0).unit
+        val normal = planeNormal * if (reverseWinding) -1.0 else 1.0
         val outward = if (wall) Vec3(1.0, 0.0, 0.0) else
-            Vec3(0.0, 0.0, if (reverseWinding xor underside) -1.0 else 1.0)
+            planeNormal * if (reverseWinding xor underside) -1.0 else 1.0
         fun GLProgram.Attribute<GLType.vec3>.constant(v: Vec3) {
             gl.vertexAttrib3f(location, v.x.toFloat(), v.y.toFloat(), v.z.toFloat())
         }

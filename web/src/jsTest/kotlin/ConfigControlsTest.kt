@@ -202,7 +202,7 @@ class ConfigControlsTest {
         composition = renderComposable(host) { ConfigPopup(params) }
         val cutRow = (0 until host.querySelectorAll("tr.control").length)
             .map { host.querySelectorAll("tr.control").item(it) as HTMLElement }
-            .single { it.querySelector("td")?.textContent == "Cut" }
+            .single { it.querySelector("td")?.textContent == "Cut faces" }
         val configRows = (0 until host.querySelectorAll("tr.control").length)
             .map { host.querySelectorAll("tr.control").item(it) as HTMLElement }
         val checkbox = cutRow.querySelector(".checkbox") as HTMLDivElement

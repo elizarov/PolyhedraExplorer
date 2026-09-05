@@ -163,7 +163,17 @@ class FaceProgram(gl: GL) : ViewBaseProgram(gl) {
         )
         val linearColor by directLight + (fillDiffuse + fillSpecular) * fillAccess
         val displayColor by pow(max(linearColor, 0.0), vec3(1.0 / 2.2))
-        gl_FragColor by vec4(displayColor, vColorAlpha)
+        // A surface-distance band, not a slab in z: keep its width consistent on oblique faces.
+        // Parallel/coplanar surfaces have no cut contour and must not become entirely tinted.
+        val cutSlope by length(vec3(normal.x, normal.y, 0.0.literal))
+        val cutDistance by max(uCutPosition - vCutDepth, 0.0) /
+            (max(uInteriorRadius, 0.0001) * max(cutSlope, 0.0001))
+        val band by uCutEnabled * step(0.001.literal, cutSlope) *
+            (1.0.literal - smoothstep(0.010.literal, 0.016.literal, cutDistance))
+        val lightBand by 1.0.literal - smoothstep(0.006.literal, 0.010.literal, cutDistance)
+        // Neutral light lip plus a dark inner edge stays readable against any orbit/print color.
+        val bandColor by vec3(0.80, 0.82, 0.84) * lightBand + vec3(0.06) * (1.0.literal - lightBand)
+        gl_FragColor by vec4(displayColor * (1.0.literal - band) + bandColor * band, vColorAlpha)
     }
 }
 

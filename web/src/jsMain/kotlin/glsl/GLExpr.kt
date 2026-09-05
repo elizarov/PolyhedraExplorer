@@ -114,6 +114,8 @@ fun <T : GLType.NonMatrixFloats<T>> atan(a: GLExpr<T>): GLExpr<T> = Call(a.type,
 // binary component-wise funs on floats and vecs
 fun <T : GLType.NonMatrixFloats<T>> atan(a: GLExpr<T>, b: GLExpr<T>): GLExpr<T> = Call(a.type, "atan", a, b)
 fun <T : GLType.NonMatrixFloats<T>> step(a: GLExpr<T>, b: GLExpr<T>): GLExpr<T> = Call(a.type, "step", a, b)
+fun <T : GLType.NonMatrixFloats<T>> smoothstep(a: GLExpr<T>, b: GLExpr<T>, x: GLExpr<T>): GLExpr<T> =
+    Call(x.type, "smoothstep", a, b, x)
 
 //
 fun <T : GLType.VecFloats<T>> pow(a: GLExpr<T>, b: GLExpr<T>): GLExpr<T> = Call(a.type, "pow", a, b)

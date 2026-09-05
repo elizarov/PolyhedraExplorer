@@ -107,6 +107,9 @@ fun EdgeContext.draw(view: ViewContext, cullMode: Int = 0) {
     val prevOrTarget = if (animation != null) prev else target
     program.use {
         assignView(view, cullMode)
+        // Two face occurrences of a shared edge composite to approximately 23% opacity.
+        // Faces-only display (including an active edge selection) must not restore the ghost.
+        uCutEdgeAlpha by if (drawEdges) 0.12 else 0.0
 
         uTargetFraction by (animation?.targetFraction ?: 1.0)
         uPrevFraction by (animation?.prevFraction ?: 0.0)

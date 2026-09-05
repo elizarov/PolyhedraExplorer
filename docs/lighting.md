@@ -58,10 +58,25 @@ approximation, not a different material and not a ray-traced or shadow-mapped
 visibility test. It makes exposed interiors read as recesses instead of bright
 outer faces, including during Cut, rotation, expansion, and transparency.
 
-Cut defaults to `+0.5` of the selected base-scale radius, retaining more of the
+Cut faces defaults to `+0.5` of the selected base-scale radius, retaining more of the
 front shell around the opening. Its range is `-1` (back) to `+1` (front); `0`
 passes through the center. URLs omit the default position and use `cp(0)` for
 an explicit center cut.
+
+The opening has a narrow neutral-light band with a dark inner edge. This is a
+diagrammatic inspection overlay on retained face fragments, not a cap or extra
+material. Its surface-distance width is proportional to the displayed radius;
+the shader corrects for face inclination and suppresses the band on parallel
+faces. The band has smooth transitions and preserves face transparency. It does
+not change exported geometry or cast additional shadows.
+
+Edges in front of the cut plane remain as a faint wireframe of the removed
+shell; retained edges keep their normal appearance. The existing Display control
+governs this overlay: Faces-only hides it, and print preview also suppresses it.
+The ghost uses the existing edge draw, with no face-direction culling in the
+removed region. Each face occurrence contributes 12% opacity (about 23% for a
+shared unexpanded edge); the transparency back pass skips it to avoid doubling
+the contribution. Depth testing still respects retained geometry.
 
 `FaceProgram` treats every reverse-facing material boundary as interior. This
 includes the reverse of a rim's underside and side walls seen through a cut:
