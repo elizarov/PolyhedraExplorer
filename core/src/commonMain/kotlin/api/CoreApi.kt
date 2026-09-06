@@ -87,8 +87,7 @@ private fun TransformSpec.toLogicalTransformOrNull(): LogicalTransform? {
     return toTransformOrNull()?.let { transform ->
         val resultNumber = tweaks[TransformTweak.StellationResult]
             ?.takeIf {
-                (id.operation == TransformOperation.Greatened || id.operation == TransformOperation.Stellated) &&
-                    it > 1.0
+                id.operation.hasDiscreteResults && it > 1.0
             }
             ?.toInt()
         LogicalTransform(
@@ -131,7 +130,7 @@ suspend fun evaluateCore(
         return current.response
     }
 
-    // Greatened and Stellated Result changes are discrete and have no animation keyframes. Avoid
+    // Numbered geometry-search results are discrete and have no animation keyframes. Avoid
     // rebuilding the previous large candidate merely to discover that the animation is empty.
     if (request.state.hasNonAnimatedStarResultChangeFrom(previousState)) {
         reportCompletion(current, reportProgress)
@@ -185,13 +184,12 @@ private fun CoreState.hasNonAnimatedStarResultChangeFrom(previous: CoreState): B
         return false
     }
     val changed = transformTags.indices.filter { index -> transformTags[index] != previous.transformTags[index] }
-    if (changed.size != 1 || changed.single() != transformTags.lastIndex) return false
-    val currentSpec = transformTags.last().parseTransformTag() ?: return false
-    val previousSpec = previous.transformTags.last().parseTransformTag() ?: return false
+    if (changed.size != 1) return false
+    val index = changed.single()
+    val currentSpec = transformTags[index].parseTransformTag() ?: return false
+    val previousSpec = previous.transformTags[index].parseTransformTag() ?: return false
     if (currentSpec.id != previousSpec.id) return false
-    if (currentSpec.id.operation != TransformOperation.Greatened &&
-        currentSpec.id.operation != TransformOperation.Stellated
-    ) return false
+    if (!currentSpec.id.operation.hasDiscreteResults) return false
     return currentSpec.tweaks - TransformTweak.StellationResult ==
         previousSpec.tweaks - TransformTweak.StellationResult
 }
@@ -245,10 +243,7 @@ private suspend fun evaluateState(
             }
         }
         reportTransformProgress(0)
-        val reportsCandidateProgress = computeTweakRanges && (
-            transform.spec.id.operation == TransformOperation.Greatened ||
-                transform.spec.id.operation == TransformOperation.Stellated
-            )
+        val reportsCandidateProgress = computeTweakRanges && transform.spec.id.operation.hasDiscreteResults
         if (computeTweakRanges) {
             val rangeProgress = if (reportsCandidateProgress) {
                 OperationProgressContext { done ->
@@ -341,11 +336,12 @@ private suspend fun LogicalTransform.safeTweakRanges(
 ): List<CoreTransformTweakRange> {
     when (spec.id.operation) {
         TransformOperation.Greatened,
+        TransformOperation.Faceted,
         TransformOperation.Stellated -> {
-            val operation = if (spec.id.operation == TransformOperation.Greatened) {
-                ConstellationOperation.Greaten
-            } else {
-                ConstellationOperation.Stellate
+            val operation = when (spec.id.operation) {
+                TransformOperation.Greatened -> ConstellationOperation.Greaten
+                TransformOperation.Faceted -> ConstellationOperation.Facet
+                else -> ConstellationOperation.Stellate
             }
             val candidates = inputPoly.stellationCandidatesAsync(operation, progress)
             if (candidates.isEmpty()) return emptyList()
@@ -845,8 +841,7 @@ private fun transformAnimation(
     if (previousTransform is Whirl && currentTransform is Whirl &&
         previousTransform.chirality != currentTransform.chirality
     ) return emptyList()
-    if (previousTransform is Greatened || currentTransform is Greatened ||
-        previousTransform is Stellated || currentTransform is Stellated
+    if (previousTransform.id.operation.hasDiscreteResults || currentTransform.id.operation.hasDiscreteResults
     ) return emptyList()
     if ((previousTransform is Dual || currentTransform is Dual) &&
         (basePoly.cachedConstellationGeometryAnalysisOrNull() ?: basePoly.analyzeGeometry())

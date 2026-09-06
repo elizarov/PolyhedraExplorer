@@ -106,6 +106,7 @@ sealed class Transform : Tagged {
         val Stellated: Transform by Stellated()
         val Resolved: Transform by Resolved()
         val ConvexHull: Transform by ConvexHull()
+        val Faceted: Transform by Faceted()
 
         val Transforms: List<Transform> = registeredTransforms.toList()
 
@@ -273,6 +274,7 @@ private fun Transform.supportsTweaks(tweaks: Set<TransformTweak>): Boolean {
         is Snub -> setOf(TransformTweak.Inset, TransformTweak.Twist)
         is Chamfered -> setOf(TransformTweak.Width)
         is Greatened,
+        is Faceted,
         is Stellated -> setOf(TransformTweak.StellationResult)
         else -> emptySet()
     }
@@ -302,6 +304,7 @@ private data class TweakedTransform(
         is Chamfered -> poly.chamfered(requireNotNull(chamferingRatio(poly)))
         is Greatened -> poly.greatened(integerResult())
         is Stellated -> poly.stellated(integerResult())
+        is Faceted -> poly.faceted(integerResult())
         else -> error("Transform ${base.tag} has no continuous parameters")
     }
 
@@ -309,6 +312,7 @@ private data class TweakedTransform(
     override val asyncTransform: AsyncTransform? = when (base) {
         is Greatened -> { poly, progress -> poly.greatenedAsync(integerResult(), progress) }
         is Stellated -> { poly, progress -> poly.stellatedAsync(integerResult(), progress) }
+        is Faceted -> { poly, progress -> poly.facetedAsync(integerResult(), progress) }
         else -> null
     }
 
@@ -345,7 +349,7 @@ private data class TweakedTransform(
         val value = factor(TransformTweak.StellationResult)
         if (value % 1.0 != 0.0) throw TransformApplicabilityException(
             CoreIssueCode.TransformNotApplicable,
-            "Stellation Result must be an integer, found $value",
+            "$base Result must be an integer, found $value",
         )
         return value.toInt()
     }

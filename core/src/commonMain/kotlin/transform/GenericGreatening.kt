@@ -2,7 +2,6 @@ package polyhedra.core.transform
 
 import polyhedra.core.poly.geometricSymmetryOperations
 import polyhedra.core.poly.GeometricSymmetryOperation
-import polyhedra.core.poly.analyzeGeometry
 import polyhedra.core.poly.scaled
 import polyhedra.core.poly.validateRenderableImmersion
 import polyhedra.core.poly.surfaceFromCycles
@@ -55,7 +54,7 @@ private data class FacetingFaceOrbit(
     val key: String,
 )
 
-/** Faceting uses geometric positions, not coincident source-member copies of a dual vertex. */
+/** Faceting uses geometric positions, not coincident source-member copies of a vertex. */
 private data class FacetingPointSet(val vs: List<Vec3>, val symmetries: List<GeometricSymmetryOperation>)
 
 private fun Polyhedron.facetingPointSet(tolerance: Double): FacetingPointSet {
@@ -82,27 +81,8 @@ internal suspend fun Polyhedron.buildGenericGreateningCandidates(
     progress: OperationProgressContext?,
 ): List<StellationCandidate> {
     val planeTolerance = maxOf(tolerance / circumradius.coerceAtLeast(1.0), 2e-7)
-    val dual = runCatching { directDual().facetingPointSet(planeTolerance) }.getOrNull() ?: return emptyList()
-    if (dual.vs.size < 4) return emptyList()
-    val symmetries = dual.symmetries
-    progress?.reportProgress(5)
-    val vertexRepresentatives = dual.vertexOrbitRepresentatives(symmetries.map { it.vertexPermutation })
-    val estimatedTriples = vertexRepresentatives.size.toLong() *
-        (dual.vs.size - 1L) * (dual.vs.size - 2L) / 2L
-    if (estimatedTriples > MAX_FACETING_TRIPLES) return emptyList()
-
-    val planes = dual.facetingPlanes(vertexRepresentatives, planeTolerance, progress?.subrange(5, 10))
-    if (planes.isEmpty()) return emptyList()
-    val orbits = dual.facetingFaceOrbits(planes, symmetries, planeTolerance, progress?.subrange(10, 17))
-        .pruneUnmatchableOrbits()
-        .take(MAX_FACETING_ORBITS)
-    if (orbits.isEmpty()) return emptyList()
-
-    val facetedDuals = dual.assembleFacetings(
-        orbits,
-        symmetries.filter { it.orientation > 0 }.map { operation -> operation.vertexPermutation },
-        progress?.subrange(17, 25),
-    )
+    val dual = runCatching { directDual() }.getOrNull() ?: return emptyList()
+    val facetedDuals = dual.enumerateSymmetricFacetings(planeTolerance, progress?.subrange(0, 25))
     val candidates = facetedDuals.mapIndexedNotNull { index, faceted ->
         val candidateProgress = progress?.subrange(
             25 + 73 * index / facetedDuals.size.coerceAtLeast(1),
@@ -141,11 +121,12 @@ internal suspend fun Polyhedron.buildGenericGreateningCandidates(
 
 /**
  * A closed oriented immersion has an integer generalized winding at every off-surface point.
- * Greatening preserves nonzero source-plane distances, so the origin is a deterministic safe
- * probe. This rejects inconsistent facetings without constructing every candidate's much heavier
+ * Faceting excludes center-crossing planes and Greatening preserves nonzero source-plane
+ * distances, so the origin is a deterministic safe probe. This rejects inconsistent surfaces
+ * without constructing every candidate's much heavier
  * Resolved physical boundary merely to discover the same non-closure.
  */
-private fun Polyhedron.hasIntegralOriginWinding(): Boolean {
+internal fun Polyhedron.hasIntegralOriginWinding(): Boolean {
     var solidAngle = 0.0
     for (face in fs) {
         val resolved = resolvedFaces[face.id]
@@ -163,6 +144,33 @@ private fun Polyhedron.hasIntegralOriginWinding(): Boolean {
     }
     val winding = solidAngle / (4.0 * PI)
     return winding.isFinite() && abs(winding - winding.roundToLong()) <= 1e-6
+}
+
+/** Shared vertex-preserving search for direct Faceted and the polar construction in Greatened. */
+internal fun Polyhedron.enumerateSymmetricFacetings(
+    tolerance: Double,
+    progress: OperationProgressContext?,
+): List<Polyhedron> {
+    val points = facetingPointSet(tolerance)
+    if (points.vs.size < 4) return emptyList()
+    val symmetries = points.symmetries
+    progress?.reportProgress(20)
+    val representatives = points.vertexOrbitRepresentatives(symmetries.map { it.vertexPermutation })
+    val estimatedTriples = representatives.size.toLong() *
+        (points.vs.size - 1L) * (points.vs.size - 2L) / 2L
+    if (estimatedTriples > MAX_FACETING_TRIPLES) return emptyList()
+
+    val planes = points.facetingPlanes(representatives, tolerance, progress?.subrange(20, 40))
+    if (planes.isEmpty()) return emptyList()
+    val orbits = points.facetingFaceOrbits(planes, symmetries, tolerance, progress?.subrange(40, 68))
+        .pruneUnmatchableOrbits()
+        .take(MAX_FACETING_ORBITS)
+    if (orbits.isEmpty()) return emptyList()
+    return points.assembleFacetings(
+        orbits,
+        symmetries.filter { it.orientation > 0 }.map { it.vertexPermutation },
+        progress?.subrange(68, 100),
+    )
 }
 
 private fun Polyhedron.facePatternMismatchCount(source: Polyhedron): Int =

@@ -108,7 +108,7 @@ class DropOrbitUiTest {
                     "Rectify vertex",
                     "Radial vertex",
                 ),
-                "Star" to listOf("Greatened", "Stellated", "Resolved"),
+                "Star" to listOf("Greatened", "Stellated", "Faceted", "Resolved"),
             ),
             dropdownOptionsBySection(),
         )

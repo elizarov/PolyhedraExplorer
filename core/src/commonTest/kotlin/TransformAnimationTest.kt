@@ -71,7 +71,7 @@ class TransformAnimationTest {
             Transform.Transforms
                 .filterNot {
                     it == Transform.None || it == Transform.Greatened || it == Transform.Stellated ||
-                        it == Transform.Resolved || it == Transform.ConvexHull
+                        it == Transform.Resolved || it == Transform.ConvexHull || it == Transform.Faceted
                 }
                 .mapTo(this, Transform::tag)
             TransformMacros.mapTo(this) { it.tag }
@@ -164,7 +164,7 @@ class TransformAnimationTest {
             Transform.Transforms
                 .filterNot {
                     it == Transform.None || it == Transform.Greatened || it == Transform.Stellated ||
-                        it == Transform.Resolved || it == Transform.ConvexHull
+                        it == Transform.Resolved || it == Transform.ConvexHull || it == Transform.Faceted
                 }
                 .mapTo(linkedSetOf(), Transform::tag),
             cases.mapTo(linkedSetOf(), PrimitiveCase::tag),

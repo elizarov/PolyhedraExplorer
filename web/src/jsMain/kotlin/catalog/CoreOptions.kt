@@ -187,6 +187,7 @@ data class Transform(
         val ConvexHull = transform(TransformOperation.ConvexHull, "Convex hull")
         val Greatened = transform(TransformOperation.Greatened, "Greatened", TransformCategory.Star)
         val Stellated = transform(TransformOperation.Stellated, "Stellated", TransformCategory.Star)
+        val Faceted = transform(TransformOperation.Faceted, "Faceted", TransformCategory.Star)
         val Resolved = transform(TransformOperation.Resolved, "Resolved", TransformCategory.Star)
 
         val Kis = macro(TransformOperation.Kis)
@@ -255,6 +256,7 @@ val PrimitiveTransforms: List<Transform> = listOf(
     Transform.ConvexHull,
     Transform.Greatened,
     Transform.Stellated,
+    Transform.Faceted,
     Transform.Resolved,
 )
 

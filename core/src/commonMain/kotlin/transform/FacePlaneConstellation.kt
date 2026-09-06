@@ -43,7 +43,7 @@ import kotlin.math.atan2
 import kotlin.math.floor
 import kotlin.math.roundToLong
 
-internal enum class ConstellationOperation { Greaten, Stellate }
+internal enum class ConstellationOperation { Greaten, Stellate, Facet }
 
 internal data class StellationCandidate(
     val poly: Polyhedron,
@@ -230,6 +230,10 @@ private suspend fun Polyhedron.buildStellationCandidates(
     operation: ConstellationOperation,
     progress: OperationProgressContext?,
 ): List<StellationCandidate> {
+    // Faceting reads vertices, not the source face planes; non-planar inputs are valid here.
+    if (operation == ConstellationOperation.Facet) {
+        return buildGenericFacetingCandidates(CONSTELLATION_EPS * circumradius.coerceAtLeast(1.0), progress)
+    }
     require(fs.all(Face::isPlanar)) { "Face-plane constellation requires planar source faces" }
     val scale = circumradius.coerceAtLeast(1.0)
     val tolerance = CONSTELLATION_EPS * scale

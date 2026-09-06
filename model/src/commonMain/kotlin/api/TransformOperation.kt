@@ -38,7 +38,13 @@ enum class TransformOperation(
     Radial("r"),
     StellateFace("f"),
     ConvexHull("H"),
+    Faceted("F"),
 }
+
+/** Discrete geometry searches whose numbered results share the Result control. */
+val TransformOperation.hasDiscreteResults: Boolean
+    get() = this == TransformOperation.Greatened || this == TransformOperation.Stellated ||
+        this == TransformOperation.Faceted
 
 /** Type-safe identity of a transform before continuous tweak values are applied. */
 data class TransformId(

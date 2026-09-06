@@ -74,6 +74,7 @@ fun TransformId.transformTweakRanges(): Map<TransformTweak, TransformTweakRange>
         )
         TransformOperation.Chamfered -> linkedMapOf(TransformTweak.Width to TransformTweakRanges.ChamferWidth)
         TransformOperation.Greatened,
+        TransformOperation.Faceted,
         TransformOperation.Stellated -> linkedMapOf(
             TransformTweak.StellationResult to TransformTweakRanges.StellationResult,
         )

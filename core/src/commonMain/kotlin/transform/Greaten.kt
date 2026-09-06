@@ -62,7 +62,7 @@ internal suspend fun Polyhedron.stellatedAsync(
     progress: OperationProgressContext? = null,
 ): Polyhedron = stellationCandidatesAsync(ConstellationOperation.Stellate, progress).selected("Stellation", result)
 
-private fun List<StellationCandidate>.selected(operation: String, result: Int): Polyhedron {
+internal fun List<StellationCandidate>.selected(operation: String, result: Int): Polyhedron {
     if (result < 1) throw TransformApplicabilityException(
         CoreIssueCode.TransformNotApplicable,
         "$operation Result must be a positive integer",

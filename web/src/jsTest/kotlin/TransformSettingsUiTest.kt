@@ -191,6 +191,33 @@ class TransformSettingsUiTest {
     }
 
     @Test
+    fun facetingResultHasStepControlsSubscriptAndPreservesFollowingTransforms(): Promise<Unit> {
+        val params = PolyParams("", null)
+        params.transforms.updateValue(listOf(Transform.Faceted, Transform.Dual))
+        params.updateTransformTweakRanges(listOf(
+            listOf(CoreTransformTweakRange(TransformTweak.StellationResult, 1.0, 3.0)), emptyList(),
+        ))
+        composition = renderComposable(host) {
+            ControlPane(params, Popup.TransformSettings(0), togglePopup = {})
+        }
+        assertEquals("Previous faceting", host.querySelector(".slider-step-previous")?.getAttribute("aria-label"))
+        assertEquals("Next faceting", host.querySelector(".slider-step-next")?.getAttribute("aria-label"))
+        (host.querySelector(".slider-step-next") as HTMLButtonElement).click()
+        return awaitRecomposition().then {
+            assertEquals(listOf("F~l=2", "d"), params.transforms.value.map { it.tag })
+            assertEquals("2", host.querySelector("button.txt sub")?.textContent)
+            assertEquals("2", (host.querySelector(".transform-setting-slider") as HTMLInputElement).value)
+            val root = RootParams()
+            root.render.poly.transforms.updateValue(params.transforms.value)
+            val restored = RootParams()
+            restored.loadFromString(root.toString())
+            assertEquals(listOf("F~l=2", "d"), restored.render.poly.transforms.value.map { it.tag })
+            (host.querySelector(".transform-settings-reset") as HTMLButtonElement).click()
+            assertEquals(listOf("F", "d"), params.transforms.value.map { it.tag })
+        }
+    }
+
+    @Test
     fun earlierChiralityOnlyTransformCanFlipAndResetWithoutChangingLaterTransforms(): Promise<Unit> {
         val params = PolyParams("", null)
         params.transforms.updateValue(listOf(Transform.Propeller, Transform.ConvexHull, Transform.Dual))

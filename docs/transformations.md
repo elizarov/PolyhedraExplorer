@@ -15,7 +15,7 @@ last applied. Traditional Conway notation is read in the opposite direction; for
 example, the project expansion `a -> t` is conventionally written `ta`.
 
 The transform popup is ordered as `Transform`, `Macro`, `Orbit-targeted`, then
-`Star`. The final `Star` section contains Greatened, Stellated, and Resolved.
+`Star`. The final `Star` section contains Greatened, Stellated, Faceted, and Resolved.
 
 ## Summary
 
@@ -34,6 +34,7 @@ The transform popup is ordered as `Transform`, `Macro`, `Orbit-targeted`, then
 | Convex hull | Convex envelope | `H` | - | geometry-dependent | geometry-dependent | geometry-dependent |
 | Greatened | Greatening | `G` | - | constellation-dependent | constellation-dependent | constellation-dependent |
 | Stellated | Stellation | `S` | - | constellation-dependent | constellation-dependent | constellation-dependent |
+| Faceted | Faceting, facetting | `F` | - | result-dependent | result-dependent | same geometric positions; member copies may differ |
 | Resolved | Nonzero-winding resolution | `R` | - | arrangement-dependent | arrangement-dependent | arrangement-dependent |
 | Drop | Orbit deletion | `x[kind]` | - | input-dependent | input-dependent | input-dependent |
 | Kis face | Selective akisation | `k[face]` | - | input-dependent | input-dependent | input-dependent |
@@ -85,7 +86,7 @@ rejected with a warning while the last valid mesh remains displayed.
 | Truncated, Needle, Zip | Depth | `d` |
 | Kis, Kis face | Height | `h` |
 | Stellate face, Radial vertex | Radius | `R` |
-| Greatened, Stellated | Result | `l` |
+| Greatened, Stellated, Faceted | Result | `l` |
 | Cantellated, Ortho | Distance | `c` |
 | Bevelled, Meta | Distance, depth | `c`, `d` |
 | Snub, Gyro | Inset, twist | `i`, `r` |
@@ -125,6 +126,7 @@ names and immersion semantics are defined in
 | Radial vertex, Stellate face | Selected neighborhood passes the independent triangular-orbit checks | Renderable immersion |
 | Propeller, Whirl, Quinto, Canonical | Abstract topology is a canonicalizable sphere | Embedded canonical realization |
 | Greatened, Stellated | Planar authoritative faces produce a valid finite face-plane constellation | Renderable immersion |
+| Faceted | Vertex positions admit an alternative closed, full-symmetry faceting within search limits | Renderable immersion |
 | Resolved | Valid resolved-face planar arrangement | Embedded boundary |
 | Convex hull | Vertices span three dimensions | One embedded convex boundary, or a renderable compound when combined with the source |
 
@@ -177,7 +179,7 @@ including Kis Height, are included in the same fused target.
 
 Animation is intentionally omitted where no stable, non-self-intersecting mesh
 correspondence exists: Drop, adding/removing or retargeting selective Kis face,
-Greatened, Stellated, Resolved, Convex hull, and chirality flips. Resolved changes the physical arrangement
+Greatened, Stellated, Faceted, Resolved, Convex hull, and chirality flips. Resolved changes the physical arrangement
 topology; the regular-star operations change
 the resolved intersection-cell topology, and their classical collapsed forms would be immersed
 rather than proper meshes. A selective Kis Height change still interpolates because
@@ -583,9 +585,50 @@ immediate to avoid passing through the invalid opposite-twist intermediate.
 
 ## Star transformations
 
-Greatened, Stellated, and Resolved are primitive transforms grouped in the final Star popup section.
-The first two derive candidates from the input geometry but use distinct constructions described
-below.
+Greatened, Stellated, Faceted, and Resolved are primitive transforms grouped in the final Star popup
+section. The first three enumerate geometric alternatives; Resolved constructs a physical boundary.
+
+### Faceted (`F`, experimental)
+
+Faceting reconnects existing vertices with different edges and planar faces; it does not introduce
+new geometric positions. This follows the usual [definition of faceting](https://mathworld.wolfram.com/Faceting.html).
+The operation runs the same full-point-group face-orbit and closed-surface search used inside
+Greatened, but directly on the input vertices, without either reciprocal-dual step. Every input
+position must occur in the result. Independent vertex fans can become compound members, retaining
+separate topological copies of a shared position. Source faces need not be planar.
+
+The current search considers off-center planes through vertex triples, their planar convex hulls
+and equal-radius rings, and coprime polygon/star circuits. It combines complete symmetry orbits
+with exactly two incident faces per edge, validates manifold renderable immersions and integer
+winding at the origin, and removes the original surface. Duplicate detection compares complete
+face circuits, not merely edges: Great icosahedron and Stellated dodecahedron share a wireframe but
+are different results. Ordering minimizes changes in F, then E, with deterministic face-circuit
+tie-breaks. It is a bounded explorer, not an exhaustive enumeration of all possible facetings:
+planes through the origin, arbitrary non-circular subset circuits, symmetry-breaking results,
+and arrangements needing more than two faces on a geometric edge are outside this search.
+The shared limits are two million orbit-representative triples, 512 face orbits, eight orbits per
+surface, and ten thousand search nodes.
+
+| Input | Results in the current search | Examples |
+| --- | ---: | --- |
+| Cube | 1 | Two tetrahedra |
+| Icosahedron | 3 | Great icosahedron, Stellated dodecahedron, Great dodecahedron |
+| Dodecahedron | 9 | Great stellated dodecahedron, Five cubes, mixed-face immersions |
+| Cuboctahedron | 4 | Mixed-face immersed surfaces |
+| Truncated tetrahedron | 3 | Tetrahedrally symmetric alternatives |
+| Snub cube | 58 | Chiral octahedral facetings |
+| Tetrahedron, Octahedron | 0 | No alternative within this domain |
+
+The gear uses the shared Result slider, previous/next controls, and reset. Later results use an HTML
+subscript and serialize as `F~l=2`; export names use `faceted_2_...`. An earlier Faceted stage remains
+editable beneath later operations such as Dual. Results, geometric analysis, and orbit-action
+availability are cached in the worker. There is no morph animation: applying, removing, or changing
+these discrete face circuits takes effect immediately.
+
+An existing metadata limitation becomes visible on some of these results: edge popup rows use
+endpoint/adjacent-face kind combinations. Several genuine geometric edge orbits can share that
+label, so the E popup can have fewer rows than the geometric orbit count. Face and vertex kinds use
+geometric orbits; the experiment does not discard valid facetings to hide the edge-label limitation.
 
 ### Greatened (`G`)
 

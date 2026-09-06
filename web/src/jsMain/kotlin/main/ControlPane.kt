@@ -17,6 +17,7 @@ import polyhedra.model.api.TransformTweak
 import polyhedra.model.api.TransformOperation
 import polyhedra.model.api.TransformPrefixReplacement
 import polyhedra.model.api.findTransformPrefixReplacement
+import polyhedra.model.api.hasDiscreteResults
 import polyhedra.model.util.updatedAt
 import polyhedra.web.catalog.*
 import polyhedra.web.components.NumericValueInput
@@ -512,10 +513,7 @@ internal fun ControlPane(
 @Composable
 private fun TransformPillLabel(transform: Transform) {
     Text(transform.toString())
-    if (
-        transform.operation == TransformOperation.Greatened ||
-        transform.operation == TransformOperation.Stellated
-    ) {
+    if (transform.operation.hasDiscreteResults) {
         transform.tweaks[TransformTweak.StellationResult]
             ?.roundToInt()
             ?.takeIf { result -> result > 1 }
@@ -645,10 +643,10 @@ private fun TransformSettingsPopup(
                 val rangeAvailable = safeRanges == null || safeRange != null && minTick <= maxTick
                 val currentTick = (currentValue / setting.step).roundToInt()
                     .coerceIn(minTick, maxTick.coerceAtLeast(minTick))
-                val operationName = if (transform.operation == TransformOperation.Greatened) {
-                    "greatening"
-                } else {
-                    "stellation"
+                val operationName = when (transform.operation) {
+                    TransformOperation.Greatened -> "greatening"
+                    TransformOperation.Faceted -> "faceting"
+                    else -> "stellation"
                 }
                 SliderStepControls(
                     canStepBackward = rangeAvailable && currentTick > minTick,

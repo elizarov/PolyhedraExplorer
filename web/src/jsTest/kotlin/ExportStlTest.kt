@@ -47,6 +47,7 @@ class ExportStlTest {
         assertEquals("resolved_tetrahedron", "Resolved Tetrahedron".toExportFileBaseName())
         assertEquals("stellated_2_icosahedron", "Stellated 2 Icosahedron".toExportFileBaseName())
         assertEquals("greatened_2_dodecahedron", "Greatened 2 Dodecahedron".toExportFileBaseName())
+        assertEquals("faceted_2_dodecahedron", "Faceted 2 Dodecahedron".toExportFileBaseName())
     }
 
     @Test
