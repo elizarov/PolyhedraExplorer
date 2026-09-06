@@ -61,6 +61,11 @@ the layer under test. Random stress cases are minimized before entering the norm
 10,000-case STL corpus remains opt-in so `./gradlew test` stays suitable for quick development, while
 the minimized cases that exposed distinct failures remain permanent regressions.
 
+Renderable-surface validation checks coincident vertices with a component-aware spatial grid,
+including neighboring cells and an exact distance check. This keeps large tessellated STL regressions
+practical without weakening their geometry checks or extending test timeouts. The spatial check is
+tested against an independent all-pairs reference, including compound members and cell boundaries.
+
 Serve `build/dist/browser/development` or `build/dist/browser/production` over HTTP. A minimal local server is:
 
 ```shell

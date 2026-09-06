@@ -7,6 +7,7 @@ package polyhedra.core.poly
 import polyhedra.model.api.PolyhedronContract
 import polyhedra.model.poly.*
 import polyhedra.model.util.*
+import kotlin.math.floor
 
 fun Polyhedron.validate() {
     validateGeometry()
@@ -33,12 +34,7 @@ fun Polyhedron.validateRenderableImmersion() {
         require(v.directedEdges.isNotEmpty()) { "$v is not part of the surface" }
     }
     val lengthTolerance = EPS * circumradius
-    for (first in vs.indices) for (second in (first + 1) until vs.size) {
-        require(vertexComponentIds[first] != vertexComponentIds[second] ||
-            (vs[first] - vs[second]).norm > lengthTolerance) {
-            "Distinct source vertices $first and $second have coincident positions"
-        }
-    }
+    validateDistinctVertexPositions(vs, vertexComponentIds, lengthTolerance)
     // Validate edges
     for (e in es) {
         require((e.a - e.b).norm > lengthTolerance) {
@@ -76,6 +72,42 @@ fun Polyhedron.validateRenderableImmersion() {
 
     // Every vertex still has one manifold fan (checked by Polyhedron). Multiple closed
     // components are compounds, not malformed surfaces.
+}
+
+private data class VertexPositionBucket(val component: Int, val x: Long, val y: Long, val z: Long)
+
+/** The same per-component distance contract without an all-pairs scan on tessellated meshes. */
+internal fun validateDistinctVertexPositions(points: List<Vec3>, components: IntArray, tolerance: Double) {
+    require(components.size == points.size)
+    require(tolerance.isFinite() && tolerance >= 0.0)
+    if (tolerance == 0.0) {
+        val positions = HashSet<Pair<Int, Triple<Double, Double, Double>>>()
+        for ((index, point) in points.withIndex()) {
+            require(positions.add(components[index] to Triple(point.x + 0.0, point.y + 0.0, point.z + 0.0))) {
+                "Distinct source vertices have coincident positions at $index"
+            }
+        }
+        return
+    }
+    val buckets = HashMap<VertexPositionBucket, MutableList<Int>>()
+    for ((index, point) in points.withIndex()) {
+        val bucket = VertexPositionBucket(
+            components[index],
+            floor(point.x / tolerance).toLong(),
+            floor(point.y / tolerance).toLong(),
+            floor(point.z / tolerance).toLong(),
+        )
+        // Neighbor cells are essential: nearby vertices can straddle any grid boundary.
+        for (dx in -1L..1L) for (dy in -1L..1L) for (dz in -1L..1L) {
+            val nearby = VertexPositionBucket(bucket.component, bucket.x + dx, bucket.y + dy, bucket.z + dz)
+            for (previous in buckets[nearby].orEmpty()) {
+                require((points[previous] - point).norm > tolerance) {
+                    "Distinct source vertices $previous and $index have coincident positions"
+                }
+            }
+        }
+        buckets.getOrPut(bucket, ::arrayListOf) += index
+    }
 }
 
 /** Legacy rendering/export gate: renderable plus positive aggregate signed volume. */
