@@ -66,10 +66,20 @@ val jvmMainCompilation = kotlin.targets.getByName<org.jetbrains.kotlin.gradle.ta
     .compilations.getByName("main")
 
 tasks.named<Test>("jvmTest") {
-    // Wall-clock algorithm regressions must not compete with webpack/Chrome on shared CI CPUs.
+    // Keep the large geometry suite from competing with webpack/Chrome on shared CI CPUs.
     // This only orders a combined `test` run; focused JVM runs do not acquire a browser dependency.
     mustRunAfter(":web:jsBrowserTest")
     testLogging.exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+}
+
+tasks.register<JavaExec>("benchmarkValidation") {
+    group = "benchmark"
+    description = "Checks stellation/cache and rim-STL performance budgets on a quiet JVM."
+    dependsOn("jvmTestClasses")
+    mainClass.set("polyhedra.core.ValidationBenchmarkKt")
+    classpath = jvmTestCompilation.output.allOutputs + jvmTestCompilation.runtimeDependencyFiles
+    javaLauncher.set(javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(25)) })
+    maxHeapSize = "512m"
 }
 
 val inspectedConfiguration = providers.gradleProperty("inspectConfigurationBase64")

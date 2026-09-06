@@ -26,7 +26,11 @@ import kotlin.time.measureTimedValue
 
 class StellationPerformanceTest {
     @Test
-    fun deltoidalHexecontahedronStellationCompletesQuickly() = runTest {
+    fun deltoidalHexecontahedronStellationPreservesGeometryAndCachedMetadata() = runTest {
+        measureDeltoidalStellation()
+    }
+
+    internal suspend fun measureDeltoidalStellation(): List<AlgorithmTiming> {
         val source = Seed.DeltoidalHexecontahedron.poly
         // Measure uncached stellation, not seed construction or first-use runtime linkage.
         // A smaller constellation warms the same kernel; clearing the cache keeps the measured
@@ -38,7 +42,6 @@ class StellationPerformanceTest {
         }
 
         assertEquals(30, candidates.size)
-        assertTrue(duration < 3.seconds, "Deltoidal hexecontahedron stellation took $duration")
         candidates.forEach { candidate ->
             candidate.poly.validateRenderableImmersion()
             candidate.poly.resolved(null, candidate.geometryAnalysis).validateProperGeometry()
@@ -61,7 +64,6 @@ class StellationPerformanceTest {
         assertSame(candidates[14].availableOrbitTransformTags, response.availableOrbitTransforms.last())
         assertSame(candidates[14].resolvedRims(Scale.Circumradius, 0.05, 0.1), response.resolvedRims)
         assertTrue(response.animation.isEmpty(), "Changing the discrete Result must not evaluate an unused animation")
-        assertTrue(switchDuration < 2.seconds, "Cached Result 15 switch took $switchDuration")
         assertEquals(100, progress.last().done)
 
         val (repeated, repeatDuration) = measureTimedValue {
@@ -70,7 +72,11 @@ class StellationPerformanceTest {
         assertSame(response.geometryAnalysis, repeated.geometryAnalysis)
         assertSame(response.symmetry, repeated.symmetry)
         assertSame(response.resolvedRims, repeated.resolvedRims)
-        assertTrue(repeatDuration < 1.seconds, "Repeated Result 15 response took $repeatDuration")
+        return listOf(
+            AlgorithmTiming("Deltoidal hexecontahedron stellation", duration, 3.seconds),
+            AlgorithmTiming("Cached Result 15 switch", switchDuration, 2.seconds),
+            AlgorithmTiming("Repeated Result 15 response", repeatDuration, 1.seconds),
+        )
     }
 
     @Test

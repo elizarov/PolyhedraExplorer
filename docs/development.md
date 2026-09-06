@@ -36,15 +36,25 @@ Gradle manages the Node.js runtime used by Kotlin JS/Wasm tasks. No global Node 
 # Compare production JS and WasmGC kernels
 ./gradlew :benchmarks:jsNodeProductionRun
 ./gradlew :benchmarks:wasmJsNodeProductionRun
+
+# Check stellation/cache and rim-STL timing budgets on a quiet local JVM
+./gradlew :core:benchmarkValidation
 ```
 
 Prefer the root `test` task during development: it runs the complete core suite on the JVM for fast algorithm feedback and the web module's JS browser tests for UI coverage. It is deliberately the same test gate used by the release workflow. Release validation then relies on the focused production acceptance test for WasmGC integration rather than repeating the exhaustive core suite in every runtime.
 
-In a combined run, JVM tests wait for the browser tests so timing regressions do not compete with
-webpack and Chrome for CPU. Focused `:core:jvmTest` runs remain JVM-only; compilation can still run
+In a combined run, JVM tests wait for the browser tests so large geometry workloads do not compete
+with webpack and Chrome for CPU. Focused `:core:jvmTest` runs remain JVM-only; compilation can still run
 in parallel. Stellation timing excludes seed construction and first-use runtime linkage; a smaller
 constellation warms the kernel before its result cache is cleared for the measured enumeration.
 Test failures include full assertion details in CI logs.
+
+The full functional workloads, including large STL exports and cache-identity assertions, run in
+`test`. Hardware-dependent timing budgets belong to `:core:benchmarkValidation`, which invokes those
+same workloads and enforces their budgets (3s stellation, 2s first cached switch, 1s repeated response,
+1s Antiprism 7/3 rim STL, 30s Greatened 5 Truncated icosahedron rim STL). Run it on a quiet machine;
+shared CI runner scheduling is not a geometry-correctness contract. Geometry assertions, test
+timeouts, and production conversion resource limits remain enforced in release validation.
 
 The opt-in STL campaign uses seed `20260813` by default and accepts
 `-PstlStressCases=<count>` and `-PstlStressSeed=<seed>`. Its current 10,000-case corpus produces

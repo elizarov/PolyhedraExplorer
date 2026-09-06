@@ -217,6 +217,10 @@ class StlApiTest {
 
     @Test
     fun exportsFifthGreateningOfTruncatedIcosahedronWithBothFaceOrbitsHidden() = runTest {
+        measureHiddenGreatenedStl()
+    }
+
+    internal suspend fun measureHiddenGreatenedStl(): AlgorithmTiming {
         val evaluation = evaluateCore(CoreRequest(CoreState("tI", listOf("G~l=5"), "c")))
         assertNull(evaluation.error, evaluation.error?.detail)
         val source = evaluation.poly
@@ -236,7 +240,7 @@ class StlApiTest {
         assertNull(response.error, response.error?.reason)
         response.toValidationPolyhedron().validateMeshGeometry()
         assertTrue(response.signedVolume6() > 0.0)
-        assertTrue(elapsed < 30.seconds, "Hidden-rim STL export took $elapsed")
+        return AlgorithmTiming("Hidden-rim Greatened 5 Truncated icosahedron STL", elapsed, 30.seconds)
     }
 
     @Test
@@ -266,7 +270,11 @@ class StlApiTest {
     }
 
     @Test
-    fun exportsStarAntiprismSevenThirdsWithEveryFaceHiddenAsRimsQuickly() = runTest {
+    fun exportsStarAntiprismSevenThirdsWithEveryFaceHiddenAsRims() = runTest {
+        measureStarAntiprismStl()
+    }
+
+    internal suspend fun measureStarAntiprismStl(): AlgorithmTiming {
         val source = requireNotNull("SA7_3".toSeedOrNull()).poly
         val presentation = CoreStlPresentation(
             poly = source,
@@ -286,7 +294,7 @@ class StlApiTest {
         assertNull(response.error, response.error?.reason)
         response.toValidationPolyhedron().validateProperGeometry()
         assertTrue(response.signedVolume6() > 0.0)
-        assertTrue(elapsed < 1.seconds, "Rim-only SA7_3 STL export took $elapsed")
+        return AlgorithmTiming("Rim-only Antiprism 7/3 STL", elapsed, 1.seconds)
     }
 
     @Test
