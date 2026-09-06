@@ -57,9 +57,47 @@ edges at different three-dimensional positions appear to cross, so lifting the p
 intersection would invent geometry. The core rejects that stage instead of displaying or exporting
 an ambiguous surface.
 
-Per-face resolution does not remove intersections between different faces. WebGL can depth-test
-the resulting triangles, while the explicit Resolved transform or the STL conversion pipeline is
-responsible for constructing an embedded solid boundary.
+Per-face resolution does not remove intersections between different faces. WebGL depth-tests
+transverse intersections; coplanar overlaps use the supplemental presentation partition below.
+The explicit Resolved transform or the STL conversion pipeline constructs an embedded solid boundary.
+
+## Coplanar face overlaps
+
+Different source faces can overlap over a positive area in the same plane. Drawing both in their
+orbit colors would make the depth-buffer winner change with the camera. The core computes and
+caches a shared `CoplanarFacePatch` partition on the final display polyhedron instead:
+
+1. Group planar faces by their unoriented plane, with scale-aware distance and angular tolerances.
+2. Partition their resolved triangles by a common arrangement of boundary lines. `PlanarCut` is
+   shared with the physical Resolved algorithm; self-crossing faces reuse their nonzero-winding fill.
+3. Weld coincident fragment vertices and combine identical convex cells. Each cell retains the
+   complete sorted set of covering source-face IDs, including triple or higher overlaps.
+4. Serialize these supplemental cells beside the original face data. F/E/V, kinds, transforms,
+   catalog comparison, and export still use authoritative source topology.
+
+Each unordered set of distinct overlapping orbits receives one unused palette color. Both faces
+use that same color for their shared region; overlaps within one orbit retain its original color.
+The WebGL buffer contains only one top-surface copy of each cell, including in acrylic mode.
+Selection highlights a cell if any contributing orbit is selected. Print preview overrides every
+cell with the selected print color. Expand separates oppositely oriented sheets but leaves equally
+oriented coplanar faces combined. Topology-changing animations retain their compatible keyframe
+meshes and use the partition on the completed result.
+
+Rim boundaries further subdivide these cells in the core. Each subcell records which source rims
+cover it, so hiding an orbit selects its rim coverage instead of its full-face coverage, without
+repeating arrangement work on visibility changes. Existing underside and wall construction remains
+independent of this top-surface color partition.
+
+Faces-popup figures show the full source outline, its original orbit color, and its shared colored
+regions. Edge-net figures apply the same partition through each adjacent face's unfolding basis.
+Derived cell boundaries do not acquire edge strokes. These previews describe the full face even
+when its orbit is currently hidden on the canvas.
+
+Tests require conservation of every source face's area, pairwise disjoint presentation cells,
+correct multi-source coverage, scale/rotation invariance, serialization parity, one-copy top-surface
+rendering, and matching canvas/figure colors. Regression examples include Ten tetrahedra, Five
+octahedra, Rectified two tetrahedra, Rectified five tetrahedra, Truncated five cubes, and Truncated ten
+tetrahedra. Edge and point contacts alone do not create a colored intersection region.
 
 ## Validation contracts
 

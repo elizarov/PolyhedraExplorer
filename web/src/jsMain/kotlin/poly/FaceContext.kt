@@ -35,6 +35,7 @@ class FaceContext(
     val printChroma by { params.printPreview.chroma.value }
     val printHue by { params.printPreview.hue.value }
     val resolvedRims by { params.poly.resolvedRims }
+    val coplanarRimFaces by { params.poly.coplanarRimFaces }
     
     // effectively hidden faces
     val hiddenFaces by {
@@ -107,6 +108,22 @@ class FaceContext(
             val presentationRim = exportParams?.rim ?: faceRim
             val presentationWidth = exportParams?.width ?: faceWidth
             val hasHiddenFaces = hiddenFaces.isNotEmpty()
+            // Topology-changing keyframes keep their original one-to-one vertex correspondence.
+            val coplanarPatches = if (animation != null) emptyList() else
+                if (hasHiddenFaces && coplanarRimFaces.isNotEmpty()) coplanarRimFaces else poly.coplanarFaces
+            val patchedFaceIds = coplanarPatches.flatMapTo(hashSetOf()) { it.sourceFaceIds }
+            val visiblePatches = coplanarPatches.flatMap { patch ->
+                val sources = patch.sourceFaceIds.filter { id ->
+                    faceShown(poly.fs[id]) || includeRim && id in patch.rimFaceIds
+                }
+                if (sources.isEmpty()) emptyList() else {
+                    // Opposite normals separate under Expand; equally oriented faces stay coincident.
+                    val groups = if (!includeExpand) listOf(sources) else sources.groupBy {
+                        poly.fs[it] * poly.fs[sources.first()] >= 0.0
+                    }.values.toList()
+                    groups.map { patch.copy(sourceFaceIds = it) }
+                }
+            }
 
             var bufferSize = 0
             var indexSize = 0
@@ -203,8 +220,10 @@ class FaceContext(
             for (f in poly.fs) {
                 val resolved = poly.resolvedFaces[f.id]
                 if (faceShown(f)) {
-                    bufferSize += resolved.vertices.size
-                    indexSize += resolved.triangles.size * 3
+                    if (f.id !in patchedFaceIds) {
+                        bufferSize += resolved.vertices.size
+                        indexSize += resolved.triangles.size * 3
+                    }
                     if (hasHiddenFaces || includeExpand) {
                         bufferSize += resolved.vertices.size
                         indexSize += resolved.triangles.size * 3
@@ -215,9 +234,9 @@ class FaceContext(
                         val rimVertexCount = rimMeshes.sumOf { mesh -> mesh.vertices.size }
                         val rimIndexCount = rimMeshes.sumOf { mesh -> mesh.triangles.size }
                         val immersedGeometry = immersedRimGeometryByFace[f.id]
-                        bufferSize += rimVertexCount +
+                        bufferSize += (if (f.id in patchedFaceIds) 0 else rimVertexCount) +
                             (immersedGeometry?.surfaces?.sumOf { surface -> surface.vertices.size } ?: rimVertexCount)
-                        indexSize += rimIndexCount +
+                        indexSize += (if (f.id in patchedFaceIds) 0 else rimIndexCount) +
                             (immersedGeometry?.surfaces?.sumOf { surface -> surface.triangles.size } ?: rimIndexCount)
                         if (includeWidth) {
                             if (immersedGeometry == null) {
@@ -246,6 +265,8 @@ class FaceContext(
                     indexSize += 6 * f.size
                 }
             }
+            bufferSize += visiblePatches.sumOf { it.vertices.size }
+            indexSize += visiblePatches.sumOf { (it.vertices.size - 2) * 3 }
             positionBuffer.ensureCapacity(bufferSize)
             lightNormalBuffer.ensureCapacity(bufferSize)
             expandDirBuffer.ensureCapacity(bufferSize)
@@ -500,14 +521,14 @@ class FaceContext(
                 val resolved = poly.resolvedFaces[f.id]
                 // Note: In GL front faces are CCW
                 if (faceShown(f)) {
-                    makeFace(f, resolved, faceColor,false)
+                    if (f.id !in patchedFaceIds) makeFace(f, resolved, faceColor,false)
                     if (hasHiddenFaces || includeExpand) {
                         makeFace(f, resolved, faceColor, true)
                     }
                 } else {
                     val rimMeshes = rimMeshesByFace[f.id]
                     if (rimMeshes != null && includeRim) {
-                        makeResolvedRim(f, rimMeshes, faceColor, false)
+                        if (f.id !in patchedFaceIds) makeResolvedRim(f, rimMeshes, faceColor, false)
                         val immersedGeometry = immersedRimGeometryByFace[f.id]
                         if (immersedGeometry == null) {
                             makeResolvedRim(f, rimMeshes, faceColor, true)
@@ -527,6 +548,31 @@ class FaceContext(
                 }
                 if (includeExpand && includeWidth) {
                     makeBorder(f, f.fvs, faceColor, true)
+                }
+            }
+            for (patch in visiblePatches) {
+                val face = poly.fs[patch.sourceFaceIds.first()]
+                val color = printColor ?: PolyStyle.faceColor(poly, patch.sourceFaceIds)
+                val base = bufOfs
+                for (position in patch.vertices) {
+                    positionBuffer[bufOfs] = position
+                    lightNormalBuffer[bufOfs] = face
+                    expandDirBuffer[bufOfs] = face
+                    thicknessDirBuffer[bufOfs] = face.outwardNormal
+                    rimDirBuffer[bufOfs] = Vec3.ZERO
+                    rimMaxBuffer[bufOfs] = 0.0
+                    colorBuffer[bufOfs] = color
+                    innerBuffer?.set(bufOfs, 0)
+                    faceModeBuffer?.set(bufOfs, if (patch.sourceFaceIds.any {
+                        poly.fs[it].kind == selectedFace
+                    }) FACE_SELECTED else FACE_NORMAL)
+                    bufOfs++
+                }
+                val reversed = ((patch.vertices[1] - patch.vertices[0]) cross
+                    (patch.vertices[2] - patch.vertices[0])) * face < 0.0
+                val surfaceId = nextSurfaceId++
+                for (i in 1 until patch.vertices.lastIndex) {
+                    indexBuffer?.indexTriangle(base, base + i, base + i + 1, reversed, surfaceId)
                 }
             }
             positionBuffer.bindBufferData(gl)
@@ -893,6 +939,7 @@ fun FaceContext.draw(view: ViewContext, lighting: LightingContext, cullMode: Int
         else -> program
     }
     val renderTwoSided = view.transparencyEnabled || view.cutEnabled ||
+        !hasExpand && poly.hasOppositeCoplanarFaces ||
         hiddenFaces.isNotEmpty() && poly.resolvedFaces.any(ResolvedFaceGeometry::sourceBoundarySelfIntersects)
     val restoreCulling = renderTwoSided && gl.isEnabled(GL.CULL_FACE)
     if (renderTwoSided) gl.disable(GL.CULL_FACE)

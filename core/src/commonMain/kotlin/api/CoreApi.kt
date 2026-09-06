@@ -295,7 +295,12 @@ private suspend fun evaluateState(
         if (reportsCandidateProgress) reportTransformProgress(99)
     }
 
-    val displayPoly = poly.scaled(scale)
+    val displayPoly = poly.scaled(scale).withCoplanarFaces()
+    val rims = rimWidth?.takeIf { it > 0.0 }?.let { width ->
+        val thickness = faceWidth?.takeIf { it > 0.0 } ?: 0.0
+        poly.cachedConstellationResolvedRimsOrNull(scale, width, thickness)
+            ?: displayPoly.resolvedRims(width, thickness)
+    }.orEmpty()
     val response = CoreResponse(
         poly = displayPoly,
         polyName = polyName,
@@ -319,11 +324,8 @@ private suspend fun evaluateState(
         errorIndex = errorIndex,
         error = errorIssue,
         geometryAnalysis = poly.cachedConstellationGeometryAnalysisOrNull() ?: poly.analyzeGeometry(),
-        resolvedRims = rimWidth?.takeIf { it > 0.0 }?.let { width ->
-            val thickness = faceWidth?.takeIf { it > 0.0 } ?: 0.0
-            poly.cachedConstellationResolvedRimsOrNull(scale, width, thickness)
-                ?: displayPoly.resolvedRims(width, thickness)
-        }.orEmpty(),
+        resolvedRims = rims,
+        coplanarRimFaces = displayPoly.coplanarRimFaces(rims),
     )
     return Evaluation(state, seed, scale, validTransforms, poly, response)
 }

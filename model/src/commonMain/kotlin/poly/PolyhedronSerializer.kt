@@ -27,6 +27,7 @@ private class SerializedPolyhedron(
     val fs: List<SerializedFace>,
     val resolvedFaces: List<ResolvedFaceGeometry> = emptyList(),
     val resolvedTopologyProvenance: ResolvedTopologyProvenance? = null,
+    val coplanarFaces: List<CoplanarFacePatch> = emptyList(),
 )
 
 @Serializable
@@ -48,6 +49,7 @@ private fun Polyhedron.toSerialized() = SerializedPolyhedron(
     fs.map { f -> SerializedFace(f.fvs.map { it.id }, f.kind) },
     resolvedFaces,
     resolvedTopologyProvenance,
+    coplanarFaces,
 )
 
 private fun SerializedPolyhedron.toPolyhedron(): Polyhedron {
@@ -63,5 +65,6 @@ private fun SerializedPolyhedron.toPolyhedron(): Polyhedron {
         faceKindSources = null,
         resolvedFaceGeometry = resolvedFaces.takeIf { it.isNotEmpty() },
         resolvedTopologyProvenance = resolvedTopologyProvenance,
+        coplanarFaces = coplanarFaces,
     )
 }

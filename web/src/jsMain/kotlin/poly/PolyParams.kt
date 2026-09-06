@@ -69,6 +69,8 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         private set
     var resolvedRims: List<ResolvedRimGeometry> = emptyList()
         private set
+    var coplanarRimFaces: List<CoplanarFacePatch> = emptyList()
+        private set
 
     val targetPoly: Polyhedron
         get() = transformAnimation?.targetPoly ?: requireNotNull(poly) { "The Wasm core has not produced a polyhedron yet" }
@@ -297,6 +299,7 @@ class PolyParams(tag: String, val animationParams: ViewAnimationParams?) : Param
         symmetry = response.symmetry
         updateGeometryAnalysis(response.geometryAnalysis)
         updateResolvedRims(response.resolvedRims)
+        coplanarRimFaces = response.coplanarRimFaces
         transformedPolys = response.transformedPolys
         updateTransformTweakRanges(response.transformTweakRanges)
         updateAvailableOrbitTransforms(response.availableOrbitTransforms)

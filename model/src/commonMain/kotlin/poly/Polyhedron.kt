@@ -16,6 +16,8 @@ class Polyhedron(
     val faceKindSources: List<FaceKindSource>?, // non-null when polyhedron was transformed
     resolvedFaceGeometry: List<ResolvedFaceGeometry>? = null,
     val resolvedTopologyProvenance: ResolvedTopologyProvenance? = null,
+    /** Core-computed presentation partition; authoritative faces and orbits remain unchanged. */
+    val coplanarFaces: List<CoplanarFacePatch> = emptyList(),
 )  {
     val vs: List<Vertex> = mutableVertices
     val fs: List<Face> = mutableFaces
@@ -53,6 +55,15 @@ class Polyhedron(
     }
     val resolvedFaces: List<ResolvedFaceGeometry> by lazy {
         resolvedFaceGeometry ?: fs.map(::resolveFaceGeometry)
+    }
+    val coplanarFacesBySource: Map<Int, List<CoplanarFacePatch>> by lazy {
+        coplanarFaces.flatMap { patch -> patch.sourceFaceIds.map { it to patch } }
+            .groupBy({ it.first }, { it.second })
+    }
+    val hasOppositeCoplanarFaces: Boolean by lazy {
+        coplanarFaces.any { patch -> patch.sourceFaceIds.any { id ->
+            fs[id] * fs[patch.sourceFaceIds.first()] < 0.0
+        } }
     }
 
     // `build edges (unidirectional & directed) and link them with vertices and faces

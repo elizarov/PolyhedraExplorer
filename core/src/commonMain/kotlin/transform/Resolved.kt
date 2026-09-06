@@ -2,6 +2,9 @@ package polyhedra.core.transform
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import polyhedra.core.poly.PlanarCut
+import polyhedra.core.poly.addPlanarCut
+import polyhedra.core.poly.partitionBy
 import polyhedra.core.poly.analyzeGeometry
 import polyhedra.core.poly.polyhedron
 import polyhedra.core.poly.validateProperGeometry
@@ -193,7 +196,7 @@ private suspend fun resolveBoundary(
     require(source.isNotEmpty()) { "Resolved requires presentation triangles" }
     val windingClassifier = WindingClassifier(source, tolerance)
 
-    val cuts = List(source.size) { mutableListOf<CutLine>() }
+    val cuts = List(source.size) { mutableListOf<PlanarCut>() }
     val coplanarParents = IntArray(source.size) { it }
     fun coplanarRoot(index: Int): Int {
         var current = index
@@ -239,7 +242,7 @@ private suspend fun resolveBoundary(
     // Every overlapping coplanar source must see the same arrangement lines, including cuts
     // introduced by third-party faces. Otherwise identical material gets incompatible partitions.
     for (group in source.indices.groupBy(::coplanarRoot).values) if (group.size > 1) {
-        val combined = arrayListOf<CutLine>()
+        val combined = arrayListOf<PlanarCut>()
         for (index in group) for (cut in cuts[index]) if (combined.none {
             (it.normal - cut.normal).norm <= EPS * 32.0 && abs(it.distance - cut.distance) <= tolerance
         }) combined += cut
@@ -480,84 +483,14 @@ private fun List<Vec3>.minMaxAlong(origin: Vec3, direction: Vec3): Pair<Double, 
     return values.minOrNull()!! to values.maxOrNull()!!
 }
 
-private data class CutLine(val normal: Vec3, val distance: Double)
-
-private fun MutableList<CutLine>.addCut(
+private fun MutableList<PlanarCut>.addCut(
     triangle: SourceTriangle,
     segment: Segment3,
     tolerance: Double,
-) {
-    val direction = segment.b - segment.a
-    var normal = (direction cross triangle.normal).unit
-    var distance = normal * segment.a
-    if (distance < -tolerance || abs(distance) <= tolerance &&
-        listOf(normal.x, normal.y, normal.z).firstOrNull { abs(it) > EPS }?.let { it < 0.0 } == true
-    ) {
-        normal = normal * -1.0
-        distance = -distance
-    }
-    if (none { existing ->
-            (existing.normal - normal).norm <= EPS * 32.0 && abs(existing.distance - distance) <= tolerance
-        }
-    ) add(CutLine(normal, distance))
-}
+) = addPlanarCut(triangle.normal, segment.a, segment.b, tolerance)
 
-private fun SourceTriangle.splitBy(cuts: List<CutLine>, tolerance: Double): List<List<Vec3>> {
-    var polygons = listOf(listOf(a, b, c))
-    for (cut in cuts.sortedWith(compareBy(CutLine::distance, { it.normal.x }, { it.normal.y }, { it.normal.z }))) {
-        polygons = polygons.flatMap { polygon -> polygon.splitBy(cut, tolerance) }
-    }
-    return polygons
-}
-
-private fun List<Vec3>.splitBy(cut: CutLine, tolerance: Double): List<List<Vec3>> {
-    val distances = map { point -> cut.normal * point - cut.distance }
-    if (distances.none { it > tolerance } || distances.none { it < -tolerance }) return listOf(this)
-
-    fun clipped(positive: Boolean): List<Vec3> {
-        val result = ArrayList<Vec3>()
-        for (index in indices) {
-            val a = this[index]
-            val b = this[(index + 1) % size]
-            val da = distances[index]
-            val db = distances[(index + 1) % size]
-            val aInside = if (positive) da >= -tolerance else da <= tolerance
-            val bInside = if (positive) db >= -tolerance else db <= tolerance
-            if (aInside) result += a
-            if (aInside != bInside && abs(da - db) > tolerance) {
-                result += a + (b - a) * (da / (da - db))
-            }
-        }
-        return result.cleanPolygon(tolerance)
-    }
-
-    return listOf(clipped(true), clipped(false)).filter { it.size >= 3 }
-}
-
-private fun List<Vec3>.cleanPolygon(tolerance: Double): List<Vec3> {
-    val result = ArrayList<Vec3>()
-    for (point in this) {
-        if (result.isEmpty() || (result.last() - point).norm > tolerance) result += point
-    }
-    if (result.size > 1 && (result.first() - result.last()).norm <= tolerance) result.removeLast()
-    var changed = true
-    while (changed && result.size > 3) {
-        changed = false
-        for (index in result.indices) {
-            val previous = result[(index + result.size - 1) % result.size]
-            val current = result[index]
-            val next = result[(index + 1) % result.size]
-            if (((current - previous) cross (next - current)).norm <= tolerance *
-                maxOf((current - previous).norm, (next - current).norm)
-            ) {
-                result.removeAt(index)
-                changed = true
-                break
-            }
-        }
-    }
-    return result
-}
+private fun SourceTriangle.splitBy(cuts: List<PlanarCut>, tolerance: Double): List<List<Vec3>> =
+    listOf(a, b, c).partitionBy(cuts, tolerance)
 
 private data class OrientedTriangle(
     val a: Vec3,

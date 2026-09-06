@@ -96,6 +96,7 @@ data class CoreResponse(
     val animation: List<CoreAnimationStep> = emptyList(),
     val geometryAnalysis: CoreGeometryAnalysis? = null,
     val resolvedRims: List<polyhedra.model.poly.ResolvedRimGeometry> = emptyList(),
+    val coplanarRimFaces: List<polyhedra.model.poly.CoplanarFacePatch> = emptyList(),
 )
 
 val CoreJson = Json {

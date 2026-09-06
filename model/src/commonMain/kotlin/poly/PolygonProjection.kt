@@ -8,7 +8,9 @@ import polyhedra.model.util.*
 import kotlin.math.abs
 
 class PolygonProjection(
-    val vs: List<Vec3>
+    val vs: List<Vec3>,
+    /** The same basis for derived presentation pieces, not a refit of each piece. */
+    val project: (Vec3) -> Vec3 = { it },
 ) : Comparable<PolygonProjection> {
     override fun compareTo(other: PolygonProjection): Int =
         VertexListApproxComparator.compare(vs, other.vs)
@@ -42,15 +44,15 @@ private fun computeProjectionFigureAt(plane: Plane, vs: List<Vec3>, i: Int): Pol
     if (v0 approx c) return PolygonProjection.Empty
     val n = vs.size
     val ux = (v0 - c).unit
+    fun project(point: Vec3): Vec3 {
+        val v = point - c
+        return Vec3(ux * v, (ux cross v) * plane, ux * plane)
+    }
     val list = ArrayList<Vec3>(n)
     for (j in 0 until n) {
-        val v = vs[(i + j) % n] - c
-        val x = ux * v
-        val y = (ux cross v) * plane
-        val z = ux * plane
-        list += Vec3(x, y, z)
+        list += project(vs[(i + j) % n])
     }
-    return PolygonProjection(list)
+    return PolygonProjection(list, ::project)
 }
 
 private fun computeProjectionFigure(plane: Plane, vs: List<Vec3>): PolygonProjection =
@@ -97,12 +99,11 @@ private fun Face.computeEdgeProjection(
             .maxBy { abs(it) }
     }
     if (side * targetSide < 0.0) horizontal = -horizontal
-    return PolygonProjection(
-        fvs.map { vertex ->
-            val offset = vertex - edgeCenter
-            Vec3(offset * horizontal, offset * vertical, 0.0)
-        },
-    )
+    fun project(point: Vec3): Vec3 {
+        val offset = point - edgeCenter
+        return Vec3(offset * horizontal, offset * vertical, 0.0)
+    }
+    return PolygonProjection(fvs.map(::project), ::project)
 }
 
 // use dual to compute vertex figure

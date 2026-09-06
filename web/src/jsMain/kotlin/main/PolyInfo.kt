@@ -176,7 +176,7 @@ private fun FacesPopup(params: RenderParams, poly: Polyhedron) {
                         Td { Text(poly.faceKindCount[kind].toString()) }
                         Td { Text(essence.dist.fmtFix) }
                         Td {
-                            SvgPolygon("figure", essence.figure, PolyStyle.edgeColor, PolyStyle.faceColor(face))
+                            SvgFaceFigure("figure", poly, face, PolyStyle.edgeColor)
                         }
                         Td(attrs = { classes("rt") }) { Text("adj") }
                         Td { Text(essence.vfs.size.toString()) }
@@ -259,7 +259,7 @@ private fun EdgesPopup(params: RenderParams, poly: Polyhedron) {
                         Td(attrs = { classes("rt"); attr("colspan", "2") }) { Text(kind.toString()) }
                         Td { Text(poly.edgeKindCount[kind].toString()) }
                         Td { Text(essence.dist.fmtFix) }
-                        Td { SvgEdgeNet("figure edge-figure", edge, PolyStyle.edgeColor) }
+                        Td { SvgEdgeNet("figure edge-figure", edge, PolyStyle.edgeColor, poly) }
                         Td { Text("len ${essence.len.fmtFix}") }
                         Td(attrs = { classes("fill") }) { Text("∠ ${essence.dihedralAngle.toDegrees().fmtFix(2)}°") }
                         OrbitTargetActions(params.poly, kind)
