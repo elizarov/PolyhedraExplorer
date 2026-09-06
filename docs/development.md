@@ -82,6 +82,12 @@ including neighboring cells and an exact distance check. This keeps large tessel
 practical without weakening their geometry checks or extending test timeouts. The spatial check is
 tested against an independent all-pairs reference, including compound members and cell boundaries.
 
+Large STL-output regressions validate the indexed triangles directly: finite coordinates, valid
+indices, nondegenerate triangles, two opposite uses per edge, one connected fan per vertex,
+component-aware vertex separation, and positive signed volume. They do not reconstruct a second
+full `Polyhedron` and resolve every already-triangular face. Corrupted mesh fixtures separately
+test this compact validator, including open edges, overused edges, reversed faces, and pinched fans.
+
 Serve `build/dist/browser/development` or `build/dist/browser/production` over HTTP. A minimal local server is:
 
 ```shell

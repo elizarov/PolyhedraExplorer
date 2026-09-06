@@ -238,7 +238,7 @@ class StlApiTest {
         }
 
         assertNull(response.error, response.error?.reason)
-        response.toValidationPolyhedron().validateMeshGeometry()
+        response.validateIndexedStl()
         assertTrue(response.signedVolume6() > 0.0)
         return AlgorithmTiming("Hidden-rim Greatened 5 Truncated icosahedron STL", elapsed, 30.seconds)
     }
