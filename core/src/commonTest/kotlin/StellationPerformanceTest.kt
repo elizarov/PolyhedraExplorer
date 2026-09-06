@@ -3,6 +3,7 @@ package polyhedra.core
 import kotlinx.coroutines.test.runTest
 import polyhedra.core.api.evaluateCore
 import polyhedra.core.poly.DeltoidalHexecontahedron
+import polyhedra.core.poly.Icosahedron
 import polyhedra.core.poly.Seed
 import polyhedra.core.poly.validateProperGeometry
 import polyhedra.core.poly.validateRenderableImmersion
@@ -26,10 +27,14 @@ import kotlin.time.measureTimedValue
 class StellationPerformanceTest {
     @Test
     fun deltoidalHexecontahedronStellationCompletesQuickly() = runTest {
+        val source = Seed.DeltoidalHexecontahedron.poly
+        // Measure uncached stellation, not seed construction or first-use runtime linkage.
+        // A smaller constellation warms the same kernel; clearing the cache keeps the measured
+        // enumeration independent of both this warm-up and test execution order.
+        Seed.Icosahedron.poly.stellationCandidatesAsync(ConstellationOperation.Stellate)
         clearStellationCandidateCache()
         val (candidates, duration) = measureTimedValue {
-            Seed.DeltoidalHexecontahedron.poly
-                .stellationCandidatesAsync(ConstellationOperation.Stellate)
+            source.stellationCandidatesAsync(ConstellationOperation.Stellate)
         }
 
         assertEquals(30, candidates.size)

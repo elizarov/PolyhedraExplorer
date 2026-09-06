@@ -65,6 +65,13 @@ val jvmTestCompilation = kotlin.targets.getByName<org.jetbrains.kotlin.gradle.ta
 val jvmMainCompilation = kotlin.targets.getByName<org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget>("jvm")
     .compilations.getByName("main")
 
+tasks.named<Test>("jvmTest") {
+    // Wall-clock algorithm regressions must not compete with webpack/Chrome on shared CI CPUs.
+    // This only orders a combined `test` run; focused JVM runs do not acquire a browser dependency.
+    mustRunAfter(":web:jsBrowserTest")
+    testLogging.exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+}
+
 val inspectedConfiguration = providers.gradleProperty("inspectConfigurationBase64")
     .map { encoded -> String(Base64.getDecoder().decode(encoded), StandardCharsets.UTF_8) }
     .orElse(providers.gradleProperty("inspectConfiguration"))

@@ -40,6 +40,12 @@ Gradle manages the Node.js runtime used by Kotlin JS/Wasm tasks. No global Node 
 
 Prefer the root `test` task during development: it runs the complete core suite on the JVM for fast algorithm feedback and the web module's JS browser tests for UI coverage. It is deliberately the same test gate used by the release workflow. Release validation then relies on the focused production acceptance test for WasmGC integration rather than repeating the exhaustive core suite in every runtime.
 
+In a combined run, JVM tests wait for the browser tests so timing regressions do not compete with
+webpack and Chrome for CPU. Focused `:core:jvmTest` runs remain JVM-only; compilation can still run
+in parallel. Stellation timing excludes seed construction and first-use runtime linkage; a smaller
+constellation warms the kernel before its result cache is cleared for the measured enumeration.
+Test failures include full assertion details in CI logs.
+
 The opt-in STL campaign uses seed `20260813` by default and accepts
 `-PstlStressCases=<count>` and `-PstlStressSeed=<seed>`. Its current 10,000-case corpus produces
 3,906 independently validated solids and 6,094 documented topology rejections, with no invalid
